@@ -35,6 +35,12 @@ const TIERS = [
     file: 'tier4-scenarios.test.js',
     scope: 'Full Day Event Lifecycle (Booth Opening -> Catalog -> Sales -> KPIs -> Audit -> Cash Closing)',
   },
+  {
+    tier: 'TIER 5',
+    name: 'Multimodal AI Sales & Intelligent Assistant',
+    file: 'tier5-ai-sales.test.js',
+    scope: 'AI Chat Guardrails, Natural Language Sales Dictation, Draft Extractor, POS Assembling, Real-time Metrics',
+  },
 ];
 
 const colors = {
