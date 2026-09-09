@@ -75,23 +75,23 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
   };
 
   return (
-    <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-4">
+    <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-4 text-white max-w-2xl mx-auto">
       {/* Encabezado */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
         <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-amber-400" />
-          <h3 className="font-bold text-sm text-slate-100 uppercase tracking-wider">
+          <Receipt className="w-4 h-4 text-white" />
+          <h3 className="font-bold text-sm text-white uppercase tracking-wider">
             Ventas Recientes del Evento ({sales.length})
           </h3>
         </div>
-        <span className="text-[11px] text-slate-500">
-          Haz clic en <strong className="text-amber-400">Editar</strong> para corregir método de pago o detalles
+        <span className="text-[11px] text-neutral-400">
+          Haz clic en <strong className="text-white">Editar</strong> para corregir
         </span>
       </div>
 
       {/* Toast de Éxito */}
       {successToast && (
-        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="font-medium">{successToast}</span>
         </div>
@@ -99,12 +99,12 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
 
       {/* Listado */}
       {isLoading && sales.length === 0 ? (
-        <div className="py-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
-          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+        <div className="py-8 text-center text-neutral-500 text-xs flex flex-col items-center justify-center gap-2">
+          <Loader2 className="w-5 h-5 text-white animate-spin" />
           <span>Cargando ventas recientes...</span>
         </div>
       ) : sales.length === 0 ? (
-        <div className="py-8 text-center text-slate-500 text-xs">
+        <div className="py-8 text-center text-neutral-500 text-xs">
           Aún no se han registrado ventas en este evento. Realiza una venta arriba para verla aquí.
         </div>
       ) : (
@@ -112,7 +112,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
           {sales.map((sale) => (
             <div
               key={sale.id}
-              className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+              className="p-3.5 rounded-2xl bg-black border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
             >
               {/* Información principal de la venta */}
               <div className="space-y-1.5 flex-1 min-w-0">

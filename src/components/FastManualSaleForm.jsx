@@ -256,42 +256,42 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   };
 
   return (
-    <div className="glass-card p-4 sm:p-5 rounded-2xl border border-slate-700/80 shadow-2xl space-y-5">
+    <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-6 text-white max-w-2xl mx-auto">
       {/* Cabecera del Formulario Manual */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
         <div>
-          <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
-            <ShoppingBag className="w-4 h-4 text-amber-400" />
+          <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-white" />
             Registro de Venta Manual Rápida
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-neutral-400">
             Llama cualquier póster del catálogo web oficial, selecciona tamaño y cobra en segundos
           </p>
         </div>
-        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-amber-400">
+        <span className="text-xs font-bold px-3 py-1 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300">
           Stand POS
         </span>
       </div>
 
       {errorMsg && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold">
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-400 text-xs font-semibold">
           ⚠️ {errorMsg}
         </div>
       )}
 
       {/* SECCIÓN 1: CAMPO ÚNICO DE BÚSQUEDA Y LLAMADA DE PÓSTERS */}
       <div className="relative">
-        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+        <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
           <span>1. Llamar Póster del Catálogo Web (233 Obras)</span>
           {isSearching && (
-            <span className="text-[10px] text-amber-400 font-normal flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" /> Buscando en PostgreSQL...
+            <span className="text-[10px] text-neutral-400 font-normal flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin text-white" /> Buscando...
             </span>
           )}
         </label>
 
         <div className="relative">
-          <Search className="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             ref={searchInputRef}
             type="text"
@@ -301,7 +301,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             onFocus={() => {
               if (searchResults.length > 0) setShowDropdown(true);
             }}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 font-medium"
+            className="w-full bg-black border border-neutral-700/90 rounded-full pl-11 pr-11 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
           />
           {searchQuery && (
             <button
@@ -311,7 +311,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                 setSelectedPoster(null);
                 setShowDropdown(false);
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -320,30 +320,30 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
         {/* Desplegable de Resultados de Búsqueda */}
         {showDropdown && searchResults.length > 0 && (
-          <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar">
+          <div className="absolute z-30 left-0 right-0 mt-1.5 bg-black border border-neutral-800 rounded-2xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar">
             {searchResults.map((p) => (
               <div
                 key={p.id}
                 onClick={() => handleSelectPoster(p)}
-                className="p-2.5 hover:bg-slate-800 flex items-center justify-between gap-3 cursor-pointer border-b border-slate-800/60 transition-colors"
+                className="p-2.5 hover:bg-neutral-900 flex items-center justify-between gap-3 cursor-pointer border-b border-neutral-800/60 transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <img
                     src={p.thumbUrl || p.imageUrl}
                     alt=""
-                    className="w-9 h-12 object-cover rounded-md border border-slate-700 shrink-0 bg-slate-950"
+                    className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900"
                   />
                   <div className="truncate">
-                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                       {p.categoria || 'ARTE'}
                     </span>
-                    <span className="font-bold text-xs text-slate-100 block truncate">{p.titulo}</span>
-                    <span className="text-[10px] text-slate-400 block truncate">{p.subtitulo || ''}</span>
+                    <span className="font-bold text-xs text-white block truncate">{p.titulo}</span>
+                    <span className="text-[10px] text-neutral-400 block truncate">{p.subtitulo || ''}</span>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
-                  <span className="text-[10px] text-slate-400 block">Desde</span>
+                  <span className="text-[10px] text-neutral-400 block">Desde</span>
                   <span className="text-xs font-black text-emerald-400">Q{p.precioMinimo}</span>
                 </div>
               </div>
@@ -354,27 +354,27 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
       {/* SECCIÓN 2: SELECTOR DE TAMAÑO Y CANTIDAD DEL PÓSTER SELECCIONADO */}
       {selectedPoster && (
-        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/50 space-y-3 animate-fadeIn">
+        <div className="p-4 rounded-2xl bg-black border border-neutral-700 space-y-3.5 animate-fadeIn">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <img
                 src={selectedPoster.thumbUrl || selectedPoster.imageUrl}
                 alt=""
-                className="w-12 h-16 object-cover rounded-lg border border-slate-700 shadow-md shrink-0 bg-slate-950"
+                className="w-12 h-16 object-cover rounded-lg border border-neutral-700 shadow-md shrink-0 bg-neutral-900"
               />
               <div>
-                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
                   {selectedPoster.categoria}
                 </span>
-                <h4 className="font-bold text-sm text-slate-100">{selectedPoster.titulo}</h4>
-                <p className="text-xs text-slate-400">{selectedPoster.subtitulo}</p>
+                <h4 className="font-bold text-sm text-white">{selectedPoster.titulo}</h4>
+                <p className="text-xs text-neutral-400">{selectedPoster.subtitulo}</p>
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => setSelectedPoster(null)}
-              className="text-slate-400 hover:text-red-400 p-1 cursor-pointer"
+              className="text-neutral-400 hover:text-white p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -382,10 +382,10 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Desplegar / Seleccionar Tamaño */}
           <div>
-            <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5 text-amber-400" /> Desplegar Tamaño y Precio:
+            <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+              <Tag className="w-3.5 h-3.5 text-white" /> Desplegar Tamaño y Precio:
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(selectedPoster.sizes || DEFAULT_SIZES).map((sz) => {
                 const isSelected = selectedSize?.sizeId === sz.sizeId;
                 return (
@@ -393,16 +393,16 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                     key={sz.sizeId}
                     type="button"
                     onClick={() => setSelectedSize(sz)}
-                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md font-black'
-                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        ? 'bg-white text-black border-white shadow-md font-black'
+                        : 'bg-[#181818] border-neutral-800 text-neutral-300 hover:border-neutral-600'
                     }`}
                   >
                     <span className="text-xs font-bold block">{sz.nombre || sz.sizeId}</span>
                     <span
                       className={`text-xs ${
-                        isSelected ? 'text-slate-950 font-black' : 'text-emerald-400 font-extrabold'
+                        isSelected ? 'text-black font-black' : 'text-emerald-400 font-extrabold'
                       }`}
                     >
                       Q {Number(sz.precio).toFixed(2)}
@@ -414,22 +414,22 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           </div>
 
           {/* Cantidad y Botón de Agregar */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-2 border-t border-neutral-800">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400">Cantidad:</span>
-              <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-700">
+              <span className="text-xs font-bold text-neutral-400">Cantidad:</span>
+              <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-700">
                 <button
                   type="button"
                   onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                  className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                  className="text-neutral-400 hover:text-white p-0.5 cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-6 text-center font-bold text-sm text-slate-200">{itemQuantity}</span>
+                <span className="w-6 text-center font-bold text-sm text-white">{itemQuantity}</span>
                 <button
                   type="button"
                   onClick={() => setItemQuantity(itemQuantity + 1)}
-                  className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                  className="text-neutral-400 hover:text-white p-0.5 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -439,7 +439,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             <button
               type="button"
               onClick={handleAddItemToTicket}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-transform active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Agregar al Ticket (Q {(itemQuantity * (selectedSize?.precio || 0)).toFixed(2)})</span>
@@ -450,13 +450,13 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
       {/* SECCIÓN 3: TICKET DE LA VENTA EN CURSO */}
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+        <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center justify-between">
           <span>2. Pósters en la Venta ({cartItems.length})</span>
           {cartItems.length > 0 && (
             <button
               type="button"
               onClick={() => setCartItems([])}
-              className="text-[11px] text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+              className="text-[11px] text-neutral-500 hover:text-red-400 transition-colors cursor-pointer"
             >
               Limpiar Venta
             </button>
@@ -464,7 +464,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         </label>
 
         {cartItems.length === 0 ? (
-          <div className="p-6 rounded-xl border border-dashed border-slate-800 text-center text-xs text-slate-500">
+          <div className="p-6 rounded-2xl border border-dashed border-neutral-800 text-center text-xs text-neutral-500">
             No has agregado pósters aún. Llama una obra arriba para agregarla a esta venta.
           </div>
         ) : (
@@ -472,18 +472,18 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             {cartItems.map((item) => (
               <div
                 key={item.id}
-                className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs"
               >
                 {item.thumbUrl && (
                   <img
                     src={item.thumbUrl}
                     alt=""
-                    className="w-8 h-11 object-cover rounded-md border border-slate-700 shrink-0 bg-slate-950"
+                    className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900"
                   />
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-slate-100 block truncate">{item.description}</span>
+                  <span className="font-semibold text-white block truncate">{item.description}</span>
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     {(item.availableSizes || DEFAULT_SIZES).map((sz) => {
                       const isSel = item.selectedSizeId === sz.sizeId || item.unitPrice === sz.precio;
@@ -492,10 +492,10 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                           key={sz.sizeId}
                           type="button"
                           onClick={() => changeTicketItemSize(item.id, sz)}
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
                             isSel
-                              ? 'bg-amber-500 text-slate-950'
-                              : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                              ? 'bg-white text-black'
+                              : 'bg-[#181818] text-neutral-400 hover:text-white'
                           }`}
                         >
                           {sz.nombre || sz.sizeId} (Q{sz.precio})
@@ -506,19 +506,19 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                 </div>
 
                 {/* Cantidad */}
-                <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 shrink-0">
+                <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-800 shrink-0">
                   <button
                     type="button"
                     onClick={() => updateTicketQty(item.id, -1)}
-                    className="text-slate-400 hover:text-white cursor-pointer"
+                    className="text-neutral-400 hover:text-white cursor-pointer"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
-                  <span className="w-4 text-center font-bold text-slate-200">{item.quantity}</span>
+                  <span className="w-4 text-center font-bold text-white">{item.quantity}</span>
                   <button
                     type="button"
                     onClick={() => updateTicketQty(item.id, 1)}
-                    className="text-slate-400 hover:text-white cursor-pointer"
+                    className="text-neutral-400 hover:text-white cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -531,7 +531,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                 <button
                   type="button"
                   onClick={() => removeTicketItem(item.id)}
-                  className="text-slate-500 hover:text-red-400 p-1 cursor-pointer"
+                  className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -543,55 +543,55 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
       {/* SECCIÓN 4: DESPLEGAR MÉTODO DE PAGO */}
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+        <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block">
           3. Desplegar Método de Pago (1 Toque)
         </label>
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setPaymentMethod('EFECTIVO')}
-            className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 p-3 rounded-2xl border font-bold text-xs transition-all cursor-pointer ${
               paymentMethod === 'EFECTIVO'
-                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                ? 'bg-white text-black border-white shadow-md font-black'
+                : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-600'
             }`}
           >
-            <Banknote className="w-4 h-4 text-emerald-400" />
+            <Banknote className="w-4 h-4" />
             <span>💵 Efectivo</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPaymentMethod('TARJETA')}
-            className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 p-3 rounded-2xl border font-bold text-xs transition-all cursor-pointer ${
               paymentMethod === 'TARJETA'
-                ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-md'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                ? 'bg-white text-black border-white shadow-md font-black'
+                : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-600'
             }`}
           >
-            <CreditCard className="w-4 h-4 text-blue-400" />
+            <CreditCard className="w-4 h-4" />
             <span>💳 Tarjeta</span>
           </button>
 
           <button
             type="button"
             onClick={() => setPaymentMethod('TRANSFERENCIA')}
-            className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 p-3 rounded-2xl border font-bold text-xs transition-all cursor-pointer ${
               paymentMethod === 'TRANSFERENCIA'
-                ? 'bg-purple-500/20 border-purple-500 text-purple-400 shadow-md'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                ? 'bg-white text-black border-white shadow-md font-black'
+                : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-600'
             }`}
           >
-            <Smartphone className="w-4 h-4 text-purple-400" />
+            <Smartphone className="w-4 h-4" />
             <span>📲 Transfer</span>
           </button>
         </div>
       </div>
 
       {/* SECCIÓN 5: DESCUENTO, NOTAS Y TOTAL FINAL */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-800">
         <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
             Descuento Opcional (Q)
           </label>
           <input
@@ -599,12 +599,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             min="0"
             value={discount}
             onChange={(e) => setDiscount(Number(e.target.value))}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+            className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white"
           />
         </div>
 
         <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
             Nota / Cliente
           </label>
           <input
@@ -612,15 +612,15 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             placeholder="Ej. Promoción 2x1, amigo..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+            className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white"
           />
         </div>
       </div>
 
       {/* TOTAL Y BOTÓN DE ASENTAR VENTA */}
-      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="p-5 rounded-2xl bg-black border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <span className="text-xs text-slate-400 font-medium block">Total a Cobrar:</span>
+          <span className="text-xs text-neutral-400 font-medium block">Total a Cobrar:</span>
           <span className="text-2xl sm:text-3xl font-black text-emerald-400">
             Q {grandTotal.toFixed(2)}
           </span>
@@ -630,7 +630,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           type="button"
           onClick={handleSubmitSale}
           disabled={isSubmitting || cartItems.length === 0}
-          className="w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20 disabled:opacity-40 transition-all cursor-pointer"
+          className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 disabled:opacity-40 transition-all cursor-pointer"
         >
           {isSubmitting ? (
             <>

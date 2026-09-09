@@ -72,8 +72,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Header Superior con Métricas y Navegación Principal */}
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
+      {/* Header Superior Blanco con STAND {IA} */}
       <Header
         activeEvent={activeEvent}
         activeTab={activeTab}
@@ -81,8 +81,8 @@ export default function App() {
         liveMetrics={liveMetrics}
       />
 
-      {/* Contenedor Principal */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      {/* Contenedor Principal Centrado */}
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-8">
         {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) */}
         {activeTab === 'venta' && (
           <div className="space-y-6">

@@ -561,82 +561,69 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   };
 
   return (
-    <div className="glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden flex flex-col h-[460px] sm:h-[490px] relative">
-      {/* Cabecera del Chat */}
-      <div className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 font-black text-xs shadow-md">
-            <Bot className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 leading-none">
-              Jarvis de Ventas IA
-              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                Gemini 3.8
-              </span>
-            </h3>
-            <span className="text-[10px] text-slate-400">Dictado por voz, fotos y catálogo de 233 pósters</span>
-          </div>
+    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border border-neutral-800 shadow-2xl overflow-hidden flex flex-col bg-black relative">
+      {/* Cabecera de la Tarjeta (Blanco Puro) */}
+      <div className="bg-white px-5 sm:px-7 py-3.5 sm:py-4 flex items-center justify-between border-b border-neutral-200 select-none shrink-0">
+        {/* Izquierda: Squircle Negro con Icono Origami {IA} */}
+        <div className="flex items-center gap-3">
+          <img
+            src="/brand/icon-chat-header.png"
+            alt="IA"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl object-cover shadow-sm"
+          />
         </div>
 
-        {/* Píldoras Rápidas de Consulta */}
-        <div className="hidden sm:flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleSendText('¿Cuánto llevamos vendido hoy?')}
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer"
-          >
-            💰 Ventas Hoy
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSendText('¿Cuáles son los pósters más vendidos?')}
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer"
-          >
-            ⭐ Top Obras
-          </button>
+        {/* Centro: Título Grande "Asistente IA" */}
+        <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight font-sans text-center">
+          Asistente IA
+        </h2>
+
+        {/* Derecha: Badge ON LINE con Borde Esmeralda */}
+        <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-emerald-500 bg-white text-emerald-600 font-extrabold text-xs tracking-wide shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>ON LINE</span>
         </div>
       </div>
 
-      {/* Historial de Mensajes con Scroll */}
-      <div className="flex-1 p-3 overflow-y-auto space-y-3 no-scrollbar text-xs">
+      {/* Historial de Mensajes (Fondo Negro Puro) */}
+      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 no-scrollbar bg-black min-h-[380px] max-h-[460px]">
         {messages.map((m) => (
           <div key={m.id} className="space-y-2">
-            <div className={`flex items-start gap-2 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex items-start gap-2.5 sm:gap-3 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               {m.sender === 'ai' && (
-                <div className="w-5 h-5 rounded-md bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
-                  <Sparkles className="w-3 h-3" />
+                <div className="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 mt-0.5 shadow-sm select-none">
+                  <img src="/brand/icon-chat-avatar.png" alt="IA" className="w-6 h-6 object-contain" />
                 </div>
               )}
               <div
-                className={`max-w-[85%] rounded-xl px-3 py-2 leading-relaxed ${
+                className={`max-w-[85%] sm:max-w-[80%] rounded-[24px] px-4 sm:px-5 py-3 sm:py-3.5 leading-relaxed text-xs sm:text-sm ${
                   m.sender === 'user'
-                    ? 'bg-amber-500 text-slate-950 font-semibold shadow-md shadow-amber-500/10'
-                    : 'bg-slate-900/90 text-slate-200 border border-slate-800 shadow-sm'
+                    ? 'bg-[#303030] text-white border border-neutral-700 shadow-md'
+                    : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{m.text}</div>
 
                 {/* Tarjetas de Sugerencias Visuales de Catálogo */}
                 {m.suggestedPosters && m.suggestedPosters.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-1.5">
-                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                  <div className="mt-3 pt-3 border-t border-neutral-700/70 space-y-2">
+                    <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider block">
                       🎨 Obras encontradas en catálogo ({m.suggestedPosters.length}):
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {m.suggestedPosters.map((sp) => (
                         <div
                           key={sp.id}
-                          className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950/90 border border-slate-800 hover:border-amber-500/50 transition-all shadow-sm"
+                          className="flex items-center gap-2.5 p-2 rounded-xl bg-black border border-neutral-700 hover:border-neutral-500 transition-all shadow-sm"
                         >
                           <img
                             src={sp.thumbUrl || sp.imageUrl}
                             alt={sp.titulo}
-                            className="w-10 h-14 object-cover rounded-md border border-slate-700/80 shrink-0 bg-slate-900 shadow"
+                            className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900 shadow"
                           />
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold text-xs text-slate-100 block truncate">{sp.titulo}</span>
-                            <span className="text-[10px] text-slate-400 block truncate">{sp.subtitulo || sp.categoria}</span>
+                            <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
+                            <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
                             <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
                               Desde Q{sp.precioMinimo}
                             </span>
@@ -644,7 +631,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                           <button
                             type="button"
                             onClick={() => addPosterToDraft(sp)}
-                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-md text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95"
+                            className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95"
                           >
                             + Vender
                           </button>
@@ -656,7 +643,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
 
                 <div
                   className={`text-[9px] mt-1 text-right ${
-                    m.sender === 'user' ? 'text-slate-900/70 font-bold' : 'text-slate-500'
+                    m.sender === 'user' ? 'text-neutral-400' : 'text-neutral-500'
                   }`}
                 >
                   {m.timestamp}
@@ -668,22 +655,22 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
 
         {/* Tarjeta de Borrador Detectado Human-in-the-Loop */}
         {pendingDraft && (
-          <div className="p-3 rounded-xl bg-slate-900 border-2 border-amber-500/80 shadow-2xl space-y-2.5 animate-fadeIn">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                <ShoppingBag className="w-3.5 h-3.5" /> Venta Detectada por IA
+          <div className="p-4 rounded-[26px] bg-[#1a1a1a] border-2 border-emerald-500/80 shadow-2xl space-y-3 animate-fadeIn text-white">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <ShoppingBag className="w-4 h-4" /> Venta Detectada por IA
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400">
-                  Canal: <strong className="text-slate-200">{pendingDraft.inputChannel}</strong>
+                <span className="text-[10px] text-neutral-400">
+                  Canal: <strong className="text-white">{pendingDraft.inputChannel}</strong>
                 </span>
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="text-slate-500 hover:text-red-400 p-0.5 rounded transition-colors cursor-pointer"
+                  className="text-neutral-400 hover:text-red-400 p-1 rounded transition-colors cursor-pointer"
                   title="Descartar borrador"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -692,31 +679,31 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
               {pendingDraft.items.map((it, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between gap-2.5 p-2 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px]"
+                  className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-black border border-neutral-800 text-xs"
                 >
-                  {/* Miniatura WebP con borde */}
+                  {/* Miniatura WebP */}
                   <img
                     src={it.thumbUrl || it.imageUrl}
                     alt=""
-                    className="w-10 h-13 object-cover rounded-md border border-slate-700 shrink-0 bg-slate-900"
+                    className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900"
                   />
 
                   {/* Detalle y selector de tamaño */}
                   <div className="flex-1 min-w-0">
-                    <span className="font-bold text-slate-200 block truncate">
+                    <span className="font-bold text-white block truncate">
                       {it.baseTitle || it.description}
                     </span>
-                    <span className="text-[9px] text-amber-400 uppercase font-semibold block">
+                    <span className="text-[9px] text-neutral-400 uppercase font-semibold block">
                       {it.category || 'ARTE'}
                     </span>
 
                     {/* Selector de tamaño interactivo */}
                     <div className="flex items-center gap-1.5 mt-1">
-                      <label className="text-[10px] text-slate-400 font-medium">Tamaño:</label>
+                      <label className="text-[10px] text-neutral-400 font-medium">Tamaño:</label>
                       <select
                         value={it.sizeId || 'MEDIANO'}
                         onChange={(e) => updateDraftItemSize(idx, e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-amber-300 font-bold focus:outline-none focus:border-amber-400 cursor-pointer"
+                        className="bg-[#222222] border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-white font-bold focus:outline-none focus:border-white cursor-pointer"
                       >
                         {(it.availableSizes && it.availableSizes.length > 0
                           ? it.availableSizes
@@ -733,7 +720,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                     <button
                       type="button"
                       onClick={() => openSwapModal(idx)}
-                      className="text-[10px] text-slate-400 hover:text-amber-400 flex items-center gap-1 underline transition-colors cursor-pointer mt-1"
+                      className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 underline transition-colors cursor-pointer mt-1"
                     >
                       <RefreshCw className="w-2.5 h-2.5" /> Cambiar diseño
                     </button>
@@ -741,19 +728,19 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
 
                   {/* Cantidad y Subtotal */}
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded p-0.5">
+                    <div className="flex items-center gap-1 bg-[#222] border border-neutral-700 rounded-lg p-0.5">
                       <button
                         type="button"
                         onClick={() => updateDraftItemQty(idx, -1)}
-                        className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-slate-800 cursor-pointer"
+                        className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer"
                       >
                         <Minus className="w-2.5 h-2.5" />
                       </button>
-                      <span className="font-bold text-xs text-slate-200 px-1">{it.quantity}</span>
+                      <span className="font-bold text-xs text-white px-1">{it.quantity}</span>
                       <button
                         type="button"
                         onClick={() => updateDraftItemQty(idx, 1)}
-                        className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-slate-800 cursor-pointer"
+                        className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer"
                       >
                         <Plus className="w-2.5 h-2.5" />
                       </button>
@@ -766,7 +753,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                     <button
                       type="button"
                       onClick={() => removeDraftItem(idx)}
-                      className="text-slate-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
+                      className="text-neutral-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
                       title="Eliminar este póster"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -777,18 +764,18 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
             </div>
 
             {/* Selector de Método de Pago y Total */}
-            <div className="pt-2 border-t border-slate-800 space-y-2">
+            <div className="pt-2 border-t border-neutral-800 space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => updateDraftPaymentMethod(m)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
                         pendingDraft.paymentMethod === m
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                          ? 'bg-white text-black border-white'
+                          : 'bg-black border-neutral-700 text-neutral-400 hover:text-white'
                       }`}
                     >
                       {m === 'EFECTIVO' ? '💵 Efectivo' : m === 'TARJETA' ? '💳 Tarjeta' : '📱 Transfer'}
@@ -797,7 +784,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 mr-1">Total:</span>
+                  <span className="text-[10px] text-neutral-400 mr-1">Total:</span>
                   <strong className="text-emerald-400 text-sm font-black">
                     Q {pendingDraft.total?.toFixed(2)}
                   </strong>
@@ -805,12 +792,12 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
               </div>
 
               {/* Botones de Acción */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-800">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={discardDraft}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-red-950/40 hover:text-red-400 text-slate-400 text-[11px] font-semibold border border-slate-700 transition-colors cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-black hover:bg-red-950/50 hover:text-red-400 text-neutral-400 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer"
                   >
                     Descartar
                   </button>
@@ -820,7 +807,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                       if (onPopulateManualForm) onPopulateManualForm(pendingDraft);
                       setPendingDraft(null);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 transition-colors cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-black hover:bg-neutral-800 text-neutral-300 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer"
                   >
                     Modificar
                   </button>
@@ -829,9 +816,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                 <button
                   type="button"
                   onClick={confirmPendingSale}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-black flex items-center gap-1 shadow-lg shadow-emerald-600/20 cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer transition-transform active:scale-95"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-4 h-4" />
                   <span>Confirmar Venta</span>
                 </button>
               </div>
@@ -841,9 +828,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
 
         {/* Indicador de carga */}
         {isLoading && (
-          <div className="flex items-center gap-2 text-slate-400 text-xs italic py-1">
-            <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-            <span>{processingNote || 'Gemini 3.8 procesando...'}</span>
+          <div className="flex items-center gap-2 text-neutral-400 text-xs italic py-1">
+            <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+            <span>{processingNote || 'Asistente IA procesando...'}</span>
           </div>
         )}
 
@@ -852,40 +839,40 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
 
       {/* Modal / Overlay Flotante para Cambiar Diseño */}
       {swappingIndex !== null && (
-        <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-30 p-3 flex flex-col animate-fadeIn">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" /> Seleccionar Póster de Reemplazo
+        <div className="absolute inset-0 bg-black/95 backdrop-blur-md z-30 p-4 flex flex-col animate-fadeIn text-white">
+          <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400" /> Seleccionar Póster de Reemplazo
             </span>
             <button
               type="button"
               onClick={closeSwapModal}
-              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              className="text-neutral-400 hover:text-white p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           <div className="relative my-2">
-            <Search className="w-3.5 h-3.5 text-amber-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Escribe el nombre o personaje... (ej. Goku, Taylor, Spider-Man)"
               value={swapQuery}
               onChange={(e) => handleSwapSearchChange(e.target.value)}
               autoFocus
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+              className="w-full bg-[#161616] border border-neutral-700 rounded-full pl-8 pr-4 py-2 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white"
             />
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar pr-1">
             {isSearchingSwap ? (
-              <div className="flex items-center justify-center p-6 text-xs text-slate-400">
-                <Loader2 className="w-4 h-4 animate-spin mr-2 text-amber-400" />
+              <div className="flex items-center justify-center p-6 text-xs text-neutral-400">
+                <Loader2 className="w-4 h-4 animate-spin mr-2 text-white" />
                 Buscando en catálogo oficial...
               </div>
             ) : swapResults.length === 0 ? (
-              <div className="text-center p-6 text-xs text-slate-400">
+              <div className="text-center p-6 text-xs text-neutral-400">
                 No se encontraron obras coincidentes. Escribe otras palabras clave.
               </div>
             ) : (
@@ -893,25 +880,25 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                 <div
                   key={p.id}
                   onClick={() => selectSwapPoster(p)}
-                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 flex items-center justify-between gap-2.5 cursor-pointer transition-colors"
+                  className="p-2.5 rounded-xl bg-[#181818] hover:bg-[#222222] border border-neutral-800 hover:border-neutral-600 flex items-center justify-between gap-2.5 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img
                       src={p.thumbUrl || p.imageUrl}
                       alt=""
-                      className="w-8 h-11 object-cover rounded border border-slate-700 shrink-0 bg-slate-950"
+                      className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900"
                     />
                     <div className="truncate">
-                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider block">
+                      <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider block">
                         {p.categoria}
                       </span>
-                      <span className="font-bold text-xs text-slate-100 block truncate">{p.titulo}</span>
-                      <span className="text-[10px] text-slate-400 block truncate">{p.subtitulo || ''}</span>
+                      <span className="font-bold text-xs text-white block truncate">{p.titulo}</span>
+                      <span className="text-[10px] text-neutral-400 block truncate">{p.subtitulo || ''}</span>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-xs font-black text-emerald-400 block">Q{p.precioMinimo}</span>
-                    <span className="text-[9px] text-amber-400 font-semibold">Seleccionar</span>
+                    <span className="text-[9px] text-neutral-300 font-semibold">Seleccionar</span>
                   </div>
                 </div>
               ))
@@ -920,8 +907,8 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         </div>
       )}
 
-      {/* Barra de Entrada Unificada con Micrófono y Cámara Integrados */}
-      <div className="p-2.5 bg-slate-900/95 border-t border-slate-800 shrink-0">
+      {/* Barra Inferior (Blanco Puro con 4 Controles Píldora Negros) */}
+      <div className="bg-white p-3.5 sm:p-5 border-t border-neutral-200 select-none shrink-0">
         <input
           type="file"
           ref={fileInputRef}
@@ -932,23 +919,20 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         />
 
         {isRecording ? (
-          <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-red-950/40 border border-red-500/40 animate-pulse">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-black text-white shadow-md">
+            <div className="flex items-center gap-2.5">
               <span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
               <span className="text-xs font-bold text-red-400">
                 Dictando venta: {formatTime(recordingSeconds)}
-              </span>
-              <span className="text-[10px] text-slate-400 hidden sm:inline">
-                (Habla claro: "2 medianos de Batman a 65 en efectivo")
               </span>
             </div>
             <button
               type="button"
               onClick={stopRecording}
-              className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
-              <span>Finalizar y Enviar</span>
+              <span>Finalizar</span>
             </button>
           </div>
         ) : (
@@ -957,43 +941,48 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
               e.preventDefault();
               handleSendText();
             }}
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-2 sm:gap-2.5"
           >
+            {/* Botón 1: Micrófono (Audio) */}
             <button
               type="button"
               onClick={startRecording}
               disabled={isLoading}
-              className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 flex items-center justify-center transition-all shadow-md shadow-amber-500/20 disabled:opacity-40 cursor-pointer shrink-0"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:opacity-40 cursor-pointer shrink-0 active:scale-95 shadow-md"
               title="Dictar venta por voz"
             >
-              <Mic className="w-4 h-4 font-bold" />
+              <Mic className="w-5 h-5 text-white" />
             </button>
 
+            {/* Botón 2: Cámara (Foto) */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-amber-400 flex items-center justify-center transition-all disabled:opacity-40 cursor-pointer shrink-0"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:opacity-40 cursor-pointer shrink-0 active:scale-95 shadow-md"
               title="Tomar foto del arte del póster"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-5 h-5 text-white" />
             </button>
 
+            {/* Input 3: Barra de Texto Píldora Negra */}
             <input
               type="text"
-              placeholder="Dicta 🎙️, foto 📷, escribe una venta o consulta..."
+              placeholder="Escribe una consulta o venta..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isLoading}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500 font-medium"
+              className="flex-1 h-11 sm:h-12 bg-black text-white placeholder-neutral-500 rounded-full px-5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-neutral-400 shadow-inner"
             />
 
+            {/* Botón 4: Enviar */}
             <button
               type="submit"
               disabled={!inputText.trim() || isLoading}
-              className="w-9 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer shrink-0 font-bold"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:text-neutral-500 cursor-pointer shrink-0 active:scale-95 shadow-md"
+              title="Enviar"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </button>
           </form>
         )}
