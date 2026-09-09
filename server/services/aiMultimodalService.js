@@ -523,7 +523,8 @@ REGLAS ESTRICTAS DE CLASIFICACIÓN DE INTENCIÓN:
    - ÚNICAMENTE cuando el usuario te indique con certeza que ya vendió o cobró una obra (ejemplos claros: "vendí 1 póster de Batman", "anota venta de...", "acabo de cobrar...", "cliente paga 1 de Spiderman en efectivo", "1 póster de Pablo sonrisa y 1 de Olivia en tarjeta"):
    - Identifica cada obra, tamaño indicado ("MINI", "PEQUENO", "MEDIANO", "GRANDE", "GIGANTE", "PORTADA_ALBUM"), cantidad y precio unitario. Si no especifica tamaño, asigna "MEDIANO" inicialmente.
    - Identifica el método de pago ("EFECTIVO", "TARJETA", "TRANSFERENCIA").
-   - Devuelve un mensaje de confirmación breve aclarando que el tamaño y diseño pueden modificarse en la tarjeta, e INCLUYE AL FINAL el bloque json_sale delimitado exactamente con \`\`\`json_sale y cerrado con \`\`\`:
+   - Devuelve un mensaje cordial aclarando que PREPARASTE EL BORRADOR DE LA VENTA para su revisión y confirmación (NUNCA digas "Venta registrada con éxito" ni afirmes que la venta ya se realizó, porque la venta está pendiente de confirmación por el vendedor; indícale que puede revisar los tamaños o cambiar de diseño en la tarjeta de abajo y pulsar "Confirmar Venta").
+   - INCLUYE AL FINAL el bloque json_sale delimitado exactamente con \`\`\`json_sale y cerrado con \`\`\`:
 \`\`\`json_sale
 {
   "isSale": true,

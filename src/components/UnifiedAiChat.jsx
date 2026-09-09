@@ -561,7 +561,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-black relative">
+    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-white relative">
       {/* Cabecera de la Tarjeta (Blanco Puro) */}
       <div className="bg-white px-5 sm:px-7 py-3.5 sm:py-4 flex items-center justify-between select-none shrink-0">
         {/* Izquierda: Squircle Negro con Icono Origami {IA} */}
@@ -658,7 +658,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           <div className="p-4 rounded-[26px] bg-[#1a1a1a] border-2 border-emerald-500/80 shadow-2xl space-y-3 animate-fadeIn text-white">
             <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
               <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <ShoppingBag className="w-4 h-4" /> Venta Detectada por IA
+                <ShoppingBag className="w-4 h-4" /> Borrador de Venta (Pendiente de Confirmar)
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-neutral-400">

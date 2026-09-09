@@ -19,13 +19,19 @@ export async function handleVoiceSale(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    // 1. Guardar archivo en GCS / storage
-    const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer,
-      originalname: file.originalname || 'voice-sale.webm',
-      mimetype: file.mimetype || 'audio/webm',
-      folder: 'audio_sales',
-    });
+    // 1. Guardar archivo en GCS / storage si está configurado
+    let audioUrl = null;
+    try {
+      const uploadRes = await uploadBufferToStorage({
+        buffer: file.buffer,
+        originalname: file.originalname || 'voice-sale.webm',
+        mimetype: file.mimetype || 'audio/webm',
+        folder: 'audio_sales',
+      });
+      audioUrl = uploadRes?.url || null;
+    } catch (gcsErr) {
+      console.warn('⚠️ [GCS Warning] No se pudo persistir audio en GCS:', gcsErr.message);
+    }
 
     // 2. Extraer venta con Gemini 3.8 Flash
     const draft = await processVoiceSaleAudio({
@@ -39,7 +45,7 @@ export async function handleVoiceSale(req, res) {
       success: true,
       draftSale: {
         ...draft,
-        audioUrl: uploadRes.url,
+        audioUrl,
         inputChannel: 'IA_VOZ',
       },
       requiresConfirmation: true, // Human-in-the-loop obligatorio
@@ -68,13 +74,19 @@ export async function handleBatchPhoto(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    // 1. Guardar foto en almacenamiento GCS
-    const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer,
-      originalname: file.originalname || 'posters-bundle.jpg',
-      mimetype: file.mimetype || 'image/jpeg',
-      folder: 'posters_scans',
-    });
+    // 1. Guardar foto en almacenamiento GCS si está disponible
+    let imageUrl = null;
+    try {
+      const uploadRes = await uploadBufferToStorage({
+        buffer: file.buffer,
+        originalname: file.originalname || 'posters-bundle.jpg',
+        mimetype: file.mimetype || 'image/jpeg',
+        folder: 'posters_scans',
+      });
+      imageUrl = uploadRes?.url || null;
+    } catch (gcsErr) {
+      console.warn('⚠️ [GCS Warning] No se pudo persistir foto en GCS:', gcsErr.message);
+    }
 
     // 2. Analizar códigos QR / barras con Gemini 3.8 Flash Vision
     const analysis = await processPostersBatchPhoto({
@@ -90,7 +102,7 @@ export async function handleBatchPhoto(req, res) {
         items: analysis.items,
         total: analysis.totalCalculated,
         paymentMethod: 'EFECTIVO', // Valor por defecto para selección rápida
-        imageUrl: uploadRes.url,
+        imageUrl,
         inputChannel: 'IA_IMAGEN_QR',
         notes: `Escaneo de foto (${analysis.detectedCodes?.length || 0} códigos detectados: ${analysis.detectedCodes?.join(', ') || 'N/A'})`,
       },
@@ -163,12 +175,18 @@ export async function handleArtworkRecognition(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer,
-      originalname: file.originalname || 'artwork.jpg',
-      mimetype: file.mimetype || 'image/jpeg',
-      folder: 'artwork_scans',
-    });
+    let imageUrl = null;
+    try {
+      const uploadRes = await uploadBufferToStorage({
+        buffer: file.buffer,
+        originalname: file.originalname || 'artwork.jpg',
+        mimetype: file.mimetype || 'image/jpeg',
+        folder: 'artwork_scans',
+      });
+      imageUrl = uploadRes?.url || null;
+    } catch (gcsErr) {
+      console.warn('⚠️ [GCS Warning] No se pudo persistir foto de obra en GCS:', gcsErr.message);
+    }
 
     const analysis = await recognizePosterArtworkFromImage({
       imageBuffer: file.buffer,
@@ -183,7 +201,7 @@ export async function handleArtworkRecognition(req, res) {
         items: analysis.items,
         total: analysis.total,
         paymentMethod: 'EFECTIVO',
-        imageUrl: uploadRes.url,
+        imageUrl,
         inputChannel: 'IA_FOTO_ARTE',
         notes: `Reconocimiento de obra visual: ${analysis.primaryTitle || 'Detectado'}`,
       },
@@ -215,12 +233,18 @@ export async function handleVideoRecognition(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer,
-      originalname: file.originalname || 'counter-video.mp4',
-      mimetype: file.mimetype || 'video/mp4',
-      folder: 'counter_videos',
-    });
+    let videoUrl = null;
+    try {
+      const uploadRes = await uploadBufferToStorage({
+        buffer: file.buffer,
+        originalname: file.originalname || 'counter-video.mp4',
+        mimetype: file.mimetype || 'video/mp4',
+        folder: 'counter_videos',
+      });
+      videoUrl = uploadRes?.url || null;
+    } catch (gcsErr) {
+      console.warn('⚠️ [GCS Warning] No se pudo persistir video en GCS:', gcsErr.message);
+    }
 
     const analysis = await recognizePostersFromVideo({
       videoBuffer: file.buffer,
@@ -235,7 +259,7 @@ export async function handleVideoRecognition(req, res) {
         items: analysis.items,
         total: analysis.total,
         paymentMethod: 'EFECTIVO',
-        videoUrl: uploadRes.url,
+        videoUrl,
         inputChannel: 'IA_VIDEO_MOSTRADOR',
         notes: `Video del mostrador: ${analysis.items.length} obras detectadas`,
       },
