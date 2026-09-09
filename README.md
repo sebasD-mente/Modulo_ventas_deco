@@ -98,7 +98,7 @@ Adhering to the **Strict Project Isolation Protocol** (`aislamiento-estricto-pro
 | `GEMINI_API_KEY` | Yes | — | Google AI Studio Gemini API Key |
 | `GEMINI_MODEL` | No | `gemini-3.8-flash` | Gemini model name for audio, vision, and text processing |
 | `GCS_BUCKET_NAME` | Yes | `deko-eventsales-media` | Dedicated Google Cloud Storage bucket |
-| `GCS_PROJECT_ID` | No | `tienda-deco-vintage-web`| Google Cloud Project ID |
+| `GCS_PROJECT_ID` | No | `tu-proyecto-gcp`| Google Cloud Project ID dedicado |
 | `GCS_CREDENTIALS_BASE64` | Conditional | — | Base64-encoded Service Account JSON key (for container/Dokploy deployment) |
 | `DEFAULT_TENANT_NAME` | No | `Deco Vintage Guate` | Default tenant identifier |
 | `DEFAULT_CURRENCY` | No | `GTQ` | ISO currency code |
