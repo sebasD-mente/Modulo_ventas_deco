@@ -43,6 +43,10 @@ build/
 public/uploads/*
 !public/uploads/.gitkeep
 
+# Test artifacts and screenshots
+tests/*.png
+
+
 # Application and package manager logs
 logs/
 *.log
