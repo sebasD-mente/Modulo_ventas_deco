@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { syncCatalogFromWeb } from '../server/services/catalogSyncService.js';
 
 const prisma = new PrismaClient();
 
@@ -188,6 +189,15 @@ async function main() {
   }
 
   console.log(`✅ Catálogo de productos sembrado exitosamente (${sampleProducts.length} productos base)`);
+
+  console.log('🔄 Sincronizando catálogo completo oficial (233 pósters con imágenes WebP)...');
+  try {
+    const syncRes = await syncCatalogFromWeb(tenant.id);
+    console.log(`✅ Sincronización web finalizada: ${syncRes.count} pósters guardados.`);
+  } catch (syncErr) {
+    console.warn('⚠️ Sincronización web en seed arrojó advertencia:', syncErr.message);
+  }
+
   console.log('🎉 Siembra completada con éxito.');
 }
 

@@ -11,12 +11,12 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (!query) return null;
   const clean = String(query).trim();
 
-  // 1. Buscar en los 233 pósters de la web
-  const webMatches = await searchWebPosters({ query: clean, limit: 3 });
+  // 1. Buscar en los 233 pósters con motor de scoring multi-token
+  const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 3 });
   if (webMatches.length > 0) {
     const matched = webMatches[0];
     
-    // Normalizar tamaño si se especificó (mini, pequeño, mediano, grande)
+    // Normalizar tamaño si se especificó (mini, pequeño, mediano, grande, etc.)
     let selectedSize = matched.sizes.find(s => s.sizeId === 'MEDIANO') || matched.sizes[0];
     if (requestedSize) {
       const sizeClean = requestedSize.toUpperCase();
@@ -27,11 +27,14 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       if (foundSize) selectedSize = foundSize;
     }
 
+    const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
+
     return {
       type: 'WEB_POSTER',
+      productId: matched.id,
       posterId: matched.id,
-      description: `${matched.titulo} (${selectedSize.nombre})`,
-      baseTitle: matched.titulo,
+      description: `${displayTitle} (${selectedSize.nombre})`,
+      baseTitle: displayTitle,
       category: matched.categoria,
       thumbUrl: matched.thumbUrl,
       imageUrl: matched.imageUrl,
@@ -507,14 +510,20 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     })),
   };
 
-  const systemPrompt = `Eres Jarvis, el Asistente Inteligente y Operador de Ventas de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
+  const systemPrompt = `Eres Jarvis, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
 
-Tu rol abarca dos funciones clave:
-1. CONSULTOR DE STAND: Respondes preguntas sobre ventas, estadísticas, velocidad de venta, arqueo de caja y resúmenes de cierre diarios del evento. También buscas obras del catálogo web de 233 pósters y sus tamaños disponibles (Mini Q25, Pequeño Q35, Mediano Q65, Grande Q125, Gigante Q180).
-2. REGISTRO RÁPIDO DE VENTAS DICTADAS POR TEXTO: Si el usuario te indica que vendió o cobró una obra (ejemplos: "vendí 2 pósters de Batman medianos en efectivo", "anota venta de 1 Chainsaw Man", "acabo de vender un Spiderman y un Porsche a Q65 con tarjeta"):
-   - Identifica cada producto mencionado, tamaño solicitado (si no lo dice, asume "MEDIANO"), cantidad entera y precio unitario en Quetzales.
-   - Identifica el método de pago ("EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"). Por defecto "EFECTIVO".
-   - En tu respuesta, además del texto conversacional confirmando la venta, DEBES INCLUIR al final un bloque JSON delimitado exactamente con \`\`\`json_sale y cerrado con \`\`\`:
+REGLAS ESTRICTAS DE CLASIFICACIÓN DE INTENCIÓN:
+
+1. MODO CONSULTA Y ATENCIÓN AL CLIENTE (NO ES VENTA):
+   - Si el usuario te hace una pregunta, consulta sobre disponibilidad, pide recomendaciones, pregunta precios, tamaños, métricas de venta, dinero en caja o saluda (ejemplos: "¿Tienen póster de Olivia Rodrigo?", "¿Qué tamaños hay?", "¿Cuánto cuesta el mediano?", "¿Tienen de Pablo Escobar?", "Hola", "¿Cuánto llevamos vendido?"):
+   - Responde de forma concisa, profesional y útil.
+   - NUNCA generes el bloque json_sale para preguntas o consultas. Queda terminantemente prohibido asumir que una consulta es una venta.
+
+2. MODO REGISTRO DE VENTA (SÓLO ANTE ÓRDENES EXPLÍCITAS DE VENTA O COBRO):
+   - ÚNICAMENTE cuando el usuario te indique con certeza que ya vendió o cobró una obra (ejemplos claros: "vendí 1 póster de Batman", "anota venta de...", "acabo de cobrar...", "cliente paga 1 de Spiderman en efectivo", "1 póster de Pablo sonrisa y 1 de Olivia en tarjeta"):
+   - Identifica cada obra, tamaño indicado ("MINI", "PEQUENO", "MEDIANO", "GRANDE", "GIGANTE", "PORTADA_ALBUM"), cantidad y precio unitario. Si no especifica tamaño, asigna "MEDIANO" inicialmente.
+   - Identifica el método de pago ("EFECTIVO", "TARJETA", "TRANSFERENCIA").
+   - Devuelve un mensaje de confirmación breve aclarando que el tamaño y diseño pueden modificarse en la tarjeta, e INCLUYE AL FINAL el bloque json_sale delimitado exactamente con \`\`\`json_sale y cerrado con \`\`\`:
 \`\`\`json_sale
 {
   "isSale": true,
@@ -522,17 +531,16 @@ Tu rol abarca dos funciones clave:
     { "title": "Nombre de la obra", "size": "MEDIANO", "quantity": 1, "unitPrice": 65.0 }
   ],
   "paymentMethod": "EFECTIVO",
-  "notes": "Venta registrada por Jarvis Chat"
+  "notes": "Venta dictada por Jarvis Chat"
 }
 \`\`\`
-Si NO es un reporte de venta (es una simple consulta, saludo o pregunta de métricas), responde normalmente y NO incluyas el bloque \`\`\`json_sale.
 
-Datos en tiempo real de la base de datos PostgreSQL:
-${JSON.stringify(contextData, null, 2)}
+Catálogo oficial de Deco Vintage:
+- Precios estándar: Mini (Q25), Pequeño (Q35), Mediano (Q65), Grande (Q125), Gigante (Q180).
+- Portada de Álbum de música: Formato vinilo 30x30 cm (Q55).
 
-Instrucciones de formato:
-1. Responde de forma clara, concisa, profesional y ejecutiva.
-2. Usa siempre la moneda Quetzales (Q).`;
+Métricas en vivo de PostgreSQL:
+${JSON.stringify(contextData, null, 2)}`;
 
   if (!gemini) {
     const isSaleKeyword = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
@@ -540,11 +548,13 @@ Instrucciones de formato:
       return {
         reply: `[Modo Offline/Local] Detecté una intención de venta: "${message}". Puedes registrarla con el formulario manual ágil justo abajo para asignarle número de ticket correlativo.`,
         draftSale: null,
+        suggestedPosters: [],
       };
     }
     return {
       reply: `[Modo Offline] Actualmente hay Q ${kpis.totalAmount.toFixed(2)} vendidos en ${kpis.totalTransactions} transacciones del evento "${event?.name || 'activo'}".`,
       draftSale: null,
+      suggestedPosters: [],
     };
   }
 
@@ -566,6 +576,7 @@ Instrucciones de formato:
     const rawText = response.text?.trim() || '';
     let draftSale = null;
     let cleanReply = rawText;
+    let suggestedPosters = [];
 
     // Detectar bloque json_sale
     const saleMatch = rawText.match(/```(?:json_sale|json)?\s*([\s\S]*?)\s*```/);
@@ -590,11 +601,14 @@ Instrucciones de formato:
                 productId: matched?.productId || null,
                 webPosterId: matched?.posterId || null,
                 description: matched?.description || it.title || 'Póster',
+                baseTitle: matched?.baseTitle || it.title || 'Póster',
+                category: matched?.category || 'ARTE',
                 thumbUrl: matched?.thumbUrl || null,
                 imageUrl: matched?.imageUrl || null,
                 quantity: qty,
                 unitPrice,
                 subtotal,
+                sizeId: matched?.sizeId || 'MEDIANO',
                 availableSizes: matched?.availableSizes || [],
               });
             }
@@ -616,15 +630,31 @@ Instrucciones de formato:
       }
     }
 
+    // Si NO se generó una venta pero el mensaje parece consultar obras del catálogo, sugerir tarjetas visuales
+    if (!draftSale) {
+      const cleanSearchTerm = message
+        .replace(/¿|\?|¡|!|tienen|tienes|hay|muestrame|muestra|buscar|busca|precio|de|un|una|el|la|los|las|poster|posters|cuadro|cuadros/gi, ' ')
+        .trim();
+
+      if (cleanSearchTerm.length >= 2) {
+        const matches = await searchWebPosters({ tenantId, query: cleanSearchTerm, limit: 3 });
+        if (matches.length > 0) {
+          suggestedPosters = matches;
+        }
+      }
+    }
+
     return {
       reply: cleanReply || 'Venta detectada con éxito. Por favor confirma en la tarjeta de abajo para asentar en PostgreSQL.',
       draftSale,
+      suggestedPosters,
     };
   } catch (err) {
     console.error('❌ Error en chatWithSalesAssistant:', err);
     return {
       reply: `Error consultando IA de ventas: ${err.message}`,
       draftSale: null,
+      suggestedPosters: [],
     };
   }
 }

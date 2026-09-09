@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { ENV } from './config/env.js';
 import apiRoutes from './routes/apiRoutes.js';
 import { prisma } from './config/prisma.js';
+import { syncCatalogFromWeb } from './services/catalogSyncService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,6 +86,21 @@ const server = app.listen(ENV.PORT, () => {
 🌍 Entorno: ${ENV.NODE_ENV}
 ⚡ Motor IA: ${ENV.GEMINI_MODEL}
   `);
+
+  // Auto-sincronización en segundo plano si la base de datos no tiene el catálogo completo
+  prisma.product
+    .count({ where: { isActive: true } })
+    .then(async (count) => {
+      if (count < 20) {
+        console.log(`[Startup] Catálogo local con solo ${count} productos. Iniciando sincronización de 233 pósters...`);
+        await syncCatalogFromWeb().catch((e) =>
+          console.warn('[Startup] Fallo no crítico en auto-sincronización:', e.message)
+        );
+      } else {
+        console.log(`[Startup] Catálogo oficial verificado: ${count} productos activos en base de datos.`);
+      }
+    })
+    .catch((err) => console.warn('[Startup] No se pudo verificar conteo de productos:', err.message));
 });
 
 // Cierre limpio (Graceful Shutdown) para evitar procesos zombis o sockets retenidos en Windows

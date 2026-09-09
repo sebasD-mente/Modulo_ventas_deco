@@ -92,7 +92,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       } finally {
         setIsSearching(false);
       }
-    }, 200);
+    }, 120);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -106,7 +106,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     const defaultSz = poster.sizes?.find((s) => s.sizeId === 'MEDIANO') || poster.sizes?.[0] || DEFAULT_SIZES[2];
     setSelectedSize(defaultSz);
     setItemQuantity(1);
-    setSearchQuery(poster.titulo);
+    const displayName = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo;
+    setSearchQuery(displayName);
     setShowDropdown(false);
   };
 
@@ -114,10 +115,15 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   const handleAddItemToTicket = () => {
     if (!selectedPoster || !selectedSize) return;
 
+    const posterTitle = selectedPoster.subtitulo
+      ? `${selectedPoster.titulo} - ${selectedPoster.subtitulo}`
+      : selectedPoster.titulo;
+
     const newItem = {
       id: `${selectedPoster.id}-${selectedSize.sizeId}-${Date.now()}`,
+      productId: selectedPoster.id,
       posterId: selectedPoster.id,
-      description: `Póster ${selectedPoster.titulo} (${selectedSize.nombre || selectedSize.sizeId})`,
+      description: `Póster ${posterTitle} (${selectedSize.nombre || selectedSize.sizeId})`,
       unitPrice: Number(selectedSize.precio),
       quantity: Number(itemQuantity),
       subtotal: Number(itemQuantity) * Number(selectedSize.precio),

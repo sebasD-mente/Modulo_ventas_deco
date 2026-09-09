@@ -40,29 +40,45 @@ function formatProductForPos(p) {
       nombre: s.nombre || s.name || 'Mediano',
       dimensiones: s.dimensiones || s.dimensions || '30 x 45 cm',
       precio: Number(s.precio || s.price || p.basePrice || 25),
+      badge: s.badge || null,
     }));
   } else {
     // Variantes de tamaño por defecto para pósters de eventos
     const base = Number(p.basePrice || 25);
     parsedSizes = [
-      { sizeId: 'MINI', nombre: 'Mini', dimensiones: '20 x 30 cm', precio: Math.max(25, base - 20) },
-      { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '25 x 38 cm', precio: Math.max(35, base - 10) },
-      { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: base },
-      { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: base + 25 },
+      { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
+      { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+      { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
+      { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
     ];
   }
+
+  // Separar título y subtítulo si el nombre fue guardado como "Título - Subtítulo"
+  let titulo = p.name;
+  let subtitulo = '';
+  if (p.name.includes(' - ')) {
+    const parts = p.name.split(' - ');
+    titulo = parts[0].trim();
+    subtitulo = parts.slice(1).join(' - ').trim();
+  }
+
+  const minPrice = parsedSizes.length > 0
+    ? parsedSizes.reduce((min, s) => Math.min(min, s.precio), Number(p.basePrice || 25))
+    : Number(p.basePrice || 25);
 
   return {
     id: p.id,
     sku: p.sku,
-    titulo: p.name,
-    subtitulo: '',
-    descripcion: '',
+    titulo,
+    subtitulo,
+    nombreCompleto: p.name,
+    descripcion: subtitulo,
     categoria: p.category,
     imageUrl: p.imageUrl,
     thumbUrl: p.imageUrl,
-    precioMinimo: Number(p.basePrice || 25),
-    precioDisplay: `Q${Number(p.basePrice || 25)}`,
+    precioMinimo: minPrice,
+    precioDisplay: `Q${minPrice}`,
     tags: Array.isArray(p.tags) ? p.tags : [],
     sizes: parsedSizes,
   };
@@ -91,13 +107,14 @@ async function getCachedProducts(tenantId) {
 }
 
 /**
- * Busca pósters en la tabla local Product por nombre, categoría, tags o SKU.
+ * Busca pósters en la tabla local Product por nombre, subtítulo, categoría, tags o SKU.
+ * Motor ultrarrápido con scoring de relevancia para autocompletado en stand POS.
  * @param {object} params - Parámetros de búsqueda.
  * @param {string} [params.tenantId] - Filtro opcional por tenant.
  * @param {string} [params.query] - Texto de búsqueda.
  * @param {string} [params.category] - Filtro de categoría.
  * @param {number} [params.limit] - Cantidad máxima de resultados.
- * @returns {Promise<Array>} - Lista de pósters formateados.
+ * @returns {Promise<Array>} - Lista de pósters ordenados por relevancia.
  */
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
   const cleanQuery = (query || '').trim().toLowerCase();
@@ -106,16 +123,49 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
   let filtered = allProducts;
 
   if (category) {
-    filtered = filtered.filter((p) => p.categoria === category);
+    filtered = filtered.filter((p) => p.categoria === category.toUpperCase());
   }
 
   if (cleanQuery) {
-    filtered = filtered.filter((p) => {
-      const matchName = p.titulo && p.titulo.toLowerCase().includes(cleanQuery);
-      const matchSku = p.sku && p.sku.toLowerCase().includes(cleanQuery);
-      const matchTag = Array.isArray(p.tags) && p.tags.some((t) => t.toLowerCase().includes(cleanQuery));
-      return matchName || matchSku || matchTag;
-    });
+    const tokens = cleanQuery.split(/\s+/).filter((t) => t.length > 0);
+
+    const scored = filtered
+      .map((p) => {
+        const fullText = [
+          p.titulo,
+          p.subtitulo,
+          p.nombreCompleto,
+          p.sku,
+          p.categoria,
+          Array.isArray(p.tags) ? p.tags.join(' ') : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        let score = 0;
+
+        // Bonificaciones de coincidencia prefijo en título y subtítulo
+        if (p.titulo.toLowerCase().startsWith(cleanQuery)) score += 100;
+        if (p.subtitulo && p.subtitulo.toLowerCase().startsWith(cleanQuery)) score += 80;
+        if (p.titulo.toLowerCase().includes(cleanQuery)) score += 50;
+        if (p.subtitulo && p.subtitulo.toLowerCase().includes(cleanQuery)) score += 40;
+        if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 60;
+
+        // Bonificación si coinciden todas las palabras clave (multi-token)
+        const allTokensMatch = tokens.every((t) => fullText.includes(t));
+        if (allTokensMatch) score += 30;
+
+        // Puntuación por cada token individual presente
+        const matchedTokensCount = tokens.filter((t) => fullText.includes(t)).length;
+        score += matchedTokensCount * 10;
+
+        return { p, score };
+      })
+      .filter((item) => item.score > 0);
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map((item) => item.p);
   }
 
   return filtered.slice(0, limit);
