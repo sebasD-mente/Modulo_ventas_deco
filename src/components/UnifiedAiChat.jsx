@@ -63,7 +63,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   const chatBottomRef = useRef(null);
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, pendingDraft, isRecording]);
 
   // Actualizar tamaño de un ítem en el borrador con recálculo dinámico de precios
@@ -561,9 +561,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border border-neutral-800 shadow-2xl overflow-hidden flex flex-col bg-black relative">
+    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-black relative">
       {/* Cabecera de la Tarjeta (Blanco Puro) */}
-      <div className="bg-white px-5 sm:px-7 py-3.5 sm:py-4 flex items-center justify-between border-b border-neutral-200 select-none shrink-0">
+      <div className="bg-white px-5 sm:px-7 py-3.5 sm:py-4 flex items-center justify-between select-none shrink-0">
         {/* Izquierda: Squircle Negro con Icono Origami {IA} */}
         <div className="flex items-center gap-3">
           <img
@@ -908,7 +908,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       )}
 
       {/* Barra Inferior (Blanco Puro con 4 Controles Píldora Negros) */}
-      <div className="bg-white p-3.5 sm:p-5 border-t border-neutral-200 select-none shrink-0">
+      <div className="bg-white p-3.5 sm:p-5 select-none shrink-0">
         <input
           type="file"
           ref={fileInputRef}

@@ -258,19 +258,14 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-6 text-white max-w-2xl mx-auto">
       {/* Cabecera del Formulario Manual */}
-      <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-        <div>
-          <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-            <ShoppingBag className="w-4 h-4 text-white" />
-            Registro de Venta Manual Rápida
-          </h3>
-          <p className="text-xs text-neutral-400">
-            Llama cualquier póster del catálogo web oficial, selecciona tamaño y cobra en segundos
-          </p>
-        </div>
-        <span className="text-xs font-bold px-3 py-1 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300">
-          Stand POS
-        </span>
+      <div className="pb-3 border-b border-neutral-800">
+        <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+          <ShoppingBag className="w-4 h-4 text-white" />
+          Venta manual
+        </h3>
+        <p className="text-xs text-neutral-400">
+          Llama cualquier póster del catálogo web oficial, selecciona tamaño y cobra en segundos
+        </p>
       </div>
 
       {errorMsg && (
@@ -282,7 +277,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       {/* SECCIÓN 1: CAMPO ÚNICO DE BÚSQUEDA Y LLAMADA DE PÓSTERS */}
       <div className="relative">
         <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
-          <span>1. Llamar Póster del Catálogo Web (233 Obras)</span>
+          <span>Buscar</span>
           {isSearching && (
             <span className="text-[10px] text-neutral-400 font-normal flex items-center gap-1">
               <Loader2 className="w-3 h-3 animate-spin text-white" /> Buscando...
