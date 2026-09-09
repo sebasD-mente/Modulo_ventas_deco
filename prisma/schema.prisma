@@ -1,0 +1,214 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id             String        @id @default(uuid())
+  name           String
+  slug           String        @unique
+  logoUrl        String?
+  currency       String        @default("GTQ")
+  currencySymbol String        @default("Q")
+  settings       Json?         @default("{}")
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  users          User[]
+  events         Event[]
+  products       Product[]
+  sales          Sale[]
+  cashClosings   CashClosing[]
+  auditLogs      AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email        String
+  passwordHash String
+  fullName     String
+  role         String        @default("ENCARGADO_STAND")
+  phone        String?
+  status       String        @default("ACTIVO")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  sales        Sale[]
+  cashClosings CashClosing[]
+  auditLogs    AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@map("users")
+}
+
+model Event {
+  id                  String        @id @default(uuid())
+  tenantId            String
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                String
+  location            String
+  startDate           DateTime
+  endDate             DateTime
+  status              String        @default("ACTIVO")
+  salesTarget         Decimal?      @db.Decimal(10, 2)
+  assignedSellerEmail String?
+  assignedSellerName  String?
+  currentSaleSequence Int           @default(0) @map("current_sale_sequence")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  sales               Sale[]
+  cashClosings        CashClosing[]
+
+  @@index([tenantId, status])
+  @@map("events")
+}
+
+model Product {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sku         String?
+  name        String
+  category    String     @default("GENERAL")
+  basePrice   Decimal    @db.Decimal(10, 2)
+  imageUrl    String?
+  qrCodeData  String?
+  barcode     String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  saleItems   SaleItem[]
+
+  @@index([tenantId, category])
+  @@index([tenantId, sku])
+  @@index([tenantId, barcode])
+  @@map("products")
+}
+
+model Sale {
+  id           String           @id @default(uuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId      String
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sellerId     String
+  seller       User             @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  saleNumber   String
+  totalAmount  Decimal          @db.Decimal(10, 2)
+  discount     Decimal          @default(0) @db.Decimal(10, 2)
+  notes        String?          @db.Text
+  status       String           @default("COMPLETADA")
+  inputChannel String           @default("MANUAL_POS")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  items        SaleItem[]
+  payments     SalePayment[]
+  attachments  SaleAttachment[]
+
+  @@unique([eventId, saleNumber])
+  @@index([tenantId, eventId, createdAt])
+  @@index([eventId, status])
+  @@map("sales")
+}
+
+model SaleItem {
+  id          String   @id @default(uuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  subtotal    Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+model SalePayment {
+  id         String   @id @default(uuid())
+  saleId     String
+  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method     String
+  amount     Decimal  @db.Decimal(10, 2)
+  reference  String?
+  receiptUrl String?
+  createdAt  DateTime @default(now())
+
+  @@index([saleId])
+  @@index([method])
+  @@map("sale_payments")
+}
+
+model SaleAttachment {
+  id            String   @id @default(uuid())
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  fileUrl       String
+  fileType      String
+  transcription String?  @db.Text
+  aiMetadata    Json?
+  createdAt     DateTime @default(now())
+
+  @@index([saleId])
+  @@map("sale_attachments")
+}
+
+model CashClosing {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId             String
+  event               Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  closedById          String
+  closedBy            User     @relation(fields: [closedById], references: [id], onDelete: Restrict)
+  closingType         String   @default("DIARIO")
+  closingDate         DateTime @default(now())
+  totalCashCalculated Decimal  @db.Decimal(10, 2)
+  totalCashReported   Decimal  @db.Decimal(10, 2)
+  cashDifference      Decimal  @db.Decimal(10, 2)
+  totalCard           Decimal  @db.Decimal(10, 2)
+  totalTransfer       Decimal  @db.Decimal(10, 2)
+  totalSalesCount     Int      @default(0)
+  grossTotal          Decimal  @db.Decimal(10, 2)
+  observations        String?  @db.Text
+  status              String   @default("CONCILIADO")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId, eventId, closingDate])
+  @@map("cash_closings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}

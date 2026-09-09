@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  deko-eventsales:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deko-eventsales-app
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME:-decovintage-master-media}
+      - GCS_CREDENTIALS_BASE64=${GCS_CREDENTIALS_BASE64}
+      - DEFAULT_TENANT_NAME=${DEFAULT_TENANT_NAME:-Deco Vintage Guate}
+    volumes:
+      - ./public/uploads:/app/public/uploads

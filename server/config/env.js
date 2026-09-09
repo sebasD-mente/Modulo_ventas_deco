@@ -1,0 +1,34 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Cargar .env desde la raíz del proyecto
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+export const ENV = {
+  PORT: parseInt(process.env.PORT || '3001', 10),
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  DATABASE_URL: process.env.DATABASE_URL,
+  JWT_SECRET: process.env.JWT_SECRET || 'fallback_secret_deko_eventsales_2026',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME || 'deko-eventsales-media',
+  GCS_CREDENTIALS_BASE64: process.env.GCS_CREDENTIALS_BASE64,
+  GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
+  DEFAULT_TENANT_NAME: process.env.DEFAULT_TENANT_NAME || 'Deco Vintage Guate',
+  DEFAULT_CURRENCY: process.env.DEFAULT_CURRENCY || 'GTQ',
+  DEFAULT_CURRENCY_SYMBOL: process.env.DEFAULT_CURRENCY_SYMBOL || 'Q'
+};
+
+// Validación de variables críticas para fail-fast
+if (!ENV.DATABASE_URL) {
+  console.warn('⚠️ [Config Advertencia] DATABASE_URL no está definida en .env. Las operaciones de base de datos fallarán hasta configurarse.');
+}
+
+if (!ENV.GEMINI_API_KEY) {
+  console.warn('⚠️ [Config Advertencia] GEMINI_API_KEY no está definida. Las funciones de IA multimodal operarán en modo heurístico/simulado.');
+}

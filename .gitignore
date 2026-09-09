@@ -1,0 +1,61 @@
+# =============================================================================
+# Deko EventSales — Production .gitignore
+# Hardened against credential leaks, ephemeral media, local caches, and build artifacts
+# =============================================================================
+
+# Environment variables and secrets
+.env
+.env*
+!.env.example
+
+# Service account credentials and cryptographic keys
+*.pem
+*.key
+*.json.key
+*credentials*.json
+*service-account*.json
+serviceAccountKey.json
+google-service-account.json
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds and caches
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# IDE, Editor, and AI agent local caches
+.gemini/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Uploads directory (stateless storage in GCS; keep directory structure only)
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Application and package manager logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
