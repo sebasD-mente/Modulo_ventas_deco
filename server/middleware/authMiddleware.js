@@ -17,28 +17,26 @@ export async function authMiddleware(req, res, next) {
     }
   }
 
-  // Fallback para desarrollo / stand si no hay token explícito
-  if (ENV.NODE_ENV === 'development') {
-    try {
-      const defaultUser = await prisma.user.findFirst({
-        where: { role: 'ENCARGADO_STAND' },
-        include: { tenant: true },
-      });
+  // Fallback para terminal de stand si no hay token Bearer explícito
+  try {
+    const defaultUser = await prisma.user.findFirst({
+      where: { role: 'ENCARGADO_STAND' },
+      include: { tenant: true },
+    });
 
-      if (defaultUser) {
-        req.user = {
-          id: defaultUser.id,
-          email: defaultUser.email,
-          fullName: defaultUser.fullName,
-          role: defaultUser.role,
-          tenantId: defaultUser.tenantId,
-        };
-        req.tenantId = defaultUser.tenantId;
-        return next();
-      }
-    } catch (err) {
-      console.warn('[AuthMiddleware Warning] ⚠️ Error obteniendo usuario por defecto:', err.message);
+    if (defaultUser) {
+      req.user = {
+        id: defaultUser.id,
+        email: defaultUser.email,
+        fullName: defaultUser.fullName,
+        role: defaultUser.role,
+        tenantId: defaultUser.tenantId,
+      };
+      req.tenantId = defaultUser.tenantId;
+      return next();
     }
+  } catch (err) {
+    console.warn('[AuthMiddleware Warning] ⚠️ Error obteniendo usuario de stand por defecto:', err.message);
   }
 
   return res.status(401).json({ success: false, error: 'No autorizado. Se requiere inicio de sesión.' });

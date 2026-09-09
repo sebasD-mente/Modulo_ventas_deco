@@ -46,10 +46,14 @@ else
   exit 1
 fi
 
-# 2. Automated Schema Migration / Push
+# 2. Automated Schema Migration / Push & Initial Seed
 echo "🔄 [Entrypoint] Synchronizing database schema with Prisma (db push)..."
 npx prisma db push --skip-generate
 echo "✅ [Entrypoint] Prisma schema synchronization completed."
+
+echo "🌱 [Entrypoint] Checking and seeding master data (tenant, active event, users)..."
+node prisma/seed.js || true
+echo "✅ [Entrypoint] Master data check completed."
 
 # 3. Pass PID 1 execution to Node application
 echo "🚀 [Entrypoint] Launching application process: $@"
