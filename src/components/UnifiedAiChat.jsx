@@ -237,6 +237,10 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         throw new Error(json.error || 'Error al comunicarse con la IA');
       }
 
+      if (json.draftSale) {
+        setPendingDraft(json.draftSale);
+      }
+
       setMessages((prev) => [
         ...prev,
         {

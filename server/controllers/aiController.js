@@ -121,7 +121,7 @@ export async function handleChatQuery(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    const reply = await chatWithSalesAssistant({
+    const result = await chatWithSalesAssistant({
       message: message.trim(),
       history: history || [],
       tenantId,
@@ -131,7 +131,8 @@ export async function handleChatQuery(req, res) {
 
     return res.json({
       success: true,
-      reply,
+      reply: result.reply,
+      draftSale: result.draftSale || null,
     });
   } catch (err) {
     console.error('❌ Error en handleChatQuery:', err);

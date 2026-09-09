@@ -507,20 +507,45 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     })),
   };
 
-  const systemPrompt = `Eres el Asistente Inteligente de Gestión de Ventas de Stand para "${event?.name || 'el evento'}".
-Tu rol es ayudar al encargado del stand y a la gerencia de Deco Vintage Guate respondiendo preguntas sobre ventas, estadísticas, velocidad de venta, arqueo de caja y generando resúmenes de cierre diarios o de evento.
-También puedes ayudar a buscar obras del catálogo web de 233 pósters y sus tamaños disponibles.
+  const systemPrompt = `Eres Jarvis, el Asistente Inteligente y Operador de Ventas de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
+
+Tu rol abarca dos funciones clave:
+1. CONSULTOR DE STAND: Respondes preguntas sobre ventas, estadísticas, velocidad de venta, arqueo de caja y resúmenes de cierre diarios del evento. También buscas obras del catálogo web de 233 pósters y sus tamaños disponibles (Mini Q25, Pequeño Q35, Mediano Q65, Grande Q125, Gigante Q180).
+2. REGISTRO RÁPIDO DE VENTAS DICTADAS POR TEXTO: Si el usuario te indica que vendió o cobró una obra (ejemplos: "vendí 2 pósters de Batman medianos en efectivo", "anota venta de 1 Chainsaw Man", "acabo de vender un Spiderman y un Porsche a Q65 con tarjeta"):
+   - Identifica cada producto mencionado, tamaño solicitado (si no lo dice, asume "MEDIANO"), cantidad entera y precio unitario en Quetzales.
+   - Identifica el método de pago ("EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"). Por defecto "EFECTIVO".
+   - En tu respuesta, además del texto conversacional confirmando la venta, DEBES INCLUIR al final un bloque JSON delimitado exactamente con \`\`\`json_sale y cerrado con \`\`\`:
+\`\`\`json_sale
+{
+  "isSale": true,
+  "items": [
+    { "title": "Nombre de la obra", "size": "MEDIANO", "quantity": 1, "unitPrice": 65.0 }
+  ],
+  "paymentMethod": "EFECTIVO",
+  "notes": "Venta registrada por Jarvis Chat"
+}
+\`\`\`
+Si NO es un reporte de venta (es una simple consulta, saludo o pregunta de métricas), responde normalmente y NO incluyas el bloque \`\`\`json_sale.
 
 Datos en tiempo real de la base de datos PostgreSQL:
 ${JSON.stringify(contextData, null, 2)}
 
-Instrucciones:
-1. Responde de forma clara, profesional, concisa y ejecutiva.
-2. Si te piden un resumen o cierre de caja, preséntalo ordenado con formato limpio: Total Vendido, Transacciones, Desglose por Método de Pago y Top de Productos.
-3. Usa la moneda Quetzales (Q).`;
+Instrucciones de formato:
+1. Responde de forma clara, concisa, profesional y ejecutiva.
+2. Usa siempre la moneda Quetzales (Q).`;
 
   if (!gemini) {
-    return `[Modo Offline] Actualmente hay Q ${kpis.totalAmount.toFixed(2)} vendidos en ${kpis.totalTransactions} transacciones.`;
+    const isSaleKeyword = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
+    if (isSaleKeyword) {
+      return {
+        reply: `[Modo Offline/Local] Detecté una intención de venta: "${message}". Puedes registrarla con el formulario manual ágil justo abajo para asignarle número de ticket correlativo.`,
+        draftSale: null,
+      };
+    }
+    return {
+      reply: `[Modo Offline] Actualmente hay Q ${kpis.totalAmount.toFixed(2)} vendidos en ${kpis.totalTransactions} transacciones del evento "${event?.name || 'activo'}".`,
+      draftSale: null,
+    };
   }
 
   try {
@@ -528,7 +553,7 @@ Instrucciones:
       { role: 'user', parts: [{ text: systemPrompt }] },
       ...history.map(h => ({
         role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.content }],
+        parts: [{ text: h.text || h.content || '' }],
       })),
       { role: 'user', parts: [{ text: message }] },
     ];
@@ -538,9 +563,68 @@ Instrucciones:
       contents: formattedContents,
     });
 
-    return response.text?.trim() || 'No se pudo generar respuesta.';
+    const rawText = response.text?.trim() || '';
+    let draftSale = null;
+    let cleanReply = rawText;
+
+    // Detectar bloque json_sale
+    const saleMatch = rawText.match(/```(?:json_sale|json)?\s*([\s\S]*?)\s*```/);
+    if (saleMatch) {
+      try {
+        const parsedJson = JSON.parse(saleMatch[1]);
+        if (parsedJson.isSale || parsedJson.items) {
+          cleanReply = rawText.replace(saleMatch[0], '').trim();
+
+          const enrichedItems = [];
+          let grandTotal = 0;
+
+          if (Array.isArray(parsedJson.items)) {
+            for (const it of parsedJson.items) {
+              const matched = await matchPosterEverywhere(tenantId, it.title || it.description, it.size);
+              const qty = Number(it.quantity) || 1;
+              const unitPrice = matched?.unitPrice || Number(it.unitPrice) || 65.0;
+              const subtotal = Number((qty * unitPrice).toFixed(2));
+              grandTotal += subtotal;
+
+              enrichedItems.push({
+                productId: matched?.productId || null,
+                webPosterId: matched?.posterId || null,
+                description: matched?.description || it.title || 'Póster',
+                thumbUrl: matched?.thumbUrl || null,
+                imageUrl: matched?.imageUrl || null,
+                quantity: qty,
+                unitPrice,
+                subtotal,
+                availableSizes: matched?.availableSizes || [],
+              });
+            }
+          }
+
+          if (enrichedItems.length > 0) {
+            draftSale = {
+              items: enrichedItems,
+              total: Number(grandTotal.toFixed(2)),
+              paymentMethod: parsedJson.paymentMethod || 'EFECTIVO',
+              inputChannel: 'IA_CHAT_TEXTO',
+              notes: parsedJson.notes || 'Venta dictada por Jarvis Chat',
+              transcription: message,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Error parseando bloque json_sale en chatWithSalesAssistant:', err.message);
+      }
+    }
+
+    return {
+      reply: cleanReply || 'Venta detectada con éxito. Por favor confirma en la tarjeta de abajo para asentar en PostgreSQL.',
+      draftSale,
+    };
   } catch (err) {
     console.error('❌ Error en chatWithSalesAssistant:', err);
-    return `Error consultando IA de ventas: ${err.message}`;
+    return {
+      reply: `Error consultando IA de ventas: ${err.message}`,
+      draftSale: null,
+    };
   }
 }
