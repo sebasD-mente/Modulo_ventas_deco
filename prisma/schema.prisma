@@ -84,6 +84,8 @@ model Product {
   category    String     @default("GENERAL")
   basePrice   Decimal    @db.Decimal(10, 2)
   imageUrl    String?
+  sizes       Json?      @default("[]")
+  tags        String[]   @default([])
   qrCodeData  String?
   barcode     String?
   isActive    Boolean    @default(true)
@@ -92,8 +94,8 @@ model Product {
 
   saleItems   SaleItem[]
 
+  @@unique([tenantId, sku])
   @@index([tenantId, category])
-  @@index([tenantId, sku])
   @@index([tenantId, barcode])
   @@map("products")
 }

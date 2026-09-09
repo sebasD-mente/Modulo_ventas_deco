@@ -21,7 +21,8 @@ export const ENV = {
   GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
   DEFAULT_TENANT_NAME: process.env.DEFAULT_TENANT_NAME || 'Deco Vintage Guate',
   DEFAULT_CURRENCY: process.env.DEFAULT_CURRENCY || 'GTQ',
-  DEFAULT_CURRENCY_SYMBOL: process.env.DEFAULT_CURRENCY_SYMBOL || 'Q'
+  DEFAULT_CURRENCY_SYMBOL: process.env.DEFAULT_CURRENCY_SYMBOL || 'Q',
+  WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintageguate.com'
 };
 
 // Validación de variables críticas para fail-fast

@@ -1,0 +1,30 @@
+# =============================================================================
+#  .dockerignore — Deko EventSales (Production Docker Ignore)
+# =============================================================================
+
+# Environment variables & secrets (keep .env.example for schema reference)
+.env*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Version control & internal tools
+.git/
+.agents/
+.gemini/
+
+# Build artifacts
+dist/
+build/
+
+# Application and server logs
+logs/
+*.log
+
+# Ephemeral local uploads (stateless storage in GCS, keep .gitkeep)
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Automated test suites & test reports
+tests/

@@ -1,149 +1,171 @@
 import { prisma } from '../config/prisma.js';
 
 /**
- * Servicio de integración con el catálogo maestro de 233 pósters de la web (PostgreSQL public schema)
+ * Servicio Desacoplado de Catálogo de Pósters
+ * Fiel al protocolo permanente aislamiento-estricto-proyectos y cirugia-arquitectura-cero-deuda:
+ * Consulta la tabla local `Product` en `deko_eventsales_db`, erradicando cualquier
+ * consulta cruzada raw SQL a bases de datos o esquemas externos.
+ * 
+ * Incorpora caché de lectura de alto rendimiento para garantizar latencia < 50ms
+ * en el punto de venta durante ferias con alta afluencia de público.
+ * 
+ * Preserva exactamente la estructura JSON esperada por FastManualSaleForm.jsx:
+ * { id, titulo, categoria, imageUrl, thumbUrl, precioMinimo, tags, sizes }
  */
+
+// Caché en memoria para búsquedas sub-milisegundo en el POS
+let productCache = null;
+let lastCacheUpdate = 0;
+const CACHE_TTL_MS = 60 * 1000; // 60 segundos de TTL
 
 /**
- * Busca pósters en la tabla public.posters por título, categoría o tags
+ * Invalida la caché en memoria para forzar recarga desde prisma.product
  */
-export async function searchWebPosters({ query = '', category = null, limit = 24 }) {
-  const cleanQuery = query.trim();
-  
-  let sql = `
-    SELECT 
-      p.id, 
-      p.titulo, 
-      p.subtitulo, 
-      p.descripcion, 
-      p.categoria, 
-      p."imageUrl", 
-      p."thumbUrl", 
-      p."precioMinimo", 
-      p."precioDisplay",
-      p.tags,
-      p.estado
-    FROM public.posters p
-    WHERE p."isPublished" = true
-  `;
-
-  const params = [];
-  let paramIdx = 1;
-
-  if (category) {
-    sql += ` AND p.categoria = $${paramIdx++}`;
-    params.push(category);
-  }
-
-  if (cleanQuery) {
-    sql += ` AND (
-      p.titulo ILIKE $${paramIdx} OR 
-      p.subtitulo ILIKE $${paramIdx} OR 
-      p.descripcion ILIKE $${paramIdx} OR
-      EXISTS (SELECT 1 FROM unnest(p.tags) tag WHERE tag ILIKE $${paramIdx})
-    )`;
-    params.push(`%${cleanQuery}%`);
-    paramIdx++;
-  }
-
-  sql += ` ORDER BY p.rating DESC NULLS LAST, p."createdAt" DESC LIMIT $${paramIdx};`;
-  params.push(limit);
-
-  // Ejecución segura de query tipada en PostgreSQL
-  const posters = await prisma.$queryRawUnsafe(sql, ...params);
-
-  // Obtener tamaños y precios para los pósters encontrados
-  if (posters.length > 0) {
-    const posterIds = posters.map(p => `'${p.id}'`).join(',');
-    const sizes = await prisma.$queryRawUnsafe(`
-      SELECT "posterId", "sizeId", "nombre", "dimensiones", "precio"
-      FROM public.poster_sizes
-      WHERE "posterId" IN (${posterIds}) AND "isActive" = true
-      ORDER BY "precio" ASC;
-    `);
-
-    // Agrupar tamaños por póster
-    const sizesMap = {};
-    sizes.forEach(s => {
-      if (!sizesMap[s.posterId]) sizesMap[s.posterId] = [];
-      sizesMap[s.posterId].push({
-        sizeId: s.sizeId,
-        nombre: s.nombre,
-        dimensiones: s.dimensiones,
-        precio: Number(s.precio)
-      });
-    });
-
-    return posters.map(p => ({
-      id: p.id,
-      titulo: p.titulo,
-      subtitulo: p.subtitulo,
-      categoria: p.categoria,
-      imageUrl: p.imageUrl,
-      thumbUrl: p.thumbUrl || p.imageUrl,
-      precioMinimo: Number(p.precioMinimo || 25),
-      tags: p.tags || [],
-      sizes: sizesMap[p.id] || [
-        { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 }
-      ]
-    }));
-  }
-
-  return [];
+export function invalidateCatalogCache() {
+  productCache = null;
+  lastCacheUpdate = 0;
 }
 
 /**
- * Obtiene un resumen ligero de todos los pósters para contexto del prompt de Gemini
+ * Normaliza y formatea un producto local de Prisma al contrato esperado por el frontend.
+ * @param {object} p - Registro del modelo Product.
+ * @returns {object} - Objeto compatible con la UI del POS.
  */
-export async function getAllWebPostersCatalogSummary() {
-  const posters = await prisma.$queryRawUnsafe(`
-    SELECT p.id, p.titulo, p.categoria, p.tags, p."precioMinimo"
-    FROM public.posters p
-    WHERE p."isPublished" = true
-    ORDER BY p.titulo ASC;
-  `);
+function formatProductForPos(p) {
+  let parsedSizes = [];
 
-  return posters.map(p => ({
+  if (Array.isArray(p.sizes) && p.sizes.length > 0) {
+    parsedSizes = p.sizes.map((s) => ({
+      sizeId: s.sizeId || s.id || 'MEDIANO',
+      nombre: s.nombre || s.name || 'Mediano',
+      dimensiones: s.dimensiones || s.dimensions || '30 x 45 cm',
+      precio: Number(s.precio || s.price || p.basePrice || 25),
+    }));
+  } else {
+    // Variantes de tamaño por defecto para pósters de eventos
+    const base = Number(p.basePrice || 25);
+    parsedSizes = [
+      { sizeId: 'MINI', nombre: 'Mini', dimensiones: '20 x 30 cm', precio: Math.max(25, base - 20) },
+      { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '25 x 38 cm', precio: Math.max(35, base - 10) },
+      { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: base },
+      { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: base + 25 },
+    ];
+  }
+
+  return {
+    id: p.id,
+    sku: p.sku,
+    titulo: p.name,
+    subtitulo: '',
+    descripcion: '',
+    categoria: p.category,
+    imageUrl: p.imageUrl,
+    thumbUrl: p.imageUrl,
+    precioMinimo: Number(p.basePrice || 25),
+    precioDisplay: `Q${Number(p.basePrice || 25)}`,
+    tags: Array.isArray(p.tags) ? p.tags : [],
+    sizes: parsedSizes,
+  };
+}
+
+/**
+ * Obtiene los productos desde caché o recarga desde la base de datos si expiró.
+ */
+async function getCachedProducts(tenantId) {
+  const now = Date.now();
+  if (productCache && now - lastCacheUpdate < CACHE_TTL_MS) {
+    return productCache;
+  }
+
+  const where = { isActive: true };
+  if (tenantId) where.tenantId = tenantId;
+
+  const products = await prisma.product.findMany({
+    where,
+    orderBy: { name: 'asc' },
+  });
+
+  productCache = products.map(formatProductForPos);
+  lastCacheUpdate = now;
+  return productCache;
+}
+
+/**
+ * Busca pósters en la tabla local Product por nombre, categoría, tags o SKU.
+ * @param {object} params - Parámetros de búsqueda.
+ * @param {string} [params.tenantId] - Filtro opcional por tenant.
+ * @param {string} [params.query] - Texto de búsqueda.
+ * @param {string} [params.category] - Filtro de categoría.
+ * @param {number} [params.limit] - Cantidad máxima de resultados.
+ * @returns {Promise<Array>} - Lista de pósters formateados.
+ */
+export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
+  const cleanQuery = (query || '').trim().toLowerCase();
+  const allProducts = await getCachedProducts(tenantId);
+
+  let filtered = allProducts;
+
+  if (category) {
+    filtered = filtered.filter((p) => p.categoria === category);
+  }
+
+  if (cleanQuery) {
+    filtered = filtered.filter((p) => {
+      const matchName = p.titulo && p.titulo.toLowerCase().includes(cleanQuery);
+      const matchSku = p.sku && p.sku.toLowerCase().includes(cleanQuery);
+      const matchTag = Array.isArray(p.tags) && p.tags.some((t) => t.toLowerCase().includes(cleanQuery));
+      return matchName || matchSku || matchTag;
+    });
+  }
+
+  return filtered.slice(0, limit);
+}
+
+/**
+ * Obtiene un resumen ligero de todos los pósters locales para contexto de prompts de IA.
+ * @param {string} [tenantId] - Filtro opcional por tenant.
+ * @returns {Promise<Array>} - Lista resumida { id, titulo, categoria, tags, precioMinimo }.
+ */
+export async function getAllWebPostersCatalogSummary(tenantId = null) {
+  const products = await getCachedProducts(tenantId);
+
+  return products.map((p) => ({
     id: p.id,
     titulo: p.titulo,
     categoria: p.categoria,
-    tags: p.tags || [],
-    precioMinimo: Number(p.precioMinimo || 25)
+    tags: p.tags,
+    precioMinimo: p.precioMinimo,
   }));
 }
 
 /**
- * Obtiene un póster específico por su ID con todos sus tamaños oficiales
+ * Obtiene un póster específico por su ID o SKU con todas sus variantes de tamaño.
+ * @param {string} posterId - ID o SKU del producto.
+ * @returns {Promise<object|null>} - Detalle del póster o null si no se encuentra.
  */
 export async function getWebPosterById(posterId) {
-  const posters = await prisma.$queryRawUnsafe(`
-    SELECT p.id, p.titulo, p.categoria, p."imageUrl", p."thumbUrl", p."precioMinimo", p.tags
-    FROM public.posters p
-    WHERE p.id = $1 LIMIT 1;
-  `, posterId);
+  if (!posterId) return null;
 
-  if (!posters || posters.length === 0) return null;
-  const poster = posters[0];
+  // Primero buscar en caché
+  if (productCache) {
+    const cached = productCache.find(
+      (p) => p.id === posterId || p.sku === posterId || p.sku === `WEB-${posterId}`
+    );
+    if (cached) return cached;
+  }
 
-  const sizes = await prisma.$queryRawUnsafe(`
-    SELECT "sizeId", "nombre", "dimensiones", "precio"
-    FROM public.poster_sizes
-    WHERE "posterId" = $1 AND "isActive" = true
-    ORDER BY "precio" ASC;
-  `, posterId);
+  const product = await prisma.product.findFirst({
+    where: {
+      OR: [
+        { id: posterId },
+        { sku: posterId },
+        { sku: `WEB-${posterId}` },
+      ],
+      isActive: true,
+    },
+  });
 
-  return {
-    id: poster.id,
-    titulo: poster.titulo,
-    categoria: poster.categoria,
-    imageUrl: poster.imageUrl,
-    thumbUrl: poster.thumbUrl || poster.imageUrl,
-    precioMinimo: Number(poster.precioMinimo || 25),
-    sizes: sizes.map(s => ({
-      sizeId: s.sizeId,
-      nombre: s.nombre,
-      dimensiones: s.dimensiones,
-      precio: Number(s.precio)
-    }))
-  };
+  if (!product) return null;
+
+  return formatProductForPos(product);
 }

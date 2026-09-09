@@ -155,11 +155,13 @@ export async function createEvent(req, res) {
 }
 
 import { searchWebPosters } from '../services/webCatalogService.js';
+import { syncCatalogFromWeb } from '../services/catalogSyncService.js';
 
 export async function searchWebPostersCatalog(req, res) {
   try {
     const { q, category, limit } = req.query;
     const results = await searchWebPosters({
+      tenantId: req.tenantId,
       query: q || '',
       category: category || null,
       limit: limit ? parseInt(limit, 10) : 24,
@@ -169,5 +171,26 @@ export async function searchWebPostersCatalog(req, res) {
   } catch (err) {
     console.error('❌ Error buscando pósters web:', err);
     return res.status(500).json({ success: false, error: 'Error en la búsqueda del catálogo web.' });
+  }
+}
+
+export async function triggerCatalogSync(req, res) {
+  try {
+    const tenantId = req.tenantId;
+    const result = await syncCatalogFromWeb(tenantId);
+    return res.status(200).json({
+      success: result.success,
+      count: result.count,
+      message: result.success
+        ? `Sincronización exitosa: ${result.count} productos actualizados.`
+        : `Sincronización finalizada: ${result.warning || result.error}`,
+      data: result,
+    });
+  } catch (err) {
+    console.error('❌ Error en sincronización de catálogo:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al sincronizar el catálogo.',
+    });
   }
 }

@@ -31,16 +31,16 @@ Deko EventSales is a dedicated POS and Sales Intelligence application for Deco V
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | M1 | Saneamiento de Código Muerto & Build Frontend | F1, F2 | none | DONE |
-| M2 | Blindaje de Seguridad en API & Concurrencia de Ventas | F3, F4, F5, F6 | none | IN_PROGRESS |
-| M3 | Control de Versiones & Repositorio Git | F7 | M1 | IN_PROGRESS |
+| M2 | Blindaje de Seguridad en API & Concurrencia de Ventas | F3, F4, F5, F6 | none | DONE |
+| M3 | Control de Versiones & Repositorio Git | F7 | M1 | DONE |
 | M4 | Almacenamiento Permanente en Google Cloud Storage | F8, F9 | none | DONE |
-| M5 | Aislamiento Estricto de Base de Datos & Sincronización | F10, F11 | M2 | PLANNED |
-| M6 | Contenerización Docker Multi-Stage & Health Check | F12, F13, F14 | M2, M4, M5 | PLANNED |
-| M7 | E2E Testing Suite & Verificación en Vivo DevTools | F15 | M1, M2, M3, M4, M5, M6 | PLANNED |
+| M5 | Aislamiento Estricto de Base de Datos & Sincronización | F10, F11 | M2 | DONE |
+| M6 | Contenerización Docker Multi-Stage & Health Check | F12, F13, F14 | M2, M4, M5 | DONE |
+| M7 | E2E Testing Suite & Verificación en Vivo DevTools | F15 | M1, M2, M3, M4, M5, M6 | DONE |
 
 ## Interface Contracts
 ### Web Catalog API ↔ Local Catalog Sync Service
-- Endpoint: `GET https://decovintageguate.com/api/catalog/posters?take=500`
+- Endpoint: `GET https://decovintageguate.com/api/catalog/posters?take=500` (or `https://decovintage.online/api/catalog/posters?take=500`)
 - Response Schema:
   ```json
   {

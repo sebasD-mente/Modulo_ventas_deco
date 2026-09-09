@@ -7,6 +7,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { ENV } from './config/env.js';
 import apiRoutes from './routes/apiRoutes.js';
+import { prisma } from './config/prisma.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,9 +30,27 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 // Servir archivos estáticos locales de uploads
 app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString(), env: ENV.NODE_ENV });
+// Health check endpoint con verificación en vivo de base de datos
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: 'ok',
+      db: 'connected',
+      time: new Date().toISOString(),
+      uptime: process.uptime(),
+      env: ENV.NODE_ENV,
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'degraded',
+      db: 'disconnected',
+      error: err.message,
+      time: new Date().toISOString(),
+      uptime: process.uptime(),
+      env: ENV.NODE_ENV,
+    });
+  }
 });
 
 // Rutas de API
@@ -41,9 +60,17 @@ app.use('/api', apiRoutes);
 const distPath = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  // SPA fallback para Express 5
+  // SPA fallback para Express 5 (excluyendo /api, /uploads y /health)
   app.use((req, res) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/uploads') ||
+      req.path === '/health' ||
+      req.path.startsWith('/health/')
+    ) {
+      return res.status(404).json({ success: false, error: 'Endpoint no encontrado' });
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
       return res.status(404).json({ success: false, error: 'Endpoint no encontrado' });
     }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -65,7 +92,6 @@ const cleanShutdown = async (signal) => {
   console.log(`\n🛑 Recibida señal ${signal}. Cerrando servidor y liberando puerto ${ENV.PORT}...`);
   server.close(async () => {
     try {
-      const { prisma } = await import('./config/prisma.js');
       await prisma.$disconnect();
       console.log('✅ Base de datos desconectada y puerto liberado.');
     } catch (err) {

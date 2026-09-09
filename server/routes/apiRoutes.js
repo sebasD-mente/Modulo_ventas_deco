@@ -19,6 +19,7 @@ import {
   activateEvent,
   createEvent,
   searchWebPostersCatalog,
+  triggerCatalogSync,
 } from '../controllers/catalogController.js';
 import {
   handleVoiceSale,
@@ -40,6 +41,7 @@ router.post('/events', createEvent);
 router.patch('/events/:id/activate', activateEvent);
 router.get('/products', getProducts);
 router.get('/catalog/web-posters', searchWebPostersCatalog);
+router.post('/catalog/sync', triggerCatalogSync);
 
 // Rutas de Ventas y Métricas
 router.post('/sales', validate(createSaleSchema), createSale);

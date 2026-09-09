@@ -11,6 +11,7 @@ async function main() {
     where: { slug: 'deco-vintage' },
     update: {},
     create: {
+      id: '9e2f9c77-8eec-47fe-b8bb-6f1d1e5e1e51',
       name: 'Deco Vintage Guate',
       slug: 'deco-vintage',
       currency: 'GTQ',
@@ -33,14 +34,15 @@ async function main() {
     where: {
       tenantId_email: {
         tenantId: tenant.id,
-        email: 'sebas@dekolabs.com',
+        email: 'admin@dekolabs.com',
       },
     },
     update: {},
     create: {
+      id: '976521eb-89a1-4173-89fb-6b313130f69c',
       tenantId: tenant.id,
-      email: 'sebas@dekolabs.com',
-      fullName: 'Sebastián Jiménez (Gerente)',
+      email: 'admin@dekolabs.com',
+      fullName: 'Administrador E2E',
       passwordHash,
       role: 'ADMIN_EMPRESA',
       phone: '+502 3837-5078',
@@ -51,14 +53,14 @@ async function main() {
     where: {
       tenantId_email: {
         tenantId: tenant.id,
-        email: 'carlos.stand@decovintage.com',
+        email: 'vendedor@dekolabs.com',
       },
     },
     update: {},
     create: {
       tenantId: tenant.id,
-      email: 'carlos.stand@decovintage.com',
-      fullName: 'Carlos Pérez (Encargado Stand)',
+      email: 'vendedor@dekolabs.com',
+      fullName: 'Vendedor Stand E2E',
       passwordHash,
       role: 'ENCARGADO_STAND',
       phone: '+502 5555-1234',
@@ -82,6 +84,8 @@ async function main() {
         endDate: new Date('2026-09-12T20:00:00Z'),
         status: 'ACTIVO',
         salesTarget: 15000.0,
+        assignedSellerEmail: 'vendedor@dekolabs.com',
+        assignedSellerName: 'Vendedor Stand E2E',
       },
     });
   }

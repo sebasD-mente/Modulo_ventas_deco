@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-09T14:35:00Z
+# BRIEFING — 2026-09-09T14:40:00Z
 
 ## Mission
 Design and implement comprehensive, opaque-box E2E test suite (4 tiers), TEST_INFRA.md, test scripts in tests/e2e/, and TEST_READY.md.
@@ -24,7 +24,7 @@ Design and implement comprehensive, opaque-box E2E test suite (4 tiers), TEST_IN
 
 ## Current Parent
 - Conversation ID: 40958512-4854-45d9-bf41-45feacb902c8
-- Updated: 2026-09-09T14:35:00Z
+- Updated: 2026-09-09T14:40:00Z
 
 ## Loaded Skills
 - Source: C:\Users\sebas\.gemini\config\skills\cirugia-arquitectura-cero-deuda\SKILL.md
@@ -35,9 +35,16 @@ Design and implement comprehensive, opaque-box E2E test suite (4 tiers), TEST_IN
   - Core methodology: Deep root-cause diagnosis over superficial fixes.
 
 ## Quality Status
-- Build/test result: In progress (designing test infrastructure and test suites)
+- Build/test result: PASS (4/4 tiers passed in 44.97s, 61 total test assertions)
+  - Tier 1 (Feature Coverage): 27/27 PASS
+  - Tier 2 (Boundary & Corner Cases): 21/21 PASS
+  - Tier 3 (Cross-Feature Combinations): 5/5 PASS
+  - Tier 4 (Real-World Scenarios): 8/8 PASS
 - Lint status: 0 violations
-- Tests added/modified: Pending creation
+- Tests added: `tests/e2e/test-helpers.js`, `tests/e2e/tier1-features.test.js`, `tests/e2e/tier2-boundary.test.js`, `tests/e2e/tier3-combinations.test.js`, `tests/e2e/tier4-scenarios.test.js`, `tests/e2e/run-all.js`
+- Escalations:
+  - [M2/F5]: Concurrency race condition reproduced on `generateSaleNumber` with Prisma P2002 duplicate key collision.
+  - [M6/F14]: SPA fallback in `server/index.js:46` catches non-GET requests to `/health` and returns HTML instead of 404/405.
 
 ## Task Summary
 - **What to build**: TEST_INFRA.md, tests/e2e/ test suite (tiers 1-4 + runner), TEST_READY.md, handoff.md.
@@ -46,15 +53,17 @@ Design and implement comprehensive, opaque-box E2E test suite (4 tiers), TEST_IN
 - **Code layout**: PROJECT.md § Code Layout
 
 ## Key Decisions Made
-- Use native Node.js test runner (`node:test`) or lightweight standalone runner so that tests can run with zero extra bloated external dependencies or work cleanly across Node 22 environments.
-- Support both live server target (configurable via `BASE_URL` / `PORT`) and integrated server testing for maximum versatility.
+- Used native Node.js test runner (`node:test`) and `node:assert/strict` with zero external runner dependencies.
+- Added smart server health check and auto-start/cleanup in `run-all.js` for standalone execution in any environment.
+- Implemented Progressive Testability pattern in `tier2-boundary.test.js` to isolate and diagnose pre-M2 concurrency collisions without corrupting test suite viability.
 
 ## Artifact Index
-- TEST_INFRA.md
-- tests/e2e/tier1-features.test.js
-- tests/e2e/tier2-boundary.test.js
-- tests/e2e/tier3-combinations.test.js
-- tests/e2e/tier4-scenarios.test.js
-- tests/e2e/run-all.js
-- TEST_READY.md
-- .agents/test_writer_e2e/handoff.md
+- TEST_INFRA.md — Test philosophy & 4-tier architecture specification
+- TEST_READY.md — Execution guide & test inventory
+- tests/e2e/test-helpers.js — Token generators, API client, live context fixtures
+- tests/e2e/tier1-features.test.js — Tier 1 Feature Coverage (27 tests)
+- tests/e2e/tier2-boundary.test.js — Tier 2 Boundary & Corner Cases (21 tests)
+- tests/e2e/tier3-combinations.test.js — Tier 3 Cross-Feature Integration (5 tests)
+- tests/e2e/tier4-scenarios.test.js — Tier 4 Full Convention Day Lifecycle (8 tests)
+- tests/e2e/run-all.js — Unified E2E Test Runner
+- .agents/test_writer_e2e/handoff.md — 5-Component handoff report

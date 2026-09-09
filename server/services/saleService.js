@@ -1,20 +1,18 @@
 import { prisma } from '../config/prisma.js';
 
 /**
- * Genera un número de venta secuencial legible por evento (ej: CC26-0001)
+ * Genera un número de venta secuencial legible y atómico por evento (ej: CC26-0001)
  */
-export async function generateSaleNumber(eventId) {
-  const count = await prisma.sale.count({
-    where: { eventId },
-  });
-  const event = await prisma.event.findUnique({
+export async function generateSaleNumber(eventId, tx = prisma) {
+  const updatedEvent = await (tx || prisma).event.update({
     where: { id: eventId },
-    select: { name: true },
+    data: { currentSaleSequence: { increment: 1 } },
+    select: { name: true, currentSaleSequence: true },
   });
-  const prefix = event?.name
-    ? event.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()
+  const prefix = updatedEvent?.name
+    ? updatedEvent.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()
     : 'VENTA';
-  const sequential = String(count + 1).padStart(4, '0');
+  const sequential = String(updatedEvent.currentSaleSequence).padStart(4, '0');
   return `${prefix}-${sequential}`;
 }
 
@@ -55,8 +53,17 @@ export async function createSaleTransaction({
       throw new Error(`El monto pagado (Q ${paymentsTotal.toFixed(2)}) no coincide con el total de la venta (Q ${totalAmount.toFixed(2)})`);
     }
 
-    // 3. Generar consecutivo
-    const saleNumber = await generateSaleNumber(eventId);
+    // 3. Generar consecutivo atómico
+    const updatedEvent = await tx.event.update({
+      where: { id: eventId },
+      data: { currentSaleSequence: { increment: 1 } },
+      select: { name: true, currentSaleSequence: true },
+    });
+    const prefix = updatedEvent?.name
+      ? updatedEvent.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()
+      : 'VENTA';
+    const sequential = String(updatedEvent.currentSaleSequence).padStart(4, '0');
+    const saleNumber = `${prefix}-${sequential}`;
 
     // 4. Crear registro maestro de venta
     const sale = await tx.sale.create({
@@ -116,6 +123,9 @@ export async function createSaleTransaction({
     });
 
     return sale;
+  }, {
+    maxWait: 15000,
+    timeout: 30000,
   });
 }
 
