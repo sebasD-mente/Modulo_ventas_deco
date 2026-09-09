@@ -133,6 +133,7 @@ export async function handleChatQuery(req, res) {
       success: true,
       reply: result.reply,
       draftSale: result.draftSale || null,
+      suggestedPosters: result.suggestedPosters || [],
     });
   } catch (err) {
     console.error('❌ Error en handleChatQuery:', err);

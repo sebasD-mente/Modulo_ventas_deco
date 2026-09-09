@@ -633,13 +633,32 @@ ${JSON.stringify(contextData, null, 2)}`;
     // Si NO se generó una venta pero el mensaje parece consultar obras del catálogo, sugerir tarjetas visuales
     if (!draftSale) {
       const cleanSearchTerm = message
-        .replace(/¿|\?|¡|!|tienen|tienes|hay|muestrame|muestra|buscar|busca|precio|de|un|una|el|la|los|las|poster|posters|cuadro|cuadros/gi, ' ')
+        .replace(/¿|\?|¡|!|tienen|tienes|hay|muestrame|muestra|buscar|busca|precio|precios|cuanto|cuánto|cuesta|cuestan|de|un|una|unos|unas|el|la|los|las|poster|posters|cuadro|cuadros|obra|obras|diseño|diseños/gi, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
 
       if (cleanSearchTerm.length >= 2) {
-        const matches = await searchWebPosters({ tenantId, query: cleanSearchTerm, limit: 3 });
+        const matches = await searchWebPosters({ tenantId, query: cleanSearchTerm, limit: 4 });
         if (matches.length > 0) {
           suggestedPosters = matches;
+        }
+      }
+
+      // Si no hubo coincidencia con el término limpio, intentar buscar por nombres en negrita mencionados por Gemini
+      if (suggestedPosters.length === 0 && cleanReply) {
+        const boldMatches = cleanReply.match(/\*\*(.*?)\*\*/g);
+        if (boldMatches && boldMatches.length > 0) {
+          for (const b of boldMatches.slice(0, 3)) {
+            const rawTitle = b.replace(/\*\*/g, '').trim();
+            if (rawTitle.length >= 3) {
+              const matches = await searchWebPosters({ tenantId, query: rawTitle, limit: 3 });
+              for (const m of matches) {
+                if (!suggestedPosters.some((p) => p.id === m.id)) {
+                  suggestedPosters.push(m);
+                }
+              }
+            }
+          }
         }
       }
     }

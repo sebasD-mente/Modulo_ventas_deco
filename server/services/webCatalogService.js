@@ -127,7 +127,16 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
   }
 
   if (cleanQuery) {
-    const tokens = cleanQuery.split(/\s+/).filter((t) => t.length > 0);
+    const rawTokens = cleanQuery.split(/\s+/).filter((t) => t.length > 0);
+    const STOP_WORDS = new Set([
+      'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas',
+      'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
+      'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster',
+      'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños',
+      'hola', 'buenas', 'buenos'
+    ]);
+    const meaningfulTokens = rawTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
+    const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : rawTokens;
 
     const scored = filtered
       .map((p) => {

@@ -621,30 +621,30 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                 {m.suggestedPosters && m.suggestedPosters.length > 0 && (
                   <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-1.5">
                     <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
-                      🎨 Obras encontradas en catálogo:
+                      🎨 Obras encontradas en catálogo ({m.suggestedPosters.length}):
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {m.suggestedPosters.map((sp) => (
                         <div
                           key={sp.id}
-                          className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-950 border border-slate-800/80 hover:border-amber-500/40 transition-colors"
+                          className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950/90 border border-slate-800 hover:border-amber-500/50 transition-all shadow-sm"
                         >
                           <img
                             src={sp.thumbUrl || sp.imageUrl}
-                            alt=""
-                            className="w-8 h-11 object-cover rounded border border-slate-700 shrink-0 bg-slate-900"
+                            alt={sp.titulo}
+                            className="w-10 h-14 object-cover rounded-md border border-slate-700/80 shrink-0 bg-slate-900 shadow"
                           />
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold text-[11px] text-slate-200 block truncate">{sp.titulo}</span>
-                            <span className="text-[9px] text-slate-400 block truncate">{sp.subtitulo || sp.categoria}</span>
-                            <span className="text-[10px] text-emerald-400 font-bold block mt-0.5">
+                            <span className="font-bold text-xs text-slate-100 block truncate">{sp.titulo}</span>
+                            <span className="text-[10px] text-slate-400 block truncate">{sp.subtitulo || sp.categoria}</span>
+                            <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
                               Desde Q{sp.precioMinimo}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => addPosterToDraft(sp)}
-                            className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-[9px] font-black shrink-0 shadow cursor-pointer"
+                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-md text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95"
                           >
                             + Vender
                           </button>
