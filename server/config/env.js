@@ -25,6 +25,18 @@ export const ENV = {
   WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintageguate.com'
 };
 
+// 🛡️ REGLA PERMANENTE: CANDADO DE AISLAMIENTO ESTRICTO DE INFRAESTRUCTURA
+const FORBIDDEN_PATTERNS = ['145.223.120.56', 'catalog_db', 'admin_deco'];
+if (ENV.DATABASE_URL && FORBIDDEN_PATTERNS.some(forbidden => ENV.DATABASE_URL.includes(forbidden))) {
+  console.error('\n' + '='.repeat(70));
+  console.error('🚨 [FATAL ERROR: VIOLACIÓN DE AISLAMIENTO ESTRICTO DE PROYECTOS]');
+  console.error('Se detectó un intento de conectar a infraestructura ajena no autorizada:');
+  console.error('IPs o credenciales del proyecto web (145.223.120.56 / catalog_db) están estrictamente prohibidas.');
+  console.error('Este módulo de ventas debe operar EXCLUSIVAMENTE en su propio servicio de Dokploy.');
+  console.error('='.repeat(70) + '\n');
+  process.exit(1);
+}
+
 // Validación de variables críticas para fail-fast
 if (!ENV.DATABASE_URL) {
   console.warn('⚠️ [Config Advertencia] DATABASE_URL no está definida en .env. Las operaciones de base de datos fallarán hasta configurarse.');
