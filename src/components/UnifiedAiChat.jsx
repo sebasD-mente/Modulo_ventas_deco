@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   Send,
   Bot,
@@ -32,6 +33,7 @@ const DEFAULT_EVENT_SIZES = [
 ];
 
 export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateManualForm }) {
+  const { authFetch } = useAuth();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -145,7 +147,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   const fetchInitialSwapPosters = async () => {
     try {
       setIsSearchingSwap(true);
-      const res = await fetch('/api/catalog/web-posters?limit=8');
+      const res = await authFetch('/api/catalog/web-posters?limit=8');
       const json = await res.json();
       if (json.success) setSwapResults(json.data || []);
     } catch (e) {
@@ -163,7 +165,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     swapDebounceRef.current = setTimeout(async () => {
       setIsSearchingSwap(true);
       try {
-        const res = await fetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=8`);
+        const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=8`);
         const json = await res.json();
         if (json.success) setSwapResults(json.data || []);
       } catch (err) {
@@ -312,7 +314,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     formData.append('eventId', eventId);
 
     try {
-      const res = await fetch('/api/ai/voice-sale', {
+      const res = await authFetch('/api/ai/voice-sale', {
         method: 'POST',
         body: formData,
       });
@@ -372,7 +374,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     formData.append('eventId', eventId);
 
     try {
-      const res = await fetch('/api/ai/recognize-artwork', {
+      const res = await authFetch('/api/ai/recognize-artwork', {
         method: 'POST',
         body: formData,
       });
@@ -426,7 +428,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     setProcessingNote('Consultando datos...');
 
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await authFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -513,7 +515,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     };
 
     try {
-      const res = await fetch('/api/sales', {
+      const res = await authFetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(salePayload),

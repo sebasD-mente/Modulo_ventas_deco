@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   Clock,
   Edit,
@@ -13,6 +14,7 @@ import {
 import EditSaleModal from './EditSaleModal.jsx';
 
 export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated }) {
+  const { authFetch } = useAuth();
   const [sales, setSales] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
@@ -22,7 +24,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
     if (!eventId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/sales/events/${eventId}`);
+      const res = await authFetch(`/api/sales/events/${eventId}`);
       const json = await res.json();
       if (json.success) {
         setSales(json.data || []);

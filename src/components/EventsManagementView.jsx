@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   Calendar,
   MapPin,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function EventsManagementView({ onEventActivated }) {
+  const { authFetch } = useAuth();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -44,7 +46,7 @@ export default function EventsManagementView({ onEventActivated }) {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/events');
+      const res = await authFetch('/api/events');
       const json = await res.json();
       if (json.success) {
         setEvents(json.data || []);
@@ -68,7 +70,7 @@ export default function EventsManagementView({ onEventActivated }) {
     setSelectedEventForSales(event);
     setIsLoadingSales(true);
     try {
-      const res = await fetch(`/api/sales/events/${event.id}`);
+      const res = await authFetch(`/api/sales/events/${event.id}`);
       const json = await res.json();
       if (json.success) {
         setEventSalesList(json.data || []);
@@ -96,7 +98,7 @@ export default function EventsManagementView({ onEventActivated }) {
 
     setIsSubmittingActivation(true);
     try {
-      const res = await fetch(`/api/events/${activatingEvent.id}/activate`, {
+      const res = await authFetch(`/api/events/${activatingEvent.id}/activate`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +132,7 @@ export default function EventsManagementView({ onEventActivated }) {
     }
 
     try {
-      const res = await fetch('/api/events', {
+      const res = await authFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEventData),

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   Search,
   Plus,
@@ -25,6 +26,7 @@ const DEFAULT_SIZES = [
 ];
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
+  const { authFetch } = useAuth();
   // Estado de búsqueda de pósters en la web
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -99,7 +101,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/catalog/web-posters?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
+        const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
         const json = await res.json();
         if (json.success) {
           if (!isSelectingRef.current) {
@@ -248,7 +250,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     };
 
     try {
-      const res = await fetch('/api/sales', {
+      const res = await authFetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(salePayload),

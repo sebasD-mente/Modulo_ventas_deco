@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Copy, Check, Calculator, AlertCircle, Share2 } from 'lucide-react';
 
 export default function CashClosingView({ liveMetrics, activeEvent, onClosingCompleted }) {
+  const { authFetch } = useAuth();
   const [reportedCash, setReportedCash] = useState('');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,7 +73,7 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
     setSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/closings', {
+      const res = await authFetch('/api/closings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

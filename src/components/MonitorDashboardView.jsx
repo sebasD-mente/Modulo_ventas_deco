@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   RotateCcw,
   Calendar,
@@ -14,6 +15,7 @@ import {
 import DonutChart from './DonutChart.jsx';
 
 export default function MonitorDashboardView() {
+  const { authFetch } = useAuth();
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -29,7 +31,7 @@ export default function MonitorDashboardView() {
   const fetchMonitorData = async (isManual = false) => {
     if (isManual) setIsRefreshing(true);
     try {
-      const res = await fetch(`/api/sales/monitor?date=${selectedDate}`);
+      const res = await authFetch(`/api/sales/monitor?date=${selectedDate}`);
       const json = await res.json();
       if (json.success && json.data) {
         setMonitorData(json.data);

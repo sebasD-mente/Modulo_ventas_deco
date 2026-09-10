@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   X,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
 
 export default function EditSaleModal({ sale, onClose, onSaved }) {
   if (!sale) return null;
+  const { authFetch } = useAuth();
 
   const [paymentMethod, setPaymentMethod] = useState(
     sale.payments?.[0]?.method || 'EFECTIVO'
@@ -87,7 +89,7 @@ export default function EditSaleModal({ sale, onClose, onSaved }) {
         notes: notes || null,
       };
 
-      const res = await fetch(`/api/sales/${sale.id}`, {
+      const res = await authFetch(`/api/sales/${sale.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
