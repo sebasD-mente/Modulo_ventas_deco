@@ -78,9 +78,9 @@ COPY server ./server
 # Copy static assets (e.g. public/uploads/.gitkeep)
 COPY public ./public
 
-# Copy container entrypoint script and ensure executable permissions
+# Copy container entrypoint script and ensure executable permissions (stripping CRLF if present)
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
 
 # Expose HTTP service port
 EXPOSE 3001

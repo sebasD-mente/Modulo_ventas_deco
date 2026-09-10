@@ -348,8 +348,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           )}
         </div>
 
-        {/* Desplegable de Resultados de Búsqueda */}
-        {showDropdown && searchResults.length > 0 && (
+        {/* Desplegable de Resultados de Búsqueda (nunca se muestra si ya hay un póster seleccionado) */}
+        {!selectedPoster && showDropdown && searchResults.length > 0 && (
           <div className="absolute z-30 left-0 right-0 mt-1.5 bg-black border border-neutral-800 rounded-2xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar">
             {searchResults.map((p) => (
               <div
@@ -403,7 +403,14 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
             <button
               type="button"
-              onClick={() => setSelectedPoster(null)}
+              onClick={() => {
+                isSelectingRef.current = false;
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                setSelectedPoster(null);
+                setSearchQuery('');
+                setSearchResults([]);
+                setShowDropdown(false);
+              }}
               className="text-neutral-400 hover:text-white p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />

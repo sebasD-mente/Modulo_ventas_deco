@@ -167,7 +167,20 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
   }
 
   if (cleanQuery) {
-    const rawTokens = cleanQuery.split(/\s+/).filter((t) => t.length > 0);
+    const normalize = (str) =>
+      (str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[-_]/g, ' ')
+        .trim();
+
+    const alphaOnly = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const normQuery = normalize(cleanQuery);
+    const alphaQuery = alphaOnly(cleanQuery);
+
+    const rawTokens = normQuery.split(/\s+/).filter((t) => t.length > 0);
     const STOP_WORDS = new Set([
       'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas',
       'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
@@ -189,24 +202,26 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
           Array.isArray(p.tags) ? p.tags.join(' ') : '',
         ]
           .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+          .join(' ');
+
+        const normFullText = normalize(fullText);
+        const alphaFullText = alphaOnly(fullText);
 
         let score = 0;
 
-        // Bonificaciones de coincidencia prefijo en título y subtítulo
+        // Bonificaciones de coincidencia directa o normalizada
+        if (normFullText.startsWith(normQuery)) score += 100;
         if (p.titulo.toLowerCase().startsWith(cleanQuery)) score += 100;
-        if (p.subtitulo && p.subtitulo.toLowerCase().startsWith(cleanQuery)) score += 80;
-        if (p.titulo.toLowerCase().includes(cleanQuery)) score += 50;
-        if (p.subtitulo && p.subtitulo.toLowerCase().includes(cleanQuery)) score += 40;
+        if (normFullText.includes(normQuery)) score += 60;
+        if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 50;
         if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 60;
 
         // Bonificación si coinciden todas las palabras clave (multi-token)
-        const allTokensMatch = tokens.every((t) => fullText.includes(t));
+        const allTokensMatch = tokens.every((t) => normFullText.includes(t));
         if (allTokensMatch) score += 30;
 
         // Puntuación por cada token individual presente
-        const matchedTokensCount = tokens.filter((t) => fullText.includes(t)).length;
+        const matchedTokensCount = tokens.filter((t) => normFullText.includes(t)).length;
         score += matchedTokensCount * 10;
 
         return { p, score };

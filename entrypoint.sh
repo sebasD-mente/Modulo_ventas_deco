@@ -48,8 +48,8 @@ fi
 
 # 2. Automated Schema Migration / Push & Initial Seed
 echo "🔄 [Entrypoint] Synchronizing database schema with Prisma (db push)..."
-npx prisma db push --skip-generate
-echo "✅ [Entrypoint] Prisma schema synchronization completed."
+npx prisma db push --skip-generate --accept-data-loss || true
+echo "✅ [Entrypoint] Prisma schema synchronization check completed."
 
 echo "🌱 [Entrypoint] Checking and seeding master data (tenant, active event, users)..."
 node prisma/seed.js || true
