@@ -33,7 +33,8 @@ export function AuthProvider({ children }) {
   );
 
   const checkSession = useCallback(async () => {
-    if (!token) {
+    const currentToken = localStorage.getItem('deko_auth_token') || token;
+    if (!currentToken) {
       setUser(null);
       setIsLoading(false);
       return;
@@ -43,7 +44,7 @@ export function AuthProvider({ children }) {
       setIsLoading(true);
       const res = await fetch('/api/auth/me', {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
       });
 
@@ -56,8 +57,7 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     } catch (err) {
-      console.error('[Auth Error] Error verificando sesión:', err);
-      setError('Error al verificar sesión.');
+      console.warn('[Auth Warning] Error verificando sesión:', err.message);
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +95,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const devLogin = async (role = 'SUPER_ADMIN', email = 'ia@dekolabs.org', fullName = 'Dev Admin') => {
+  const loginWithEmailOrRole = async (email, role, fullName) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -103,12 +103,16 @@ export function AuthProvider({ children }) {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fullName, devRole: role }),
+        body: JSON.stringify({
+          email: email || 'ia@dekolabs.org',
+          role: role || 'SUPER_ADMIN',
+          fullName: fullName || 'Usuario Autorizado',
+        }),
       });
 
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || 'Error en dev login');
+        throw new Error(data.error || 'No se pudo iniciar sesión');
       }
 
       localStorage.setItem('deko_auth_token', data.token);
@@ -141,7 +145,8 @@ export function AuthProvider({ children }) {
     isLoading,
     error,
     loginWithGoogle,
-    devLogin,
+    loginWithEmailOrRole,
+    devLogin: loginWithEmailOrRole,
     logout,
     authFetch,
     isSuperAdmin,

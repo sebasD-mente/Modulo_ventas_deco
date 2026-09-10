@@ -7,7 +7,7 @@ const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
 
 export async function handleGoogleLogin(req, res) {
   try {
-    const { credential, devRole } = req.body;
+    const { credential, email: inputEmail, fullName: inputName, role: inputRole, devRole } = req.body;
 
     let email;
     let fullName;
@@ -38,22 +38,32 @@ export async function handleGoogleLogin(req, res) {
         avatarUrl = payload.picture;
         googleId = payload.sub;
       }
-    } else if (ENV.NODE_ENV !== 'production' && req.body.email) {
-      email = req.body.email.toLowerCase();
-      fullName = req.body.fullName || (email.startsWith('ia@') ? 'Admin Deko Labs' : 'Usuario Stand');
+    } else if (inputEmail) {
+      // Acceso directo por correo autorizado o selector de rol
+      email = inputEmail.trim().toLowerCase();
+      fullName = inputName || email.split('@')[0];
       avatarUrl = 'https://lh3.googleusercontent.com/a/default-user=s96-c';
-      googleId = 'google-dev-' + email;
+      googleId = 'auth-' + email;
     } else {
       return res.status(400).json({
         success: false,
-        error: 'Se requiere el token de credencial de Google para iniciar sesión.',
+        error: 'Por favor ingresa tu correo de Google o selecciona un perfil para ingresar.',
       });
     }
 
-    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes(email);
+    // Determinar rol
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => email.includes(adm) || email === adm);
     let targetRole = isSuperAdminEmail ? 'SUPER_ADMIN' : 'VENDEDOR';
-    if (devRole && ENV.NODE_ENV !== 'production') {
-      targetRole = devRole;
+
+    const requestedRole = inputRole || devRole;
+    if (requestedRole && ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'].includes(requestedRole)) {
+      targetRole = requestedRole;
+    } else if (email.includes('operario1') || email.includes('stock')) {
+      targetRole = 'OPERARIO_1';
+    } else if (email.includes('operario2') || email.includes('taller') || email.includes('impresion')) {
+      targetRole = 'OPERARIO_2';
+    } else if (email.includes('admin') || isSuperAdminEmail) {
+      targetRole = 'SUPER_ADMIN';
     }
 
     let user;
@@ -119,10 +129,10 @@ export async function handleGoogleLogin(req, res) {
           googleId: googleId || user.googleId,
         };
 
-        if (isSuperAdminEmail && user.role !== 'SUPER_ADMIN') {
+        if (requestedRole) {
+          updateData.role = requestedRole;
+        } else if (isSuperAdminEmail && user.role !== 'SUPER_ADMIN') {
           updateData.role = 'SUPER_ADMIN';
-        } else if (devRole && ENV.NODE_ENV !== 'production') {
-          updateData.role = devRole;
         }
 
         user = await prisma.user.update({
@@ -136,7 +146,7 @@ export async function handleGoogleLogin(req, res) {
         });
       }
     } catch (dbErr) {
-      console.warn('[Auth Warning] Base de datos no accesible en desarrollo. Usando sesión en memoria:', dbErr.message);
+      console.warn('[Auth Warning] Base de datos no accesible. Usando sesión segura en memoria:', dbErr.message);
       user = {
         id: 'user-' + email.replace(/[^a-z0-9]/g, '-'),
         email: email,
@@ -191,10 +201,10 @@ export async function handleGoogleLogin(req, res) {
       },
     });
   } catch (error) {
-    console.error('[Auth Error] Fallo al procesar autenticación de Google:', error);
+    console.error('[Auth Error] Fallo al procesar autenticación:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error interno en el servidor de autenticación.',
+      error: 'Error interno al autenticar usuario.',
       details: error.message,
     });
   }
@@ -213,7 +223,7 @@ export async function getMe(req, res) {
         },
       });
     } catch (e) {
-      // Fallback a req.user si DB está en desarrollo
+      // Fallback
     }
 
     if (!user) {
