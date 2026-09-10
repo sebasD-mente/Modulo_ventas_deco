@@ -133,11 +133,20 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const isVendedor = user?.role === 'VENDEDOR';
-  const isOperario1 = user?.role === 'OPERARIO_1';
-  const isOperario2 = user?.role === 'OPERARIO_2';
-  const isProduccion = isOperario1 || isOperario2;
+  const userRoles = Array.isArray(user?.roles) && user.roles.length > 0
+    ? user.roles
+    : (user?.role ? [user.role] : []);
+
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+  const isVendedor = userRoles.includes('VENDEDOR');
+  const isOperario1 = userRoles.includes('OPERARIO_1');
+  const isOperario2 = userRoles.includes('OPERARIO_2');
+  const isProduccion = isOperario1 || isOperario2 || isSuperAdmin;
+
+  const hasRole = (roleToCheck) => {
+    if (isSuperAdmin) return true;
+    return userRoles.includes(roleToCheck);
+  };
 
   const value = {
     user,
@@ -149,6 +158,8 @@ export function AuthProvider({ children }) {
     devLogin: loginWithEmailOrRole,
     logout,
     authFetch,
+    roles: userRoles,
+    hasRole,
     isSuperAdmin,
     isVendedor,
     isOperario1,

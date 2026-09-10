@@ -2,6 +2,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
+import { demoUsers } from './userController.js';
 
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
 
@@ -104,12 +105,15 @@ export async function handleGoogleLogin(req, res) {
           targetRole = 'SUPER_ADMIN';
         }
 
+        const initialRoles = targetRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [targetRole];
+
         user = await prisma.user.create({
           data: {
             tenantId: tenant.id,
             email: email,
             fullName: fullName,
             role: targetRole,
+            roles: initialRoles,
             googleId: googleId,
             avatarUrl: avatarUrl,
             status: 'ACTIVO',
@@ -121,17 +125,20 @@ export async function handleGoogleLogin(req, res) {
           },
         });
 
-        console.log(`[Auth] ✨ Nuevo usuario registrado: ${email} con rol: ${user.role}`);
+        console.log(`[Auth] ✨ Nuevo usuario registrado: ${email} con roles: [${user.roles.join(', ')}]`);
       } else {
+        const currentRoles = Array.isArray(user.roles) && user.roles.length > 0
+          ? user.roles
+          : [user.role || 'VENDEDOR'];
+
         const updateData = {
           fullName: fullName,
           avatarUrl: avatarUrl || user.avatarUrl,
           googleId: googleId || user.googleId,
         };
 
-        if (requestedRole) {
-          updateData.role = requestedRole;
-        } else if (isSuperAdminEmail && user.role !== 'SUPER_ADMIN') {
+        if (isSuperAdminEmail && !currentRoles.includes('SUPER_ADMIN')) {
+          updateData.roles = ['SUPER_ADMIN', ...currentRoles.filter(r => r !== 'SUPER_ADMIN')];
           updateData.role = 'SUPER_ADMIN';
         }
 
@@ -147,22 +154,29 @@ export async function handleGoogleLogin(req, res) {
       }
     } catch (dbErr) {
       console.warn('[Auth Warning] Base de datos no accesible. Usando sesión segura en memoria:', dbErr.message);
-      user = {
-        id: 'user-' + email.replace(/[^a-z0-9]/g, '-'),
-        email: email,
-        fullName: fullName,
-        role: targetRole,
-        avatarUrl: avatarUrl,
-        assignedEventId: 'event-demo-1',
-        assignedEvent: {
-          id: 'event-demo-1',
-          name: 'Feria Vintage Plaza Fontabella 2026',
-          location: 'Plaza Fontabella, Zona 10',
+      const matchedDemo = demoUsers.find((u) => u.email === email);
+      if (matchedDemo) {
+        user = { ...matchedDemo };
+      } else {
+        const fallbackRoles = targetRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [targetRole];
+        user = {
+          id: 'user-' + email.replace(/[^a-z0-9]/g, '-'),
+          email: email,
+          fullName: fullName,
+          role: targetRole,
+          roles: fallbackRoles,
+          avatarUrl: avatarUrl,
+          assignedEventId: 'event-demo-1',
+          assignedEvent: {
+            id: 'event-demo-1',
+            name: 'Feria Vintage Plaza Fontabella 2026',
+            location: 'Plaza Fontabella, Zona 10',
+            status: 'ACTIVO',
+          },
+          tenantId: tenantId,
           status: 'ACTIVO',
-        },
-        tenantId: tenantId,
-        status: 'ACTIVO',
-      };
+        };
+      }
     }
 
     if (user.status !== 'ACTIVO') {
@@ -172,11 +186,16 @@ export async function handleGoogleLogin(req, res) {
       });
     }
 
+    const userRoles = Array.isArray(user.roles) && user.roles.length > 0
+      ? user.roles
+      : [user.role || 'VENDEDOR'];
+
     const tokenPayload = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-      role: user.role,
+      role: user.role || userRoles[0],
+      roles: userRoles,
       tenantId: user.tenantId,
       assignedEventId: user.assignedEventId,
       avatarUrl: user.avatarUrl,
@@ -193,7 +212,8 @@ export async function handleGoogleLogin(req, res) {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role,
+        role: user.role || userRoles[0],
+        roles: userRoles,
         avatarUrl: user.avatarUrl,
         assignedEventId: user.assignedEventId,
         assignedEvent: user.assignedEvent,
@@ -230,13 +250,18 @@ export async function getMe(req, res) {
       user = req.user;
     }
 
+    const userRoles = Array.isArray(user.roles) && user.roles.length > 0
+      ? user.roles
+      : [user.role || 'VENDEDOR'];
+
     return res.status(200).json({
       success: true,
       user: {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role,
+        role: user.role || userRoles[0],
+        roles: userRoles,
         avatarUrl: user.avatarUrl,
         assignedEventId: user.assignedEventId,
         assignedEvent: user.assignedEvent || {

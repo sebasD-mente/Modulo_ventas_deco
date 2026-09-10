@@ -5,7 +5,7 @@ import { LogOut, Shield, User } from 'lucide-react';
 export default function Header({ activeEvent, activeTab, setActiveTab }) {
   const { user, logout, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
 
-  // Configuración de pestañas permitidas por rol
+  // Configuración de pestañas permitidas por roles aditivos
   let navTabs = [];
 
   if (isSuperAdmin) {
@@ -17,32 +17,42 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
       { id: 'cierre', label: 'Cierre' },
       { id: 'usuarios', label: 'Usuarios' },
     ];
-  } else if (isVendedor) {
-    navTabs = [
-      { id: 'venta', label: 'Nueva venta' },
-      { id: 'monitor', label: 'Monitor' },
-      { id: 'cierre', label: 'Cierre de caja' },
-    ];
-  } else if (isOperario1) {
-    navTabs = [
-      { id: 'produccion', label: 'Producción & Stock' },
-    ];
-  } else if (isOperario2) {
-    navTabs = [
-      { id: 'produccion', label: 'Taller de Impresión' },
-    ];
   } else {
-    navTabs = [
-      { id: 'venta', label: 'Terminal de Ventas' },
-    ];
+    const tabMap = new Map();
+
+    if (isVendedor) {
+      tabMap.set('venta', { id: 'venta', label: 'Nueva venta' });
+      tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
+    }
+
+    if (isOperario1 && isOperario2) {
+      tabMap.set('produccion', { id: 'produccion', label: 'Producción' });
+    } else if (isOperario1) {
+      tabMap.set('produccion', { id: 'produccion', label: 'Producción & Stock' });
+    } else if (isOperario2) {
+      tabMap.set('produccion', { id: 'produccion', label: 'Taller de Impresión' });
+    }
+
+    if (isVendedor) {
+      tabMap.set('cierre', { id: 'cierre', label: 'Cierre de caja' });
+    }
+
+    navTabs = Array.from(tabMap.values());
+    if (navTabs.length === 0) {
+      navTabs = [{ id: 'venta', label: 'Terminal de Ventas' }];
+    }
   }
 
-  const roleLabelMap = {
-    SUPER_ADMIN: '👑 SUPER ADMIN',
-    VENDEDOR: '💼 VENDEDOR',
-    OPERARIO_1: '👷 OPERARIO 1',
-    OPERARIO_2: '🖨️ OPERARIO 2',
-  };
+  const roleBadgeText = isSuperAdmin
+    ? '👑 SUPER ADMIN'
+    : (user?.roles && user.roles.length > 0 ? user.roles : [user?.role || 'VENDEDOR'])
+        .map((r) => {
+          if (r === 'VENDEDOR') return '💼 VENDEDOR';
+          if (r === 'OPERARIO_1') return '👷 STOCK';
+          if (r === 'OPERARIO_2') return '🖨️ TALLER';
+          return r;
+        })
+        .join(' + ');
 
   return (
     <header className="bg-white border-b border-neutral-200 text-black sticky top-0 z-40 px-3 py-2 sm:py-2.5 sm:px-6 select-none shadow-sm">
@@ -81,7 +91,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
                     {user.fullName}
                   </span>
                   <span className="text-[9px] font-black text-emerald-700 tracking-wider">
-                    {roleLabelMap[user.role] || user.role}
+                    {roleBadgeText}
                   </span>
                 </div>
                 <button

@@ -98,21 +98,24 @@ let demoProductionItems = [
 
 export async function getProductionItems(req, res) {
   try {
-    const { role } = req.user;
+    const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
+    const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
+
     const { eventId, status, search } = req.query;
 
     let items;
     try {
       let statusFilter = {};
 
-      if (role === 'OPERARIO_2') {
+      // Si solo es Operario 2 (sin Operario 1 ni Super Admin), mostrar exclusivamente A_PRODUCCION
+      if (isOperario2 && !isOperario1 && !isSuperAdmin) {
         statusFilter = { productionStatus: 'A_PRODUCCION' };
-      } else if (role === 'OPERARIO_1') {
-        if (status && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
-          statusFilter = { productionStatus: status };
-        }
       } else {
-        if (status && status !== 'ALL') {
+        if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
           statusFilter = { productionStatus: status };
         }
       }
@@ -171,7 +174,7 @@ export async function getProductionItems(req, res) {
     } catch (e) {
       // Fallback a demo items en desarrollo
       items = demoProductionItems.filter((it) => {
-        if (role === 'OPERARIO_2' && it.productionStatus !== 'A_PRODUCCION') return false;
+        if (isOperario2 && !isOperario1 && !isSuperAdmin && it.productionStatus !== 'A_PRODUCCION') return false;
         if (status && status !== 'ALL' && it.productionStatus !== status) return false;
         if (search && !it.description.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
@@ -182,6 +185,7 @@ export async function getProductionItems(req, res) {
       success: true,
       data: items,
       role: req.user.role,
+      roles: userRoles,
     });
   } catch (error) {
     console.error('[Production Controller Error] getProductionItems:', error);
@@ -193,7 +197,14 @@ export async function updateProductionStatus(req, res) {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
-    const { role, id: userId } = req.user;
+    const { id: userId } = req.user;
+
+    const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
+    const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
 
     const validStatuses = ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'];
     if (!validStatuses.includes(status)) {
@@ -204,12 +215,19 @@ export async function updateProductionStatus(req, res) {
     const demoIndex = demoProductionItems.findIndex((it) => it.id === id);
     if (demoIndex !== -1) {
       const demoItem = demoProductionItems[demoIndex];
-      if (role === 'OPERARIO_2' && (demoItem.productionStatus !== 'A_PRODUCCION' || status !== 'IMPRESO')) {
-        return res.status(403).json({
-          success: false,
-          error: 'Operario 2 solo puede marcar como IMPRESO las obras enviadas A PRODUCCION.',
-        });
+      if (status === 'IMPRESO') {
+        if (!isOperario2) {
+          return res.status(403).json({ success: false, error: 'No tienes permiso para marcar obras como IMPRESO.' });
+        }
+        if (demoItem.productionStatus !== 'A_PRODUCCION' && !isSuperAdmin) {
+          return res.status(403).json({ success: false, error: 'Solo se pueden imprimir obras enviadas A PRODUCCION.' });
+        }
+      } else if (['SEPARADO', 'A_PRODUCCION', 'PENDIENTE'].includes(status)) {
+        if (!isOperario1) {
+          return res.status(403).json({ success: false, error: 'No tienes permiso para gestionar el stock y pase a producción.' });
+        }
       }
+
       demoItem.productionStatus = status;
       demoItem.statusChangedAt = new Date();
       return res.status(200).json({
@@ -229,18 +247,24 @@ export async function updateProductionStatus(req, res) {
         return res.status(404).json({ success: false, error: 'Obra/Item no encontrado.' });
       }
 
-      if (role === 'OPERARIO_2') {
-        if (item.productionStatus !== 'A_PRODUCCION' || status !== 'IMPRESO') {
+      if (status === 'IMPRESO') {
+        if (!isOperario2) {
           return res.status(403).json({
             success: false,
-            error: 'Operario 2 solo puede marcar como IMPRESO las obras enviadas A PRODUCCION.',
+            error: 'No tienes permiso de taller para marcar obras como IMPRESO.',
           });
         }
-      } else if (role === 'OPERARIO_1') {
-        if (!['SEPARADO', 'A_PRODUCCION', 'PENDIENTE'].includes(status)) {
+        if (item.productionStatus !== 'A_PRODUCCION' && !isSuperAdmin) {
           return res.status(403).json({
             success: false,
-            error: 'Operario 1 solo puede cambiar el estado a SEPARADO, A PRODUCCION o PENDIENTE.',
+            error: 'Solo se pueden marcar como IMPRESO las obras que están A PRODUCCION.',
+          });
+        }
+      } else if (['SEPARADO', 'A_PRODUCCION', 'PENDIENTE'].includes(status)) {
+        if (!isOperario1) {
+          return res.status(403).json({
+            success: false,
+            error: 'No tienes permiso de Operario 1 para cambiar el estado a SEPARADO, A PRODUCCION o PENDIENTE.',
           });
         }
       }

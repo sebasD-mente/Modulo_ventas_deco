@@ -1,11 +1,12 @@
 import { prisma } from '../config/prisma.js';
 
-let demoUsers = [
+export let demoUsers = [
   {
     id: 'user-superadmin-1',
     email: 'ia@dekolabs.org',
     fullName: 'Sebastián (Deko Labs)',
     role: 'SUPER_ADMIN',
+    roles: ['SUPER_ADMIN'],
     avatarUrl: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
     status: 'ACTIVO',
     assignedEventId: null,
@@ -17,6 +18,7 @@ let demoUsers = [
     email: 'vendedor@decovintage.online',
     fullName: 'Carlos Méndez (Ventas)',
     role: 'VENDEDOR',
+    roles: ['VENDEDOR'],
     avatarUrl: null,
     status: 'ACTIVO',
     assignedEventId: 'event-demo-1',
@@ -28,6 +30,7 @@ let demoUsers = [
     email: 'operario1@decovintage.online',
     fullName: 'Marcos López (Operario 1)',
     role: 'OPERARIO_1',
+    roles: ['OPERARIO_1'],
     avatarUrl: null,
     status: 'ACTIVO',
     assignedEventId: null,
@@ -39,6 +42,7 @@ let demoUsers = [
     email: 'operario2@decovintage.online',
     fullName: 'Andrea Ruiz (Operario 2 Taller)',
     role: 'OPERARIO_2',
+    roles: ['OPERARIO_2'],
     avatarUrl: null,
     status: 'ACTIVO',
     assignedEventId: null,
@@ -66,17 +70,24 @@ export async function getUsersList(req, res) {
 
     return res.status(200).json({
       success: true,
-      data: users.map((u) => ({
-        id: u.id,
-        email: u.email,
-        fullName: u.fullName,
-        role: u.role,
-        avatarUrl: u.avatarUrl,
-        status: u.status,
-        assignedEventId: u.assignedEventId,
-        assignedEvent: u.assignedEvent,
-        createdAt: u.createdAt,
-      })),
+      data: users.map((u) => {
+        const uRoles = Array.isArray(u.roles) && u.roles.length > 0
+          ? u.roles
+          : [u.role || 'VENDEDOR'];
+
+        return {
+          id: u.id,
+          email: u.email,
+          fullName: u.fullName,
+          role: u.role || uRoles[0],
+          roles: uRoles,
+          avatarUrl: u.avatarUrl,
+          status: u.status,
+          assignedEventId: u.assignedEventId,
+          assignedEvent: u.assignedEvent,
+          createdAt: u.createdAt,
+        };
+      }),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -86,19 +97,33 @@ export async function getUsersList(req, res) {
 export async function updateUserRole(req, res) {
   try {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, roles } = req.body;
 
     const validRoles = ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ success: false, error: 'Rol no válido.' });
+    let targetRoles = [];
+
+    if (Array.isArray(roles) && roles.length > 0) {
+      targetRoles = roles.filter((r) => validRoles.includes(r));
+    } else if (role && validRoles.includes(role)) {
+      targetRoles = [role];
     }
+
+    if (targetRoles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Debe especificar al menos un rol válido (SUPER_ADMIN, VENDEDOR, OPERARIO_1, OPERARIO_2).',
+      });
+    }
+
+    const primaryRole = targetRoles[0];
 
     const demoUser = demoUsers.find((u) => u.id === id);
     if (demoUser) {
-      demoUser.role = role;
+      demoUser.role = primaryRole;
+      demoUser.roles = targetRoles;
       return res.status(200).json({
         success: true,
-        message: `Rol de ${demoUser.fullName} actualizado a ${role}`,
+        message: `Roles de ${demoUser.fullName} actualizados a [${targetRoles.join(', ')}]`,
         data: demoUser,
       });
     }
@@ -106,19 +131,25 @@ export async function updateUserRole(req, res) {
     try {
       const updated = await prisma.user.update({
         where: { id },
-        data: { role },
+        data: {
+          role: primaryRole,
+          roles: targetRoles,
+        },
         include: { assignedEvent: true },
       });
 
       return res.status(200).json({
         success: true,
-        message: `Rol de ${updated.fullName} actualizado a ${role}`,
-        data: updated,
+        message: `Roles de ${updated.fullName} actualizados a [${targetRoles.join(', ')}]`,
+        data: {
+          ...updated,
+          roles: updated.roles || targetRoles,
+        },
       });
     } catch (e) {
       return res.status(200).json({
         success: true,
-        message: `Rol actualizado a ${role}`,
+        message: `Roles actualizados a [${targetRoles.join(', ')}]`,
       });
     }
   } catch (error) {

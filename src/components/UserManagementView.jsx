@@ -37,12 +37,26 @@ export default function UserManagementView() {
     fetchUsersAndEvents();
   }, [fetchUsersAndEvents]);
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleToggleRole = async (userId, targetRole, currentRoles = []) => {
     try {
-      const res = await authFetch(`/api/users/${userId}/role`, {
+      let updatedRoles = [];
+      const rolesList = Array.isArray(currentRoles) && currentRoles.length > 0 ? [...currentRoles] : ['VENDEDOR'];
+
+      if (rolesList.includes(targetRole)) {
+        // Evitar dejar al usuario sin ningún rol
+        if (rolesList.length === 1) {
+          alert('El usuario debe conservar al menos un rol activo.');
+          return;
+        }
+        updatedRoles = rolesList.filter((r) => r !== targetRole);
+      } else {
+        updatedRoles = [...rolesList, targetRole];
+      }
+
+      const res = await authFetch(`/api/users/${userId}/roles`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ roles: updatedRoles }),
       });
       const data = await res.json();
       if (data.success) {
@@ -53,7 +67,7 @@ export default function UserManagementView() {
         alert(data.error);
       }
     } catch (err) {
-      console.error('Error cambiando rol:', err);
+      console.error('Error actualizando roles:', err);
     }
   };
 
@@ -95,6 +109,13 @@ export default function UserManagementView() {
     }
   };
 
+  const roleDefinitions = [
+    { key: 'SUPER_ADMIN', label: '👑 Super Admin', activeClass: 'bg-emerald-950 border-emerald-500 text-emerald-300' },
+    { key: 'VENDEDOR', label: '💼 Vendedor POS', activeClass: 'bg-white border-white text-black font-black' },
+    { key: 'OPERARIO_1', label: '👷 Op. 1 (Stock)', activeClass: 'bg-amber-950 border-amber-500 text-amber-300' },
+    { key: 'OPERARIO_2', label: '🖨️ Op. 2 (Taller)', activeClass: 'bg-cyan-950 border-cyan-500 text-cyan-300' },
+  ];
+
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl text-white max-w-2xl mx-auto space-y-6 select-none">
       {/* Header */}
@@ -105,13 +126,13 @@ export default function UserManagementView() {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              Gestión de Usuarios & Vendedores
+              Gestión de Usuarios & Multi-Roles
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
                 SUPER ADMIN
               </span>
             </h2>
             <p className="text-xs text-neutral-400">
-              Asignación de roles, permisos y eventos físicos
+              Asignación combinada de roles simultáneos y eventos físicos
             </p>
           </div>
         </div>
@@ -144,88 +165,104 @@ export default function UserManagementView() {
             No hay usuarios registrados aún.
           </div>
         ) : (
-          users.map((u) => (
-            <div
-              key={u.id}
-              className={`bg-black border rounded-2xl p-4 space-y-3 transition-all ${
-                u.status === 'INACTIVO' ? 'border-neutral-900 opacity-60' : 'border-neutral-800'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
-                    {u.avatarUrl ? (
-                      <img src={u.avatarUrl} alt={u.fullName} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-bold text-neutral-400">{u.fullName[0]}</span>
-                    )}
-                  </div>
+          users.map((u) => {
+            const userRolesList = Array.isArray(u.roles) && u.roles.length > 0
+              ? u.roles
+              : [u.role || 'VENDEDOR'];
+            const hasVendedorRole = userRolesList.includes('VENDEDOR') || userRolesList.includes('SUPER_ADMIN');
 
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-white truncate">{u.fullName}</h4>
-                      <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                          u.status === 'ACTIVO'
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                            : 'bg-red-950 text-red-300 border border-red-800'
-                        }`}
-                      >
-                        {u.status}
-                      </span>
+            return (
+              <div
+                key={u.id}
+                className={`bg-black border rounded-2xl p-4 space-y-3 transition-all ${
+                  u.status === 'INACTIVO' ? 'border-neutral-900 opacity-60' : 'border-neutral-800'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} alt={u.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-neutral-400">{u.fullName[0]}</span>
+                      )}
                     </div>
-                    <div className="text-xs text-neutral-400 truncate">{u.email}</div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white truncate">{u.fullName}</h4>
+                        <span
+                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                            u.status === 'ACTIVO'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                              : 'bg-red-950 text-red-300 border border-red-800'
+                          }`}
+                        >
+                          {u.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-400 truncate">{u.email}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStatus(u.id)}
+                    className="text-xs font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded-xl bg-neutral-900 border border-neutral-800 cursor-pointer"
+                  >
+                    {u.status === 'ACTIVO' ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
+
+                {/* Controles Multi-Rol y Asignación de Evento */}
+                <div className="space-y-2.5 pt-2 border-t border-neutral-900">
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                      Roles Asignados (Toca para activar/desactivar simultáneamente):
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {roleDefinitions.map((roleDef) => {
+                        const isAssigned = userRolesList.includes(roleDef.key);
+                        return (
+                          <button
+                            key={roleDef.key}
+                            type="button"
+                            onClick={() => handleToggleRole(u.id, roleDef.key, userRolesList)}
+                            className={`px-2.5 py-1.5 rounded-xl text-[11px] border font-bold transition-all text-center cursor-pointer active:scale-95 ${
+                              isAssigned
+                                ? roleDef.activeClass
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
+                            }`}
+                          >
+                            {roleDef.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                      Evento Físico Asignado (Para facturación en feria)
+                    </label>
+                    <select
+                      value={u.assignedEventId || ''}
+                      onChange={(e) => handleAssignEvent(u.id, e.target.value)}
+                      disabled={!hasVendedorRole}
+                      className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white disabled:opacity-40 cursor-pointer"
+                    >
+                      <option value="">Sin evento asignado</option>
+                      {events.map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.name} ({ev.status})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleToggleStatus(u.id)}
-                  className="text-xs font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded-xl bg-neutral-900 border border-neutral-800 cursor-pointer"
-                >
-                  {u.status === 'ACTIVO' ? 'Desactivar' : 'Activar'}
-                </button>
               </div>
-
-              {/* Controles de Rol y Asignación de Evento */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-neutral-900">
-                <div>
-                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                    Rol en la Aplicación
-                  </label>
-                  <select
-                    value={u.role}
-                    onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white cursor-pointer"
-                  >
-                    <option value="SUPER_ADMIN">👑 Super Administrador</option>
-                    <option value="VENDEDOR">💼 Vendedor</option>
-                    <option value="OPERARIO_1">👷 Operario 1 (Stock)</option>
-                    <option value="OPERARIO_2">🖨️ Operario 2 (Taller)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-                    Evento Físico Asignado
-                  </label>
-                  <select
-                    value={u.assignedEventId || ''}
-                    onChange={(e) => handleAssignEvent(u.id, e.target.value)}
-                    disabled={u.role !== 'VENDEDOR'}
-                    className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white disabled:opacity-40 cursor-pointer"
-                  >
-                    <option value="">Sin evento asignado</option>
-                    {events.map((ev) => (
-                      <option key={ev.id} value={ev.id}>
-                        {ev.name} ({ev.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

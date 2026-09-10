@@ -19,6 +19,7 @@ export async function authMiddleware(req, res, next) {
             email: true,
             fullName: true,
             role: true,
+            roles: true,
             tenantId: true,
             assignedEventId: true,
             avatarUrl: true,
@@ -35,7 +36,8 @@ export async function authMiddleware(req, res, next) {
             id: decoded.id,
             email: decoded.email,
             fullName: decoded.fullName,
-            role: decoded.role,
+            role: decoded.role || (decoded.roles && decoded.roles[0]) || 'VENDEDOR',
+            roles: decoded.roles || (decoded.role ? [decoded.role] : ['VENDEDOR']),
             tenantId: decoded.tenantId || 'tenant-deco-vintage',
             assignedEventId: decoded.assignedEventId,
             avatarUrl: decoded.avatarUrl,
@@ -47,6 +49,11 @@ export async function authMiddleware(req, res, next) {
             error: 'Usuario inactivo o no encontrado en el sistema.',
           });
         }
+      }
+
+      // Normalizar roles
+      if (!user.roles || !Array.isArray(user.roles) || user.roles.length === 0) {
+        user.roles = user.role ? [user.role] : ['VENDEDOR'];
       }
 
       if (user.status !== 'ACTIVO') {
@@ -75,6 +82,7 @@ export async function authMiddleware(req, res, next) {
       email: 'ia@dekolabs.org',
       fullName: 'Dev Admin (Deko Labs)',
       role: devRole,
+      roles: devRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [devRole],
       tenantId: 'tenant-deco-vintage',
       assignedEventId: null,
       avatarUrl: null,
@@ -97,18 +105,23 @@ export function requireRole(allowedRoles = []) {
       return res.status(401).json({ success: false, error: 'No autenticado' });
     }
 
-    if (req.user.role === 'SUPER_ADMIN') {
+    const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user.role || 'VENDEDOR'];
+
+    if (userRoles.includes('SUPER_ADMIN')) {
       return next();
     }
 
-    if (allowedRoles.includes(req.user.role)) {
+    const hasPermission = allowedRoles.some((r) => userRoles.includes(r));
+    if (hasPermission) {
       return next();
     }
 
     return res.status(403).json({
       success: false,
       error: `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}`,
-      userRole: req.user.role,
+      userRoles: userRoles,
     });
   };
 }
@@ -118,13 +131,17 @@ export function requireEventAccess(req, res, next) {
     return res.status(401).json({ success: false, error: 'No autenticado' });
   }
 
-  if (req.user.role === 'SUPER_ADMIN') {
+  const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+    ? req.user.roles
+    : [req.user.role || 'VENDEDOR'];
+
+  if (userRoles.includes('SUPER_ADMIN')) {
     return next();
   }
 
   const requestedEventId = req.params.eventId || req.body.eventId || req.query.eventId;
 
-  if (req.user.role === 'VENDEDOR') {
+  if (userRoles.includes('VENDEDOR')) {
     if (req.user.assignedEventId && requestedEventId && req.user.assignedEventId !== requestedEventId) {
       return res.status(403).json({
         success: false,

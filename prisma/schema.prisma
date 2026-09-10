@@ -38,6 +38,7 @@ model User {
   passwordHash    String?
   fullName        String
   role            String          @default("VENDEDOR") // SUPER_ADMIN | VENDEDOR | OPERARIO_1 | OPERARIO_2
+  roles           String[]        @default(["VENDEDOR"]) // Soporte Multi-Rol Aditivo
   googleId        String?         @unique
   avatarUrl       String?
   phone           String?

@@ -83,6 +83,7 @@ router.get(
 // ==========================================
 router.get('/users', requireRole(['SUPER_ADMIN']), getUsersList);
 router.patch('/users/:id/role', requireRole(['SUPER_ADMIN']), updateUserRole);
+router.patch('/users/:id/roles', requireRole(['SUPER_ADMIN']), updateUserRole);
 router.patch('/users/:id/assign-event', requireRole(['SUPER_ADMIN']), assignUserToEvent);
 router.patch('/users/:id/toggle-status', requireRole(['SUPER_ADMIN']), toggleUserStatus);
 

@@ -117,7 +117,12 @@ export default function ProductionManagementView() {
   };
 
   // Determinar rol efectivo para renderizar la interfaz
-  const isOp2Only = isOperario2 && !isSuperAdmin;
+  const isOp2Only = isOperario2 && !isOperario1 && !isSuperAdmin;
+  const sectionBadge = isSuperAdmin
+    ? 'SUPER ADMIN'
+    : (isOperario1 && isOperario2
+        ? 'PRODUCCIÓN TOTAL'
+        : (isOperario2 ? 'TALLER' : (isOperario1 ? 'STOCK & PRODUCCIÓN' : 'OPERADOR')));
 
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl text-white max-w-2xl mx-auto space-y-6 select-none">
@@ -131,7 +136,7 @@ export default function ProductionManagementView() {
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
               {isOp2Only ? 'Taller de Impresión' : 'Gestión de Producción'}
               <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300">
-                {user?.role?.replace('_', ' ')}
+                {sectionBadge}
               </span>
             </h2>
             <p className="text-xs text-neutral-400">
