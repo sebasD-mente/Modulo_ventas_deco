@@ -105,6 +105,22 @@ const server = app.listen(ENV.PORT, () => {
       }
     })
     .catch((err) => console.warn('[Startup] No se pudo verificar conteo de productos:', err.message));
+
+  // 🛡️ REGLA ZERO-TRUST: Reconciliación y purga de cuentas residuales/no autorizadas en base de datos
+  prisma.user
+    .deleteMany({
+      where: {
+        email: {
+          notIn: ENV.SUPER_ADMIN_EMAILS,
+        },
+      },
+    })
+    .then((res) => {
+      if (res.count > 0) {
+        console.log(`[Startup Zero-Trust] 🧹 Se purgaron ${res.count} cuentas residuales/no autorizadas de la base de datos.`);
+      }
+    })
+    .catch((err) => console.warn('[Startup Zero-Trust] Verificación inicial de usuarios:', err.message));
 });
 
 // Cierre limpio (Graceful Shutdown) para evitar procesos zombis o sockets retenidos en Windows

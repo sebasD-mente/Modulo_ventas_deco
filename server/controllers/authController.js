@@ -2,7 +2,6 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { ENV } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
-import { demoUsers } from './userController.js';
 
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
 
@@ -31,7 +30,6 @@ export async function handleGoogleLogin(req, res) {
     let googleId;
 
     if (!ENV.GOOGLE_CLIENT_ID) {
-      // Si aún no se ha configurado el Client ID en el servidor, decodificar el token pero rechazar si no es válido
       const decoded = jwt.decode(credential);
       if (!decoded || !decoded.email) {
         return res.status(401).json({ success: false, error: 'Token de Google inválido o malformado.' });
@@ -41,7 +39,6 @@ export async function handleGoogleLogin(req, res) {
       avatarUrl = decoded.picture;
       googleId = decoded.sub;
     } else {
-      // Verificación criptográfica estricta con los certificados públicos de Google
       const ticket = await googleClient.verifyIdToken({
         idToken: credential,
         audience: ENV.GOOGLE_CLIENT_ID,
@@ -63,115 +60,89 @@ export async function handleGoogleLogin(req, res) {
     let user;
     let tenantId = 'tenant-deco-vintage';
 
-    try {
-      let tenant = await prisma.tenant.findFirst({
-        where: { slug: 'deco-vintage-guate' },
-      });
+    let tenant = await prisma.tenant.findFirst({
+      where: { slug: 'deco-vintage-guate' },
+    });
 
-      if (!tenant) {
-        tenant = await prisma.tenant.create({
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: {
+          name: ENV.DEFAULT_TENANT_NAME,
+          slug: 'deco-vintage-guate',
+          currency: ENV.DEFAULT_CURRENCY,
+          currencySymbol: ENV.DEFAULT_CURRENCY_SYMBOL,
+        },
+      });
+    }
+    tenantId = tenant.id;
+
+    user = await prisma.user.findFirst({
+      where: {
+        tenantId: tenant.id,
+        email: cleanEmail,
+      },
+      include: {
+        assignedEvent: {
+          select: { id: true, name: true, location: true, status: true },
+        },
+      },
+    });
+
+    if (!user) {
+      // Únicamente se auto-aprovisiona el Super Admin configurado explícitamente en el entorno
+      if (isSuperAdminEmail) {
+        user = await prisma.user.create({
           data: {
-            name: ENV.DEFAULT_TENANT_NAME,
-            slug: 'deco-vintage-guate',
-            currency: ENV.DEFAULT_CURRENCY,
-            currencySymbol: ENV.DEFAULT_CURRENCY_SYMBOL,
+            tenantId: tenant.id,
+            email: cleanEmail,
+            fullName: fullName,
+            role: 'SUPER_ADMIN',
+            roles: ['SUPER_ADMIN'],
+            googleId: googleId,
+            avatarUrl: avatarUrl,
+            status: 'ACTIVO',
           },
-        });
-      }
-      tenantId = tenant.id;
-
-      user = await prisma.user.findFirst({
-        where: {
-          tenantId: tenant.id,
-          email: cleanEmail,
-        },
-        include: {
-          assignedEvent: {
-            select: { id: true, name: true, location: true, status: true },
-          },
-        },
-      });
-
-      if (!user) {
-        // Únicamente se auto-aprovisiona el Super Admin configurado explícitamente en el entorno
-        if (isSuperAdminEmail) {
-          user = await prisma.user.create({
-            data: {
-              tenantId: tenant.id,
-              email: cleanEmail,
-              fullName: fullName,
-              role: 'SUPER_ADMIN',
-              roles: ['SUPER_ADMIN'],
-              googleId: googleId,
-              avatarUrl: avatarUrl,
-              status: 'ACTIVO',
-            },
-            include: {
-              assignedEvent: {
-                select: { id: true, name: true, location: true, status: true },
-              },
-            },
-          });
-          console.log(`[Auth] 👑 Super Admin autorizado aprovisionado: ${cleanEmail}`);
-        } else {
-          // 🛑 BLOQUEO ESTRICTO ZERO-TRUST: Si el usuario no fue registrado previamente por el Administrador, se rechaza
-          console.warn(`[Auth Warning 403] Intento de acceso bloqueado. Cuenta no autorizada: ${cleanEmail}`);
-          return res.status(403).json({
-            success: false,
-            error: `Acceso denegado: La cuenta de Google (${cleanEmail}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
-          });
-        }
-      } else {
-        // El usuario sí existe en la BD
-        const currentRoles = Array.isArray(user.roles) && user.roles.length > 0
-          ? user.roles
-          : [user.role || 'VENDEDOR'];
-
-        const updateData = {
-          fullName: fullName || user.fullName,
-          avatarUrl: avatarUrl || user.avatarUrl,
-          googleId: googleId || user.googleId,
-        };
-
-        if (isSuperAdminEmail && !currentRoles.includes('SUPER_ADMIN')) {
-          updateData.roles = ['SUPER_ADMIN', ...currentRoles.filter(r => r !== 'SUPER_ADMIN')];
-          updateData.role = 'SUPER_ADMIN';
-        }
-
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: updateData,
           include: {
             assignedEvent: {
               select: { id: true, name: true, location: true, status: true },
             },
           },
         });
-      }
-    } catch (dbErr) {
-      console.warn('[Auth Warning] Base de datos no accesible. Validando lista autorizada:', dbErr.message);
-      const matchedDemo = demoUsers.find((u) => u.email.toLowerCase() === email);
-      if (matchedDemo) {
-        user = { ...matchedDemo, fullName: fullName || matchedDemo.fullName, avatarUrl: avatarUrl || matchedDemo.avatarUrl };
-      } else if (isSuperAdminEmail) {
-        user = {
-          id: 'user-' + email.replace(/[^a-z0-9]/g, '-'),
-          email: email,
-          fullName: fullName,
-          role: 'SUPER_ADMIN',
-          roles: ['SUPER_ADMIN'],
-          avatarUrl: avatarUrl,
-          assignedEventId: null,
-          assignedEvent: null,
-          tenantId: tenantId,
-          status: 'ACTIVO',
-        };
+        console.log(`[Auth] 👑 Super Admin autorizado aprovisionado: ${cleanEmail}`);
       } else {
+        // 🛑 BLOQUEO ESTRICTO ZERO-TRUST: Si el usuario no fue registrado previamente por el Administrador, se rechaza
+        console.warn(`[Auth Warning 403] Intento de acceso bloqueado. Cuenta no autorizada: ${cleanEmail}`);
         return res.status(403).json({
           success: false,
-          error: `Acceso denegado: La cuenta de Google (${email}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
+          error: `Acceso denegado: La cuenta de Google (${cleanEmail}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
         });
       }
+    } else {
+      // El usuario sí existe en la BD
+      const currentRoles = Array.isArray(user.roles) && user.roles.length > 0
+        ? user.roles
+        : [user.role || 'VENDEDOR'];
+
+      const updateData = {
+        fullName: fullName || user.fullName,
+        avatarUrl: avatarUrl || user.avatarUrl,
+        googleId: googleId || user.googleId,
+      };
+
+      if (isSuperAdminEmail && !currentRoles.includes('SUPER_ADMIN')) {
+        updateData.roles = ['SUPER_ADMIN', ...currentRoles.filter((r) => r !== 'SUPER_ADMIN')];
+        updateData.role = 'SUPER_ADMIN';
+      }
+
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+        include: {
+          assignedEvent: {
+            select: { id: true, name: true, location: true, status: true },
+          },
+        },
+      });
     }
 
     if (user.status !== 'ACTIVO') {
@@ -227,22 +198,17 @@ export async function handleGoogleLogin(req, res) {
 
 export async function getMe(req, res) {
   try {
-    let user;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        include: {
-          assignedEvent: {
-            select: { id: true, name: true, location: true, status: true },
-          },
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        assignedEvent: {
+          select: { id: true, name: true, location: true, status: true },
         },
-      });
-    } catch (e) {
-      // Fallback
-    }
+      },
+    });
 
     if (!user) {
-      user = req.user;
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
     }
 
     let userRoles = Array.isArray(user.roles) && user.roles.length > 0
@@ -252,16 +218,14 @@ export async function getMe(req, res) {
     const userEmail = (user.email || '').toLowerCase().trim();
     const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes(userEmail);
 
-    if (isSuperAdminEmail) {
-      if (!userRoles.includes('SUPER_ADMIN')) {
-        userRoles = ['SUPER_ADMIN', ...userRoles.filter(r => r !== 'SUPER_ADMIN')];
-        try {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { role: 'SUPER_ADMIN', roles: userRoles }
-          });
-        } catch (e) {}
-      }
+    if (isSuperAdminEmail && !userRoles.includes('SUPER_ADMIN')) {
+      userRoles = ['SUPER_ADMIN', ...userRoles.filter((r) => r !== 'SUPER_ADMIN')];
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { role: 'SUPER_ADMIN', roles: userRoles },
+        });
+      } catch (e) {}
     }
 
     return res.status(200).json({
@@ -274,12 +238,7 @@ export async function getMe(req, res) {
         roles: userRoles,
         avatarUrl: user.avatarUrl,
         assignedEventId: user.assignedEventId,
-        assignedEvent: user.assignedEvent || {
-          id: 'event-demo-1',
-          name: 'Feria Vintage Plaza Fontabella 2026',
-          location: 'Plaza Fontabella, Zona 10',
-          status: 'ACTIVO',
-        },
+        assignedEvent: user.assignedEvent || null,
         tenantId: user.tenantId,
       },
     });

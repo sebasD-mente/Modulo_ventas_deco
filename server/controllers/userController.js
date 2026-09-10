@@ -1,72 +1,17 @@
 import { prisma } from '../config/prisma.js';
-
-export let demoUsers = [
-  {
-    id: 'user-superadmin-1',
-    email: 'ia@dekolabs.org',
-    fullName: 'Sebastián (Deko Labs)',
-    role: 'SUPER_ADMIN',
-    roles: ['SUPER_ADMIN'],
-    avatarUrl: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
-    status: 'ACTIVO',
-    assignedEventId: null,
-    assignedEvent: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 'user-vendedor-1',
-    email: 'vendedor@decovintage.online',
-    fullName: 'Carlos Méndez (Ventas)',
-    role: 'VENDEDOR',
-    roles: ['VENDEDOR'],
-    avatarUrl: null,
-    status: 'ACTIVO',
-    assignedEventId: 'event-demo-1',
-    assignedEvent: { id: 'event-demo-1', name: 'Feria Vintage Plaza Fontabella 2026', location: 'Plaza Fontabella' },
-    createdAt: new Date(),
-  },
-  {
-    id: 'user-operario1-1',
-    email: 'operario1@decovintage.online',
-    fullName: 'Marcos López (Operario 1)',
-    role: 'OPERARIO_1',
-    roles: ['OPERARIO_1'],
-    avatarUrl: null,
-    status: 'ACTIVO',
-    assignedEventId: null,
-    assignedEvent: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 'user-operario2-1',
-    email: 'operario2@decovintage.online',
-    fullName: 'Andrea Ruiz (Operario 2 Taller)',
-    role: 'OPERARIO_2',
-    roles: ['OPERARIO_2'],
-    avatarUrl: null,
-    status: 'ACTIVO',
-    assignedEventId: null,
-    assignedEvent: null,
-    createdAt: new Date(),
-  },
-];
+import { ENV } from '../config/env.js';
 
 export async function getUsersList(req, res) {
   try {
-    let users;
-    try {
-      users = await prisma.user.findMany({
-        where: { tenantId: req.tenantId },
-        include: {
-          assignedEvent: {
-            select: { id: true, name: true, location: true, status: true },
-          },
+    const users = await prisma.user.findMany({
+      where: { tenantId: req.tenantId },
+      include: {
+        assignedEvent: {
+          select: { id: true, name: true, location: true, status: true },
         },
-        orderBy: { createdAt: 'desc' },
-      });
-    } catch (e) {
-      users = demoUsers;
-    }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     return res.status(200).json({
       success: true,
@@ -117,41 +62,23 @@ export async function updateUserRole(req, res) {
 
     const primaryRole = targetRoles[0];
 
-    const demoUser = demoUsers.find((u) => u.id === id);
-    if (demoUser) {
-      demoUser.role = primaryRole;
-      demoUser.roles = targetRoles;
-      return res.status(200).json({
-        success: true,
-        message: `Roles de ${demoUser.fullName} actualizados a [${targetRoles.join(', ')}]`,
-        data: demoUser,
-      });
-    }
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        role: primaryRole,
+        roles: targetRoles,
+      },
+      include: { assignedEvent: true },
+    });
 
-    try {
-      const updated = await prisma.user.update({
-        where: { id },
-        data: {
-          role: primaryRole,
-          roles: targetRoles,
-        },
-        include: { assignedEvent: true },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: `Roles de ${updated.fullName} actualizados a [${targetRoles.join(', ')}]`,
-        data: {
-          ...updated,
-          roles: updated.roles || targetRoles,
-        },
-      });
-    } catch (e) {
-      return res.status(200).json({
-        success: true,
-        message: `Roles actualizados a [${targetRoles.join(', ')}]`,
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: `Roles de ${updated.fullName} actualizados a [${targetRoles.join(', ')}]`,
+      data: {
+        ...updated,
+        roles: updated.roles || targetRoles,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -162,37 +89,17 @@ export async function assignUserToEvent(req, res) {
     const { id } = req.params;
     const { eventId } = req.body;
 
-    const demoUser = demoUsers.find((u) => u.id === id);
-    if (demoUser) {
-      demoUser.assignedEventId = eventId || null;
-      demoUser.assignedEvent = eventId
-        ? { id: eventId, name: 'Feria Vintage Plaza Fontabella 2026', location: 'Plaza Fontabella' }
-        : null;
-      return res.status(200).json({
-        success: true,
-        message: `Vendedor asignado al evento ${demoUser.assignedEvent?.name || 'Ninguno'}`,
-        data: demoUser,
-      });
-    }
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { assignedEventId: eventId || null },
+      include: { assignedEvent: true },
+    });
 
-    try {
-      const updated = await prisma.user.update({
-        where: { id },
-        data: { assignedEventId: eventId || null },
-        include: { assignedEvent: true },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: `Vendedor asignado al evento ${updated.assignedEvent?.name || 'Ninguno'}`,
-        data: updated,
-      });
-    } catch (e) {
-      return res.status(200).json({
-        success: true,
-        message: `Vendedor asignado`,
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: `Vendedor asignado al evento ${updated.assignedEvent?.name || 'Ninguno'}`,
+      data: updated,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -201,39 +108,31 @@ export async function assignUserToEvent(req, res) {
 export async function toggleUserStatus(req, res) {
   try {
     const { id } = req.params;
-    const demoUser = demoUsers.find((u) => u.id === id);
-    if (demoUser) {
-      demoUser.status = demoUser.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
-      return res.status(200).json({
-        success: true,
-        message: `Usuario ${demoUser.status === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente.`,
-        data: demoUser,
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+
+    // Proteger que un Super Admin del entorno no pueda ser desactivado por error
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes((user.email || '').toLowerCase().trim());
+    if (isSuperAdminEmail && user.status === 'ACTIVO') {
+      return res.status(400).json({
+        success: false,
+        error: 'No se puede desactivar a un Super Administrador definido en las variables de entorno.',
       });
     }
 
-    try {
-      const user = await prisma.user.findUnique({ where: { id } });
-      if (!user) {
-        return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
-      }
+    const newStatus = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { status: newStatus },
+    });
 
-      const newStatus = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
-      const updated = await prisma.user.update({
-        where: { id },
-        data: { status: newStatus },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: `Usuario ${newStatus === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente.`,
-        data: updated,
-      });
-    } catch (e) {
-      return res.status(200).json({
-        success: true,
-        message: `Estado actualizado`,
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: `Usuario ${newStatus === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente.`,
+      data: updated,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -275,75 +174,45 @@ export async function createUser(req, res) {
 
     const primaryRole = targetRoles[0];
 
-    try {
-      const existing = await prisma.user.findFirst({
-        where: {
-          tenantId: req.tenantId || 'tenant-deco-vintage',
-          email: normalizedEmail,
-        },
+    const existing = await prisma.user.findFirst({
+      where: {
+        tenantId: req.tenantId || 'tenant-deco-vintage',
+        email: normalizedEmail,
+      },
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        error: `Ya existe un usuario registrado con el correo ${normalizedEmail}.`,
       });
+    }
 
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          error: `Ya existe un usuario registrado con el correo ${normalizedEmail}.`,
-        });
-      }
-
-      const newUser = await prisma.user.create({
-        data: {
-          tenantId: req.tenantId || 'tenant-deco-vintage',
-          email: normalizedEmail,
-          fullName: fullName.trim(),
-          role: primaryRole,
-          roles: targetRoles,
-          assignedEventId: assignedEventId || null,
-          status: 'ACTIVO',
-        },
-        include: {
-          assignedEvent: {
-            select: { id: true, name: true, location: true, status: true },
-          },
-        },
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: `Usuario ${newUser.fullName} (${newUser.email}) registrado y autorizado correctamente.`,
-        data: {
-          ...newUser,
-          roles: newUser.roles || targetRoles,
-        },
-      });
-    } catch (dbErr) {
-      const existingDemo = demoUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
-      if (existingDemo) {
-        return res.status(400).json({
-          success: false,
-          error: `Ya existe un usuario registrado con el correo ${normalizedEmail}.`,
-        });
-      }
-
-      const newDemoUser = {
-        id: 'user-' + Date.now(),
+    const newUser = await prisma.user.create({
+      data: {
+        tenantId: req.tenantId || 'tenant-deco-vintage',
         email: normalizedEmail,
         fullName: fullName.trim(),
         role: primaryRole,
         roles: targetRoles,
-        avatarUrl: null,
-        status: 'ACTIVO',
         assignedEventId: assignedEventId || null,
-        assignedEvent: null,
-        createdAt: new Date(),
-      };
-      demoUsers.unshift(newDemoUser);
+        status: 'ACTIVO',
+      },
+      include: {
+        assignedEvent: {
+          select: { id: true, name: true, location: true, status: true },
+        },
+      },
+    });
 
-      return res.status(201).json({
-        success: true,
-        message: `Usuario ${newDemoUser.fullName} (${newDemoUser.email}) registrado y autorizado correctamente.`,
-        data: newDemoUser,
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      message: `Usuario ${newUser.fullName} (${newUser.email}) registrado y autorizado correctamente.`,
+      data: {
+        ...newUser,
+        roles: newUser.roles || targetRoles,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -360,30 +229,27 @@ export async function deleteUser(req, res) {
       });
     }
 
-    const demoIndex = demoUsers.findIndex((u) => u.id === id);
-    if (demoIndex !== -1) {
-      demoUsers.splice(demoIndex, 1);
-      return res.status(200).json({
-        success: true,
-        message: 'Usuario eliminado del sistema correctamente.',
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+    }
+
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes((targetUser.email || '').toLowerCase().trim());
+    if (isSuperAdminEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se puede eliminar a un Super Administrador maestro configurado en las variables de entorno.',
       });
     }
 
-    try {
-      await prisma.user.delete({
-        where: { id },
-      });
+    await prisma.user.delete({
+      where: { id },
+    });
 
-      return res.status(200).json({
-        success: true,
-        message: 'Usuario eliminado del sistema correctamente.',
-      });
-    } catch (e) {
-      return res.status(200).json({
-        success: true,
-        message: 'Usuario eliminado correctamente.',
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: 'Usuario eliminado del sistema correctamente.',
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

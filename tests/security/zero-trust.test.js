@@ -129,4 +129,50 @@ describe('🔒 Suite de Seguridad Zero-Trust & Aislamiento Estricto', () => {
     assert.equal(result.success, true, 'Debe parsear exitosamente con valores válidos');
     assert.deepEqual(result.data.SUPER_ADMIN_EMAILS, ['admin1@test.com', 'admin2@test.com']);
   });
+
+  it('No debe existir demoUsers ni arrays de usuarios simulados en server/', () => {
+    const files = getAllFiles(serverDir);
+    const violations = [];
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf-8');
+      if (content.includes('demoUsers')) {
+        violations.push(path.relative(serverDir, file));
+      }
+    }
+
+    assert.equal(
+      violations.length,
+      0,
+      `Se encontraron referencias a demoUsers en: ${violations.join(', ')}`
+    );
+  });
+
+  it('server/middleware/authMiddleware.js no debe contener bypasses de desarrollo (x-dev-role o devUser)', () => {
+    const authMwFile = path.join(serverDir, 'middleware', 'authMiddleware.js');
+    const content = fs.readFileSync(authMwFile, 'utf-8');
+
+    assert.ok(
+      !content.includes('x-dev-role'),
+      'authMiddleware.js no debe contener encabezado de bypass x-dev-role'
+    );
+    assert.ok(
+      !content.includes('devUser'),
+      'authMiddleware.js no debe contener objetos devUser simulados'
+    );
+  });
+
+  it('prisma/seed.js no debe sembrar usuarios ficticios ni hardcodear contraseñas', () => {
+    const seedFile = path.resolve(__dirname, '../../prisma/seed.js');
+    const content = fs.readFileSync(seedFile, 'utf-8');
+
+    assert.ok(
+      !content.includes('prisma.user.upsert') && !content.includes('prisma.user.create'),
+      'prisma/seed.js no debe crear usuarios arbitrarios'
+    );
+    assert.ok(
+      !content.includes('bcrypt'),
+      'prisma/seed.js no debe requerir bcrypt para hashing de usuarios planos'
+    );
+  });
 });

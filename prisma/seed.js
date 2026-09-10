@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { syncCatalogFromWeb } from '../server/services/catalogSyncService.js';
 
 const prisma = new PrismaClient();
@@ -7,14 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando siembra de datos maestros para Deko EventSales...');
 
-  // 1. Tenant: Deco Vintage Guate
+  // 1. Tenant Oficial: Deco Vintage Guate
   const tenant = await prisma.tenant.upsert({
-    where: { slug: 'deco-vintage' },
+    where: { slug: 'deco-vintage-guate' },
     update: {},
     create: {
-      id: '9e2f9c77-8eec-47fe-b8bb-6f1d1e5e1e51',
       name: 'Deco Vintage Guate',
-      slug: 'deco-vintage',
+      slug: 'deco-vintage-guate',
       currency: 'GTQ',
       currencySymbol: 'Q',
       settings: {
@@ -28,49 +26,7 @@ async function main() {
 
   console.log(`✅ Tenant verificado: ${tenant.name} (${tenant.id})`);
 
-  // 2. Usuarios del sistema
-  const passwordHash = await bcrypt.hash('Deco2026!Eventos', 10);
-
-  const adminUser = await prisma.user.upsert({
-    where: {
-      tenantId_email: {
-        tenantId: tenant.id,
-        email: 'admin@dekolabs.com',
-      },
-    },
-    update: {},
-    create: {
-      id: '976521eb-89a1-4173-89fb-6b313130f69c',
-      tenantId: tenant.id,
-      email: 'admin@dekolabs.com',
-      fullName: 'Administrador E2E',
-      passwordHash,
-      role: 'ADMIN_EMPRESA',
-      phone: '+502 3837-5078',
-    },
-  });
-
-  const standSeller = await prisma.user.upsert({
-    where: {
-      tenantId_email: {
-        tenantId: tenant.id,
-        email: 'vendedor@dekolabs.com',
-      },
-    },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      email: 'vendedor@dekolabs.com',
-      fullName: 'Vendedor Stand E2E',
-      passwordHash,
-      role: 'ENCARGADO_STAND',
-      phone: '+502 5555-1234',
-    },
-  });
-
-  console.log(`✅ Usuarios sembrados: ${adminUser.fullName}, ${standSeller.fullName}`);
-
-  // 3. Evento Activo: Comic Con Guatemala 2026
+  // 2. Evento Inicial: Comic Con Guatemala 2026
   let activeEvent = await prisma.event.findFirst({
     where: { tenantId: tenant.id, name: 'Comic Con Guatemala 2026' },
   });
@@ -85,13 +41,13 @@ async function main() {
         endDate: new Date('2026-09-12T20:00:00Z'),
         status: 'ACTIVO',
         salesTarget: 15000.0,
-        assignedSellerEmail: 'vendedor@dekolabs.com',
-        assignedSellerName: 'Vendedor Stand E2E',
+        assignedSellerEmail: null,
+        assignedSellerName: null,
       },
     });
   }
 
-  console.log(`✅ Evento activo verificado: ${activeEvent.name} (${activeEvent.id})`);
+  console.log(`✅ Evento verificado: ${activeEvent.name} (${activeEvent.id})`);
 
   // 4. Catálogo de productos con QR codes y códigos de barra
   const sampleProducts = [

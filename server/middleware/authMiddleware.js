@@ -31,24 +31,10 @@ export async function authMiddleware(req, res, next) {
       }
 
       if (!user) {
-        if (ENV.NODE_ENV !== 'production') {
-          user = {
-            id: decoded.id,
-            email: decoded.email,
-            fullName: decoded.fullName,
-            role: decoded.role || (decoded.roles && decoded.roles[0]) || 'VENDEDOR',
-            roles: decoded.roles || (decoded.role ? [decoded.role] : ['VENDEDOR']),
-            tenantId: decoded.tenantId || 'tenant-deco-vintage',
-            assignedEventId: decoded.assignedEventId,
-            avatarUrl: decoded.avatarUrl,
-            status: 'ACTIVO',
-          };
-        } else {
-          return res.status(401).json({
-            success: false,
-            error: 'Usuario inactivo o no encontrado en el sistema.',
-          });
-        }
+        return res.status(401).json({
+          success: false,
+          error: 'Usuario inactivo o no encontrado en el sistema.',
+        });
       }
 
       // Normalizar roles
@@ -79,25 +65,6 @@ export async function authMiddleware(req, res, next) {
         error: 'Token de sesión expirado o inválido.',
       });
     }
-  }
-
-  // Fallback de desarrollo para pruebas locales si no hay token explícito
-  if (ENV.NODE_ENV !== 'production') {
-    const devRole = req.headers['x-dev-role'] || 'SUPER_ADMIN';
-    const devUser = {
-      id: 'dev-user-id',
-      email: 'ia@dekolabs.org',
-      fullName: 'Dev Admin (Deko Labs)',
-      role: devRole,
-      roles: devRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [devRole],
-      tenantId: 'tenant-deco-vintage',
-      assignedEventId: null,
-      avatarUrl: null,
-      status: 'ACTIVO',
-    };
-    req.user = devUser;
-    req.tenantId = 'tenant-deco-vintage';
-    return next();
   }
 
   return res.status(401).json({
