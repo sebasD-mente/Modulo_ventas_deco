@@ -15,6 +15,8 @@ import {
 } from '../controllers/productionController.js';
 import {
   getUsersList,
+  createUser,
+  deleteUser,
   updateUserRole,
   assignUserToEvent,
   toggleUserStatus,
@@ -84,6 +86,8 @@ router.get(
 // 4. RUTAS DE ADMINISTRACIÓN DE USUARIOS (SOLO SUPER_ADMIN)
 // ==========================================
 router.get('/users', requireRole(['SUPER_ADMIN']), getUsersList);
+router.post('/users', requireRole(['SUPER_ADMIN']), createUser);
+router.delete('/users/:id', requireRole(['SUPER_ADMIN']), deleteUser);
 router.patch('/users/:id/role', requireRole(['SUPER_ADMIN']), updateUserRole);
 router.patch('/users/:id/roles', requireRole(['SUPER_ADMIN']), updateUserRole);
 router.patch('/users/:id/assign-event', requireRole(['SUPER_ADMIN']), assignUserToEvent);

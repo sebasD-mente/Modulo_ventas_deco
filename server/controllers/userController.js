@@ -238,3 +238,153 @@ export async function toggleUserStatus(req, res) {
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+
+export async function createUser(req, res) {
+  try {
+    const { email, fullName, roles, role, assignedEventId } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Debe proporcionar un correo electrónico válido de Google.',
+      });
+    }
+
+    if (!fullName || fullName.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Debe proporcionar el nombre completo del empleado.',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const validRoles = ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'];
+    let targetRoles = [];
+
+    if (Array.isArray(roles) && roles.length > 0) {
+      targetRoles = roles.filter((r) => validRoles.includes(r));
+    } else if (role && validRoles.includes(role)) {
+      targetRoles = [role];
+    } else {
+      targetRoles = ['VENDEDOR'];
+    }
+
+    if (targetRoles.length === 0) {
+      targetRoles = ['VENDEDOR'];
+    }
+
+    const primaryRole = targetRoles[0];
+
+    try {
+      const existing = await prisma.user.findFirst({
+        where: {
+          tenantId: req.tenantId || 'tenant-deco-vintage',
+          email: normalizedEmail,
+        },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          error: `Ya existe un usuario registrado con el correo ${normalizedEmail}.`,
+        });
+      }
+
+      const newUser = await prisma.user.create({
+        data: {
+          tenantId: req.tenantId || 'tenant-deco-vintage',
+          email: normalizedEmail,
+          fullName: fullName.trim(),
+          role: primaryRole,
+          roles: targetRoles,
+          assignedEventId: assignedEventId || null,
+          status: 'ACTIVO',
+        },
+        include: {
+          assignedEvent: {
+            select: { id: true, name: true, location: true, status: true },
+          },
+        },
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: `Usuario ${newUser.fullName} (${newUser.email}) registrado y autorizado correctamente.`,
+        data: {
+          ...newUser,
+          roles: newUser.roles || targetRoles,
+        },
+      });
+    } catch (dbErr) {
+      const existingDemo = demoUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
+      if (existingDemo) {
+        return res.status(400).json({
+          success: false,
+          error: `Ya existe un usuario registrado con el correo ${normalizedEmail}.`,
+        });
+      }
+
+      const newDemoUser = {
+        id: 'user-' + Date.now(),
+        email: normalizedEmail,
+        fullName: fullName.trim(),
+        role: primaryRole,
+        roles: targetRoles,
+        avatarUrl: null,
+        status: 'ACTIVO',
+        assignedEventId: assignedEventId || null,
+        assignedEvent: null,
+        createdAt: new Date(),
+      };
+      demoUsers.unshift(newDemoUser);
+
+      return res.status(201).json({
+        success: true,
+        message: `Usuario ${newDemoUser.fullName} (${newDemoUser.email}) registrado y autorizado correctamente.`,
+        data: newDemoUser,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function deleteUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (req.user && req.user.id === id) {
+      return res.status(400).json({
+        success: false,
+        error: 'No puedes eliminar tu propia cuenta de Super Administrador en sesión.',
+      });
+    }
+
+    const demoIndex = demoUsers.findIndex((u) => u.id === id);
+    if (demoIndex !== -1) {
+      demoUsers.splice(demoIndex, 1);
+      return res.status(200).json({
+        success: true,
+        message: 'Usuario eliminado del sistema correctamente.',
+      });
+    }
+
+    try {
+      await prisma.user.delete({
+        where: { id },
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Usuario eliminado del sistema correctamente.',
+      });
+    } catch (e) {
+      return res.status(200).json({
+        success: true,
+        message: 'Usuario eliminado correctamente.',
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}

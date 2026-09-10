@@ -56,17 +56,8 @@ export async function handleGoogleLogin(req, res) {
       googleId = payload.sub;
     }
 
-    // Determinar rol inicial para nuevos usuarios
+    // 🛡️ REGLA ZERO-TRUST: Verificar si el correo pertenece a la lista raíz de SUPER_ADMIN
     const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => email === adm || email.includes(adm));
-    let targetRole = isSuperAdminEmail ? 'SUPER_ADMIN' : 'VENDEDOR';
-
-    if (email.includes('operario1') || email.includes('stock')) {
-      targetRole = 'OPERARIO_1';
-    } else if (email.includes('operario2') || email.includes('taller') || email.includes('impresion')) {
-      targetRole = 'OPERARIO_2';
-    } else if (email.includes('admin') || isSuperAdminEmail) {
-      targetRole = 'SUPER_ADMIN';
-    }
 
     let user;
     let tenantId = 'tenant-deco-vintage';
@@ -102,38 +93,43 @@ export async function handleGoogleLogin(req, res) {
 
       if (!user) {
         const totalUsers = await prisma.user.count({ where: { tenantId: tenant.id } });
-        if (totalUsers === 0) {
-          targetRole = 'SUPER_ADMIN';
-        }
-
-        const initialRoles = targetRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [targetRole];
-
-        user = await prisma.user.create({
-          data: {
-            tenantId: tenant.id,
-            email: email,
-            fullName: fullName,
-            role: targetRole,
-            roles: initialRoles,
-            googleId: googleId,
-            avatarUrl: avatarUrl,
-            status: 'ACTIVO',
-          },
-          include: {
-            assignedEvent: {
-              select: { id: true, name: true, location: true, status: true },
+        
+        // Únicamente se auto-aprovisiona el Super Admin del sistema o si la base de datos está completamente vacía (primer inicio)
+        if (isSuperAdminEmail || totalUsers === 0) {
+          user = await prisma.user.create({
+            data: {
+              tenantId: tenant.id,
+              email: email,
+              fullName: fullName,
+              role: 'SUPER_ADMIN',
+              roles: ['SUPER_ADMIN'],
+              googleId: googleId,
+              avatarUrl: avatarUrl,
+              status: 'ACTIVO',
             },
-          },
-        });
-
-        console.log(`[Auth] ✨ Nuevo usuario registrado: ${email} con roles: [${user.roles.join(', ')}]`);
+            include: {
+              assignedEvent: {
+                select: { id: true, name: true, location: true, status: true },
+              },
+            },
+          });
+          console.log(`[Auth] 👑 Super Admin aprovisionado: ${email}`);
+        } else {
+          // 🛑 BLOQUEO ESTRICTO ZERO-TRUST: Si el usuario no está pre-registrado por el Administrador, se deniega el acceso
+          console.warn(`[Auth Warning 403] Intento de acceso denegado. Cuenta no autorizada: ${email}`);
+          return res.status(403).json({
+            success: false,
+            error: `Acceso denegado: La cuenta de Google (${email}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
+          });
+        }
       } else {
+        // El usuario sí existe en la BD
         const currentRoles = Array.isArray(user.roles) && user.roles.length > 0
           ? user.roles
           : [user.role || 'VENDEDOR'];
 
         const updateData = {
-          fullName: fullName,
+          fullName: fullName || user.fullName,
           avatarUrl: avatarUrl || user.avatarUrl,
           googleId: googleId || user.googleId,
         };
@@ -154,36 +150,35 @@ export async function handleGoogleLogin(req, res) {
         });
       }
     } catch (dbErr) {
-      console.warn('[Auth Warning] Base de datos no accesible. Usando sesión segura en memoria:', dbErr.message);
-      const matchedDemo = demoUsers.find((u) => u.email === email);
+      console.warn('[Auth Warning] Base de datos no accesible. Validando lista autorizada:', dbErr.message);
+      const matchedDemo = demoUsers.find((u) => u.email.toLowerCase() === email);
       if (matchedDemo) {
-        user = { ...matchedDemo };
-      } else {
-        const fallbackRoles = targetRole === 'SUPER_ADMIN' ? ['SUPER_ADMIN'] : [targetRole];
+        user = { ...matchedDemo, fullName: fullName || matchedDemo.fullName, avatarUrl: avatarUrl || matchedDemo.avatarUrl };
+      } else if (isSuperAdminEmail) {
         user = {
           id: 'user-' + email.replace(/[^a-z0-9]/g, '-'),
           email: email,
           fullName: fullName,
-          role: targetRole,
-          roles: fallbackRoles,
+          role: 'SUPER_ADMIN',
+          roles: ['SUPER_ADMIN'],
           avatarUrl: avatarUrl,
-          assignedEventId: 'event-demo-1',
-          assignedEvent: {
-            id: 'event-demo-1',
-            name: 'Feria Vintage Plaza Fontabella 2026',
-            location: 'Plaza Fontabella, Zona 10',
-            status: 'ACTIVO',
-          },
+          assignedEventId: null,
+          assignedEvent: null,
           tenantId: tenantId,
           status: 'ACTIVO',
         };
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: `Acceso denegado: La cuenta de Google (${email}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
+        });
       }
     }
 
     if (user.status !== 'ACTIVO') {
       return res.status(403).json({
         success: false,
-        error: 'Tu cuenta ha sido desactivada. Consulta con el Administrador.',
+        error: 'Acceso denegado: Tu cuenta ha sido desactivada por el Administrador.',
       });
     }
 
