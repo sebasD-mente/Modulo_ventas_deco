@@ -1,62 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Sparkles, AlertCircle, Loader2, Mail, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Loader2, KeyRound } from 'lucide-react';
 
 export default function LoginView() {
-  const { loginWithGoogle, loginWithEmailOrRole, isLoading, error } = useAuth();
+  const { loginWithGoogle, isLoading, error } = useAuth();
   const [authError, setAuthError] = useState(null);
-  const [emailInput, setEmailInput] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasGoogleConfig, setHasGoogleConfig] = useState(true);
 
   useEffect(() => {
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    if (window.google && googleClientId) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: async (response) => {
-            if (response.credential) {
-              try {
-                setAuthError(null);
-                await loginWithGoogle(response.credential);
-              } catch (err) {
-                setAuthError(err.message);
-              }
-            }
-          },
-        });
+    if (!googleClientId) {
+      setHasGoogleConfig(false);
+      return;
+    }
 
-        const btnDiv = document.getElementById('googleSignInBtn');
-        if (btnDiv) {
-          window.google.accounts.id.renderButton(btnDiv, {
-            theme: 'filled_black',
-            size: 'large',
-            shape: 'pill',
-            text: 'signin_with',
-            locale: 'es',
-            width: 320,
+    setHasGoogleConfig(true);
+
+    const initGsi = () => {
+      if (window.google && googleClientId) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: googleClientId,
+            auto_select: false,
+            callback: async (response) => {
+              if (response.credential) {
+                try {
+                  setAuthError(null);
+                  await loginWithGoogle(response.credential);
+                } catch (err) {
+                  setAuthError(err.message);
+                }
+              }
+            },
           });
+
+          const btnDiv = document.getElementById('googleSignInBtn');
+          if (btnDiv) {
+            btnDiv.innerHTML = '';
+            window.google.accounts.id.renderButton(btnDiv, {
+              type: 'standard',
+              theme: 'filled_black',
+              size: 'large',
+              shape: 'pill',
+              text: 'signin_with',
+              locale: 'es',
+              width: 300,
+            });
+          }
+        } catch (err) {
+          console.warn('Google Identity Services no se pudo inicializar:', err);
         }
-      } catch (err) {
-        console.warn('Google Identity Services no se pudo inicializar:', err);
       }
+    };
+
+    if (window.google) {
+      initGsi();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google) {
+          clearInterval(interval);
+          initGsi();
+        }
+      }, 300);
+      return () => clearInterval(interval);
     }
   }, [loginWithGoogle]);
-
-  const handleEmailSubmit = async (e) => {
-    e.preventDefault();
-    if (!emailInput.trim()) return;
-    try {
-      setAuthError(null);
-      setIsSubmitting(true);
-      await loginWithEmailOrRole(emailInput.trim(), null, emailInput.split('@')[0]);
-    } catch (err) {
-      setAuthError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 sm:p-6 font-sans select-none">
@@ -78,10 +87,10 @@ export default function LoginView() {
 
         <div className="space-y-1.5">
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            Iniciar Sesión
+            Acceso al Sistema
           </h1>
           <p className="text-xs text-neutral-400">
-            Accede con tu cuenta autorizada de Google para operar el sistema.
+            Inicia sesión con tu cuenta de Google para verificar tu identidad y permisos de acceso.
           </p>
         </div>
 
@@ -93,50 +102,35 @@ export default function LoginView() {
           </div>
         )}
 
-        {/* Botón Oficial Google Identity Services */}
-        <div className="flex flex-col items-center justify-center">
-          <div id="googleSignInBtn" className="min-h-[44px] flex items-center justify-center"></div>
-        </div>
-
-        {/* Separador Visual Elegante */}
-        <div className="relative flex items-center justify-center py-2">
-          <div className="border-t border-neutral-800 w-full"></div>
-          <span className="bg-[#121212] px-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider absolute">
-            O con correo autorizado
-          </span>
-        </div>
-
-        {/* Formulario de Acceso por Correo */}
-        <form onSubmit={handleEmailSubmit} className="space-y-3">
-          <div className="relative">
-            <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              type="email"
-              placeholder="nombre@decovintage.online o Gmail"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full bg-black border border-neutral-700/90 rounded-2xl pl-11 pr-4 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-white shadow-inner placeholder:text-neutral-500"
-              required
-            />
+        {/* Advertencia si falta Client ID */}
+        {!hasGoogleConfig && (
+          <div className="bg-amber-950/40 border border-amber-800/80 rounded-2xl p-4 text-xs text-amber-200 text-left space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-300">
+              <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Google OAuth 2.0 Requerido</span>
+            </div>
+            <p className="text-[11px] text-neutral-300 leading-relaxed">
+              Para garantizar seguridad Zero-Trust y evitar accesos no autorizados, debes ingresar tu <strong>VITE_GOOGLE_CLIENT_ID</strong> en las variables de entorno de Dokploy o en tu archivo <code>.env</code>.
+            </p>
           </div>
-          <button
-            type="submit"
-            disabled={isLoading || isSubmitting || !emailInput.trim()}
-            className="w-full bg-white hover:bg-neutral-200 disabled:opacity-40 text-black font-black text-xs sm:text-sm py-3 px-5 rounded-2xl transition-all shadow-xl active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {(isLoading || isSubmitting) ? (
-              <Loader2 className="w-4 h-4 animate-spin text-black" />
-            ) : (
-              <ArrowRight className="w-4 h-4 text-black" />
-            )}
-            <span>Continuar con mi Cuenta</span>
-          </button>
-        </form>
+        )}
+
+        {/* Botón Oficial Google Identity Services */}
+        <div className="py-3 flex flex-col items-center justify-center min-h-[50px]">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+              <span>Verificando credenciales criptográficas con Google...</span>
+            </div>
+          ) : (
+            <div id="googleSignInBtn" className="flex items-center justify-center"></div>
+          )}
+        </div>
 
         {/* Badge de Seguridad Zero-Trust */}
         <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-center gap-1.5 text-[10px] text-neutral-400">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Acceso Protegido con Google OAuth 2.0 & RBAC</span>
+          <span>Autenticación Criptográfica Zero-Trust • Google Identity</span>
         </div>
       </div>
     </div>

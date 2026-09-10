@@ -95,38 +95,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const loginWithEmailOrRole = async (email, role, fullName) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email || 'ia@dekolabs.org',
-          role: role || 'SUPER_ADMIN',
-          fullName: fullName || 'Usuario Autorizado',
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'No se pudo iniciar sesión');
-      }
-
-      localStorage.setItem('deko_auth_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-      return data.user;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = () => {
     localStorage.removeItem('deko_auth_token');
     setToken(null);
@@ -154,8 +122,6 @@ export function AuthProvider({ children }) {
     isLoading,
     error,
     loginWithGoogle,
-    loginWithEmailOrRole,
-    devLogin: loginWithEmailOrRole,
     logout,
     authFetch,
     roles: userRoles,

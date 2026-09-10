@@ -8,48 +8,44 @@ const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
 
 export async function handleGoogleLogin(req, res) {
   try {
-    const { credential, email: inputEmail, fullName: inputName, role: inputRole, devRole } = req.body;
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere autenticación obligatoria con Google. No se proporcionó un token de identidad válido.',
+      });
+    }
 
     let email;
     let fullName;
     let avatarUrl;
     let googleId;
 
-    if (credential) {
-      if (!ENV.GOOGLE_CLIENT_ID) {
-        const decoded = jwt.decode(credential);
-        if (!decoded || !decoded.email) {
-          return res.status(400).json({ success: false, error: 'Token de Google inválido' });
-        }
-        email = decoded.email.toLowerCase();
-        fullName = decoded.name || email.split('@')[0];
-        avatarUrl = decoded.picture;
-        googleId = decoded.sub;
-      } else {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: credential,
-          audience: ENV.GOOGLE_CLIENT_ID,
-        });
-        const payload = ticket.getPayload();
-        if (!payload || !payload.email) {
-          return res.status(400).json({ success: false, error: 'Credenciales de Google no válidas' });
-        }
-        email = payload.email.toLowerCase();
-        fullName = payload.name || email.split('@')[0];
-        avatarUrl = payload.picture;
-        googleId = payload.sub;
+    if (!ENV.GOOGLE_CLIENT_ID) {
+      // Si aún no se ha configurado el Client ID en el servidor, decodificar el token pero rechazar si no es válido
+      const decoded = jwt.decode(credential);
+      if (!decoded || !decoded.email) {
+        return res.status(401).json({ success: false, error: 'Token de Google inválido o malformado.' });
       }
-    } else if (inputEmail) {
-      // Acceso directo por correo autorizado o selector de rol
-      email = inputEmail.trim().toLowerCase();
-      fullName = inputName || email.split('@')[0];
-      avatarUrl = 'https://lh3.googleusercontent.com/a/default-user=s96-c';
-      googleId = 'auth-' + email;
+      email = decoded.email.toLowerCase();
+      fullName = decoded.name || email.split('@')[0];
+      avatarUrl = decoded.picture;
+      googleId = decoded.sub;
     } else {
-      return res.status(400).json({
-        success: false,
-        error: 'Por favor ingresa tu correo de Google o selecciona un perfil para ingresar.',
+      // Verificación criptográfica estricta con los certificados públicos de Google
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: ENV.GOOGLE_CLIENT_ID,
       });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ success: false, error: 'La verificación criptográfica con Google ha fallado.' });
+      }
+      email = payload.email.toLowerCase();
+      fullName = payload.name || email.split('@')[0];
+      avatarUrl = payload.picture;
+      googleId = payload.sub;
     }
 
     // Determinar rol
