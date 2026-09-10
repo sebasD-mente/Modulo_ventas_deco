@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Shield, User } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 export default function Header({ activeEvent, activeTab, setActiveTab }) {
   const { user, logout, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();

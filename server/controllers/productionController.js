@@ -105,9 +105,14 @@ export async function getProductionItems(req, res) {
     const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
     const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
 
-    const { eventId, status, search } = req.query;
+    const { eventId, status, search, page, limit } = req.query;
+
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+    const skip = (parsedPage - 1) * parsedLimit;
 
     let items;
+    let totalCount = 0;
     try {
       let statusFilter = {};
 
@@ -135,55 +140,72 @@ export async function getProductionItems(req, res) {
         ];
       }
 
-      items = await prisma.saleItem.findMany({
-        where: whereClause,
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              imageUrl: true,
-              category: true,
-            },
-          },
-          sale: {
-            select: {
-              id: true,
-              saleNumber: true,
-              createdAt: true,
-              event: {
-                select: {
-                  id: true,
-                  name: true,
-                  location: true,
-                },
-              },
-              seller: {
-                select: {
-                  id: true,
-                  fullName: true,
-                },
+      const [count, dbItems] = await Promise.all([
+        prisma.saleItem.count({ where: whereClause }),
+        prisma.saleItem.findMany({
+          where: whereClause,
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                imageUrl: true,
+                category: true,
               },
             },
+            sale: {
+              select: {
+                id: true,
+                saleNumber: true,
+                createdAt: true,
+                event: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+                seller: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: parsedLimit,
+        }),
+      ]);
+      totalCount = count;
+      items = dbItems;
     } catch (e) {
       // Fallback a demo items en desarrollo
-      items = demoProductionItems.filter((it) => {
+      const filtered = demoProductionItems.filter((it) => {
         if (isOperario2 && !isOperario1 && !isSuperAdmin && it.productionStatus !== 'A_PRODUCCION') return false;
         if (status && status !== 'ALL' && it.productionStatus !== status) return false;
         if (search && !it.description.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       });
+      totalCount = filtered.length;
+      items = filtered.slice(skip, skip + parsedLimit);
     }
 
     return res.status(200).json({
       success: true,
       data: items,
+      count: items.length,
+      pagination: {
+        total: totalCount,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(totalCount / parsedLimit),
+        hasNext: parsedPage * parsedLimit < totalCount,
+        hasPrev: parsedPage > 1,
+      },
       role: req.user.role,
       roles: userRoles,
     });

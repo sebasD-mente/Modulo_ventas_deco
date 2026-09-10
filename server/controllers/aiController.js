@@ -2,7 +2,10 @@ import {
   processVoiceSaleAudio,
   processPostersBatchPhoto,
   chatWithSalesAssistant,
+  streamChatWithSalesAssistant,
+  constructDraftPayload,
 } from '../services/aiMultimodalService.js';
+import { searchWebPosters } from '../services/webCatalogService.js';
 import { uploadBufferToStorage } from '../services/gcsStorageService.js';
 
 export async function handleVoiceSale(req, res) {
@@ -133,27 +136,101 @@ export async function handleChatQuery(req, res) {
       return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
     }
 
-    const result = await chatWithSalesAssistant({
-      message: message.trim(),
-      history: history || [],
-      tenantId,
-      eventId,
-      date: date || null,
-      pendingDraft: pendingDraft || null,
-    });
+    const isStream = req.body.stream === true || req.headers.accept?.includes('text/event-stream');
 
-    return res.json({
-      success: true,
-      reply: result.reply,
-      draftSale: result.draftSale || null,
-      suggestedPosters: result.suggestedPosters || [],
+    if (!isStream) {
+      // Consultar motor IA con Gemini 2.5 Flash y Function Calling nativo (modo tradicional JSON)
+      const result = await chatWithSalesAssistant({
+        message: message.trim(),
+        history: history || [],
+        tenantId,
+        eventId,
+        date: date || null,
+        pendingDraft: pendingDraft || null,
+      });
+
+      let draft = result.draftSale || null;
+      let suggestedPosters = result.suggestedPosters || [];
+
+      // Manejar llamadas a herramientas (functionCalls) retornadas por el motor de IA Gemini 2.5 Flash
+      const toolCalls = result.toolCalls || result.functionCalls || [];
+      for (const toolCall of toolCalls) {
+        const { name, args } = toolCall;
+        if (name === 'prepareSaleDraft' && args) {
+          draft = await constructDraftPayload(tenantId, args, message.trim());
+        } else if (name === 'searchCatalog' && args?.query) {
+          const matches = await searchWebPosters({
+            tenantId,
+            query: args.query,
+            category: args.category,
+            limit: 4,
+          });
+          if (matches?.length > 0) {
+            suggestedPosters = matches;
+          }
+        }
+      }
+
+      return res.json({
+        success: true,
+        reply: result.reply,
+        draft,
+        draftSale: draft,
+        suggestedPosters,
+        toolCalls,
+      });
+    }
+
+    // Modo Streaming con Server-Sent Events (SSE) y Gemini 2.5 Flash
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
+    res.flushHeaders?.();
+
+    let fullText = '';
+
+    try {
+      const streamGenerator = streamChatWithSalesAssistant({
+        message: message.trim(),
+        history: history || [],
+        tenantId,
+        eventId,
+        date: date || null,
+        pendingDraft: pendingDraft || null,
+      });
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.type === 'token') {
+          fullText += chunk.text;
+          res.write(`event: token\ndata: ${JSON.stringify({ text: chunk.text, delta: chunk.text })}\n\n`);
+        } else if (chunk.type === 'draft_sale') {
+          res.write(`event: draft_sale\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'suggested_posters') {
+          res.write(`event: suggested_posters\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        }
+      }
+
+      res.write(`event: done\ndata: ${JSON.stringify({ fullText })}\n\n`);
+      res.end();
+    } catch (streamErr) {
+      console.error('❌ Error durante el streaming SSE:', streamErr);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: streamErr.message })}\n\n`);
+      res.end();
+    }
   } catch (err) {
     console.error('❌ Error en handleChatQuery:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Error comunicándose con el asistente de IA.',
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Error comunicándose con el asistente de IA.',
+      });
+    } else {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.end();
+    }
   }
 }
 

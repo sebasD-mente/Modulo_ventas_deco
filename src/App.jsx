@@ -1,16 +1,30 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import LoginView from './components/LoginView';
 import UnifiedAiChat from './components/UnifiedAiChat';
 import FastManualSaleForm from './components/FastManualSaleForm';
 import RecentSalesList from './components/RecentSalesList';
-import EventsManagementView from './components/EventsManagementView';
-import MonitorDashboardView from './components/MonitorDashboardView';
-import CashClosingView from './components/CashClosingView';
-import ProductionManagementView from './components/ProductionManagementView';
-import UserManagementView from './components/UserManagementView';
 import { Loader2 } from 'lucide-react';
+
+// Vistas secundarias cargadas bajo demanda mediante React.lazy()
+const EventsManagementView = lazy(() => import('./components/EventsManagementView'));
+const MonitorDashboardView = lazy(() => import('./components/MonitorDashboardView'));
+const ProductionManagementView = lazy(() => import('./components/ProductionManagementView'));
+const CashClosingView = lazy(() => import('./components/CashClosingView'));
+const UserManagementView = lazy(() => import('./components/UserManagementView'));
+
+// Componente de espera elegante mientras se descarga el chunk
+function ViewLoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-white animate-pulse">
+      <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
+      <div className="text-xs font-bold tracking-widest uppercase text-neutral-400">
+        STAND {'{IA}'} • Cargando módulo...
+      </div>
+    </div>
+  );
+}
 
 function SalesTerminalMain() {
   const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
@@ -131,40 +145,43 @@ function SalesTerminalMain() {
           </div>
         )}
 
-        {/* PÁGINA 2: GESTIÓN DE EVENTOS (SUPER ADMIN) */}
-        {activeTab === 'eventos' && isSuperAdmin && (
-          <EventsManagementView
-            onEventActivated={(activatedEvent) => {
-              setActiveEvent(activatedEvent);
-              refreshMetrics();
-              setActiveTab('venta');
-            }}
-          />
-        )}
+        {/* VISTAS SECUNDARIAS ASÍNCRONAS CON CARGA BAJO DEMANDA */}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {/* PÁGINA 2: GESTIÓN DE EVENTOS (SUPER ADMIN) */}
+          {activeTab === 'eventos' && isSuperAdmin && (
+            <EventsManagementView
+              onEventActivated={(activatedEvent) => {
+                setActiveEvent(activatedEvent);
+                refreshMetrics();
+                setActiveTab('venta');
+              }}
+            />
+          )}
 
-        {/* PÁGINA 3: MONITOR EN TIEMPO REAL */}
-        {activeTab === 'monitor' && (isSuperAdmin || isVendedor) && (
-          <MonitorDashboardView />
-        )}
+          {/* PÁGINA 3: MONITOR EN TIEMPO REAL */}
+          {activeTab === 'monitor' && (isSuperAdmin || isVendedor) && (
+            <MonitorDashboardView />
+          )}
 
-        {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN) */}
-        {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2) && (
-          <ProductionManagementView />
-        )}
+          {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN) */}
+          {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2) && (
+            <ProductionManagementView />
+          )}
 
-        {/* PÁGINA 5: CIERRE DE CAJA Y ARQUEO */}
-        {activeTab === 'cierre' && (isSuperAdmin || isVendedor) && (
-          <CashClosingView
-            liveMetrics={liveMetrics}
-            activeEvent={activeEvent}
-            onClosingCompleted={refreshMetrics}
-          />
-        )}
+          {/* PÁGINA 5: CIERRE DE CAJA Y ARQUEO */}
+          {activeTab === 'cierre' && (isSuperAdmin || isVendedor) && (
+            <CashClosingView
+              liveMetrics={liveMetrics}
+              activeEvent={activeEvent}
+              onClosingCompleted={refreshMetrics}
+            />
+          )}
 
-        {/* PÁGINA 6: GESTIÓN DE USUARIOS Y ROLES (SUPER ADMIN) */}
-        {activeTab === 'usuarios' && isSuperAdmin && (
-          <UserManagementView />
-        )}
+          {/* PÁGINA 6: GESTIÓN DE USUARIOS Y ROLES (SUPER ADMIN) */}
+          {activeTab === 'usuarios' && isSuperAdmin && (
+            <UserManagementView />
+          )}
+        </Suspense>
       </main>
 
       {/* Footer Discreto */}

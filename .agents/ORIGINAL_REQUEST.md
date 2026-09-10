@@ -176,4 +176,59 @@ Integrity mode: development
 - [ ] La suite de tests automatizados pasa 100% limpia (`npm test`).
 - [ ] El build de producción compila sin errores (`npm run build`).
 
+## 2026-09-10T22:19:31Z
+
+Implementación quirúrgica y exhaustiva de la Fase 2 del Roadmap técnico de STAND {IA}: migración a Function Calling formal con Gemini 2.5 Flash, streaming progresivo de tokens (SSE) en el chat de IA, optimización de consultas SQL nativas (erradicación de cuellos de botella N+1 y agregaciones en memoria), optimización del bundle frontend con code-splitting (Vite / React.lazy), saneamiento total de código muerto (23 iconos huérfanos, CSS residual, dependencias innecesarias, assets duplicados y scripts obsoletos), con validación automatizada y despliegue en producción.
+
+Working directory: `c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas`
+Integrity mode: development
+
+## Requirements
+
+### R1. Function Calling Nativo y Schemas Estrictos en Motor IA (@google/genai)
+- Reemplazar el scraping de texto markdown (` ```json_sale `) en `server/services/aiMultimodalService.js` por herramientas formales (`tools` con `functionDeclarations` en `@google/genai`):
+  * `prepareSaleDraft(items, total, paymentMethod, notes, customerName)`
+  * `searchCatalog(query, category)`
+  * `getEventKPIs(eventId)`
+- Implementar `responseSchema` estricto en las llamadas multimodales (visión, transcripción de voz) para eliminar la fragilidad de `JSON.parse` en texto plano.
+
+### R2. Streaming de Tokens en Tiempo Real (Server-Sent Events / SSE)
+- Implementar streaming de respuestas en `/api/ai/chat` mediante `generateContentStream` en el backend emitiendo eventos `text/event-stream`.
+- Actualizar `src/components/UnifiedAiChat.jsx` para procesar el stream en tiempo real (`ReadableStream` / `fetch`), reduciendo el Time-To-First-Byte (TTFB) a <400ms con renderizado progresivo del texto.
+
+### R3. Optimización de Consultas y Agregaciones SQL Nativas en Backend
+- En `server/services/saleService.js:getEventKPIs`, reemplazar la hidratación en memoria de todas las ventas por consultas de agregación nativas de PostgreSQL con Prisma (`prisma.sale.aggregate()` y `prisma.salePayment.groupBy()`), optimizando de O(N) a O(1).
+- Implementar límites y paginación eficiente en listados de ventas y producción.
+
+### R4. Optimización de Rendimiento Frontend y División de Bundle (Code-Splitting)
+- Implementar `React.lazy()` y `<Suspense>` en `src/App.jsx` para todas las vistas secundarias (`EventsManagementView`, `UserManagementView`, `ProductionManagementView`, `CashClosingView`, `MonitorDashboardView`).
+- Configurar `manualChunks` en `vite.config.js` para separar `vendor-react` y librerías externas, reduciendo el bundle principal de 633 kB a <250 kB y eliminando las advertencias de tamaño de Vite.
+
+### R5. Saneamiento Forense de Código Muerto, Dependencias y Assets Huérfanos
+- Purgar los 23 iconos huérfanos de `lucide-react` en los 7 archivos identificados (`UnifiedAiChat.jsx`, `ProductionManagementView.jsx`, `MonitorDashboardView.jsx`, `Header.jsx`, `FastManualSaleForm.jsx`, `RecentSalesList.jsx`, `UserManagementView.jsx`).
+- Purgar las dependencias huérfanas `"clsx"` y `"tailwind-merge"` de `package.json` si no tienen uso activo.
+- Purgar las 37 líneas de CSS muerto en `src/index.css`.
+- Purgar imágenes duplicadas y assets con nombres con espacios en `public/brand/`, corrigiendo el favicon en `index.html`.
+- Eliminar scripts residuales obsoletos en `scripts/` que violaban el aislamiento.
+
+### R6. Verificación Integral y Despliegue en Producción
+- Ejecutar la suite de pruebas unitarias, de integración y de seguridad (`npm test`).
+- Compilar la aplicación para producción (`npm run build`) verificando la reducción de peso del bundle.
+- Desplegar en Dokploy mediante el webhook oficial y verificar la funcionalidad en vivo con Chrome DevTools MCP.
+
+## Acceptance Criteria
+
+### Inteligencia Artificial y Streaming
+- [ ] El chat de IA utiliza Function Calling formal tipado sin depender de expresiones regulares sobre markdown.
+- [ ] Las respuestas del chat se renderizan progresivamente vía SSE con latencia percibida inferior a 500ms.
+- [ ] La extracción de ventas por voz, foto y chat genera borradores estructurados con 100% de fiabilidad.
+
+### Rendimiento y Base de Datos
+- [ ] `getEventKPIs` computa sumatorias y conteos exclusivamente en PostgreSQL vía `aggregate`/`groupBy`.
+- [ ] El bundle JavaScript inicial generado por `npm run build` es menor a 250 kB sin alertas de chunk size.
+
+### Calidad y Limpieza de Código
+- [ ] 0 iconos huérfanos, 0 clases CSS muertas y 0 dependencias no utilizadas en el proyecto.
+- [ ] La suite completa de pruebas automatizadas pasa al 100% con código de salida 0.
+
 

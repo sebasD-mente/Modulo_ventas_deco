@@ -2,19 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Send,
-  Bot,
-  User,
   Mic,
   Square,
   Camera,
   Loader2,
   CheckCircle2,
-  Sparkles,
   ShoppingBag,
-  CreditCard,
-  Banknote,
-  Smartphone,
-  ChevronDown,
   RefreshCw,
   Trash2,
   X,
@@ -478,7 +471,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     }
   };
 
-  // Enviar mensaje de texto al chat
+  // Enviar mensaje de texto al chat con soporte para streaming SSE y renderizado progresivo
   const handleSendText = async (customText = null) => {
     const query = (customText || inputText).trim();
     if (!query || isLoading) return;
@@ -494,14 +487,34 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     setIsLoading(true);
     setProcessingNote('Consultando datos...');
 
+    const aiMsgId = Date.now() + 1;
+    const aiTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Agregar mensaje inicial vacío del asistente con isStreaming: true
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: aiMsgId,
+        sender: 'ai',
+        text: '',
+        isStreaming: true,
+        suggestedPosters: [],
+        timestamp: aiTime,
+      },
+    ]);
+
     try {
       const res = await authFetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
         body: JSON.stringify({
           message: query,
           eventId,
           pendingDraft: pendingDraft || null,
+          stream: true,
           history: messages.slice(-6).map((m) => ({
             role: m.sender === 'user' ? 'user' : 'model',
             text: m.text,
@@ -509,36 +522,118 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         }),
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Error al comunicarse con la IA');
-      }
+      const contentType = res.headers.get('content-type') || '';
 
-      if (json.draftSale) {
-        setPendingDraft(json.draftSale);
-      }
+      if (contentType.includes('text/event-stream')) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let accumulatedText = '';
+        let currentEvent = 'message';
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: 'ai',
-          text: json.reply,
-          suggestedPosters: json.suggestedPosters || [],
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) {
+              currentEvent = 'message';
+              continue;
+            }
+
+            if (line.startsWith('event:')) {
+              currentEvent = line.replace(/^event:\s*/, '').trim();
+            } else if (line.startsWith('data:')) {
+              const dataStr = line.replace(/^data:\s*/, '').trim();
+              if (!dataStr) continue;
+
+              try {
+                const data = JSON.parse(dataStr);
+
+                if (currentEvent === 'token') {
+                  const tokenText = data.text !== undefined ? data.text : (data.delta || '');
+                  accumulatedText += tokenText;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, text: accumulatedText } : m))
+                  );
+                } else if (currentEvent === 'draft_sale') {
+                  const draftData = data.draftSale || data;
+                  if (draftData) {
+                    setPendingDraft(draftData);
+                  }
+                } else if (currentEvent === 'suggested_posters') {
+                  const posters = Array.isArray(data) ? data : (data.posters || []);
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, suggestedPosters: posters } : m))
+                  );
+                } else if (currentEvent === 'done') {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === aiMsgId
+                        ? {
+                            ...m,
+                            isStreaming: false,
+                            text: accumulatedText || data.fullText || m.text || 'Entendido.',
+                          }
+                        : m
+                    )
+                  );
+                } else if (currentEvent === 'error') {
+                  throw new Error(data.error || 'Error en stream SSE');
+                }
+              } catch (parseErr) {
+                console.warn('⚠️ [SSE Parse Error] No se pudo parsear frame:', parseErr, dataStr);
+              }
+            }
+          }
+        }
+
+        // Finalizar streaming
+        setMessages((prev) =>
+          prev.map((m) => (m.id === aiMsgId ? { ...m, isStreaming: false } : m))
+        );
+      } else {
+        // Fallback síncrono para respuestas tradicionales JSON
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Error al comunicarse con la IA');
+        }
+
+        if (json.draftSale || json.draft) {
+          setPendingDraft(json.draftSale || json.draft);
+        }
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsgId
+              ? {
+                  ...m,
+                  isStreaming: false,
+                  text: json.reply,
+                  suggestedPosters: json.suggestedPosters || [],
+                }
+              : m
+          )
+        );
+      }
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: 'ai',
-          text: `⚠️ No pude responder: ${err.message}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                isStreaming: false,
+                text: `⚠️ No pude responder: ${err.message}`,
+              }
+            : m
+        )
+      );
     } finally {
       setIsLoading(false);
       setProcessingNote('');
@@ -672,7 +767,12 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                     : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
                 }`}
               >
-                <div className="whitespace-pre-wrap">{m.text}</div>
+                <div className="whitespace-pre-wrap">
+                  {m.text}
+                  {m.isStreaming && (
+                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />
+                  )}
+                </div>
 
                 {/* Tarjetas de Sugerencias Visuales de Catálogo */}
                 {m.suggestedPosters && m.suggestedPosters.length > 0 && (

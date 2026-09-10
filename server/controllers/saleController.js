@@ -4,6 +4,7 @@ import {
   getEventKPIs,
   getMonitorDashboardMetrics,
   createCashClosingTransaction,
+  getEventSalesList as getEventSalesServiceList,
 } from '../services/saleService.js';
 import { prisma } from '../config/prisma.js';
 
@@ -77,32 +78,30 @@ export async function updateSale(req, res) {
 export async function getEventSalesList(req, res) {
   try {
     const { eventId } = req.params;
-    const { date } = req.query;
+    const { date, page, limit } = req.query;
     const tenantId = req.tenantId;
 
-    const where = {
+    const result = await getEventSalesServiceList({
       tenantId,
       eventId,
-    };
-
-    if (date) {
-      const startOfDay = new Date(`${date}T00:00:00.000Z`);
-      const endOfDay = new Date(`${date}T23:59:59.999Z`);
-      where.createdAt = { gte: startOfDay, lte: endOfDay };
-    }
-
-    const sales = await prisma.sale.findMany({
-      where,
-      include: {
-        items: true,
-        payments: true,
-        seller: { select: { fullName: true, email: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+      date,
+      page,
+      limit,
     });
 
-    return res.json({ success: true, data: sales, count: sales.length });
+    return res.json({
+      success: true,
+      data: result.sales,
+      count: result.sales.length,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNext: result.hasNext,
+        hasPrev: result.hasPrev,
+      },
+    });
   } catch (err) {
     console.error('❌ Error listando ventas:', err);
     return res.status(500).json({ success: false, error: 'Error obteniendo ventas del evento.' });

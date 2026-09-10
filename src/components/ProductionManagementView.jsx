@@ -6,15 +6,9 @@ import {
   Clock,
   Printer,
   Package,
-  Layers,
   Search,
-  Filter,
   RefreshCw,
-  AlertCircle,
-  Sparkles,
-  ChevronRight,
   Check,
-  Calendar,
 } from 'lucide-react';
 
 export default function ProductionManagementView() {

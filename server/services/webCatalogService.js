@@ -167,13 +167,13 @@ async function getCachedProducts(tenantId) {
  * @returns {Promise<Array>} - Lista de pósters ordenados por relevancia.
  */
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
-  const cleanQuery = (query || '').trim().toLowerCase();
+  const cleanQuery = String(query ?? '').trim().toLowerCase();
   const allProducts = await getCachedProducts(tenantId);
 
   let filtered = allProducts;
 
-  if (category) {
-    filtered = filtered.filter((p) => p.categoria === category.toUpperCase());
+  if (category && String(category).trim()) {
+    filtered = filtered.filter((p) => p.categoria === String(category).trim().toUpperCase());
   }
 
   if (cleanQuery) {

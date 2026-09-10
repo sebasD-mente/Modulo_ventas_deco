@@ -3,10 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import {
   RotateCcw,
   Calendar,
-  CreditCard,
-  Smartphone,
-  Banknote,
-  Receipt,
   ChevronDown,
   ChevronUp,
   Loader2,

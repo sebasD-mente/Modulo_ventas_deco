@@ -11,10 +11,8 @@ import {
   Smartphone,
   Tag,
   Loader2,
-  Sparkles,
   ShoppingBag,
   X,
-  Store,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 

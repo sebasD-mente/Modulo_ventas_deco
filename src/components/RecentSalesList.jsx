@@ -9,7 +9,6 @@ import {
   CheckCircle,
   Loader2,
   Receipt,
-  FileText,
 } from 'lucide-react';
 import EditSaleModal from './EditSaleModal.jsx';
 

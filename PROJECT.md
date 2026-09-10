@@ -1,91 +1,84 @@
-# Project: Deko EventSales — Production Architecture & Hardening
+# Project: STAND {IA} — Fase 2: Modernización Enterprise, Streaming & Rendimiento
 
 ## Architecture
-Deko EventSales is a dedicated POS and Sales Intelligence application for Deco Vintage Guate and Deko Labs. It operates with strict separation of concerns, complete database isolation, and cloud-native statelessness:
-- **Frontend**: Single Page Application built with React 19, Vite, Tailwind CSS, Lucide icons, Canvas Confetti.
-- **Backend**: Node.js 22 with Express, Prisma ORM, JSON Web Tokens (JWT), Google GenAI SDK.
-- **Database**: Dedicated PostgreSQL database (`deko_eventsales_db`) completely isolated from web catalog DB (`catalog_db`), enforcing multi-tenant event sales.
-- **Storage**: Stateless media storage via Google Cloud Storage (`gs://deko-eventsales-media/`), zero ephemeral disk dependency in production.
-- **Containerization**: Multi-stage Docker container based on `node:22-bookworm-slim` (Debian glibc / OpenSSL 3.0.x for Prisma), orchestrated with an automated database migration/connectivity `entrypoint.sh` for Dokploy.
+STAND {IA} (Deko EventSales) es el sistema POS inteligente de alta concurrencia y producción artesanal para Deco Vintage Guate y Deko Labs. La Fase 2 eleva el sistema al estándar Enterprise:
+- **Motor de IA Multimodal (@google/genai ^2.19.0)**: Function Calling nativo y fuertemente tipado con herramientas formales (`prepareSaleDraft`, `searchCatalog`, `getEventKPIs`), erradicando expresiones regulares sobre markdown. Schemas estrictos (`responseSchema`) en visión, audio y video para garantizar JSON inquebrantable.
+- **Streaming Progresivo en Tiempo Real**: Server-Sent Events (SSE) en `/api/ai/chat` con `ai.models.generateContentStream`, reduciendo TTFB a <400ms con renderizado progresivo en cliente mediante `ReadableStream`.
+- **Base de Datos & Rendimiento SQL (PostgreSQL / Prisma)**: Agregaciones nativas `prisma.sale.aggregate()` y `prisma.salePayment.groupBy()` en O(1) para cálculo de KPIs de evento en milisegundos, con paginación optimizada en listados de ventas y órdenes de taller.
+- **Frontend Ultraligero & Code-Splitting (React 19 / Vite)**: Carga dinámica con `React.lazy()` y `<Suspense>` para vistas secundarias, complementado con `manualChunks` en Vite para aislar `vendor-react` y dependencias, reduciendo el bundle de entrada de 633 kB a <250 kB sin advertencias.
+- **Saneamiento Forense Cero Deuda**: Purga total de 23 iconos huérfanos de `lucide-react`, dependencias no utilizadas (`clsx`, `tailwind-merge`), 38 líneas de CSS muerto, assets duplicados en `public/brand/`, corrección de favicon en `index.html` y eliminación de scripts residuales.
+- **Infraestructura y Despliegue Inmutable**: Docker multi-stage con Debian bookworm-slim, despliegue continuo en Dokploy y verificación en vivo con Chrome DevTools MCP.
+
+---
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | F1: Dead Code Removal | Delete 7 orphan components (`AiChatAssistant.jsx`, `BatchPhotoScanner.jsx`, `QuickPosKeyboard.jsx`, `LiveMonitor.jsx`, `CatalogView.jsx`, `VoiceRecorder.jsx`, `HumanVerificationModal.jsx`). Audit all imports across `src/` to ensure zero broken references. | M1 | Survey (Explorer 1) |
-| 2 | F2: Frontend Build Verification | Verify `npm run build` runs cleanly and exits with code 0 producing production bundle in `dist/`. | M1 | Survey (Explorer 1) |
-| 3 | F3: API Security Hardening | In `server/middleware/authMiddleware.js`, remove `\|\| !authHeader` to enforce valid Bearer JWT in production, returning 401 Unauthorized for unauthenticated requests. | M2 | Survey (Explorer 2) |
-| 4 | F4: Server Graceful Shutdown Fix | In `server/index.js:68`, fix broken import `./config/db.js` -> `./config/prisma.js` so Prisma disconnects cleanly on SIGTERM/SIGINT. | M2 | Survey (Explorer 3) |
-| 5 | F5: Atomic Sales Concurrency | Add `currentSaleSequence` counter to `Event` model and update it atomically via `tx.event.update` inside transaction in `server/services/saleService.js`, eliminating `P2002` collisions. | M2 | Survey (Explorer 2) |
-| 6 | F6: SQL Parameterization & Local Product Query | In `server/services/webCatalogService.js`, eliminate raw SQL string interpolation with `$queryRawUnsafe` and query local `prisma.product`. | M2 | Survey (Explorer 2) |
-| 7 | F7: Git Initialization & Technical Docs | Create fortified `.gitignore` (excluding `.env*`, `node_modules/`, `dist/`, `.gemini/`, `public/uploads/*` except `.gitkeep`, keys, logs), create `public/uploads/.gitkeep`, write technical `README.md`, and run `git init` with initial semantic commit. | M3 | Survey (Explorer 1) |
-| 8 | F8: GCS Bucket Provisioning | Provision bucket `gs://deko-eventsales-media/` in `us-central1` on GCP project `tienda-deco-vintage-web` with `roles/storage.objectViewer` for `allUsers` and CORS policy. | M4 | Survey (Explorer 3) |
-| 9 | F9: GCS Storage Service Refactor | Refactor `server/services/gcsStorageService.js` to eliminate silent fallback to ephemeral `public/uploads` in production, update default bucket to `deko-eventsales-media`, and fail fast on errors. | M4 | Survey (Explorer 3) |
-| 10 | F10: Strict Database Isolation | Update `.env` and configuration to connect exclusively to dedicated `deko_eventsales_db`, eradicating cross-database coupling with `catalog_db?schema=event_sales`. | M5 | Survey (Explorer 2) |
-| 11 | F11: Decoupled Catalog Sync Service | Implement `server/services/catalogSyncService.js` consuming public API `GET /api/catalog/posters` and upserting into local `Product` table with `sizes` and `tags`. | M5 | Survey (Explorer 2) |
-| 12 | F12: Docker Multi-Stage Containerization | Rebuild `Dockerfile` using 3-stage build with `node:22-bookworm-slim`, removing missing `/app/public` copy, and create strict `.dockerignore`. | M6 | Survey (Explorer 3) |
-| 13 | F13: Docker Entrypoint Automation | Create `entrypoint.sh` with PostgreSQL connectivity retry loop, `npx prisma db push --skip-generate`, Unix LF encoding, and `exec "$@"`. | M6 | Survey (Explorer 3) |
-| 14 | F14: Health Check & Observability | Enrich `GET /health` in `server/index.js` to perform a live database ping (`prisma.$queryRaw\`SELECT 1\``) returning 200 OK or 503 Service Unavailable. | M6 | Survey (Explorer 3) |
-| 15 | F15: E2E Verification & Live Browser Testing | Execute comprehensive automated test suite and live browser verification with Chrome DevTools MCP (interactive UI navigation, screenshots, zero console errors). | M7 | Survey & User Rules |
+| 1 | F1: Function Calling Nativo & Schemas Estrictos | Reemplazar scraping de texto markdown por tools formales (`prepareSaleDraft`, `searchCatalog`, `getEventKPIs`) y aplicar `responseSchema` estricto en visión y voz con `@google/genai`. | M1 | Survey (Explorer 1) |
+| 2 | F2: Streaming de Tokens en Tiempo Real (SSE) | Implementar endpoint `/api/ai/chat` emitiendo `text/event-stream` con `generateContentStream` y cliente `ReadableStream` en `UnifiedAiChat.jsx` para renderizado progresivo (<400ms TTFB). | M2 | Survey (Explorer 1) |
+| 3 | F3: Agregaciones SQL Nativas O(1) & Paginación | En `saleService.js:getEventKPIs`, reemplazar hidratación en memoria por `prisma.sale.aggregate()` y `prisma.salePayment.groupBy()`. Añadir paginación en listados. | M3 | Survey (Explorer 2) |
+| 4 | F4: Code-Splitting Frontend & Bundle <250 kB | Implementar `React.lazy()` / `<Suspense>` en `src/App.jsx` para vistas secundarias y configurar `manualChunks` en `vite.config.js` reduciendo el bundle principal a <250 kB. | M4 | Survey (Explorer 3) |
+| 5 | F5: Saneamiento Forense de Código Muerto & Assets | Purgar 23 iconos huérfanos en 7 archivos, remover `"clsx"` y `"tailwind-merge"`, eliminar 38 líneas de CSS muerto, corregir favicon en `index.html`, purgar assets duplicados y scripts obsoletos. | M5 | Survey (Explorer 2) |
+| 6 | F6: Verificación E2E, Despliegue Dokploy & DevTools en Vivo | Ejecutar suite de pruebas, compilar producción, sincronizar con Dokploy y verificar en vivo con Chrome DevTools MCP (captura de pantalla y prueba activa de chat). | M6 | Survey (Explorer 3) |
+
+---
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Saneamiento de Código Muerto & Build Frontend | F1, F2 | none | DONE |
-| M2 | Blindaje de Seguridad en API & Concurrencia de Ventas | F3, F4, F5, F6 | none | DONE |
-| M3 | Control de Versiones & Repositorio Git | F7 | M1 | DONE |
-| M4 | Almacenamiento Permanente en Google Cloud Storage | F8, F9 | none | DONE |
-| M5 | Aislamiento Estricto de Base de Datos & Sincronización | F10, F11 | M2 | DONE |
-| M6 | Contenerización Docker Multi-Stage & Health Check | F12, F13, F14 | M2, M4, M5 | DONE |
-| M7 | E2E Testing Suite & Verificación en Vivo DevTools | F15 | M1, M2, M3, M4, M5, M6 | DONE |
+| M1 | Function Calling Nativo y Schemas Estrictos (@google/genai) | F1 | none | DONE |
+| M2 | Streaming de Tokens en Tiempo Real (SSE) | F2 | M1 | DONE |
+| M3 | Agregaciones SQL Nativas O(1) y Paginación en Backend | F3 | none | DONE |
+| M4 | Code-Splitting Frontend y Optimización de Bundle (<250 kB) | F4 | none | DONE |
+| M5 | Saneamiento Forense de Código Muerto, Dependencias y Assets | F5 | none | DONE |
+| M6 | Verificación Integral, Despliegue Dokploy y Pruebas en Vivo | F6 | M1, M2, M3, M4, M5 | IN_PROGRESS |
+
+---
 
 ## Interface Contracts
-### Web Catalog API ↔ Local Catalog Sync Service
-- Endpoint: `GET https://decovintageguate.com/api/catalog/posters?take=500` (or `https://decovintage.online/api/catalog/posters?take=500`)
-- Response Schema:
-  ```json
-  {
-    "success": true,
-    "data": [
-      {
-        "id": "string (uuid)",
-        "titulo": "string",
-        "categoria": "string",
-        "imageUrl": "string (url)",
-        "thumbUrl": "string (url)",
-        "precioMinimo": "number",
-        "tags": ["string"],
-        "sizes": [
-          { "sizeId": "string", "nombre": "string", "dimensiones": "string", "precio": "number" }
-        ]
-      }
-    ],
-    "count": "number"
-  }
-  ```
-- Local Upsert Target: `prisma.product` with `sku: "WEB-" + id`, `name: titulo`, `category: categoria`, `basePrice: precioMinimo`, `imageUrl`, `sizes (Json)`, `tags (String[])`.
 
-### GCS Storage Service Contract
-- Function: `uploadBufferToStorage(buffer, originalname, folder)`
-- Returns: `{ success: true, url: "https://storage.googleapis.com/deko-eventsales-media/...", filename: "..." }`
-- Error handling: In production, rejects with explicit Error if GCS upload fails. Zero local disk writes.
+### AI Tools Contract (@google/genai)
+1. `prepareSaleDraft`
+   - Parameters: `items` (array of objects: `productName`, `quantity`, `unitPrice`, `size`), `total` (number), `paymentMethod` (enum: `EFECTIVO`, `TRANSFERENCIA`, `TARJETA`), `notes` (string), `customerName` (string).
+   - Execution: Emits/returns structured draft payload matching `SaleDraft` contract.
+2. `searchCatalog`
+   - Parameters: `query` (string), `category` (optional string).
+   - Execution: Queries local catalog service and returns matched posters.
+3. `getEventKPIs`
+   - Parameters: `eventId` (string).
+   - Execution: Invokes `saleService.getEventKPIs(eventId)` and returns aggregate metrics.
 
-### Sale Number Generation Contract
-- Function: `generateSaleNumber(eventId)` or atomic transaction block inside `createSaleTransaction`
-- Implementation: `tx.event.update({ where: { id: eventId }, data: { currentSaleSequence: { increment: 1 } }, select: { name: true, currentSaleSequence: true } })`
-- Returns: `${prefix}-${String(sequence).padStart(4, '0')}` (guaranteed unique per event).
+### SSE Protocol Contract (`/api/ai/chat`)
+- Headers:
+  - `Content-Type: text/event-stream`
+  - `Cache-Control: no-cache, no-transform`
+  - `Connection: keep-alive`
+  - `X-Accel-Buffering: no`
+- Events:
+  - `event: token\ndata: {"text":"..."}\n\n`
+  - `event: draft_sale\ndata: { ...draftObject... }\n\n`
+  - `event: suggested_posters\ndata: [ ...posters... ]\n\n`
+  - `event: done\ndata: {"fullText":"..."}\n\n`
+  - `event: error\ndata: {"error":"..."}\n\n`
+- Dual-Mode: If client does not send `Accept: text/event-stream` or `stream: true`, returns standard JSON response for backwards compatibility.
+
+### Event KPIs SQL Contract (`saleService.js:getEventKPIs`)
+- Complexity: O(1) RAM, 1 round-trip via `Promise.all`
+- Queries:
+  - `prisma.sale.aggregate({ where: { eventId, status: { not: 'ANULADA' } }, _sum: { totalAmount: true }, _count: { id: true } })`
+  - `prisma.salePayment.groupBy({ by: ['paymentMethod'], where: { sale: { eventId, status: { not: 'ANULADA' } } }, _sum: { amount: true } })`
+  - `prisma.saleItem.groupBy({ by: ['productName'], where: { sale: { eventId, status: { not: 'ANULADA' } } }, _sum: { quantity: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 5 })`
+  - `prisma.sale.findMany({ where: { eventId }, take: 15, orderBy: { createdAt: 'desc' }, include: { seller: true, payments: true, items: true } })`
+
+---
 
 ## Code Layout
-- `src/`: React frontend source files
-  - `components/`: Active UI components (`UnifiedAiChat.jsx`, `FastManualSaleForm.jsx`, `MonitorDashboardView.jsx`, `RecentSalesList.jsx`, `EventsManagementView.jsx`, `CashClosingView.jsx`, `Header.jsx`, `DonutChart.jsx`, `EditSaleModal.jsx`). Dead components eradicated.
+- `src/`: React 19 Frontend
+  - `components/`: `UnifiedAiChat.jsx`, `FastManualSaleForm.jsx`, `MonitorDashboardView.jsx`, `RecentSalesList.jsx`, `EventsManagementView.jsx`, `CashClosingView.jsx`, `Header.jsx`, `DonutChart.jsx`, `EditSaleModal.jsx`, `ProductionManagementView.jsx`, `UserManagementView.jsx`.
+  - `App.jsx`: Root component with code-splitting via `React.lazy` and `Suspense`.
+  - `index.css`: Tailwind directives and clean custom CSS.
 - `server/`: Express backend
-  - `config/`: Configuration modules (`env.js`, `prisma.js`, `gcs.js`, `gemini.js`).
-  - `middleware/`: Middleware (`authMiddleware.js`).
-  - `routes/`: Express routers (`apiRoutes.js`).
-  - `services/`: Business logic services (`saleService.js`, `gcsStorageService.js`, `webCatalogService.js`, `catalogSyncService.js`, `geminiService.js`, `cashClosingService.js`).
-- `prisma/`: Database schema (`schema.prisma`) and migrations.
-- `public/`: Static assets (`public/uploads/.gitkeep`).
-- `Dockerfile`: Production multi-stage Docker build.
-- `entrypoint.sh`: Container bootstrap script.
-- `.dockerignore`: Container ignore rules.
-- `.gitignore`: Repository ignore rules.
-- `README.md`: Technical system documentation.
+  - `controllers/`: `aiController.js`, `saleController.js`, `productionController.js`, `authController.js`.
+  - `services/`: `aiMultimodalService.js`, `saleService.js`, `productionService.js`, `gcsStorageService.js`, `webCatalogService.js`, `catalogSyncService.js`.
+- `public/brand/`: Clean branded media assets.
+- `vite.config.js`: Vite configuration with optimized `manualChunks`.
