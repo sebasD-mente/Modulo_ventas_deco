@@ -8,20 +8,36 @@ export default function LoginView() {
   const [hasGoogleConfig, setHasGoogleConfig] = useState(true);
 
   useEffect(() => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    let isMounted = true;
 
-    if (!googleClientId) {
-      setHasGoogleConfig(false);
-      return;
-    }
+    const setupGoogleAuth = async () => {
+      let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-    setHasGoogleConfig(true);
+      // Si no viene horneado en Vite en tiempo de build, obtenerlo del backend Express en runtime (Dokploy)
+      if (!clientId) {
+        try {
+          const res = await fetch('/api/auth/config');
+          const data = await res.json();
+          if (data.success && data.googleClientId) {
+            clientId = data.googleClientId;
+          }
+        } catch (e) {
+          console.warn('No se pudo obtener la configuración de autenticación del backend:', e);
+        }
+      }
 
-    const initGsi = () => {
-      if (window.google && googleClientId) {
+      if (!clientId) {
+        if (isMounted) setHasGoogleConfig(false);
+        return;
+      }
+
+      if (isMounted) setHasGoogleConfig(true);
+
+      const renderGoogleBtn = () => {
+        if (!window.google || !window.google.accounts || !window.google.accounts.id) return false;
         try {
           window.google.accounts.id.initialize({
-            client_id: googleClientId,
+            client_id: clientId,
             auto_select: false,
             callback: async (response) => {
               if (response.credential) {
@@ -48,23 +64,28 @@ export default function LoginView() {
               width: 300,
             });
           }
+          return true;
         } catch (err) {
           console.warn('Google Identity Services no se pudo inicializar:', err);
+          return false;
         }
+      };
+
+      if (!renderGoogleBtn()) {
+        const interval = setInterval(() => {
+          if (renderGoogleBtn()) {
+            clearInterval(interval);
+          }
+        }, 250);
+        setTimeout(() => clearInterval(interval), 10000);
       }
     };
 
-    if (window.google) {
-      initGsi();
-    } else {
-      const interval = setInterval(() => {
-        if (window.google) {
-          clearInterval(interval);
-          initGsi();
-        }
-      }, 300);
-      return () => clearInterval(interval);
-    }
+    setupGoogleAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, [loginWithGoogle]);
 
   return (

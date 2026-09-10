@@ -6,6 +6,14 @@ import { demoUsers } from './userController.js';
 
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID);
 
+export function getAuthConfig(req, res) {
+  const clientId = ENV.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
+  return res.status(200).json({
+    success: true,
+    googleClientId: clientId,
+  });
+}
+
 export async function handleGoogleLogin(req, res) {
   try {
     const { credential } = req.body;

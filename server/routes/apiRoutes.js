@@ -5,6 +5,7 @@ import { upload } from '../middleware/uploadMiddleware.js';
 import { createSaleSchema, cashClosingSchema, updateSaleSchema } from '../validators/saleValidators.js';
 import {
   handleGoogleLogin,
+  getAuthConfig,
   getMe,
 } from '../controllers/authController.js';
 import {
@@ -49,6 +50,7 @@ const router = express.Router();
 // ==========================================
 // 1. RUTAS PÚBLICAS DE AUTENTICACIÓN
 // ==========================================
+router.get('/auth/config', getAuthConfig);
 router.post('/auth/google', handleGoogleLogin);
 
 // ==========================================
