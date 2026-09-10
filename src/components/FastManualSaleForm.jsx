@@ -46,6 +46,19 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
   const searchInputRef = useRef(null);
   const debounceRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const isSelectingRef = useRef(false);
+
+  // Cerrar el dropdown al hacer clic fuera del buscador
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Cargar borrador si viene de la IA
   useEffect(() => {
@@ -67,8 +80,13 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     }
   }, [initialDraft]);
 
-  // Búsqueda reactiva en el catálogo web con debounce de 200ms
+  // Búsqueda reactiva en el catálogo web con debounce de 120ms
   useEffect(() => {
+    if (isSelectingRef.current) {
+      isSelectingRef.current = false;
+      return;
+    }
+
     if (!searchQuery.trim()) {
       setSearchResults([]);
       setIsSearching(false);
@@ -84,8 +102,10 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         const res = await fetch(`/api/catalog/web-posters?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
         const json = await res.json();
         if (json.success) {
-          setSearchResults(json.data || []);
-          setShowDropdown(true);
+          if (!isSelectingRef.current) {
+            setSearchResults(json.data || []);
+            setShowDropdown(true);
+          }
         }
       } catch (err) {
         console.error('Error buscando pósters:', err);
@@ -101,6 +121,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
   // Al seleccionar un póster de la lista desplegable
   const handleSelectPoster = (poster) => {
+    isSelectingRef.current = true;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setIsSearching(false);
+    setShowDropdown(false);
+    setSearchResults([]);
+
     setSelectedPoster(poster);
     // Por defecto seleccionar MEDIANO o el primer tamaño disponible
     const defaultSz = poster.sizes?.find((s) => s.sizeId === 'MEDIANO') || poster.sizes?.[0] || DEFAULT_SIZES[2];
@@ -108,7 +134,6 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     setItemQuantity(1);
     const displayName = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo;
     setSearchQuery(displayName);
-    setShowDropdown(false);
   };
 
   // Agregar el póster seleccionado al ticket de venta
@@ -136,8 +161,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     setCartItems((prev) => [...prev, newItem]);
 
     // Limpiar selección para el siguiente póster
+    isSelectingRef.current = false;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSelectedPoster(null);
     setSearchQuery('');
+    setSearchResults([]);
+    setShowDropdown(false);
     setItemQuantity(1);
     searchInputRef.current?.focus();
   };
@@ -275,7 +304,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       )}
 
       {/* SECCIÓN 1: CAMPO ÚNICO DE BÚSQUEDA Y LLAMADA DE PÓSTERS */}
-      <div className="relative">
+      <div ref={searchContainerRef} className="relative">
         <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
           <span>Buscar</span>
           {isSearching && (
@@ -292,9 +321,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             type="text"
             placeholder="Escribe el nombre o personaje... (ej. Chainsaw, Spider-Man, Batman, Van Gogh)"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              isSelectingRef.current = false;
+              setSearchQuery(e.target.value);
+            }}
             onFocus={() => {
-              if (searchResults.length > 0) setShowDropdown(true);
+              if (searchResults.length > 0 && !selectedPoster) setShowDropdown(true);
             }}
             className="w-full bg-black border border-neutral-700/90 rounded-full pl-11 pr-11 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
           />
@@ -302,8 +334,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             <button
               type="button"
               onClick={() => {
+                isSelectingRef.current = false;
+                if (debounceRef.current) clearTimeout(debounceRef.current);
                 setSearchQuery('');
                 setSelectedPoster(null);
+                setSearchResults([]);
                 setShowDropdown(false);
               }}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"

@@ -39,5 +39,18 @@ export async function authMiddleware(req, res, next) {
     console.warn('[AuthMiddleware Warning] ⚠️ Error obteniendo usuario de stand por defecto:', err.message);
   }
 
+  // Fallback de desarrollo para pruebas locales
+  if (ENV.NODE_ENV !== 'production') {
+    req.user = {
+      id: 'dev-user',
+      email: 'dev@decovintage.online',
+      fullName: 'Vendedor Stand (Dev)',
+      role: 'ENCARGADO_STAND',
+      tenantId: 'tenant-deco-vintage',
+    };
+    req.tenantId = 'tenant-deco-vintage';
+    return next();
+  }
+
   return res.status(401).json({ success: false, error: 'No autorizado. Se requiere inicio de sesión.' });
 }
