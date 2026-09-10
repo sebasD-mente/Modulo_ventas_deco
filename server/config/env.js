@@ -24,7 +24,12 @@ export const ENV = {
   DEFAULT_CURRENCY_SYMBOL: process.env.DEFAULT_CURRENCY_SYMBOL || 'Q',
   WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintage.online',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
-  SUPER_ADMIN_EMAILS: (process.env.SUPER_ADMIN_EMAILS || 'ia@dekolabs.org,decovintageguate@gmail.com').split(',').map(e => e.trim().toLowerCase()),
+  SUPER_ADMIN_EMAILS: Array.from(new Set([
+    'ia@dekolabs.org',
+    'decovintageguate@gmail.com',
+    'admin@decovintage.online',
+    ...(process.env.SUPER_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  ])),
 };
 
 // 🛡️ REGLA PERMANENTE: CANDADO DE AISLAMIENTO ESTRICTO DE INFRAESTRUCTURA

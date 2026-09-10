@@ -246,9 +246,24 @@ export async function getMe(req, res) {
       user = req.user;
     }
 
-    const userRoles = Array.isArray(user.roles) && user.roles.length > 0
-      ? user.roles
+    let userRoles = Array.isArray(user.roles) && user.roles.length > 0
+      ? [...user.roles]
       : [user.role || 'VENDEDOR'];
+
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => userEmail === adm || userEmail.includes(adm));
+
+    if (isSuperAdminEmail) {
+      if (!userRoles.includes('SUPER_ADMIN')) {
+        userRoles = ['SUPER_ADMIN', ...userRoles.filter(r => r !== 'SUPER_ADMIN')];
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'SUPER_ADMIN', roles: userRoles }
+          });
+        } catch (e) {}
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -256,7 +271,7 @@ export async function getMe(req, res) {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role || userRoles[0],
+        role: isSuperAdminEmail ? 'SUPER_ADMIN' : (user.role || userRoles[0]),
         roles: userRoles,
         avatarUrl: user.avatarUrl,
         assignedEventId: user.assignedEventId,
