@@ -56,14 +56,11 @@ export async function handleGoogleLogin(req, res) {
       googleId = payload.sub;
     }
 
-    // Determinar rol
-    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => email.includes(adm) || email === adm);
+    // Determinar rol inicial para nuevos usuarios
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => email === adm || email.includes(adm));
     let targetRole = isSuperAdminEmail ? 'SUPER_ADMIN' : 'VENDEDOR';
 
-    const requestedRole = inputRole || devRole;
-    if (requestedRole && ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'].includes(requestedRole)) {
-      targetRole = requestedRole;
-    } else if (email.includes('operario1') || email.includes('stock')) {
+    if (email.includes('operario1') || email.includes('stock')) {
       targetRole = 'OPERARIO_1';
     } else if (email.includes('operario2') || email.includes('taller') || email.includes('impresion')) {
       targetRole = 'OPERARIO_2';
