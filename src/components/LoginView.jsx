@@ -39,6 +39,8 @@ export default function LoginView() {
           window.google.accounts.id.initialize({
             client_id: clientId,
             auto_select: false,
+            ux_mode: 'popup',
+            context: 'signin',
             callback: async (response) => {
               if (response.credential) {
                 try {

@@ -15,10 +15,14 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Seguridad y optimizaciones
-app.use(helmet({
-  contentSecurityPolicy: false, // Permitir Vite en desarrollo y multimedia
-}));
+// Seguridad y optimizaciones con soporte para popups de Google OAuth 2.0 (COOP / GSI)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Permitir Vite y multimedia
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // Requerido para accounts.google.com/gsi/transform
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(compression());
 app.use(cors({
   origin: '*',
