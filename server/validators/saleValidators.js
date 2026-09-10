@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const saleItemSchema = z.object({
+  id: z.string().uuid().optional().nullable(),
   productId: z.string().uuid().optional().nullable(),
   description: z.string().min(1, 'La descripción del ítem es requerida'),
   quantity: z.number().int().positive('La cantidad debe ser mayor a 0'),
@@ -22,7 +23,16 @@ export const createSaleSchema = z.object({
   payments: z.array(salePaymentSchema).min(1, 'Debe especificarse al menos un método de pago'),
   discount: z.number().nonnegative('El descuento no puede ser negativo').default(0),
   notes: z.string().max(500).optional().nullable(),
-  inputChannel: z.enum(['MANUAL_POS', 'MANUAL_RAPIDA', 'IA_VOZ', 'IA_IMAGEN_QR', 'IA_TEXTO']).default('MANUAL_POS'),
+  inputChannel: z.enum([
+    'MANUAL_POS',
+    'MANUAL_RAPIDA',
+    'IA_VOZ',
+    'IA_IMAGEN_QR',
+    'IA_TEXTO',
+    'IA_CHAT_TEXTO',
+    'IA_FOTO_ARTE',
+    'IA_VIDEO_MOSTRADOR',
+  ]).default('MANUAL_POS'),
 });
 
 export const cashClosingSchema = z.object({

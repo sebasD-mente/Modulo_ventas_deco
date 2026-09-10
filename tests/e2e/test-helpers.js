@@ -25,7 +25,8 @@ export function generateToken(payload, options = {}, secret = JWT_SECRET) {
     tenantId: DEFAULT_TENANT_ID,
     email: 'admin@dekolabs.com',
     fullName: 'Test Admin',
-    role: 'ADMIN_EMPRESA',
+    role: 'SUPER_ADMIN',
+    roles: ['SUPER_ADMIN'],
   };
   return jwt.sign({ ...defaultPayload, ...payload }, secret, {
     expiresIn: options.expiresIn || '2h',
@@ -42,7 +43,8 @@ export function getValidAdminToken(tenantId = DEFAULT_TENANT_ID, userId = DEFAUL
     tenantId,
     email: 'admin@dekolabs.com',
     fullName: 'Administrador E2E',
-    role: 'ADMIN_EMPRESA',
+    role: 'SUPER_ADMIN',
+    roles: ['SUPER_ADMIN'],
   });
 }
 
@@ -55,7 +57,8 @@ export function getValidSellerToken(tenantId = DEFAULT_TENANT_ID, userId = DEFAU
     tenantId,
     email: 'vendedor@dekolabs.com',
     fullName: 'Vendedor Stand E2E',
-    role: 'ENCARGADO_STAND',
+    role: 'VENDEDOR',
+    roles: ['VENDEDOR'],
   });
 }
 
@@ -68,7 +71,8 @@ export function getExpiredToken(tenantId = DEFAULT_TENANT_ID, userId = DEFAULT_U
       id: userId,
       tenantId,
       email: 'expired@dekolabs.com',
-      role: 'ENCARGADO_STAND',
+      role: 'VENDEDOR',
+      roles: ['VENDEDOR'],
     },
     JWT_SECRET,
     { expiresIn: '-10s' }
@@ -84,7 +88,8 @@ export function getInvalidSecretToken(tenantId = DEFAULT_TENANT_ID, userId = DEF
       id: userId,
       tenantId,
       email: 'hacker@malicious.com',
-      role: 'ADMIN_EMPRESA',
+      role: 'SUPER_ADMIN',
+      roles: ['SUPER_ADMIN'],
     },
     'wrong_alien_secret_key_12345',
     { expiresIn: '1h' }

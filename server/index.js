@@ -106,21 +106,36 @@ const server = app.listen(ENV.PORT, () => {
     })
     .catch((err) => console.warn('[Startup] No se pudo verificar conteo de productos:', err.message));
 
-  // 🛡️ REGLA ZERO-TRUST: Reconciliación y purga de cuentas residuales/no autorizadas en base de datos
+  // 🛡️ REGLA ZERO-TRUST: Verificación y reconciliación no destructiva de Super Administradores
   prisma.user
-    .deleteMany({
+    .findMany({
       where: {
         email: {
-          notIn: ENV.SUPER_ADMIN_EMAILS,
+          in: ENV.SUPER_ADMIN_EMAILS,
         },
       },
     })
-    .then((res) => {
-      if (res.count > 0) {
-        console.log(`[Startup Zero-Trust] 🧹 Se purgaron ${res.count} cuentas residuales/no autorizadas de la base de datos.`);
+    .then(async (admins) => {
+      console.log(
+        `[Startup Zero-Trust] 🛡️ Super Admins configurados en entorno: ${ENV.SUPER_ADMIN_EMAILS.length}. Registrados en base de datos: ${admins.length}.`
+      );
+      for (const admin of admins) {
+        const currentRoles = Array.isArray(admin.roles) && admin.roles.length > 0 ? admin.roles : [admin.role || 'SUPER_ADMIN'];
+        if (!currentRoles.includes('SUPER_ADMIN') || admin.role !== 'SUPER_ADMIN' || admin.status !== 'ACTIVO') {
+          const updatedRoles = Array.from(new Set(['SUPER_ADMIN', ...currentRoles]));
+          await prisma.user.update({
+            where: { id: admin.id },
+            data: {
+              role: 'SUPER_ADMIN',
+              roles: updatedRoles,
+              status: 'ACTIVO',
+            },
+          });
+          console.log(`[Startup Zero-Trust] 👑 Rol restaurado/verificado a SUPER_ADMIN para: ${admin.email}`);
+        }
       }
     })
-    .catch((err) => console.warn('[Startup Zero-Trust] Verificación inicial de usuarios:', err.message));
+    .catch((err) => console.warn('[Startup Zero-Trust] Verificación inicial de administradores:', err.message));
 });
 
 // Cierre limpio (Graceful Shutdown) para evitar procesos zombis o sockets retenidos en Windows

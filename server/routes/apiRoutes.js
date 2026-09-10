@@ -120,23 +120,97 @@ router.patch(
   validate(updateSaleSchema),
   updateSale
 );
-router.get('/sales/events/:eventId', getEventSalesList);
-router.get('/sales/events/:eventId/metrics', getEventLiveMetrics);
-router.get('/sales/monitor', getMonitorMetrics);
+router.get(
+  '/sales/events/:eventId',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
+  getEventSalesList
+);
+router.get(
+  '/sales/events/:eventId/metrics',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
+  getEventLiveMetrics
+);
+router.get(
+  '/sales/monitor',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  getMonitorMetrics
+);
 
 // ==========================================
 // 7. RUTAS DE CIERRES DE CAJA
 // ==========================================
-router.post('/closings', requireRole(['SUPER_ADMIN', 'VENDEDOR']), validate(cashClosingSchema), postCashClosing);
-router.get('/closings/events/:eventId', getCashClosingsList);
+router.post(
+  '/closings',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
+  validate(cashClosingSchema),
+  postCashClosing
+);
+router.get(
+  '/closings/events/:eventId',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
+  getCashClosingsList
+);
 
 // ==========================================
 // 8. RUTAS DE INTELIGENCIA ARTIFICIAL MULTIMODAL
 // ==========================================
-router.post('/ai/voice-sale', requireRole(['SUPER_ADMIN', 'VENDEDOR']), upload.single('audio'), handleVoiceSale);
-router.post('/ai/batch-photo', requireRole(['SUPER_ADMIN', 'VENDEDOR']), upload.single('image'), handleBatchPhoto);
-router.post('/ai/recognize-artwork', requireRole(['SUPER_ADMIN', 'VENDEDOR']), upload.single('image'), handleArtworkRecognition);
-router.post('/ai/recognize-video', requireRole(['SUPER_ADMIN', 'VENDEDOR']), upload.single('video'), handleVideoRecognition);
-router.post('/ai/chat', requireRole(['SUPER_ADMIN', 'VENDEDOR']), handleChatQuery);
+router.post(
+  '/ai/voice-sale',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  upload.single('audio'),
+  requireEventAccess,
+  handleVoiceSale
+);
+router.post(
+  '/ai/batch-photo',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  upload.single('image'),
+  requireEventAccess,
+  handleBatchPhoto
+);
+router.post(
+  '/ai/recognize-artwork',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  upload.single('image'),
+  requireEventAccess,
+  handleArtworkRecognition
+);
+router.post(
+  '/ai/recognize-video',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  upload.single('video'),
+  requireEventAccess,
+  handleVideoRecognition
+);
+router.post(
+  '/ai/chat',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
+  handleChatQuery
+);
+
+// ==========================================
+// 9. MANEJADOR DE ERRORES DE SUBIDA (MULTER) Y VALIDACIÓN
+// ==========================================
+router.use((err, req, res, next) => {
+  if (err?.name === 'MulterError') {
+    return res.status(400).json({
+      success: false,
+      error: `Error al procesar archivo: ${err.message}`,
+      code: err.code,
+    });
+  }
+  if (err?.code === 'UNSUPPORTED_MEDIA_TYPE' || err?.message?.includes('Tipo de archivo')) {
+    return res.status(400).json({
+      success: false,
+      error: err.message,
+    });
+  }
+  next(err);
+});
 
 export default router;

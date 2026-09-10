@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Copy, Check, Calculator, AlertCircle, Share2 } from 'lucide-react';
+import { ShieldCheck, Copy, Check, Calculator, AlertCircle, Share2, AlertTriangle, X, Loader2 } from 'lucide-react';
 
 export default function CashClosingView({ liveMetrics, activeEvent, onClosingCompleted }) {
   const { authFetch } = useAuth();
   const [reportedCash, setReportedCash] = useState('');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -61,13 +62,19 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleCreateClosing = async (e) => {
+  // Abrir modal de confirmación previa validación
+  const handleOpenConfirmation = (e) => {
     e.preventDefault();
     if (reportedCash === '') {
       setErrorMsg('Ingresa el monto de efectivo físico contado en caja.');
       return;
     }
+    setErrorMsg(null);
+    setShowConfirmModal(true);
+  };
 
+  // Confirmar y asentar cierre definitivo
+  const handleConfirmClosing = async () => {
     setIsSubmitting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -90,10 +97,12 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
       }
 
       setSuccessMsg('¡Cierre de caja asentado y conciliado con éxito en PostgreSQL!');
+      setShowConfirmModal(false);
       if (onClosingCompleted) onClosingCompleted();
     } catch (err) {
       console.error('Error guardando cierre:', err);
       setErrorMsg(err.message);
+      setShowConfirmModal(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -127,7 +136,7 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
           </div>
         )}
 
-        <form onSubmit={handleCreateClosing} className="space-y-4">
+        <form onSubmit={handleOpenConfirmation} className="space-y-4">
           {/* Efectivo esperado por sistema */}
           <div className="p-3.5 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between text-xs">
             <span className="font-medium text-neutral-400">Efectivo Esperado (Sistema):</span>
@@ -224,6 +233,91 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
           Inmutable • Registrado en PostgreSQL VPS • Deko Labs Architecture
         </div>
       </div>
+
+      {/* Modal de Confirmación Explícita de Cierre Contable */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn select-none">
+          <div className="bg-[#141414] border border-neutral-800 rounded-[32px] max-w-md w-full p-6 space-y-5 shadow-2xl text-white">
+            {/* Cabecera del Diálogo */}
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                <span>¿Confirmar Asiento de Cierre?</span>
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setShowConfirmModal(false)}
+                className="p-1 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              Esta acción registrará el arqueo contable en <strong>PostgreSQL</strong> con política de inmutabilidad contable (<code>Restrict</code>). Una vez asentado, no podrá ser revertido. Verifica el desglose:
+            </p>
+
+            {/* Desglose de Montos */}
+            <div className="p-4 rounded-2xl bg-black border border-neutral-800 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center text-neutral-400">
+                <span>Efectivo Esperado (Sistema):</span>
+                <span className="font-mono font-bold text-white">Q {calculatedCash.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-neutral-400">
+                <span>Efectivo Físico Contado:</span>
+                <span className="font-mono font-bold text-emerald-400">Q {numReported.toFixed(2)}</span>
+              </div>
+              <div className="pt-2 border-t border-neutral-800/80 flex justify-between items-center">
+                <span className="font-bold text-neutral-300">Balance / Diferencia:</span>
+                <span className={`font-mono font-black ${
+                  difference === 0 ? 'text-emerald-400' : difference > 0 ? 'text-emerald-400' : 'text-red-400'
+                }`}>
+                  {difference === 0 ? 'Q 0.00 (Cuadrada)' : difference > 0 ? `+Q ${difference.toFixed(2)} (Sobrante)` : `-Q ${Math.abs(difference).toFixed(2)} (Faltante)`}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-neutral-400 pt-1">
+                <span>Total Facturado del Evento:</span>
+                <span className="font-mono text-white">Q {totalGross.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {observations && (
+              <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800 text-[11px] text-neutral-300">
+                <span className="font-bold text-neutral-400 block mb-0.5">Observaciones:</span>
+                <p className="italic">{observations}</p>
+              </div>
+            )}
+
+            {/* Botones de Acción */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-3 rounded-2xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleConfirmClosing}
+                className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Asentando...</span>
+                  </>
+                ) : (
+                  <span>Sí, Asentar Cierre</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

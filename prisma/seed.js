@@ -146,12 +146,16 @@ async function main() {
 
   console.log(`✅ Catálogo de productos sembrado exitosamente (${sampleProducts.length} productos base)`);
 
-  console.log('🔄 Sincronizando catálogo completo oficial (233 pósters con imágenes WebP)...');
-  try {
-    const syncRes = await syncCatalogFromWeb(tenant.id);
-    console.log(`✅ Sincronización web finalizada: ${syncRes.count} pósters guardados.`);
-  } catch (syncErr) {
-    console.warn('⚠️ Sincronización web en seed arrojó advertencia:', syncErr.message);
+  if (process.env.SKIP_WEB_SYNC === 'true') {
+    console.log('⚡ [Seed] SKIP_WEB_SYNC activo: Verificación ligera de tenant/evento completada. Catálogo completo se sincroniza en background tras el arranque del servidor.');
+  } else {
+    console.log('🔄 Sincronizando catálogo completo oficial (233 pósters con imágenes WebP)...');
+    try {
+      const syncRes = await syncCatalogFromWeb(tenant.id);
+      console.log(`✅ Sincronización web finalizada: ${syncRes.count} pósters guardados.`);
+    } catch (syncErr) {
+      console.warn('⚠️ Sincronización web en seed arrojó advertencia:', syncErr.message);
+    }
   }
 
   console.log('🎉 Siembra completada con éxito.');

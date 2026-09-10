@@ -36,23 +36,31 @@ export default function EditSaleModal({ sale, onClose, onSaved }) {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Modificar cantidad de un ítem
+  // Modificar cantidad de un ítem (inmutabilidad estricta)
   const handleUpdateQuantity = (idx, delta) => {
-    const updated = [...items];
-    const current = updated[idx];
-    const newQty = Math.max(1, current.quantity + delta);
-    current.quantity = newQty;
-    current.subtotal = Number((newQty * current.unitPrice).toFixed(2));
-    setItems(updated);
+    setItems((prevItems) => {
+      const current = prevItems[idx];
+      if (!current) return prevItems;
+      const newQty = Math.max(1, current.quantity + delta);
+      const updated = [...prevItems];
+      updated[idx] = {
+        ...current,
+        quantity: newQty,
+        subtotal: Number((newQty * current.unitPrice).toFixed(2)),
+      };
+      return updated;
+    });
   };
 
-  // Eliminar un ítem del ticket
+  // Eliminar un ítem del ticket (inmutabilidad estricta)
   const handleRemoveItem = (idx) => {
-    if (items.length <= 1) {
-      alert('La venta debe conservar al menos un póster.');
-      return;
-    }
-    setItems(items.filter((_, i) => i !== idx));
+    setItems((prevItems) => {
+      if (prevItems.length <= 1) {
+        alert('La venta debe conservar al menos un póster.');
+        return prevItems;
+      }
+      return prevItems.filter((_, i) => i !== idx);
+    });
   };
 
   // Calcular totales reactivos

@@ -49,7 +49,7 @@ export async function createSaleTransaction({
 
     // 2. Validar que los métodos de pago cubran el monto
     const paymentsTotal = payments.reduce((acc, p) => acc + Number(p.amount), 0);
-    if (Math.abs(paymentsTotal - totalAmount) > 0.05 && paymentsTotal === 0) {
+    if (Math.abs(paymentsTotal - totalAmount) > 0.05) {
       throw new Error(`El monto pagado (Q ${paymentsTotal.toFixed(2)}) no coincide con el total de la venta (Q ${totalAmount.toFixed(2)})`);
     }
 
@@ -281,25 +281,64 @@ export async function updateSaleTransaction({
     let totalAmount = Number(existing.totalAmount);
     let newDiscount = discount !== undefined ? Number(discount) : Number(existing.discount);
 
-    // 2. Si se actualizaron ítems, reconstruir renglones y recalcular total
+    // 2. Si se actualizaron ítems, reconciliar renglones sin borrar en cascada y recalcular total
     if (items && items.length > 0) {
-      await tx.saleItem.deleteMany({ where: { saleId } });
-
       let itemsTotal = 0;
-      const itemsData = items.map((item) => {
+      const matchedExistingIds = new Set();
+
+      for (const item of items) {
         const subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
         itemsTotal += subtotal;
-        return {
-          saleId,
-          productId: item.productId || null,
-          description: item.description.trim(),
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          subtotal,
-        };
-      });
+        const trimmedDesc = item.description.trim();
 
-      await tx.saleItem.createMany({ data: itemsData });
+        // Buscar correspondencia en ítems existentes para preservar ID y trazabilidad
+        const existingItem = existing.items.find((ex) => {
+          if (matchedExistingIds.has(ex.id)) return false;
+          if (item.id && ex.id === item.id) return true;
+          if (!item.id && item.productId && ex.productId === item.productId) return true;
+          if (!item.id && !item.productId && ex.description.trim().toLowerCase() === trimmedDesc.toLowerCase()) return true;
+          return false;
+        });
+
+        if (existingItem) {
+          matchedExistingIds.add(existingItem.id);
+          await tx.saleItem.update({
+            where: { id: existingItem.id },
+            data: {
+              productId: item.productId || null,
+              description: trimmedDesc,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              subtotal,
+              // Preserva productionStatus, productionNotes y logs históricos en production_logs
+            },
+          });
+        } else {
+          await tx.saleItem.create({
+            data: {
+              saleId,
+              productId: item.productId || null,
+              description: trimmedDesc,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              subtotal,
+              productionStatus: 'PENDIENTE',
+            },
+          });
+        }
+      }
+
+      // Eliminar únicamente los ítems descartados de la venta
+      const discardedItemIds = existing.items
+        .filter((ex) => !matchedExistingIds.has(ex.id))
+        .map((ex) => ex.id);
+
+      if (discardedItemIds.length > 0) {
+        await tx.saleItem.deleteMany({
+          where: { id: { in: discardedItemIds } },
+        });
+      }
+
       totalAmount = Number(Math.max(0, itemsTotal - newDiscount).toFixed(2));
     } else if (discount !== undefined) {
       const itemsTotal = existing.items.reduce((acc, it) => acc + Number(it.subtotal), 0);

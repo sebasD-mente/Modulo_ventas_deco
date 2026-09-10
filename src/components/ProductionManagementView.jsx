@@ -25,9 +25,18 @@ export default function ProductionManagementView() {
   const [selectedEventId, setSelectedEventId] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'PENDIENTE' | 'SEPARADO' | 'A_PRODUCCION' | 'IMPRESO'
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState(null);
+
+  // Debounce de 250ms para evitar peticiones HTTP excesivas en cada pulsación
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Cargar eventos para el selector de filtro
   const fetchEvents = useCallback(async () => {
@@ -65,7 +74,7 @@ export default function ProductionManagementView() {
       const params = new URLSearchParams();
       if (selectedEventId) params.append('eventId', selectedEventId);
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
-      if (searchQuery) params.append('search', searchQuery);
+      if (debouncedSearchQuery.trim()) params.append('search', debouncedSearchQuery.trim());
 
       const res = await authFetch(`/api/production/items?${params.toString()}`);
       const data = await res.json();
@@ -77,7 +86,7 @@ export default function ProductionManagementView() {
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, selectedEventId, statusFilter, searchQuery]);
+  }, [authFetch, selectedEventId, statusFilter, debouncedSearchQuery]);
 
   useEffect(() => {
     fetchEvents();

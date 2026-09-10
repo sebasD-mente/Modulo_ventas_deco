@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +7,12 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('deko_auth_token'));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('deko_auth_token');
+    setToken(null);
+    setUser(null);
+  }, []);
 
   const authFetch = useCallback(
     async (url, options = {}) => {
@@ -29,7 +35,7 @@ export function AuthProvider({ children }) {
 
       return res;
     },
-    [token]
+    [token, logout]
   );
 
   const checkSession = useCallback(async () => {
@@ -67,7 +73,7 @@ export function AuthProvider({ children }) {
     checkSession();
   }, [checkSession]);
 
-  const loginWithGoogle = async (credential) => {
+  const loginWithGoogle = useCallback(async (credential) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -93,30 +99,26 @@ export function AuthProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('deko_auth_token');
-    setToken(null);
-    setUser(null);
-  };
+  const userRoles = useMemo(() => {
+    return Array.isArray(user?.roles) && user.roles.length > 0
+      ? user.roles
+      : (user?.role ? [user.role] : []);
+  }, [user]);
 
-  const userRoles = Array.isArray(user?.roles) && user.roles.length > 0
-    ? user.roles
-    : (user?.role ? [user.role] : []);
+  const isSuperAdmin = useMemo(() => userRoles.includes('SUPER_ADMIN'), [userRoles]);
+  const isVendedor = useMemo(() => userRoles.includes('VENDEDOR'), [userRoles]);
+  const isOperario1 = useMemo(() => userRoles.includes('OPERARIO_1'), [userRoles]);
+  const isOperario2 = useMemo(() => userRoles.includes('OPERARIO_2'), [userRoles]);
+  const isProduccion = useMemo(() => isOperario1 || isOperario2 || isSuperAdmin, [isOperario1, isOperario2, isSuperAdmin]);
 
-  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
-  const isVendedor = userRoles.includes('VENDEDOR');
-  const isOperario1 = userRoles.includes('OPERARIO_1');
-  const isOperario2 = userRoles.includes('OPERARIO_2');
-  const isProduccion = isOperario1 || isOperario2 || isSuperAdmin;
-
-  const hasRole = (roleToCheck) => {
+  const hasRole = useCallback((roleToCheck) => {
     if (isSuperAdmin) return true;
     return userRoles.includes(roleToCheck);
-  };
+  }, [isSuperAdmin, userRoles]);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     token,
     isLoading,
@@ -132,7 +134,23 @@ export function AuthProvider({ children }) {
     isOperario2,
     isProduccion,
     checkSession,
-  };
+  }), [
+    user,
+    token,
+    isLoading,
+    error,
+    loginWithGoogle,
+    logout,
+    authFetch,
+    userRoles,
+    hasRole,
+    isSuperAdmin,
+    isVendedor,
+    isOperario1,
+    isOperario2,
+    isProduccion,
+    checkSession,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

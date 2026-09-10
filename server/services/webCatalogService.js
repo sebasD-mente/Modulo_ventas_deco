@@ -13,17 +13,24 @@ import { prisma } from '../config/prisma.js';
  * { id, titulo, categoria, imageUrl, thumbUrl, precioMinimo, tags, sizes }
  */
 
-// Caché en memoria para búsquedas sub-milisegundo en el POS
-let productCache = null;
-let lastCacheUpdate = 0;
+// Caché en memoria segmentada por tenant para búsquedas sub-milisegundo en el POS
+// Estructura: Map<tenantId, { products: Array, timestamp: number }>
+const productCache = new Map();
 const CACHE_TTL_MS = 60 * 1000; // 60 segundos de TTL
+const DEFAULT_TENANT_KEY = '__GLOBAL__';
 
 /**
- * Invalida la caché en memoria para forzar recarga desde prisma.product
+ * Invalida la caché en memoria para forzar recarga desde prisma.product.
+ * Si se especifica tenantId, invalida únicamente ese tenant; de lo contrario limpia toda la caché.
+ * @param {string} [tenantId] - Identificador opcional del tenant a invalidar.
  */
-export function invalidateCatalogCache() {
-  productCache = null;
-  lastCacheUpdate = 0;
+export function invalidateCatalogCache(tenantId = null) {
+  if (tenantId) {
+    productCache.delete(tenantId);
+    productCache.delete(DEFAULT_TENANT_KEY);
+  } else {
+    productCache.clear();
+  }
 }
 
 /**
@@ -88,9 +95,12 @@ function formatProductForPos(p) {
  * Obtiene los productos desde caché o recarga desde la base de datos si expiró.
  */
 async function getCachedProducts(tenantId) {
+  const key = tenantId || DEFAULT_TENANT_KEY;
   const now = Date.now();
-  if (productCache && now - lastCacheUpdate < CACHE_TTL_MS) {
-    return productCache;
+  const cachedEntry = productCache.get(key);
+
+  if (cachedEntry && now - cachedEntry.timestamp < CACHE_TTL_MS) {
+    return cachedEntry.products;
   }
 
   const where = { isActive: true };
@@ -102,12 +112,12 @@ async function getCachedProducts(tenantId) {
       orderBy: { name: 'asc' },
     });
 
-    productCache = products.map(formatProductForPos);
-    lastCacheUpdate = now;
-    return productCache;
+    const formatted = products.map(formatProductForPos);
+    productCache.set(key, { products: formatted, timestamp: now });
+    return formatted;
   } catch (err) {
     console.warn('[WebCatalog Warning] ⚠️ No se pudo consultar prisma.product:', err.message);
-    if (productCache && productCache.length > 0) return productCache;
+    if (cachedEntry && cachedEntry.products?.length > 0) return cachedEntry.products;
     // Fallback de desarrollo para pruebas locales
     return [
       {
@@ -255,31 +265,50 @@ export async function getAllWebPostersCatalogSummary(tenantId = null) {
 /**
  * Obtiene un póster específico por su ID o SKU con todas sus variantes de tamaño.
  * @param {string} posterId - ID o SKU del producto.
+ * @param {string} [tenantId] - Identificador opcional del tenant para aislamiento estricto.
  * @returns {Promise<object|null>} - Detalle del póster o null si no se encuentra.
  */
-export async function getWebPosterById(posterId) {
+export async function getWebPosterById(posterId, tenantId = null) {
   if (!posterId) return null;
 
-  // Primero buscar en caché
-  if (productCache) {
-    const cached = productCache.find(
-      (p) => p.id === posterId || p.sku === posterId || p.sku === `WEB-${posterId}`
-    );
-    if (cached) return cached;
+  // Si se especificó tenantId, SOLO buscar en la partición de ese tenant específico.
+  // NUNCA iterar sobre las cachés de otros tenants para evitar fuga multitenant.
+  if (tenantId) {
+    if (productCache.has(tenantId)) {
+      const entry = productCache.get(tenantId);
+      const cached = entry?.products?.find(
+        (p) => p.id === posterId || p.sku === posterId || p.sku === `WEB-${posterId}`
+      );
+      if (cached) return cached;
+    }
+  } else {
+    // Únicamente si tenantId es null/undefined se permite iterar el mapa global de cachés
+    for (const entry of productCache.values()) {
+      const cached = entry?.products?.find(
+        (p) => p.id === posterId || p.sku === posterId || p.sku === `WEB-${posterId}`
+      );
+      if (cached) return cached;
+    }
   }
 
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: posterId },
-        { sku: posterId },
-        { sku: `WEB-${posterId}` },
-      ],
-      isActive: true,
-    },
-  });
+  try {
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { id: posterId },
+          { sku: posterId },
+          { sku: `WEB-${posterId}` },
+        ],
+        isActive: true,
+        ...(tenantId ? { tenantId } : {}),
+      },
+    });
 
-  if (!product) return null;
+    if (!product) return null;
 
-  return formatProductForPos(product);
+    return formatProductForPos(product);
+  } catch (err) {
+    console.warn('[WebCatalog Warning] ⚠️ No se pudo consultar prisma.product en getWebPosterById:', err.message);
+    return null;
+  }
 }

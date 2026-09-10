@@ -5,6 +5,50 @@ import { getEventKPIs } from './saleService.js';
 import { searchWebPosters, getAllWebPostersCatalogSummary } from './webCatalogService.js';
 
 /**
+ * Normaliza cualquier denominación de tamaño o medidas en pulgadas / centímetros
+ * a los identificadores canónicos del catálogo de Deco Vintage.
+ * Previene la sub-tarifación donde obras Grande ("18x24" / Q125) caen a Mediano (Q65).
+ */
+export function normalizeCatalogSizeId(requestedSize) {
+  if (!requestedSize) return 'MEDIANO';
+  const raw = String(requestedSize).toLowerCase().trim();
+
+  // Eliminar unidades y compactar separadores: "18 x 24 pulgadas" -> "18x24"
+  const compact = raw
+    .replace(/\s+/g, '')
+    .replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '')
+    .replace(/por|\*|x/gi, 'x');
+
+  // 1. Mapeo de pulgadas y centímetros a tamaños oficiales
+  // Grande (45 x 60 cm / 18 x 24 pulgadas) -> Q125.00
+  if (/18x24|24x18|45x60|60x45/.test(compact)) return 'GRANDE';
+
+  // Gigante (60 x 90 cm / 24 x 36 pulgadas) -> Q180.00
+  if (/24x36|36x24|60x90|90x60/.test(compact)) return 'GIGANTE';
+
+  // Mediano (30 x 45 cm / 12 x 18 pulgadas) -> Q65.00
+  if (/12x18|18x12|30x45|45x30/.test(compact)) return 'MEDIANO';
+
+  // Pequeño (21 x 27 cm / ~8x10 u 8.5x11 pulgadas) -> Q35.00
+  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact)) return 'PEQUENO';
+
+  // Mini (14 x 21 cm / ~5x7 o 6x8 pulgadas) -> Q25.00
+  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact)) return 'MINI';
+
+  // Portada de Álbum / Vinilo (30 x 30 cm / 12 x 12 pulgadas) -> Q55.00
+  if (/30x30|12x12|vinilo|album|álbum/.test(compact)) return 'PORTADA_ALBUM';
+
+  // 2. Mapeo por términos textuales
+  if (/gigante|extra\s*grande|xl\b/i.test(raw)) return 'GIGANTE';
+  if (/grande|large|l\b/i.test(raw)) return 'GRANDE';
+  if (/mediano|medio|medium|m\b/i.test(raw)) return 'MEDIANO';
+  if (/peque[ñn]o|chico|small|s\b/i.test(raw)) return 'PEQUENO';
+  if (/mini|miniatura|xs\b/i.test(raw)) return 'MINI';
+
+  return raw.toUpperCase();
+}
+
+/**
  * Busca coincidencia tanto en el catálogo local del stand como en los 233 pósters de la web
  */
 export async function matchPosterEverywhere(tenantId, query, requestedSize = null) {
@@ -16,15 +60,24 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (webMatches.length > 0) {
     const matched = webMatches[0];
     
-    // Normalizar tamaño si se especificó (mini, pequeño, mediano, grande, etc.)
+    // Normalizar tamaño considerando medidas en pulgadas ("18x24") o nombres
     let selectedSize = matched.sizes.find(s => s.sizeId === 'MEDIANO') || matched.sizes[0];
     if (requestedSize) {
-      const sizeClean = requestedSize.toUpperCase();
+      const normalizedSizeId = normalizeCatalogSizeId(requestedSize);
+      const sizeClean = String(requestedSize).toUpperCase().trim();
       const foundSize = matched.sizes.find(s => 
+        s.sizeId === normalizedSizeId || 
         s.sizeId === sizeClean || 
-        s.nombre.toUpperCase().includes(sizeClean)
+        s.nombre.toUpperCase() === sizeClean ||
+        s.nombre.toUpperCase().includes(sizeClean) ||
+        (s.dimensiones && s.dimensiones.toUpperCase().includes(sizeClean))
       );
-      if (foundSize) selectedSize = foundSize;
+      if (foundSize) {
+        selectedSize = foundSize;
+      } else {
+        const fallbackBySizeId = matched.sizes.find(s => s.sizeId === normalizedSizeId);
+        if (fallbackBySizeId) selectedSize = fallbackBySizeId;
+      }
     }
 
     const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
@@ -87,10 +140,16 @@ Tu tarea es escuchar el dictado del vendedor en el stand y extraer con precisió
 
 Pósters y obras populares de referencia en el catálogo:
 - Five Nights at Freddy's, Chainsaw Man, La Mona Lisa, Spider-Man, Batman, Porsche 911, The Beatles, Dragon Ball Goku, Star Wars Darth Vader, etc.
-- Tamaños habituales: Mini (Q25), Pequeño (Q35), Mediano (Q65), Grande (Q125), Gigante (Q180).
+- Catálogo oficial de Deco Vintage y equivalencias de medidas:
+  * Mini (Q25): 14x21 cm (~5x7 o 6x8 pulgadas)
+  * Pequeño (Q35): 21x27 cm (~8x10 u 8.5x11 pulgadas)
+  * Mediano (Q65): 30x45 cm (~12x18 pulgadas)
+  * Grande (Q125): 45x60 cm (~18x24 pulgadas) -> Si piden "18x24", asignar SIEMPRE tamaño "GRANDE" (Q125).
+  * Gigante (Q180): 60x90 cm (~24x36 pulgadas) -> Si piden "24x36", asignar SIEMPRE tamaño "GIGANTE" (Q180).
+  * Portada de Álbum / Vinilo (Q55): Formato vinilo 30x30 cm (~12x12 pulgadas).
 
 Instrucciones estrictas:
-1. Extrae cada obra mencionada con su nombre, tamaño ("mini", "pequeño", "mediano", "grande"), cantidad entera y precio unitario en Quetzales. Si no especifica tamaño, asume "mediano".
+1. Extrae cada obra mencionada con su nombre, tamaño ("mini", "pequeño", "mediano", "grande", "gigante", o medidas como "18x24", "12x18", "24x36"), cantidad entera y precio unitario en Quetzales. Si no especifica tamaño, asume "mediano".
 2. Si menciona método de pago ("en efectivo", "con tarjeta", "por transferencia"), identifícalo (valores válidos: EFECTIVO, TARJETA, TRANSFERENCIA, OTRO). Si no lo menciona, pon "EFECTIVO".
 3. Devuelve ÚNICAMENTE un objeto JSON válido:
 {
@@ -477,7 +536,7 @@ Tu misión:
 /**
  * 5. CHAT ANALÍTICO DE VENTAS: Consultas en lenguaje natural ("Jarvis de Stand")
  */
-export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null }) {
+export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null }) {
   const gemini = getGeminiClient();
 
   const kpis = await getEventKPIs({ tenantId, eventId, date });
@@ -510,6 +569,29 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     })),
   };
 
+  const draftContext = (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0)
+    ? `
+BORRADOR DE VENTA ACTUAL EN PANTALLA (EDICIÓN CONVERSACIONAL ACTIVA):
+${JSON.stringify({
+  items: pendingDraft.items.map(it => ({
+    title: it.baseTitle || it.description,
+    size: it.sizeId || 'MEDIANO',
+    quantity: it.quantity,
+    unitPrice: it.unitPrice,
+    subtotal: it.subtotal
+  })),
+  total: pendingDraft.total,
+  paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
+  notes: pendingDraft.notes || ''
+}, null, 2)}
+
+INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR:
+- Si el usuario solicita modificar o ajustar la venta actual (ejemplos: "cámbialo a tamaño grande", "ponle 2 unidades", "cambia a tarjeta", "agrega uno de Batman", "elimina el primero"):
+  * Preserva las obras existentes del borrador a menos que el usuario indique removerlas.
+  * Aplica los cambios solicitados (tamaño, cantidad, método de pago o adición de obras).
+  * Genera el bloque \`\`\`json_sale con la totalidad de los ítems actualizados y el total recalculado.
+` : '';
+
   const systemPrompt = `Eres Jarvis, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
 
 REGLAS ESTRICTAS DE CLASIFICACIÓN DE INTENCIÓN:
@@ -536,9 +618,16 @@ REGLAS ESTRICTAS DE CLASIFICACIÓN DE INTENCIÓN:
 }
 \`\`\`
 
-Catálogo oficial de Deco Vintage:
-- Precios estándar: Mini (Q25), Pequeño (Q35), Mediano (Q65), Grande (Q125), Gigante (Q180).
-- Portada de Álbum de música: Formato vinilo 30x30 cm (Q55).
+Catálogo oficial de Deco Vintage y equivalencias de medidas:
+- Precios estándar:
+  * Mini (Q25): 14x21 cm (~5x7 o 6x8 pulgadas)
+  * Pequeño (Q35): 21x27 cm (~8x10 u 8.5x11 pulgadas)
+  * Mediano (Q65): 30x45 cm (~12x18 pulgadas)
+  * Grande (Q125): 45x60 cm (~18x24 pulgadas) -> Si piden "18x24", asignar SIEMPRE tamaño "GRANDE" (Q125).
+  * Gigante (Q180): 60x90 cm (~24x36 pulgadas) -> Si piden "24x36", asignar SIEMPRE tamaño "GIGANTE" (Q180).
+  * Portada de Álbum de música: Formato vinilo 30x30 cm (~12x12 pulgadas) (Q55).
+
+${draftContext}
 
 Métricas en vivo de PostgreSQL:
 ${JSON.stringify(contextData, null, 2)}`;

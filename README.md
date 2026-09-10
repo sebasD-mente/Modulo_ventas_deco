@@ -96,7 +96,7 @@ Adhering to the **Strict Project Isolation Protocol** (`aislamiento-estricto-pro
 | `JWT_SECRET` | Yes | — | Cryptographic secret for signing JWTs (min. 32 characters) |
 | `JWT_EXPIRES_IN` | No | `7d` | Expiration window for JWT sessions |
 | `GEMINI_API_KEY` | Yes | — | Google AI Studio Gemini API Key |
-| `GEMINI_MODEL` | No | `gemini-3.8-flash` | Gemini model name for audio, vision, and text processing |
+| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model name for audio, vision, and text processing |
 | `GCS_BUCKET_NAME` | Yes | `deko-eventsales-media` | Dedicated Google Cloud Storage bucket |
 | `GCS_PROJECT_ID` | No | `tu-proyecto-gcp`| Google Cloud Project ID dedicado |
 | `GCS_CREDENTIALS_BASE64` | Conditional | — | Base64-encoded Service Account JSON key (for container/Dokploy deployment) |

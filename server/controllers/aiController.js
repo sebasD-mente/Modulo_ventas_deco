@@ -33,7 +33,7 @@ export async function handleVoiceSale(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir audio en GCS:', gcsErr.message);
     }
 
-    // 2. Extraer venta con Gemini 3.8 Flash
+    // 2. Extraer venta con Gemini 2.5 Flash
     const draft = await processVoiceSaleAudio({
       audioBuffer: file.buffer,
       mimeType: file.mimetype || 'audio/webm',
@@ -88,7 +88,7 @@ export async function handleBatchPhoto(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir foto en GCS:', gcsErr.message);
     }
 
-    // 2. Analizar códigos QR / barras con Gemini 3.8 Flash Vision
+    // 2. Analizar códigos QR / barras con Gemini 2.5 Flash Vision
     const analysis = await processPostersBatchPhoto({
       imageBuffer: file.buffer,
       mimeType: file.mimetype || 'image/jpeg',
@@ -122,7 +122,7 @@ export async function handleBatchPhoto(req, res) {
 
 export async function handleChatQuery(req, res) {
   try {
-    const { message, history, eventId, date } = req.body;
+    const { message, history, eventId, date, pendingDraft } = req.body;
     const tenantId = req.tenantId;
 
     if (!message || !message.trim()) {
@@ -139,6 +139,7 @@ export async function handleChatQuery(req, res) {
       tenantId,
       eventId,
       date: date || null,
+      pendingDraft: pendingDraft || null,
     });
 
     return res.json({

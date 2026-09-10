@@ -64,26 +64,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy runtime node_modules (including Prisma binaries and generated client)
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY package*.json ./
+# Copy runtime node_modules and Prisma artifacts with node:node ownership
+COPY --chown=node:node --from=deps /app/node_modules ./node_modules
+COPY --chown=node:node --from=deps /app/prisma ./prisma
+COPY --chown=node:node package*.json ./
 
 # Copy compiled frontend distribution from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/dist ./dist
 
 # Copy backend server source
-COPY server ./server
+COPY --chown=node:node server ./server
 
-# Copy static assets (e.g. public/uploads/.gitkeep)
-COPY public ./public
+# Copy static assets
+COPY --chown=node:node public ./public
 
-# Copy container entrypoint script and ensure executable permissions (stripping CRLF if present)
-COPY entrypoint.sh ./entrypoint.sh
-RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
+# Copy entrypoint, normalize line endings, set execution bit, and ensure permissions
+COPY --chown=node:node entrypoint.sh ./entrypoint.sh
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh && \
+    mkdir -p /app/public/uploads && chown -R node:node /app
+
+# Switch to unprivileged node user (OCI & CIS Docker Benchmark compliance)
+USER node
 
 # Expose HTTP service port
 EXPOSE 3001
+
+# Container Healthcheck using Node 22 native fetch
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD node -e 'fetch("http://localhost:3001/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))'
 
 # Define container entrypoint and default command
 ENTRYPOINT ["/app/entrypoint.sh"]

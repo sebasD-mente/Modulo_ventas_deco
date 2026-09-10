@@ -46,15 +46,22 @@ else
   exit 1
 fi
 
-# 2. Automated Schema Migration / Push & Initial Seed
-echo "🔄 [Entrypoint] Synchronizing database schema with Prisma (db push)..."
-npx prisma db push --skip-generate --accept-data-loss || true
-echo "✅ [Entrypoint] Prisma schema synchronization check completed."
+# 2. Automated Schema Migration / Push (Safe Execution without Data Loss)
+echo "🔄 [Entrypoint] Synchronizing database schema with Prisma..."
+if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+  echo "📦 [Entrypoint] Migrations directory detected. Executing 'prisma migrate deploy'..."
+  npx prisma migrate deploy
+else
+  echo "📦 [Entrypoint] No migrations directory detected. Executing safe 'prisma db push --skip-generate'..."
+  npx prisma db push --skip-generate
+fi
+echo "✅ [Entrypoint] Database schema synchronized successfully."
 
-echo "🌱 [Entrypoint] Checking and seeding master data (tenant, active event, users)..."
-node prisma/seed.js || true
+# 3. Master Data Verification (Lightweight Boot Seed, Non-blocking)
+echo "🌱 [Entrypoint] Checking master data (tenant and active event)..."
+SKIP_WEB_SYNC=true node prisma/seed.js
 echo "✅ [Entrypoint] Master data check completed."
 
-# 3. Pass PID 1 execution to Node application
+# 4. Pass PID 1 execution to Node application
 echo "🚀 [Entrypoint] Launching application process: $@"
 exec "$@"

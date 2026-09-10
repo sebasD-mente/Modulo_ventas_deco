@@ -8,16 +8,19 @@ services:
     container_name: deko-eventsales-app
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "${PORT:-3001}:3001"
     environment:
-      - PORT=3000
+      - PORT=3001
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - SUPER_ADMIN_EMAILS=${SUPER_ADMIN_EMAILS}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
-      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME:-decovintage-master-media}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME:-deko-eventsales-media}
       - GCS_CREDENTIALS_BASE64=${GCS_CREDENTIALS_BASE64}
+      - GCS_PROJECT_ID=${GCS_PROJECT_ID:-tienda-deco-vintage-web}
       - DEFAULT_TENANT_NAME=${DEFAULT_TENANT_NAME:-Deco Vintage Guate}
     volumes:
       - ./public/uploads:/app/public/uploads

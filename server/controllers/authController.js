@@ -24,34 +24,40 @@ export async function handleGoogleLogin(req, res) {
       });
     }
 
-    let email;
-    let fullName;
-    let avatarUrl;
-    let googleId;
-
     if (!ENV.GOOGLE_CLIENT_ID) {
-      const decoded = jwt.decode(credential);
-      if (!decoded || !decoded.email) {
-        return res.status(401).json({ success: false, error: 'Token de Google inválido o malformado.' });
-      }
-      email = decoded.email.toLowerCase();
-      fullName = decoded.name || email.split('@')[0];
-      avatarUrl = decoded.picture;
-      googleId = decoded.sub;
-    } else {
+      console.error('[Auth Error] 🛑 GOOGLE_CLIENT_ID no configurado en entorno.');
+      return res.status(500).json({
+        success: false,
+        error: 'Configuración de autenticación incompleta en el servidor: GOOGLE_CLIENT_ID no configurado.',
+      });
+    }
+
+    let payload;
+    try {
       const ticket = await googleClient.verifyIdToken({
         idToken: credential,
         audience: ENV.GOOGLE_CLIENT_ID,
       });
-      const payload = ticket.getPayload();
-      if (!payload || !payload.email) {
-        return res.status(401).json({ success: false, error: 'La verificación criptográfica con Google ha fallado.' });
-      }
-      email = payload.email.toLowerCase();
-      fullName = payload.name || email.split('@')[0];
-      avatarUrl = payload.picture;
-      googleId = payload.sub;
+      payload = ticket.getPayload();
+    } catch (verifyErr) {
+      console.error('[Auth Error] ❌ Fallo de verificación criptográfica Google:', verifyErr.message);
+      return res.status(401).json({
+        success: false,
+        error: 'Token de Google inválido o verificación criptográfica de firma fallida.',
+      });
     }
+
+    if (!payload || !payload.email) {
+      return res.status(401).json({
+        success: false,
+        error: 'La verificación criptográfica con Google ha fallado: payload incompleto.',
+      });
+    }
+
+    const email = payload.email.toLowerCase();
+    const fullName = payload.name || email.split('@')[0];
+    const avatarUrl = payload.picture;
+    const googleId = payload.sub;
 
     // 🛡️ REGLA ZERO-TRUST: Verificar si el correo pertenece estrictamente a SUPER_ADMIN_EMAILS
     const cleanEmail = email.toLowerCase().trim();

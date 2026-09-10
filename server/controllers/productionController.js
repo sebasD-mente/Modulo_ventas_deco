@@ -312,9 +312,10 @@ export async function updateProductionStatus(req, res) {
         data: updatedItem,
       });
     } catch (dbErr) {
-      return res.status(200).json({
-        success: true,
-        message: `Obra actualizada a estado ${status}`,
+      console.error('❌ [Production Controller DB Error] updateItemStatus:', dbErr);
+      return res.status(500).json({
+        success: false,
+        error: dbErr.message || 'Error al actualizar el estado de producción en base de datos.',
       });
     }
   } catch (error) {

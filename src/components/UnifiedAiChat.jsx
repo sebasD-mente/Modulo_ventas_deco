@@ -58,6 +58,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
 
@@ -67,6 +68,25 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, pendingDraft, isRecording]);
+
+  // Limpieza estricta de pistas de audio y temporizador al desmontar componente
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (_) {}
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Actualizar tamaño de un ítem en el borrador con recálculo dinámico de precios
   const updateDraftItemSize = (idx, newSizeId) => {
@@ -254,11 +274,42 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     });
   };
 
-  // Iniciar grabación de audio
+  // Detección y negociación dinámica de códec para compatibilidad cross-browser (Chrome, Firefox, Safari/iOS)
+  const getSupportedAudioMimeType = () => {
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+      return '';
+    }
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg;codecs=opus',
+    ];
+    for (const mime of candidates) {
+      if (MediaRecorder.isTypeSupported(mime)) {
+        return mime;
+      }
+    }
+    return '';
+  };
+
+  // Iniciar grabación de audio con directivas de supresión de ruido y negociación de códec
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      streamRef.current = stream;
+
+      const selectedMime = getSupportedAudioMimeType();
+      const recorderOptions = selectedMime ? { mimeType: selectedMime } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -267,8 +318,12 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach((track) => track.stop());
+        const actualMime = mediaRecorder.mimeType || selectedMime || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
         await handleAudioSale(audioBlob);
       };
 
@@ -280,20 +335,31 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       }, 1000);
     } catch (err) {
       console.error('Error accediendo al micrófono:', err);
-      alert('No se pudo acceder al micrófono. Por favor verifica los permisos en tu navegador.');
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      alert('No se pudo acceder al micrófono o tu navegador no soporta grabación de audio. Por favor verifica los permisos.');
     }
   };
 
   // Detener grabación de audio
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
   };
 
-  // Enviar audio a Gemini
+  // Enviar audio a Gemini con extensión dinámica
   const handleAudioSale = async (audioBlob) => {
     setIsLoading(true);
     setProcessingNote('Gemini analizando dictado de voz y buscando obras en catálogo...');
@@ -309,8 +375,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       },
     ]);
 
+    const ext = audioBlob.type.includes('mp4') ? 'mp4' : audioBlob.type.includes('aac') ? 'aac' : 'webm';
     const formData = new FormData();
-    formData.append('audio', audioBlob, 'voice-sale.webm');
+    formData.append('audio', audioBlob, `voice-sale.${ext}`);
     formData.append('eventId', eventId);
 
     try {
@@ -434,6 +501,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         body: JSON.stringify({
           message: query,
           eventId,
+          pendingDraft: pendingDraft || null,
           history: messages.slice(-6).map((m) => ({
             role: m.sender === 'user' ? 'user' : 'model',
             text: m.text,
