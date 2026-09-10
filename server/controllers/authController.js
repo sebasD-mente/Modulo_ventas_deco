@@ -56,8 +56,9 @@ export async function handleGoogleLogin(req, res) {
       googleId = payload.sub;
     }
 
-    // 🛡️ REGLA ZERO-TRUST: Verificar si el correo pertenece a la lista raíz de SUPER_ADMIN
-    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => email === adm || email.includes(adm));
+    // 🛡️ REGLA ZERO-TRUST: Verificar si el correo pertenece estrictamente a SUPER_ADMIN_EMAILS
+    const cleanEmail = email.toLowerCase().trim();
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes(cleanEmail);
 
     let user;
     let tenantId = 'tenant-deco-vintage';
@@ -82,7 +83,7 @@ export async function handleGoogleLogin(req, res) {
       user = await prisma.user.findFirst({
         where: {
           tenantId: tenant.id,
-          email: email,
+          email: cleanEmail,
         },
         include: {
           assignedEvent: {
@@ -92,14 +93,12 @@ export async function handleGoogleLogin(req, res) {
       });
 
       if (!user) {
-        const totalUsers = await prisma.user.count({ where: { tenantId: tenant.id } });
-        
-        // Únicamente se auto-aprovisiona el Super Admin del sistema o si la base de datos está completamente vacía (primer inicio)
-        if (isSuperAdminEmail || totalUsers === 0) {
+        // Únicamente se auto-aprovisiona el Super Admin configurado explícitamente en el entorno
+        if (isSuperAdminEmail) {
           user = await prisma.user.create({
             data: {
               tenantId: tenant.id,
-              email: email,
+              email: cleanEmail,
               fullName: fullName,
               role: 'SUPER_ADMIN',
               roles: ['SUPER_ADMIN'],
@@ -113,13 +112,13 @@ export async function handleGoogleLogin(req, res) {
               },
             },
           });
-          console.log(`[Auth] 👑 Super Admin aprovisionado: ${email}`);
+          console.log(`[Auth] 👑 Super Admin autorizado aprovisionado: ${cleanEmail}`);
         } else {
-          // 🛑 BLOQUEO ESTRICTO ZERO-TRUST: Si el usuario no está pre-registrado por el Administrador, se deniega el acceso
-          console.warn(`[Auth Warning 403] Intento de acceso denegado. Cuenta no autorizada: ${email}`);
+          // 🛑 BLOQUEO ESTRICTO ZERO-TRUST: Si el usuario no fue registrado previamente por el Administrador, se rechaza
+          console.warn(`[Auth Warning 403] Intento de acceso bloqueado. Cuenta no autorizada: ${cleanEmail}`);
           return res.status(403).json({
             success: false,
-            error: `Acceso denegado: La cuenta de Google (${email}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
+            error: `Acceso denegado: La cuenta de Google (${cleanEmail}) no está registrada ni autorizada en este sistema. Comunícate con el Administrador para que registre tu usuario.`,
           });
         }
       } else {
@@ -251,7 +250,7 @@ export async function getMe(req, res) {
       : [user.role || 'VENDEDOR'];
 
     const userEmail = (user.email || '').toLowerCase().trim();
-    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => userEmail === adm || userEmail.includes(adm));
+    const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes(userEmail);
 
     if (isSuperAdminEmail) {
       if (!userRoles.includes('SUPER_ADMIN')) {

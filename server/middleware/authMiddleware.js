@@ -57,7 +57,7 @@ export async function authMiddleware(req, res, next) {
       }
 
       const userEmail = (user.email || '').toLowerCase().trim();
-      const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.some((adm) => userEmail === adm || userEmail.includes(adm));
+      const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes(userEmail);
       if (isSuperAdminEmail && !user.roles.includes('SUPER_ADMIN')) {
         user.roles = ['SUPER_ADMIN', ...user.roles.filter(r => r !== 'SUPER_ADMIN')];
         user.role = 'SUPER_ADMIN';
