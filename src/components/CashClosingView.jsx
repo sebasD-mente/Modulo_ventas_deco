@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Copy, Check, Calculator, AlertCircle, FileText, Share2 } from 'lucide-react';
+import { ShieldCheck, Copy, Check, Calculator, AlertCircle, Share2 } from 'lucide-react';
 
 export default function CashClosingView({ liveMetrics, activeEvent, onClosingCompleted }) {
   const [reportedCash, setReportedCash] = useState('');
@@ -75,7 +75,7 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: activeEvent.id,
+          eventId: activeEvent?.id,
           closingType: 'DIARIO',
           totalCashReported: numReported,
           observations: observations || null,
@@ -98,45 +98,45 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Formulario de Arqueo de Efectivo Físico */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-700/80">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-            <Calculator className="w-5 h-5" />
-          </div>
+    <div className="space-y-6 max-w-2xl mx-auto text-white">
+      {/* 1. Formulario de Arqueo de Efectivo Físico */}
+      <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-6">
+        <div className="flex items-center gap-2.5 pb-3 border-b border-neutral-800">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-100">
-              Arqueo de Efectivo Diario
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-white" />
+              Arqueo de efectivo diario
             </h3>
-            <p className="text-xs text-slate-400">Verifica el efectivo físico presente en la gaveta del stand</p>
+            <p className="text-xs text-neutral-400">Verifica el efectivo físico presente en la gaveta del stand</p>
           </div>
         </div>
 
         {successMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4" /> {successMsg}
+          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            <span>{successMsg}</span>
           </div>
         )}
 
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> {errorMsg}
+          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
         <form onSubmit={handleCreateClosing} className="space-y-4">
           {/* Efectivo esperado por sistema */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Efectivo Esperado (Sistema):</span>
-            <span className="text-base font-bold text-slate-100">
+          <div className="p-3.5 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between text-xs">
+            <span className="font-medium text-neutral-400">Efectivo Esperado (Sistema):</span>
+            <span className="text-base font-black text-white font-mono">
               Q {calculatedCash.toFixed(2)}
             </span>
           </div>
 
           {/* Input de conteo físico */}
           <div>
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+            <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
               Efectivo Físico Contado en Caja (Q)
             </label>
             <input
@@ -146,84 +146,83 @@ ${observations ? `\n📝 *Notas:* ${observations}` : ''}
               placeholder="0.00"
               value={reportedCash}
               onChange={(e) => setReportedCash(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-lg font-black text-amber-400 focus:outline-none focus:border-amber-500"
+              className="w-full bg-black border border-neutral-700/90 rounded-2xl px-4 py-3 text-xl font-black text-emerald-400 placeholder:text-neutral-600 focus:outline-none focus:border-white font-mono shadow-inner text-center"
             />
           </div>
 
           {/* Indicador de Diferencia / Cuadre */}
           <div
-            className={`p-3.5 rounded-xl border flex items-center justify-between ${
+            className={`p-3.5 rounded-2xl border flex items-center justify-between ${
               difference === 0
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                 : difference > 0
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                 : 'bg-red-500/10 border-red-500/30 text-red-400'
             }`}
           >
             <span className="text-xs font-bold uppercase tracking-wider">
-              {difference === 0 ? 'Caja Cuadrada Exacta' : difference > 0 ? 'Sobrante en Caja' : 'Faltante en Caja'}
+              {difference === 0 ? 'Caja cuadrada exacta' : difference > 0 ? 'Sobrante en caja' : 'Faltante en caja'}
             </span>
-            <span className="text-base font-black">
+            <span className="text-base font-black font-mono">
               {difference >= 0 ? `+Q ${difference.toFixed(2)}` : `-Q ${Math.abs(difference).toFixed(2)}`}
             </span>
           </div>
 
           {/* Observaciones */}
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-              Observaciones o Incidencias del Turno
+            <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+              Observaciones o incidencias del turno
             </label>
             <textarea
               rows="3"
               placeholder="Ej. Q20 sobrante por propina / fondo de cambio inicial Q100..."
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+              className="w-full bg-black border border-neutral-700/90 rounded-2xl px-4 py-2.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
             ></textarea>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting || reportedCash === ''}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 disabled:opacity-40 transition-all cursor-pointer"
+            className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm uppercase tracking-wider shadow-xl shadow-emerald-500/20 disabled:opacity-40 transition-all cursor-pointer active:scale-95"
           >
-            {isSubmitting ? 'Guardando en PostgreSQL...' : 'Registrar y Conciliar Cierre'}
+            {isSubmitting ? 'Guardando en PostgreSQL...' : 'Registrar y conciliar cierre'}
           </button>
         </form>
       </div>
 
-      {/* Resumen para WhatsApp de Gerencia */}
-      <div className="glass-card p-6 rounded-2xl border border-slate-700/80 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                Resumen Ejecutivo para WhatsApp
-              </h3>
-            </div>
-            <button
-              onClick={copyToClipboard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? '¡Copiado!' : 'Copiar Texto'}</span>
-            </button>
+      {/* 2. Resumen para WhatsApp de Gerencia */}
+      <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-4 text-white">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-4 h-4 text-white" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+              Resumen ejecutivo para WhatsApp
+            </h3>
           </div>
-
-          <p className="text-xs text-slate-400 mb-3">
-            Formato listo con emojis para enviar al grupo de WhatsApp de supervisores y gerencia:
-          </p>
-
-          <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300/90 whitespace-pre-wrap leading-relaxed overflow-x-auto select-all">
-            {generateWhatsAppSummary()}
-          </pre>
+          <button
+            onClick={copyToClipboard}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-neutral-200 text-black font-black text-xs transition-transform active:scale-95 shadow-md cursor-pointer"
+          >
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? '¡Copiado!' : 'Copiar texto'}</span>
+          </button>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500 text-center">
+        <p className="text-xs text-neutral-400">
+          Formato estructurado con emojis listo para supervisores y gerencia:
+        </p>
+
+        <pre className="p-4 rounded-2xl bg-black border border-neutral-800 text-xs font-mono text-emerald-400 whitespace-pre-wrap leading-relaxed overflow-x-auto select-all shadow-inner">
+          {generateWhatsAppSummary()}
+        </pre>
+
+        <div className="pt-2 text-[11px] text-neutral-500 text-center">
           Inmutable • Registrado en PostgreSQL VPS • Deko Labs Architecture
         </div>
       </div>
     </div>
   );
 }
+

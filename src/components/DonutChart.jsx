@@ -1,15 +1,9 @@
 import React from 'react';
 
 /**
- * Gráfico Donut SVG Puro idéntico al screenshot con etiquetas porcentuales y leyenda
+ * Gráfico Donut SVG Puro estilizado para fondo oscuro neutro
  */
 export default function DonutChart({ data, size = 260 }) {
-  // data = [
-  //   { key: 'TARJETA', label: 'Tarjeta', icon: '💳', amount: 380, percentage: 52.8, color: '#2563EB' },
-  //   { key: 'TRANSFERENCIA', label: 'Transferencia', icon: '📲', amount: 250, percentage: 34.7, color: '#9333EA' },
-  //   { key: 'EFECTIVO', label: 'Efectivo', icon: '💵', amount: 90, percentage: 12.5, color: '#10B981' },
-  // ]
-
   const total = data.reduce((acc, d) => acc + (d.amount || 0), 0);
   const center = size / 2;
   const outerRadius = size * 0.44;
@@ -25,7 +19,7 @@ export default function DonutChart({ data, size = 260 }) {
             cy={center}
             r={(outerRadius + innerRadius) / 2}
             fill="none"
-            stroke="#1E293B"
+            stroke="#262626"
             strokeWidth={outerRadius - innerRadius}
           />
           <text
@@ -33,14 +27,14 @@ export default function DonutChart({ data, size = 260 }) {
             y={center}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill="#64748B"
+            fill="#737373"
             fontSize="12"
             fontWeight="bold"
           >
             Sin ventas
           </text>
         </svg>
-        <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-slate-400">
+        <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-neutral-400">
           {data.map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }}></span>
@@ -92,7 +86,6 @@ export default function DonutChart({ data, size = 260 }) {
 
       // Calcular rotación del texto para legibilidad radial
       let rotDeg = (midAngle * 180) / Math.PI;
-      // Normalizar rotación para no leer de cabeza
       if (rotDeg > 90 && rotDeg < 270) {
         rotDeg += 180;
       } else if (rotDeg < -90 && rotDeg > -270) {
@@ -116,8 +109,8 @@ export default function DonutChart({ data, size = 260 }) {
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
           {slices.map((s) => (
             <g key={s.key} className="transition-transform hover:opacity-90">
-              <path d={s.pathData} fill={s.color} stroke="#0B1120" strokeWidth="2" />
-              {/* Etiqueta dentro del arco si el porcentaje es suficiente (> 12% para 2 líneas) */}
+              <path d={s.pathData} fill={s.color} stroke="#000000" strokeWidth="2" />
+              {/* Etiqueta dentro del arco si el porcentaje es suficiente */}
               {s.sliceAngle > 0.45 && (
                 <g transform={`translate(${s.lx}, ${s.ly}) rotate(${s.rotDeg})`}>
                   <text
@@ -135,13 +128,13 @@ export default function DonutChart({ data, size = 260 }) {
               )}
             </g>
           ))}
-          {/* Círculo interior oscuro idéntico al screenshot */}
-          <circle cx={center} cy={center} r={innerRadius - 1} fill="#090D16" />
+          {/* Círculo interior oscuro puro */}
+          <circle cx={center} cy={center} r={innerRadius - 1} fill="#000000" />
         </svg>
       </div>
 
-      {/* Leyenda inferior idéntica al screenshot */}
-      <div className="flex flex-wrap items-center justify-center gap-4 mt-3 text-[11px] text-slate-300 font-semibold">
+      {/* Leyenda inferior */}
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-3 text-[11px] text-neutral-300 font-semibold">
         {data.map((item) => (
           <div key={item.key} className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }}></span>
