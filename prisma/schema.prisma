@@ -31,21 +31,26 @@ model Tenant {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  tenantId     String
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email        String
-  passwordHash String
-  fullName     String
-  role         String        @default("ENCARGADO_STAND")
-  phone        String?
-  status       String        @default("ACTIVO")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id              String          @id @default(uuid())
+  tenantId        String
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  passwordHash    String?
+  fullName        String
+  role            String          @default("VENDEDOR") // SUPER_ADMIN | VENDEDOR | OPERARIO_1 | OPERARIO_2
+  googleId        String?         @unique
+  avatarUrl       String?
+  phone           String?
+  status          String          @default("ACTIVO") // ACTIVO | INACTIVO
+  assignedEventId String?
+  assignedEvent   Event?          @relation("AssignedSeller", fields: [assignedEventId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  sales        Sale[]
-  cashClosings CashClosing[]
-  auditLogs    AuditLog[]
+  sales           Sale[]
+  cashClosings    CashClosing[]
+  auditLogs       AuditLog[]
+  productionLogs  ProductionLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -70,6 +75,7 @@ model Event {
 
   sales               Sale[]
   cashClosings        CashClosing[]
+  assignedSellers     User[]        @relation("AssignedSeller")
 
   @@index([tenantId, status])
   @@map("events")
@@ -128,19 +134,47 @@ model Sale {
 }
 
 model SaleItem {
-  id          String   @id @default(uuid())
-  saleId      String
-  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId   String?
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  description String
-  quantity    Int      @default(1)
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  subtotal    Decimal  @db.Decimal(10, 2)
-  createdAt   DateTime @default(now())
+  id                String          @id @default(uuid())
+  saleId            String
+  sale              Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  description       String
+  quantity          Int             @default(1)
+  unitPrice         Decimal         @db.Decimal(10, 2)
+  subtotal          Decimal         @db.Decimal(10, 2)
+  
+  // Ciclo de Vida de Producción
+  productionStatus  String          @default("PENDIENTE") // PENDIENTE | SEPARADO | A_PRODUCCION | IMPRESO
+  productionNotes   String?         @db.Text
+  statusChangedAt   DateTime?
+  statusChangedById String?
+  impresoAt         DateTime?
+  impresoById       String?
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  productionLogs    ProductionLog[]
 
   @@index([saleId])
+  @@index([productionStatus])
   @@map("sale_items")
+}
+
+model ProductionLog {
+  id             String    @id @default(uuid())
+  saleItemId     String
+  saleItem       SaleItem  @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  previousStatus String
+  newStatus      String
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  @@index([saleItemId])
+  @@map("production_logs")
 }
 
 model SalePayment {

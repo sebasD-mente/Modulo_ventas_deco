@@ -1,33 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
+import LoginView from './components/LoginView';
 import UnifiedAiChat from './components/UnifiedAiChat';
 import FastManualSaleForm from './components/FastManualSaleForm';
 import RecentSalesList from './components/RecentSalesList';
 import EventsManagementView from './components/EventsManagementView';
 import MonitorDashboardView from './components/MonitorDashboardView';
 import CashClosingView from './components/CashClosingView';
+import ProductionManagementView from './components/ProductionManagementView';
+import UserManagementView from './components/UserManagementView';
 import { Loader2 } from 'lucide-react';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('venta'); // 'venta' | 'eventos' | 'cierre'
+function SalesTerminalMain() {
+  const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
+  const [activeTab, setActiveTab] = useState('venta');
   const [activeEvent, setActiveEvent] = useState(null);
   const [liveMetrics, setLiveMetrics] = useState(null);
   const [manualDraft, setManualDraft] = useState(null);
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Cargar datos iniciales
-  const loadInitialData = async () => {
+  // Ajustar pestaña por defecto según rol
+  useEffect(() => {
+    if (user) {
+      if (isOperario1 || isOperario2) {
+        setActiveTab('produccion');
+      } else if (isVendedor) {
+        setActiveTab('venta');
+      }
+    }
+  }, [user, isOperario1, isOperario2, isVendedor]);
+
+  // Cargar datos iniciales del evento activo y métricas
+  const loadInitialData = useCallback(async () => {
+    if (!token) return;
     try {
       setIsLoading(true);
       // 1. Evento Activo
-      const eventRes = await fetch('/api/events/active');
+      const eventRes = await authFetch('/api/events/active');
       const eventData = await eventRes.json();
       if (eventData.success && eventData.data) {
         setActiveEvent(eventData.data);
 
         // 2. Métricas en vivo del evento activo
-        const metricsRes = await fetch(`/api/sales/events/${eventData.data.id}/metrics`);
+        const metricsRes = await authFetch(`/api/sales/events/${eventData.data.id}/metrics`);
         const metricsData = await metricsRes.json();
         if (metricsData.success) {
           setLiveMetrics(metricsData.data);
@@ -38,13 +55,12 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [authFetch, token]);
 
-  // Recargar métricas tras una venta o cierre
   const refreshMetrics = async () => {
     if (!activeEvent) return;
     try {
-      const metricsRes = await fetch(`/api/sales/events/${activeEvent.id}/metrics`);
+      const metricsRes = await authFetch(`/api/sales/events/${activeEvent.id}/metrics`);
       const metricsData = await metricsRes.json();
       if (metricsData.success) {
         setLiveMetrics(metricsData.data);
@@ -56,24 +72,30 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (user) {
+      loadInitialData();
+    }
+  }, [user, loadInitialData]);
 
-  if (isLoading && !activeEvent) {
+  if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-4">
-        <Loader2 className="w-10 h-10 text-amber-500 animate-spin mb-3" />
-        <div className="text-sm font-bold tracking-wider uppercase text-amber-400">
-          Deko EventSales • Deco Vintage Guate
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-4">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
+        <div className="text-xs font-bold tracking-widest uppercase text-neutral-400">
+          STAND {'{IA}'} • Verificando Sesión Segura...
         </div>
-        <div className="text-xs text-slate-400 mt-1">Conectando con base de datos PostgreSQL VPS...</div>
       </div>
     );
   }
 
+  // Si no hay usuario autenticado, renderizar pantalla de Login Oficial de Google
+  if (!user) {
+    return <LoginView />;
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
-      {/* Header Superior Blanco con STAND {IA} */}
+      {/* Header Superior Blanco con STAND {IA} y Perfil de Usuario */}
       <Header
         activeEvent={activeEvent}
         activeTab={activeTab}
@@ -84,27 +106,23 @@ export default function App() {
       {/* Contenedor Principal Centrado */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-8">
         {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) */}
-        {activeTab === 'venta' && (
+        {activeTab === 'venta' && (isSuperAdmin || isVendedor) && (
           <div className="space-y-6">
-            {/* PARTE SUPERIOR: Chat con el Agente de IA Unificado (Audio, Cámara y Texto) */}
             <UnifiedAiChat
               eventId={activeEvent?.id}
               onSaleRegistered={refreshMetrics}
               onPopulateManualForm={(draft) => {
                 setManualDraft(draft);
-                // Desplazar suavemente hacia el formulario manual
                 window.scrollTo({ top: 380, behavior: 'smooth' });
               }}
             />
 
-            {/* PARTE INFERIOR (SCROLL): Formulario de Venta Manual Ágil con Catálogo Web */}
             <FastManualSaleForm
               eventId={activeEvent?.id}
               onSaleRegistered={refreshMetrics}
               initialDraft={manualDraft}
             />
 
-            {/* LISTA DE VENTAS RECIENTES DEL EVENTO & EDICIÓN RÁPIDA */}
             <RecentSalesList
               eventId={activeEvent?.id}
               refreshTrigger={salesRefreshTrigger}
@@ -113,36 +131,54 @@ export default function App() {
           </div>
         )}
 
-        {/* PÁGINA 2: GESTIÓN DE EVENTOS Y CONSULTA DE VENTAS */}
-        {activeTab === 'eventos' && (
+        {/* PÁGINA 2: GESTIÓN DE EVENTOS (SUPER ADMIN) */}
+        {activeTab === 'eventos' && isSuperAdmin && (
           <EventsManagementView
             onEventActivated={(activatedEvent) => {
               setActiveEvent(activatedEvent);
               refreshMetrics();
-              setActiveTab('venta'); // Redirigir a la venta con el nuevo evento activo
+              setActiveTab('venta');
             }}
           />
         )}
 
-        {/* PÁGINA: MONITOR DE VENTAS EN TIEMPO REAL PARA GERENCIA */}
-        {activeTab === 'monitor' && (
+        {/* PÁGINA 3: MONITOR EN TIEMPO REAL */}
+        {activeTab === 'monitor' && (isSuperAdmin || isVendedor) && (
           <MonitorDashboardView />
         )}
 
-        {/* PÁGINA 3 (UTILIDAD): CIERRE DE CAJA Y ARQUEO */}
-        {activeTab === 'cierre' && (
+        {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN) */}
+        {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2) && (
+          <ProductionManagementView />
+        )}
+
+        {/* PÁGINA 5: CIERRE DE CAJA Y ARQUEO */}
+        {activeTab === 'cierre' && (isSuperAdmin || isVendedor) && (
           <CashClosingView
             liveMetrics={liveMetrics}
             activeEvent={activeEvent}
             onClosingCompleted={refreshMetrics}
           />
         )}
+
+        {/* PÁGINA 6: GESTIÓN DE USUARIOS Y ROLES (SUPER ADMIN) */}
+        {activeTab === 'usuarios' && isSuperAdmin && (
+          <UserManagementView />
+        )}
       </main>
 
       {/* Footer Discreto */}
-      <footer className="border-t border-slate-800/60 py-4 px-6 text-center text-xs text-slate-500">
-        Deko EventSales SaaS • Desarrollado por <strong>Deko Labs</strong> para <strong>Deco Vintage Guate</strong> • PostgreSQL VPS Inmutable
+      <footer className="border-t border-neutral-900 py-4 px-6 text-center text-xs text-neutral-500">
+        STAND {'{IA}'} SaaS • Desarrollado por <strong>Deko Labs</strong> para <strong>Deco Vintage Guate</strong> • PostgreSQL VPS Inmutable
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <SalesTerminalMain />
+    </AuthProvider>
   );
 }

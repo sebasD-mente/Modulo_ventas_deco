@@ -22,7 +22,9 @@ export const ENV = {
   DEFAULT_TENANT_NAME: process.env.DEFAULT_TENANT_NAME || 'Deco Vintage Guate',
   DEFAULT_CURRENCY: process.env.DEFAULT_CURRENCY || 'GTQ',
   DEFAULT_CURRENCY_SYMBOL: process.env.DEFAULT_CURRENCY_SYMBOL || 'Q',
-  WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintage.online'
+  WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintage.online',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
+  SUPER_ADMIN_EMAILS: (process.env.SUPER_ADMIN_EMAILS || 'ia@dekolabs.org,decovintageguate@gmail.com').split(',').map(e => e.trim().toLowerCase()),
 };
 
 // 🛡️ REGLA PERMANENTE: CANDADO DE AISLAMIENTO ESTRICTO DE INFRAESTRUCTURA

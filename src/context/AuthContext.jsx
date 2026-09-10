@@ -1,0 +1,164 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('deko_auth_token'));
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const authFetch = useCallback(
+    async (url, options = {}) => {
+      const headers = {
+        ...(options.headers || {}),
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(url, {
+        ...options,
+        headers,
+      });
+
+      if (res.status === 401) {
+        logout();
+      }
+
+      return res;
+    },
+    [token]
+  );
+
+  const checkSession = useCallback(async () => {
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await fetch('/api/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (data.success && data.user) {
+        setUser(data.user);
+      } else {
+        localStorage.removeItem('deko_auth_token');
+        setToken(null);
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('[Auth Error] Error verificando sesión:', err);
+      setError('Error al verificar sesión.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  const loginWithGoogle = async (credential) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Fallo en autenticación con Google');
+      }
+
+      localStorage.setItem('deko_auth_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      return data.user;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const devLogin = async (role = 'SUPER_ADMIN', email = 'ia@dekolabs.org', fullName = 'Dev Admin') => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fullName, devRole: role }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Error en dev login');
+      }
+
+      localStorage.setItem('deko_auth_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      return data.user;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('deko_auth_token');
+    setToken(null);
+    setUser(null);
+  };
+
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isVendedor = user?.role === 'VENDEDOR';
+  const isOperario1 = user?.role === 'OPERARIO_1';
+  const isOperario2 = user?.role === 'OPERARIO_2';
+  const isProduccion = isOperario1 || isOperario2;
+
+  const value = {
+    user,
+    token,
+    isLoading,
+    error,
+    loginWithGoogle,
+    devLogin,
+    logout,
+    authFetch,
+    isSuperAdmin,
+    isVendedor,
+    isOperario1,
+    isOperario2,
+    isProduccion,
+    checkSession,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth debe ser usado dentro de AuthProvider');
+  }
+  return context;
+}
