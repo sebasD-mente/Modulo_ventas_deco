@@ -102,6 +102,32 @@ app.get('/health/ai', async (req, res) => {
       }
     }
 
+    // Verificación en vivo del stream real de STAND {IA}
+    try {
+      const { streamChatWithSalesAssistant } = await import('./services/aiMultimodalService.js');
+      const streamGen = streamChatWithSalesAssistant({
+        message: 'Hola STAND IA, ¿cómo estás?',
+        contextData: { evento: 'Feria Vintage Guate', ubicacion: 'Stand Central' },
+      });
+      let tokens = '';
+      for await (const chunk of streamGen) {
+        if (chunk.type === 'token' && chunk.text) {
+          tokens += chunk.text;
+          if (tokens.length >= 100) break;
+        }
+      }
+      diag.standIaLiveStream = {
+        ok: !tokens.includes('volumen alto de consultas'),
+        isFallback: tokens.includes('volumen alto de consultas'),
+        sample: tokens.substring(0, 100),
+      };
+    } catch (streamErr) {
+      diag.standIaLiveStream = {
+        ok: false,
+        error: streamErr.message,
+      };
+    }
+
     res.status(200).json(diag);
   } catch (err) {
     res.status(500).json({ status: 'error', error: err.message });
