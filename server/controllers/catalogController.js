@@ -154,6 +154,111 @@ export async function createEvent(req, res) {
   }
 }
 
+export async function archiveEvent(req, res) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    const event = await prisma.event.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
+    }
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { status: 'ARCHIVADO' },
+    });
+
+    return res.json({
+      success: true,
+      data: updated,
+      message: `El evento "${updated.name}" ha sido archivado exitosamente.`,
+    });
+  } catch (err) {
+    console.error('❌ Error archivando evento:', err);
+    return res.status(500).json({ success: false, error: 'Error al archivar el evento.' });
+  }
+}
+
+export async function unarchiveEvent(req, res) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    const event = await prisma.event.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
+    }
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { status: 'CONFIRMADO' },
+    });
+
+    return res.json({
+      success: true,
+      data: updated,
+      message: `El evento "${updated.name}" ha sido restaurado a la lista de confirmados.`,
+    });
+  } catch (err) {
+    console.error('❌ Error desarchivando evento:', err);
+    return res.status(500).json({ success: false, error: 'Error al restaurar el evento.' });
+  }
+}
+
+export async function deleteEvent(req, res) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    const event = await prisma.event.findFirst({
+      where: { id, tenantId },
+      include: {
+        _count: {
+          select: { sales: true, cashClosings: true },
+        },
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
+    }
+
+    if (event._count.sales > 0 || event._count.cashClosings > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `No se puede eliminar "${event.name}" porque tiene registros contables (${event._count.sales} ventas y ${event._count.cashClosings} arqueos). Puedes archivarlo para preservar el historial.`,
+      });
+    }
+
+    if (event.status === 'ACTIVO') {
+      return res.status(400).json({
+        success: false,
+        error: `No se puede eliminar un evento que está actualmente EN CURSO. Activa otro evento o archívalo primero.`,
+      });
+    }
+
+    await prisma.event.delete({
+      where: { id },
+    });
+
+    return res.json({
+      success: true,
+      message: `El evento "${event.name}" fue eliminado correctamente.`,
+    });
+  } catch (err) {
+    console.error('❌ Error eliminando evento:', err);
+    return res.status(500).json({ success: false, error: 'Error al eliminar el evento.' });
+  }
+}
+
+
 import { searchWebPosters } from '../services/webCatalogService.js';
 import { syncCatalogFromWeb } from '../services/catalogSyncService.js';
 

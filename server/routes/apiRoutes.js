@@ -36,9 +36,13 @@ import {
   getEventsList,
   activateEvent,
   createEvent,
+  archiveEvent,
+  unarchiveEvent,
+  deleteEvent,
   searchWebPostersCatalog,
   triggerCatalogSync,
 } from '../controllers/catalogController.js';
+
 import {
   handleVoiceSale,
   handleBatchPhoto,
@@ -100,7 +104,11 @@ router.get('/events/active', getActiveEvent);
 router.get('/events', getEventsList);
 router.post('/events', requireRole(['SUPER_ADMIN']), createEvent);
 router.patch('/events/:id/activate', requireRole(['SUPER_ADMIN']), activateEvent);
+router.patch('/events/:id/archive', requireRole(['SUPER_ADMIN']), archiveEvent);
+router.patch('/events/:id/unarchive', requireRole(['SUPER_ADMIN']), unarchiveEvent);
+router.delete('/events/:id', requireRole(['SUPER_ADMIN']), deleteEvent);
 router.get('/products', getProducts);
+
 router.get('/catalog/web-posters', searchWebPostersCatalog);
 router.post('/catalog/sync', requireRole(['SUPER_ADMIN']), triggerCatalogSync);
 
