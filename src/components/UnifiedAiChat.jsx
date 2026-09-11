@@ -108,9 +108,10 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     {
       id: 1,
       sender: 'ai',
-      text: '¡Hola! Soy Jarvis, tu Asistente de Ventas IA. Puedes consultarme por obras del catálogo 🎨, dictarme ventas por voz 🎙️, o subir fotos de arte y códigos 📷.',
+      text: '¡Hola! Soy STAND IA y estoy listo para registrar ventas y dar reportes, ¿con qué comenzamos?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
+
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);

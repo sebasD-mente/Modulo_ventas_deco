@@ -894,15 +894,16 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     total,
     paymentMethod: args?.paymentMethod || 'EFECTIVO',
     inputChannel: 'IA_CHAT_TEXTO',
-    notes: args?.notes || 'Venta dictada por Jarvis Chat',
+    notes: args?.notes || 'Venta dictada por STAND IA Chat',
     customerName: args?.customerName || null,
     transcription: userMessage,
   };
 }
 
 /**
- * 5. CHAT ANALÍTICO DE VENTAS: Consultas en lenguaje natural ("Jarvis de Stand")
+ * 5. CHAT ANALÍTICO DE VENTAS: Consultas en lenguaje natural ("STAND IA de Stand")
  */
+
 export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null }) {
   const gemini = getGeminiClient();
 
@@ -965,7 +966,8 @@ INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR:
   * Invoca la herramienta formal prepareSaleDraft con la totalidad de los ítems actualizados y el total recalculado.
 ` : '';
 
-  const systemPrompt = `Eres Jarvis, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
+  const systemPrompt = `Eres STAND IA, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
+
 
 REGLAS ESTRICTAS DE HERRAMIENTAS Y FUNCTION CALLING:
 
@@ -1179,7 +1181,8 @@ INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR:
   * Invoca la herramienta formal prepareSaleDraft con la totalidad de los ítems actualizados y el total recalculado.
 ` : '';
 
-  const systemInstruction = `Eres Jarvis, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || resolvedContextData.evento || 'el evento'}".
+  const systemInstruction = `Eres STAND IA, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || resolvedContextData.evento || 'el evento'}".
+
 
 REGLAS ESTRICTAS DE HERRAMIENTAS Y FUNCTION CALLING:
 
