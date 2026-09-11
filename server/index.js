@@ -58,6 +58,56 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Diagnóstico de IA en vivo para verificación de modelos y credenciales sin adivinanzas
+app.get('/health/ai', async (req, res) => {
+  try {
+    const { getGeminiClient } = await import('./config/gemini.js');
+    const gemini = getGeminiClient();
+    const apiKey = ENV.GEMINI_API_KEY || '';
+    const diag = {
+      status: 'ok',
+      configured: Boolean(apiKey),
+      keyLength: apiKey.length,
+      keyPrefix: apiKey ? `${apiKey.substring(0, 6)}...` : 'none',
+      envModel: ENV.GEMINI_MODEL,
+      models: {},
+      time: new Date().toISOString(),
+    };
+
+    if (!gemini) {
+      return res.status(200).json({ ...diag, error: 'GEMINI_CLIENT_NOT_INITIALIZED' });
+    }
+
+    const testModels = [ENV.GEMINI_MODEL, 'gemini-1.5-flash', 'gemini-2.0-flash'].filter(Boolean);
+    const uniqueModels = Array.from(new Set(testModels));
+
+    for (const m of uniqueModels) {
+      try {
+        const t0 = Date.now();
+        const r = await gemini.models.generateContent({
+          model: m,
+          contents: 'ping',
+        });
+        diag.models[m] = {
+          ok: true,
+          latencyMs: Date.now() - t0,
+          sample: r.text?.trim()?.substring(0, 40) || 'OK',
+        };
+      } catch (err) {
+        diag.models[m] = {
+          ok: false,
+          status: err.status || err.statusCode || err.code || 'ERR',
+          message: err.message?.substring(0, 200),
+        };
+      }
+    }
+
+    res.status(200).json(diag);
+  } catch (err) {
+    res.status(500).json({ status: 'error', error: err.message });
+  }
+});
+
 // Rutas de API
 app.use('/api', apiRoutes);
 

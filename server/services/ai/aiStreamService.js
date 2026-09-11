@@ -4,7 +4,7 @@ import { prisma } from '../../config/prisma.js';
 import { getEventKPIs } from '../saleService.js';
 import { searchWebPosters } from '../webCatalogService.js';
 import { normalizeArtworkQuery } from '../semanticParserService.js';
-import { executeWithModelFallback, streamWithModelFallback } from '../geminiPoolService.js';
+import { executeWithModelFallback, streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
 import {
   salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus,
@@ -45,8 +45,10 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
   }
   try {
     const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
+    const activePool = [ENV.GEMINI_MODEL || 'gemini-1.5-flash', ...MODEL_PRIORITY_POOL.filter(m => m !== (ENV.GEMINI_MODEL || 'gemini-1.5-flash'))];
     const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({ model, contents: formattedContents, config: { systemInstruction: systemPrompt, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+      models: activePool,
       actionName: 'AI_CHAT', tenantId, context: { eventId }, client: gemini,
     });
     let draftSale = null, suggestedPosters = [], eventKpis = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
@@ -96,8 +98,10 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     return;
   }
   const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
+  const activePool = [ENV.GEMINI_MODEL || 'gemini-1.5-flash', ...MODEL_PRIORITY_POOL.filter(m => m !== (ENV.GEMINI_MODEL || 'gemini-1.5-flash'))];
   const stream = streamWithModelFallback({
     buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+    models: activePool,
     client: gemini,
   });
   const executedCalls = new Set();

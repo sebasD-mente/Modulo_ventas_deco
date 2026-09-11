@@ -9,6 +9,7 @@ import { searchWebPosters } from '../services/webCatalogService.js';
 import { uploadBufferToStorage } from '../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../services/llmObservabilityService.js';
 import { normalizeArtworkQuery } from '../services/semanticParserService.js';
+import { ENV } from '../config/env.js';
 
 
 export async function handleVoiceSale(req, res) {
@@ -51,7 +52,7 @@ export async function handleVoiceSale(req, res) {
       tenantId,
       userId: req.userId || null,
       action: 'AI_VOICE_SALE',
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
       tokensIn: null,
       tokensOut: null,
       latencyMs: Date.now() - t0Voice,
@@ -119,7 +120,7 @@ export async function handleBatchPhoto(req, res) {
       tenantId,
       userId: req.userId || null,
       action: 'AI_BATCH_QR_SCAN',
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
       tokensIn: null,
       tokensOut: null,
       latencyMs: Date.now() - t0Batch,
@@ -182,7 +183,7 @@ export async function handleChatQuery(req, res) {
         tenantId,
         userId: req.userId || null,
         action: 'AI_CHAT',
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
         tokensIn:  null,
         tokensOut: result.reply ? Math.ceil(result.reply.length / 4) : null, // ~4 chars/token
         latencyMs: Date.now() - t0Chat,
@@ -270,7 +271,7 @@ export async function handleChatQuery(req, res) {
         tenantId,
         userId: req.userId || null,
         action: 'AI_CHAT_STREAM',
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
         tokensIn:  null,
         tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
         latencyMs: Date.now() - t0Stream,

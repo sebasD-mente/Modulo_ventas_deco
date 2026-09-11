@@ -98,13 +98,44 @@ export function isRetryableOnSameModel(err) {
   return isServiceOverloadedError(err) || isTransientNetworkError(err);
 }
 
+export function isModelNotFoundError(err) {
+  if (!err) return false;
+  const status = err.status || err.statusCode || err.code;
+  if (status === 404 || status === '404' || status === 'NOT_FOUND') return true;
+  const msg = String(err.message || '').toLowerCase();
+  return (
+    msg.includes('not found') ||
+    msg.includes('is not found') ||
+    msg.includes('not_found') ||
+    msg.includes('unsupported model') ||
+    msg.includes('does not exist') ||
+    msg.includes('is not supported')
+  );
+}
+
+export function isClientInvalidModelError(err) {
+  if (!err) return false;
+  const status = err.status || err.statusCode || err.code;
+  if (status === 400 || status === '400') {
+    const msg = String(err.message || '').toLowerCase();
+    return msg.includes('model') || msg.includes('not supported') || msg.includes('not found');
+  }
+  return false;
+}
+
 /**
  * Determines if the error warrants falling back to the next model in the priority pool.
  * @param {any} err
  * @returns {boolean}
  */
 export function shouldFallbackToNextModel(err) {
-  return isRateLimitOrQuotaError(err) || isServiceOverloadedError(err) || isTransientNetworkError(err);
+  return (
+    isRateLimitOrQuotaError(err) ||
+    isServiceOverloadedError(err) ||
+    isTransientNetworkError(err) ||
+    isModelNotFoundError(err) ||
+    isClientInvalidModelError(err)
+  );
 }
 
 /**
@@ -174,17 +205,22 @@ export async function executeWithModelFallback({
         lastError = err;
         console.warn(`[Gemini Pool] ⚠️ Intento ${attempt + 1} falló en modelo "${currentModel}": ${err?.message || err}`);
 
-        // Non-recoverable client errors (400 Bad Request, 401 Unauthorized, 403 Forbidden)
-        if (err?.status === 400 || err?.status === 401 || err?.status === 403) {
+        // Non-recoverable client errors (401 Unauthorized, 403 Forbidden)
+        if (err?.status === 401 || err?.status === 403) {
+          if (!isRateLimitOrQuotaError(err)) {
+            throw err;
+          }
+        }
+        if (err?.status === 400 && !isModelNotFoundError(err) && !isClientInvalidModelError(err)) {
           if (!isRateLimitOrQuotaError(err)) {
             throw err;
           }
         }
 
-        // Quota / Rate limit (429): do not waste time retrying the same model, switch immediately
-        if (isRateLimitOrQuotaError(err)) {
+        // Quota / Rate limit (429) o Modelo no soportado (404/400): conmutar inmediatamente
+        if (isRateLimitOrQuotaError(err) || isModelNotFoundError(err) || isClientInvalidModelError(err)) {
           if (!isLastModel) {
-            console.warn(`[Gemini Pool] ⚡ Cuota agotada en "${currentModel}". Conmutando inmediatamente a "${models[modelIdx + 1]}"...`);
+            console.warn(`[Gemini Pool] ⚡ Error en "${currentModel}" (${isModelNotFoundError(err) || isClientInvalidModelError(err) ? 'Modelo no soportado' : 'Cuota agotada'}). Conmutando inmediatamente a "${models[modelIdx + 1]}"...`);
             break;
           } else {
             break;
@@ -264,7 +300,7 @@ export async function* streamWithModelFallback({
       lastError = initErr;
       console.warn(`[Gemini Stream Pool] ⚠️ Fallo al inicializar stream con "${activeModel}": ${initErr?.message || initErr}`);
 
-      if (shouldFallbackToNextModel(initErr) && i < models.length - 1) {
+      if (i < models.length - 1) {
         console.warn(`[Gemini Stream Pool] ⚡ Conmutando stream a "${models[i + 1]}"...`);
         continue;
       }

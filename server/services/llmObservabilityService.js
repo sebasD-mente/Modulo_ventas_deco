@@ -61,7 +61,7 @@ export function recordLlmInteraction({
   effectiveModel,
   initialModel,
 }) {
-  const usedModel = effectiveModel || model || ENV.GEMINI_MODEL || 'gemini-2.5-flash';
+  const usedModel = effectiveModel || model || ENV.GEMINI_MODEL || 'gemini-1.5-flash';
   const costUsd = estimateCostUsd(usedModel, tokensIn, tokensOut);
 
   const mergedDetails = details ? { ...details } : {};
@@ -138,7 +138,7 @@ export async function withLlmObservability(fn, { tenantId, userId, action, detai
       tenantId,
       userId,
       action,
-      model: model || ENV.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: model || ENV.GEMINI_MODEL || 'gemini-1.5-flash',
       tokensIn,
       tokensOut,
       latencyMs,
