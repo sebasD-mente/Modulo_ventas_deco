@@ -91,20 +91,32 @@ const server = app.listen(ENV.PORT, () => {
 ⚡ Motor IA: ${ENV.GEMINI_MODEL}
   `);
 
-  // Auto-sincronización en segundo plano si la base de datos no tiene el catálogo completo
-  prisma.product
-    .count({ where: { isActive: true } })
-    .then(async (count) => {
-      if (count < 20) {
-        console.log(`[Startup] Catálogo local con solo ${count} productos. Iniciando sincronización de 233 pósters...`);
-        await syncCatalogFromWeb().catch((e) =>
-          console.warn('[Startup] Fallo no crítico en auto-sincronización:', e.message)
-        );
+  // ── Sincronización de Catálogo Web ─────────────────────────────────────────
+  // Se ejecuta siempre al arrancar (para capturar productos nuevos de la tienda)
+  // y cada 6 horas de forma periódica para mantener el catálogo actualizado.
+  const runCatalogSync = async (reason = 'startup') => {
+    try {
+      const localCount = await prisma.product.count({ where: { isActive: true } });
+      console.log(`[CatalogSync] 🔄 Iniciando sync (${reason}). Productos locales: ${localCount}`);
+      const result = await syncCatalogFromWeb();
+      if (result.success) {
+        console.log(`[CatalogSync] ✅ Sync completado (${reason}): ${result.count} productos en catálogo. Fuente: ${result.source}`);
       } else {
-        console.log(`[Startup] Catálogo oficial verificado: ${count} productos activos en base de datos.`);
+        console.warn(`[CatalogSync] ⚠️ Sync (${reason}) no disponible: ${result.warning || result.error}`);
       }
-    })
-    .catch((err) => console.warn('[Startup] No se pudo verificar conteo de productos:', err.message));
+    } catch (e) {
+      console.warn(`[CatalogSync] ⚠️ Fallo no crítico en sync (${reason}):`, e.message);
+    }
+  };
+
+  // Siempre sincronizar al arrancar — captura cualquier producto nuevo en la tienda web
+  runCatalogSync('startup');
+
+  // Sync automático cada 6 horas para mantener el catálogo actualizado en ferias largas
+  const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 horas
+  setInterval(() => runCatalogSync('scheduled-6h'), CATALOG_SYNC_INTERVAL_MS).unref();
+  // ── Fin Sincronización ──────────────────────────────────────────────────────
+
 
   // 🛡️ REGLA ZERO-TRUST: Verificación y reconciliación no destructiva de Super Administradores
   prisma.user

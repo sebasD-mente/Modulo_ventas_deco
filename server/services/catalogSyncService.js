@@ -167,8 +167,17 @@ export async function syncCatalogFromWeb(tenantId) {
     };
   }
 
+  const existingSkusBefore = new Set(
+    (await prisma.product.findMany({
+      where: { tenantId: targetTenantId, isActive: true },
+      select: { sku: true },
+    })).map((p) => p.sku)
+  );
+
   console.log(`[CatalogSync] Iniciando upsert de ${allPosters.length} pósters en la tabla local Product...`);
   let upsertedCount = 0;
+  let newCount = 0;
+  const syncedSkus = new Set();
 
   for (const poster of allPosters) {
     const posterId = poster.id || poster._id || poster.legacyId;
@@ -197,6 +206,7 @@ export async function syncCatalogFromWeb(tenantId) {
     ).filter(t => t.length > 1);
 
     try {
+      const isNew = !existingSkusBefore.has(sku);
       await prisma.product.upsert({
         where: {
           tenantId_sku: {
@@ -225,20 +235,37 @@ export async function syncCatalogFromWeb(tenantId) {
           isActive: true,
         },
       });
+      syncedSkus.add(sku);
       upsertedCount++;
+      if (isNew) {
+        newCount++;
+        console.log(`[CatalogSync] ✨ Nuevo póster: "${name}" (${sku})`);
+      }
     } catch (upsertErr) {
       console.warn(`[CatalogSync] Error al actualizar póster SKU ${sku}: ${upsertErr.message}`);
     }
   }
 
+  // Soft-delete de productos que ya no existen en la tienda web
+  const removedSkus = [...existingSkusBefore].filter((sku) => !syncedSkus.has(sku));
+  if (removedSkus.length > 0) {
+    await prisma.product.updateMany({
+      where: { tenantId: targetTenantId, sku: { in: removedSkus } },
+      data: { isActive: false },
+    }).catch((e) => console.warn('[CatalogSync] No se pudo desactivar productos removidos:', e.message));
+    console.log(`[CatalogSync] 🗑️  ${removedSkus.length} productos ya no disponibles en la tienda → marcados como inactivos.`);
+  }
+
   // Invalidar caché en memoria para refrescar búsquedas instantáneas
   invalidateCatalogCache();
 
-  console.log(`[CatalogSync] ✅ Sincronización exitosa: ${upsertedCount} productos sincronizados en deko_eventsales_db.`);
+  console.log(`[CatalogSync] ✅ Sincronización exitosa: ${upsertedCount} productos (${newCount} nuevos, ${upsertedCount - newCount} actualizados).`);
 
   return {
     success: true,
     count: upsertedCount,
+    newCount,
     source: successfulUrl,
   };
 }
+
