@@ -89,7 +89,7 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica para Hito M4 
 
     it('1.2. El prompt maestro modela personalidad cercana, cómplice y con entusiasmo cultural', () => {
       const prompt = buildSalesSystemPrompt({});
-      assert.ok(prompt.includes('J.A.R.V.I.S.'), 'Debe definir la personalidad J.A.R.V.I.S.');
+      assert.ok(prompt.includes('STAND {IA}'), 'Debe definir la personalidad STAND {IA}');
       assert.ok(prompt.includes('PASIÓN CULTURAL AUTÉNTICA'), 'Debe exigir pasión cultural');
       assert.ok(prompt.includes('anime'), 'Debe incluir referencias de anime');
       assert.ok(prompt.includes('música'), 'Debe incluir referencias de música');

@@ -282,3 +282,78 @@ Requerimientos Quirúrgicos de Implementación:
    - Ejecutar pruebas automatizadas unitarias y de integración.
    - Comprobar que `npm run build` pase limpiamente.
    - Validar que no se toquen bases de datos ni archivos fuera de Modulo_Ventas.
+
+## 2026-09-11T21:05:27Z
+
+# Teamwork Project Prompt
+
+Cirugía modular y refactorización arquitectónica del archivo monolítico `server/services/aiMultimodalService.js` (2,415 líneas) en el sistema STAND {IA}, dividiéndolo en 4 submódulos especializados de responsabilidad única bajo `server/services/ai/` y una fachada limpia de menos de 40 líneas con identidad pura comercial.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Directiva Sagrada de Aislamiento
+1. La intervención es 100% exclusiva dentro del directorio `Modulo_Ventas`.
+2. Prohibido terminantemente tocar, modificar, editar o borrar cualquier archivo fuera de `Modulo_Ventas` (el proyecto vecino `Web Deco Vintage Proyect` y su agente son sagrados e intocables).
+3. Cero conexiones a bases de datos externas de producción o hosts Dokploy ajenos.
+
+## Requirements
+
+### R1. Despiece Modular Quirúrgico con Límites Estrictos de Líneas
+Despiezar `server/services/aiMultimodalService.js` en 4 módulos en `server/services/ai/` respetando estrictamente los límites de líneas:
+- **`server/services/ai/aiPromptService.js` (<180 líneas)**:
+  * `buildSalesSystemPrompt` (con la identidad oficial pura de STAND {IA} y reglas de trato de "tú").
+  * `salesAssistantSafetySettings`.
+  * Esquemas JSON: `voiceSaleResponseSchema`, `artworkRecognitionResponseSchema`, `videoRecognitionResponseSchema`, `batchPhotoResponseSchema`.
+- **`server/services/ai/aiToolsService.js` (<200 líneas)**:
+  * Las 7 declaraciones de tools: `prepareSaleDraftDeclaration`, `searchCatalogDeclaration`, `getEventKPIsDeclaration`, `getCashDrawerStatusDeclaration`, `getSellerShiftReportDeclaration`, `getProductionQueueStatusDeclaration`, `checkInventoryStockDeclaration`.
+  * Array exportado `salesAssistantTools`.
+  * Funciones ejecutoras: `executeGetCashDrawerStatus`, `executeGetSellerShiftReport`, `executeGetProductionQueueStatus`, `executeCheckInventoryStock`, `constructDraftPayload`.
+- **`server/services/ai/aiMediaService.js` (<200 líneas)**:
+  * `normalizeCatalogSizeId`, `matchPosterEverywhere`.
+  * `processVoiceSaleAudio`, `recognizePosterArtworkFromImage`, `recognizePostersFromVideo`, `processPostersBatchPhoto`.
+- **`server/services/ai/aiStreamService.js` (<150 líneas)**:
+  * `chatWithSalesAssistant`.
+  * `streamChatWithSalesAssistant` (generador asíncrono SSE token a token).
+
+### R2. Fachada Limpia con Cero Breaking Changes
+Transformar `server/services/aiMultimodalService.js` en una fachada limpia de menos de 40 líneas que reexporte el 100% de los símbolos desde `./ai/*.js`:
+```javascript
+export * from './ai/aiPromptService.js';
+export * from './ai/aiToolsService.js';
+export * from './ai/aiMediaService.js';
+export * from './ai/aiStreamService.js';
+```
+Garantizar compatibilidad retroactiva total para que ningún controlador, ruta ni import existente se rompa.
+
+### R3. Identidad Pura Comercial de STAND {IA}
+- Eliminar cualquier mención residual o prestada de "J.A.R.V.I.S." del prompt del sistema.
+- Consolidar la personalidad oficial comercial de STAND {IA}: trato de "tú", enérgico, dinámico, consultor experto en arte pop y cultura friki/geek, promoviendo activamente el upselling del tamaño estrella Mediano (Q65.00) y la tecnología HP Látex.
+- Renombrar `tests/ai/jarvis-prompt.test.js` a `tests/ai/stand-prompt.test.js` y actualizar sus assertions a la identidad canónica de STAND {IA}.
+
+### R4. Aislamiento de Base de Datos y Blindaje de Pruebas
+- En `tests/ai/db-tools-adversarial.test.js`, asegurar que `prisma.product.findMany` esté totalmente mockeado en los bloques `beforeEach` para eliminar cualquier intento de conexión de red externa a hosts Dokploy o PostgreSQL remotos.
+
+## Acceptance Criteria
+
+### Modularidad y Cumplimiento de Límites
+- [ ] `server/services/aiMultimodalService.js` es una fachada de menos de 40 líneas.
+- [ ] `server/services/ai/aiPromptService.js` tiene menos de 180 líneas.
+- [ ] `server/services/ai/aiToolsService.js` tiene menos de 200 líneas.
+- [ ] `server/services/ai/aiMediaService.js` tiene menos de 200 líneas.
+- [ ] `server/services/ai/aiStreamService.js` tiene menos de 150 líneas.
+- [ ] Todos los exports originales se mantienen accesibles desde `server/services/aiMultimodalService.js`.
+
+### Identidad Pura y Tests Unitarios
+- [ ] `tests/ai/jarvis-prompt.test.js` renombrado exitosamente a `tests/ai/stand-prompt.test.js`.
+- [ ] Cero menciones de "J.A.R.V.I.S." en los prompts y en los tests de identidad.
+- [ ] `node --test tests/ai/stand-prompt.test.js` ejecuta y aprueba al 100%.
+- [ ] `tests/ai/db-tools-adversarial.test.js` ejecuta de forma aislada sin llamadas de red a bases de datos externas.
+
+### Arnés de Calidad Deko Labs
+- [ ] `npm run test:security` pasa al 100% (9/9 pruebas aprobadas).
+- [ ] `npm run audit:secrets` pasa con 0 violaciones detectadas.
+- [ ] `npm run audit:monoliths` reporta `aiMultimodalService.js` reducido fuera de estado crítico.
+- [ ] `npm run build` (Vite) compila exitosamente para producción sin errores de importación.
+- [ ] `npm run harness:check` culmina en estado de salida 0 (100% VERDE).
+

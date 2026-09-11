@@ -1,0 +1,141 @@
+import { getGeminiClient } from '../../config/gemini.js';
+import { ENV } from '../../config/env.js';
+import { prisma } from '../../config/prisma.js';
+import { getEventKPIs } from '../saleService.js';
+import { searchWebPosters } from '../webCatalogService.js';
+import { normalizeArtworkQuery } from '../semanticParserService.js';
+import { executeWithModelFallback, streamWithModelFallback } from '../geminiPoolService.js';
+import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
+import {
+  salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus,
+  executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock,
+} from './aiToolsService.js';
+
+async function resolveEventContextData({ tenantId, eventId, date, contextData = {} }) {
+  let kpis = null, event = null;
+  if (eventId) {
+    try {
+      kpis = await getEventKPIs({ tenantId, eventId, date });
+      event = await prisma.event?.findUnique?.({ where: { id: eventId }, select: { name: true, location: true, salesTarget: true } });
+    } catch (err) { console.warn('⚠️ Error cargando contexto de evento:', err.message); }
+  }
+  return {
+    event, kpis,
+    resolved: {
+      evento: event?.name || contextData?.evento || 'el evento', ubicacion: event?.location || contextData?.ubicacion || 'Mostrador Stand',
+      metaVentas: event?.salesTarget ? `Q ${event.salesTarget}` : (contextData?.metaVentas || 'Sin meta definida'),
+      totalVendido: kpis ? `Q ${kpis.totalAmount.toFixed(2)}` : (contextData?.totalVendido || 'Q 0.00'),
+      transaccionesTotales: kpis ? kpis.totalTransactions : (contextData?.transaccionesTotales || 0),
+      unidadesVendidas: kpis ? kpis.totalUnits : (contextData?.unidadesVendidas || 0),
+      ticketPromedio: kpis ? `Q ${kpis.averageTicket.toFixed(2)}` : (contextData?.ticketPromedio || 'Q 0.00'),
+      desgloseMetodosPago: kpis ? { efectivo: `Q ${kpis.paymentBreakdown.EFECTIVO.amount.toFixed(2)}`, tarjeta: `Q ${kpis.paymentBreakdown.TARJETA.amount.toFixed(2)}`, transferencia: `Q ${kpis.paymentBreakdown.TRANSFERENCIA.amount.toFixed(2)}` } : (contextData?.desgloseMetodosPago || {}),
+      topProductos: kpis ? kpis.topProducts : (contextData?.topProductos || []),
+      ultimasVentas: kpis ? kpis.recentSales?.map(s => ({ numero: s.saleNumber, total: `Q ${s.totalAmount}`, vendedor: s.seller?.fullName, hora: s.createdAt, items: s.items?.map(i => `${i.quantity}x ${i.description}`).join(', '), pagos: s.payments?.map(p => `${p.method}: Q${p.amount}`).join(', ') })) || [] : (contextData?.ultimasVentas || []),
+    },
+  };
+}
+
+export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = null }) {
+  const gemini = geminiClient || getGeminiClient();
+  const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date });
+  const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
+  if (!gemini) {
+    const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
+    return { reply: isSale ? `[Modo Offline] Intención de venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} ventas.`, draftSale: null, suggestedPosters: [], toolCalls: [] };
+  }
+  try {
+    const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
+    const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
+      taskFn: async ({ model, client }) => client.models.generateContent({ model, contents: formattedContents, config: { systemInstruction: systemPrompt, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+      actionName: 'AI_CHAT', tenantId, context: { eventId }, client: gemini,
+    });
+    let draftSale = null, suggestedPosters = [], eventKpis = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
+    const functionCalls = response.functionCalls || [];
+    for (const call of functionCalls) {
+      const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
+      if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message);
+      else if (call.name === 'searchCatalog' && call.args?.query) { const m = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 }); if (m?.length) suggestedPosters = m; }
+      else if (call.name === 'getEventKPIs') { try { eventKpis = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); } catch (e) { console.warn('KPI err:', e.message); } }
+      else if (call.name === 'getCashDrawerStatus') cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, effEvId);
+      else if (call.name === 'getSellerShiftReport') sellerShiftReport = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null);
+      else if (call.name === 'getProductionQueueStatus') productionQueueStatus = await executeGetProductionQueueStatus(tenantId, effEvId);
+      else if (call.name === 'checkInventoryStock' && call.args?.query) { inventoryStock = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, effEvId); if (inventoryStock?.suggestedPosters?.length && !suggestedPosters.length) suggestedPosters = inventoryStock.suggestedPosters; }
+    }
+    let cleanReply = response.text?.trim() || '';
+    if (!cleanReply) {
+      if (cashDrawerStatus) cleanReply = cashDrawerStatus.summaryText;
+      else if (sellerShiftReport) cleanReply = sellerShiftReport.summaryText;
+      else if (productionQueueStatus) cleanReply = productionQueueStatus.summary;
+      else if (inventoryStock) cleanReply = inventoryStock.summary;
+      else if (eventKpis) cleanReply = `📊 Ventas en vivo: Q ${eventKpis.totalAmount?.toFixed(2) || '0.00'} (${eventKpis.totalTransactions || 0} transacciones).`;
+      else if (draftSale) cleanReply = '¡Listo! He preparado el borrador de la venta en tu pantalla con todos los detalles.';
+      else cleanReply = '¡Entendido! Con gusto te apoyo con cualquier consulta o venta en el stand.';
+    }
+    return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
+  } catch (err) {
+    return { reply: `Error consultando IA: ${err.message}`, draftSale: null, suggestedPosters: [], toolCalls: [], functionCalls: [] };
+  }
+}
+
+export async function* streamChatWithSalesAssistant(messageOrOptions, historyParam = [], pendingDraftParam = null, contextDataParam = {}, geminiClientParam = null) {
+  const isObj = messageOrOptions && typeof messageOrOptions === 'object' && !Array.isArray(messageOrOptions) && messageOrOptions.message !== undefined;
+  const message = isObj ? messageOrOptions.message : messageOrOptions;
+  const history = isObj ? (messageOrOptions.history || []) : (historyParam || []);
+  const pendingDraft = isObj ? (messageOrOptions.pendingDraft || null) : (pendingDraftParam || null);
+  const contextData = isObj ? (messageOrOptions.contextData || {}) : (contextDataParam || {});
+  const tenantId = isObj ? messageOrOptions.tenantId : contextData.tenantId;
+  const eventId = isObj ? messageOrOptions.eventId : contextData.eventId;
+  const date = isObj ? (messageOrOptions.date || null) : (contextData.date || null);
+  const gemini = (isObj ? messageOrOptions.geminiClient : geminiClientParam) || getGeminiClient();
+
+  const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
+  const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
+  if (!gemini) {
+    const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
+    yield { type: 'token', text: isSale ? `[Modo Offline] Venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} transacciones.` };
+    return;
+  }
+  const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
+  const stream = streamWithModelFallback({
+    buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+    client: gemini,
+  });
+  const executedCalls = new Set();
+  let hasTextTokens = false;
+  const toolSummaries = [];
+
+  for await (const chunk of stream) {
+    if (chunk.type) { yield chunk; if (chunk.type === 'token' && chunk.text) hasTextTokens = true; continue; }
+    if (chunk.text) { hasTextTokens = true; yield { type: 'token', text: chunk.text }; }
+    if (chunk.functionCalls?.length) {
+      for (const call of chunk.functionCalls) {
+        if (!call?.name) continue;
+        const sig = `${call.name}:${JSON.stringify(call.args || {})}`;
+        if (executedCalls.has(sig)) continue;
+        executedCalls.add(sig);
+        const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : (eventId || contextData?.eventId);
+        if (call.name === 'prepareSaleDraft' && call.args) yield { type: 'draft_sale', data: await constructDraftPayload(tenantId, call.args, message) };
+        else if (call.name === 'searchCatalog' && call.args?.query) yield { type: 'suggested_posters', data: (await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 })) || [] };
+        else if (call.name === 'getEventKPIs') {
+          let k = null;
+          try { k = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); }
+          catch (e) { k = { event: { name: resolved.evento }, totalAmount: 0, totalTransactions: 0, totalUnits: 0, averageTicket: 0, paymentBreakdown: {} }; }
+          if (k) { yield { type: 'event_kpis', data: k }; toolSummaries.push(`📊 **Ventas en tiempo real:** Q ${k.totalAmount?.toFixed(2) || '0.00'} (${k.totalTransactions || 0} ventas).`); }
+        } else if (call.name === 'getCashDrawerStatus') {
+          const s = await executeGetCashDrawerStatus(tenantId, effEvId); yield { type: 'cash_drawer_status', data: s }; if (s?.summaryText) toolSummaries.push(s.summaryText);
+        } else if (call.name === 'getSellerShiftReport') {
+          const r = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null); yield { type: 'seller_shift_report', data: r }; if (r?.summaryText) toolSummaries.push(r.summaryText);
+        } else if (call.name === 'getProductionQueueStatus') {
+          const q = await executeGetProductionQueueStatus(tenantId, effEvId); yield { type: 'production_queue_status', data: q }; if (q?.summary) toolSummaries.push(q.summary);
+        } else if (call.name === 'checkInventoryStock' && call.args?.query) {
+          const st = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, effEvId); yield { type: 'inventory_stock', data: st };
+          if (st?.suggestedPosters?.length) yield { type: 'suggested_posters', data: st.suggestedPosters };
+          if (st?.summary) toolSummaries.push(st.summary);
+        }
+      }
+    }
+  }
+  if (!hasTextTokens && toolSummaries.length) {
+    for (const sum of toolSummaries) yield { type: 'token', text: sum.trim() };
+  }
+}

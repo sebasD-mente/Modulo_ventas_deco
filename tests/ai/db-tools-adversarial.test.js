@@ -18,10 +18,144 @@ import {
   salesAssistantTools,
 } from '../../server/services/aiMultimodalService.js';
 import { getEventKPIs } from '../../server/services/saleService.js';
+import { invalidateCatalogCache } from '../../server/services/webCatalogService.js';
+
+// Catálogo simulado en memoria para aislar prisma.product.findMany
+const MOCK_DB_PRODUCTS = [
+  {
+    id: 'prod-spiderman-1',
+    sku: 'DV-SPID-01',
+    name: 'Spider-Man Vintage Comic',
+    category: 'CÓMICS',
+    basePrice: 25,
+    imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/sample2.jpg',
+    tags: ['spiderman', 'spider-man', 'marvel'],
+    isActive: true,
+    tenantId: 'tenant-test',
+    sizes: [
+      { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
+      { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
+      { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' },
+      { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+    ],
+  },
+  {
+    id: 'prod-taylor-1',
+    sku: 'DV-TAYL-01',
+    name: 'Taylor Swift Eras Tour',
+    category: 'MUSICA',
+    basePrice: 25,
+    imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/sample-taylor.jpg',
+    tags: ['taylor', 'swift', 'eras', 'musica'],
+    isActive: true,
+    tenantId: 'tenant-test',
+    sizes: [
+      { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
+      { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
+      { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' },
+      { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+    ],
+  },
+];
 
 describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y Streaming (M3 Challenger)', () => {
+  let originalPrismaMethods = {};
+
   beforeEach(() => {
     ENV.GEMINI_API_KEY = 'test-gemini-key-for-m3-adversarial';
+    invalidateCatalogCache();
+
+    // 1. Respaldo de métodos de Prisma
+    originalPrismaMethods = {
+      productFindMany: prisma.product?.findMany,
+      eventFindFirst: prisma.event?.findFirst,
+      eventFindUnique: prisma.event?.findUnique,
+      saleGroupBy: prisma.sale?.groupBy,
+      saleFindMany: prisma.sale?.findMany,
+      saleAggregate: prisma.sale?.aggregate,
+      saleItemGroupBy: prisma.saleItem?.groupBy,
+      saleItemFindMany: prisma.saleItem?.findMany,
+      saleItemAggregate: prisma.saleItem?.aggregate,
+      salePaymentGroupBy: prisma.salePayment?.groupBy,
+      salePaymentAggregate: prisma.salePayment?.aggregate,
+      cashClosingFindFirst: prisma.cashClosing?.findFirst,
+      userFindMany: prisma.user?.findMany,
+    };
+
+    // 2. Mocks seguros en memoria (100% aislamiento de red)
+    if (prisma.product) {
+      prisma.product.findMany = async () => MOCK_DB_PRODUCTS;
+    }
+    if (prisma.event) {
+      prisma.event.findFirst = async () => ({
+        id: 'stress-event',
+        name: 'Comic-Con Guatemala 2026',
+        location: 'Fórum Majadas',
+        salesTarget: 25000,
+        status: 'ACTIVE',
+      });
+      prisma.event.findUnique = async () => ({
+        id: 'stress-event',
+        name: 'Comic-Con Guatemala 2026',
+        location: 'Fórum Majadas',
+        salesTarget: 25000,
+        status: 'ACTIVE',
+      });
+    }
+    if (prisma.sale) {
+      prisma.sale.groupBy = async () => [];
+      prisma.sale.findMany = async () => [];
+      prisma.sale.aggregate = async () => ({ _sum: { totalAmount: 0 }, _count: { id: 0 } });
+    }
+    if (prisma.saleItem) {
+      prisma.saleItem.groupBy = async () => [];
+      prisma.saleItem.findMany = async () => [];
+      prisma.saleItem.aggregate = async () => ({ _sum: { quantity: 0 }, _count: { id: 0 } });
+    }
+    if (prisma.salePayment) {
+      prisma.salePayment.groupBy = async () => [];
+      prisma.salePayment.aggregate = async () => ({ _sum: { amount: 0 }, _count: { id: 0 } });
+    }
+    if (prisma.cashClosing) {
+      prisma.cashClosing.findFirst = async () => null;
+    }
+    if (prisma.user) {
+      prisma.user.findMany = async () => [];
+    }
+  });
+
+  afterEach(() => {
+    invalidateCatalogCache();
+    // 3. Restauración incondicional
+    if (prisma.product && originalPrismaMethods.productFindMany) {
+      prisma.product.findMany = originalPrismaMethods.productFindMany;
+    }
+    if (prisma.event) {
+      if (originalPrismaMethods.eventFindFirst) prisma.event.findFirst = originalPrismaMethods.eventFindFirst;
+      if (originalPrismaMethods.eventFindUnique) prisma.event.findUnique = originalPrismaMethods.eventFindUnique;
+    }
+    if (prisma.sale) {
+      if (originalPrismaMethods.saleGroupBy) prisma.sale.groupBy = originalPrismaMethods.saleGroupBy;
+      if (originalPrismaMethods.saleFindMany) prisma.sale.findMany = originalPrismaMethods.saleFindMany;
+      if (originalPrismaMethods.saleAggregate) prisma.sale.aggregate = originalPrismaMethods.saleAggregate;
+    }
+    if (prisma.saleItem) {
+      if (originalPrismaMethods.saleItemGroupBy) prisma.saleItem.groupBy = originalPrismaMethods.saleItemGroupBy;
+      if (originalPrismaMethods.saleItemFindMany) prisma.saleItem.findMany = originalPrismaMethods.saleItemFindMany;
+      if (originalPrismaMethods.saleItemAggregate) prisma.saleItem.aggregate = originalPrismaMethods.saleItemAggregate;
+    }
+    if (prisma.salePayment) {
+      if (originalPrismaMethods.salePaymentGroupBy) prisma.salePayment.groupBy = originalPrismaMethods.salePaymentGroupBy;
+      if (originalPrismaMethods.salePaymentAggregate) prisma.salePayment.aggregate = originalPrismaMethods.salePaymentAggregate;
+    }
+    if (prisma.cashClosing && originalPrismaMethods.cashClosingFindFirst) {
+      prisma.cashClosing.findFirst = originalPrismaMethods.cashClosingFindFirst;
+    }
+    if (prisma.user && originalPrismaMethods.userFindMany) {
+      prisma.user.findMany = originalPrismaMethods.userFindMany;
+    }
   });
 
   // =========================================================================
@@ -30,7 +164,7 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
   describe('1. Invocación con argumentos undefined, null, tipos incorrectos y cadenas vacías', () => {
     let origFindFirst, origFindUnique, origSaleGroupBy, origSaleItemGroupBy, origSalePaymentGroupBy,
         origCashClosingFindFirst, origSaleItemFindMany, origSaleFindMany, origUserFindMany,
-        origSalePaymentAgg, origSaleItemAgg, origSaleAgg;
+        origSalePaymentAgg, origSaleItemAgg, origSaleAgg, origProductFindMany;
 
     beforeEach(() => {
       origFindFirst = prisma.event.findFirst;
@@ -40,11 +174,12 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
       origSalePaymentGroupBy = prisma.salePayment.groupBy;
       origCashClosingFindFirst = prisma.cashClosing.findFirst;
       origSaleItemFindMany = prisma.saleItem.findMany;
-      origSaleFindMany = prisma.saleFindMany;
+      origSaleFindMany = prisma.sale?.findMany;
       origUserFindMany = prisma.user.findMany;
       origSalePaymentAgg = prisma.salePayment.aggregate;
       origSaleItemAgg = prisma.saleItem.aggregate;
       origSaleAgg = prisma.sale.aggregate;
+      origProductFindMany = prisma.product?.findMany;
 
       // Mock rápido de Prisma para evitar esperar 4.5s de timeout de red en cada caso corrupto
       prisma.event.findFirst = async () => null;
@@ -54,11 +189,12 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
       prisma.salePayment.groupBy = async () => [];
       prisma.cashClosing.findFirst = async () => null;
       prisma.saleItem.findMany = async () => [];
-      if (prisma.sale.findMany) prisma.sale.findMany = async () => [];
+      if (prisma.sale?.findMany) prisma.sale.findMany = async () => [];
       prisma.user.findMany = async () => [];
       prisma.salePayment.aggregate = async () => ({ _sum: { amount: 0 }, _count: { id: 0 } });
       prisma.saleItem.aggregate = async () => ({ _sum: { quantity: 0 }, _count: { id: 0 } });
       prisma.sale.aggregate = async () => ({ _sum: { totalAmount: 0 }, _count: { id: 0 } });
+      if (prisma.product) prisma.product.findMany = async () => MOCK_DB_PRODUCTS;
     });
 
     afterEach(() => {
@@ -69,11 +205,12 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
       prisma.salePayment.groupBy = origSalePaymentGroupBy;
       prisma.cashClosing.findFirst = origCashClosingFindFirst;
       prisma.saleItem.findMany = origSaleItemFindMany;
-      if (origSaleFindMany) prisma.sale.findMany = origSaleFindMany;
+      if (origSaleFindMany && prisma.sale) prisma.sale.findMany = origSaleFindMany;
       prisma.user.findMany = origUserFindMany;
       prisma.salePayment.aggregate = origSalePaymentAgg;
       prisma.saleItem.aggregate = origSaleItemAgg;
       prisma.sale.aggregate = origSaleAgg;
+      if (origProductFindMany && prisma.product) prisma.product.findMany = origProductFindMany;
     });
 
     it('1.1 executeGetCashDrawerStatus resiste todo tipo de inputs corruptos sin colapsar', async () => {

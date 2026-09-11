@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-11T16:07:06Z
+# BRIEFING — 2026-09-11T21:05:27Z
 
 ## Mission
-Modernización quirúrgica integral del agente STAND {IA} en el proyecto Modulo_Ventas (c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas) para erradicar los 5 dolores críticos (P0/P1/P2) diagnosticados en la auditoría forense y dotarlo del estándar de excelencia de J.A.R.V.I.S., respetando estrictamente el aislamiento de infraestructura (100% en deko_eventsales_db).
+Cirugía modular y refactorización arquitectónica del archivo monolítico `server/services/aiMultimodalService.js` (2,415 líneas) en el sistema STAND {IA}, dividiéndolo en 4 submódulos especializados de responsabilidad única bajo `server/services/ai/` y una fachada limpia de menos de 40 líneas con identidad pura comercial.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -16,8 +16,10 @@ Modernización quirúrgica integral del agente STAND {IA} en el proyecto Modulo_
 - Victory Auditor (Phase 2): f707bc62-ed20-4c3e-8142-e20f90e17f95 (VICTORY CONFIRMED)
 - Orchestrator (Auditoría 360): 90425077-fad3-4f25-aaeb-7fd30a0e5a41 (completed)
 - Victory Auditor (Auditoría 360): bb28db25-f78e-43ea-ae28-677d87415619 (VICTORY CONFIRMED)
-- Orchestrator (Modernización STAND IA): 4f9147ba-7ab0-47c4-ba7b-7275197efacc (completed, victory claimed)
-- Victory Auditor (Modernización STAND IA): 0815f5ed-bfbc-450f-8240-790e8aca73df (auditing, victory_auditor_6)
+- Orchestrator (Modernización STAND IA): 4f9147ba-7ab0-47c4-ba7b-7275197efacc (completed)
+- Victory Auditor (Modernización STAND IA): 0815f5ed-bfbc-450f-8240-790e8aca73df (VICTORY CONFIRMED)
+- Orchestrator (Cirugía Modular aiMultimodalService): e10a6ac6-c756-4f75-b83b-4e5bad61d322 (active, orchestrator_7)
+- Victory Auditor (Cirugía Modular aiMultimodalService): [TBD]
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -33,14 +35,20 @@ Modernización quirúrgica integral del agente STAND {IA} en el proyecto Modulo_
 - Forensic diagnosis of 5 core issues: visual card duplication, 4-poster limit truncation, complex NLP order failures, rigid conversational tone vs Jarvis, missing Function Calling tools
 - Structured audit deliverable with P0, P1, P2 prioritization and 3-pillar roadmap (Robusto, Profesional, Escalable)
 - Modernización quirúrgica de STAND {IA}: Erradicar P0/P1/P2 respetando aislamiento de base de datos e infraestructura
+- Cirugía modular de `server/services/aiMultimodalService.js` en 4 submódulos bajo `server/services/ai/` con límites estrictos de líneas: aiPromptService (<180), aiToolsService (<200), aiMediaService (<200), aiStreamService (<150)
+- Fachada limpia `server/services/aiMultimodalService.js` de <40 líneas con re-exports totales (cero breaking changes)
+- Identidad pura comercial STAND {IA} (cero menciones residuales de J.A.R.V.I.S., trato de "tú", upselling mediano Q65 y HP Látex, tests renombrados y passing)
+- Blindaje y aislamiento de base de datos en tests (mock de prisma.product.findMany)
+- Cumplimiento 100% de arnés de calidad Deko Labs: test:security (9/9), audit:secrets (0 violaciones), audit:monoliths, npm run build limpio y npm run harness:check (exit 0)
 
 ## User Context
-- **Last user request**: Modernización quirúrgica integral del agente STAND {IA} en Modulo_Ventas para erradicar los 5 dolores críticos (P0/P1/P2) y dotarlo del estándar de excelencia de J.A.R.V.I.S.
+- **Last user request**: Cirugía modular y refactorización arquitectónica de aiMultimodalService.js dividiéndolo en 4 módulos bajo server/services/ai/ y una fachada limpia <40 líneas con identidad pura comercial.
 - **Pending clarifications**: none
-- **Delivered results**: Modernización quirúrgica integral de STAND {IA} completada al 100% y verificada de forma independiente con veredicto VICTORY CONFIRMED. Erradicados los 5 dolores críticos: Integridad Contable y Portada de Álbum a Q55 (M1), Estabilidad SSE con deduplicación y buffer RAF a 60 FPS (M2), Suite de 5 herramientas PostgreSQL con schemas @google/genai Type.OBJECT y eventos SSE (M3), Prompt Maestro estilo J.A.R.V.I.S. con 4 directivas comerciales y pool multi-modelo anti-429 con Full Jitter (M4), y Verificación E2E con 106/106 tests aprobados, compilación limpia y pruebas activas en vivo con Chrome DevTools MCP (M5).
+- **Delivered results**: Cirugía modular de `server/services/aiMultimodalService.js` (2,415 líneas) dividida en 4 submódulos bajo `server/services/ai/` respetando estrictamente los presupuestos de líneas (<40, <180, <200, <200, <150), fachada limpia de 10 líneas, identidad pura comercial STAND {IA} sin menciones de Jarvis, blindaje de tests con mocks de BD herméticos, 100% de arnés Deko Labs (exit 0) y evidencia visual en vivo capturada vía Chrome DevTools MCP.
 
 ## Project Status
 - **Phase**: complete
+- **Route**: General (`teamwork_preview_orchestrator`)
 - **Active Orchestrator**: none (cleaned up)
 - **Active Auditor**: none (cleaned up)
 - **Monitoring Crons**: none (cancelled)
@@ -52,27 +60,9 @@ Modernización quirúrgica integral del agente STAND {IA} en el proyecto Modulo_
 
 ## Artifact Index
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_6/handoff.md — Master Orchestrator Handoff Report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_6/handoff.md — Independent Victory Auditor Report (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_6/evidence_initial.png — Initial UI visual evidence
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_6/evidence_interaction.png — Active interaction visual evidence
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_7/handoff.md — Master Orchestrator Handoff Report
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_7/handoff.md — Independent Victory Auditor Report (VICTORY CONFIRMED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_7/evidence_live_app_main.png — Live app visual evidence
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_7/evidence_live_chat_interaction.png — Live chat visual evidence
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel final handoff report
-
-## Artifact Index
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_5/STAND_AI_360_AUDIT_REPORT.md — Master 360 Audit Report (72.3 kB)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_5/handoff.md — Orchestrator handoff report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_5/handoff.md — Independent Victory Auditor report (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/challenger_pains/report_5_pains_diagnosis.md — Empirical diagnosis of 5 pains (64.2 kB)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/explorer_backend/report_backend_ai.md — Backend & DB exploration report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/explorer_frontend/report_frontend_ui.md — Frontend & UX exploration report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/explorer_jarvis/report_jarvis_benchmark.md — Jarvis benchmark report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel final handoff report
-
-
-
-
-
-
