@@ -232,3 +232,53 @@ Integrity mode: development
 - [ ] La suite completa de pruebas automatizadas pasa al 100% con código de salida 0.
 
 
+## 2026-09-11T15:33:48Z
+
+Realizar una auditoría 360 profunda, quirúrgica y exhaustiva del agente de IA STAND en el proyecto Modulo_Ventas (c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas), comparándolo como referencia con el estándar de excelencia de Jarvis en el proyecto Web Deco Vintage Proyect (solo lectura, respetando estrictamente el aislamiento entre proyectos).
+
+Objetivos de la auditoría del equipo multi-agente:
+1. Inspeccionar cada línea de código, script, conexión a la base de datos PostgreSQL aislada (deko_eventsales_db / Prisma), controladores, servicios de IA, prompts de sistema, esquemas de function calling y componentes React del frontend (UnifiedAiChat.jsx).
+2. Diagnosticar con precisión forense:
+   - Por qué las respuestas son erráticas y por qué repite tarjetas visuales.
+   - Por qué trunca búsquedas a 4 pósters y cómo implementar deduplicación por ID y por imagen.
+   - Por qué falla o malinterpreta órdenes complejas de ventas en lenguaje natural como "1 de un verano sin ti portada en tarjeta" y cómo resolver el mapeo semántico de alias, medidas canónicas y métodos de pago.
+   - Por qué el tono conversacional se siente rígido o robótico y cómo elevarlo al nivel de fluidez, empatía y profesionalismo de Jarvis.
+   - Qué herramientas formales de Function Calling le faltan para tener acceso total a la información de la app (cierres y arqueos de caja, métricas de vendedores, estado de taller/producción, inventario).
+3. Diseñar y entregar un informe técnico de auditoría exhaustivo clasificado por prioridades (P0, P1, P2) y la hoja de ruta definitiva con los 3 pilares: Robusto, Profesional y Escalable, además de proponer capacidades avanzadas para ventas frenéticas en eventos masivos.
+
+## 2026-09-11T16:07:06Z
+
+Ejecutar la modernización quirúrgica integral del agente STAND {IA} en el proyecto Modulo_Ventas (c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas) para erradicar los 5 dolores críticos (P0/P1/P2) diagnosticados en la auditoría forense y dotarlo del estándar de excelencia de J.A.R.V.I.S., respetando estrictamente el aislamiento de infraestructura (100% en deko_eventsales_db).
+
+Requerimientos Quirúrgicos de Implementación:
+
+1. Integridad Contable, Mapeo Semántico y Deduplicación Bicapa (P0-1, P1-1, P1-2, P1-3):
+   - En `server/services/aiMultimodalService.js`, actualizar `normalizeCatalogSizeId()` para que reconozca explícitamente "portada", "portada de album", "vinilo" y "cuadrado", retornando 'PORTADA_ALBUM'.
+   - Garantizar que en `constructDraftPayload()`, `fallbackPrice` para 'PORTADA_ALBUM' sea exactamente Q55.00 (nunca Q65.00).
+   - Crear `server/services/semanticParserService.js` con extractor de métodos de pago (TARJETA, TRANSFERENCIA, EFECTIVO) y diccionario cultural `STAND_ENTITY_ALIASES` (Bad Bunny, Taylor Swift, Spider-Man, Pablo Escobar, F1, Checo Pérez, Star Wars, Goku, Anime, etc.).
+   - En `server/services/webCatalogService.js`, implementar `deduplicatePosters(posters)` filtrando por Set(id), Set(imageSlug) y Set(normalizedTitle).
+   - Reemplazar los 4 puntos hardcodeados con limit: 4 o limit: 3 en aiController.js:206, aiMultimodalService.js:60, 1050, 1258 por limit: 12.
+
+2. Estabilidad de Streaming SSE, Desacople de Renderizado y VAD Móvil (P0-2, P0-3, P0-4, P0-5):
+   - En `server/services/aiMultimodalService.js:1248-1266`, agregar Set(executedCalls) con firma `${call.name}:${JSON.stringify(call.args)}` para evitar re-emisión múltiple de eventos draft_sale y suggested_posters.
+   - En `src/components/UnifiedAiChat.jsx`, implementar buffer de tokens con requestAnimationFrame para limitar re-renders a 60 FPS y desacoplar scrollIntoView para que solo se ejecute si el usuario está al final del chat, evitando Layout Thrashing.
+   - En `src/components/UnifiedAiChat.jsx`, asegurar `if (audioCtx.state === 'suspended') await audioCtx.resume()` y `mediaRecorder.start(250)` con timeslice de 250ms para evitar cortes a 1.5s en iOS/Safari y Android.
+   - En `src/components/UnifiedAiChat.jsx:1178` y `src/components/FastManualSaleForm.jsx:64, 230`, preservar attachments (audios en GCS y fotos), inputChannel y selectedSizeId al transferir borradores.
+   - En `src/components/UnifiedAiChat.jsx:686-689`, inyectar en el historial de Gemini los metadatos de las obras sugeridas previas: `[Contexto de obras mostradas en pantalla al cliente en este turno: ...]`.
+
+3. Suite Completa de Herramientas de Base de Datos PostgreSQL (P1-4, P1-5):
+   - En `server/services/aiMultimodalService.js`, hacer que getEventKPIs ejecute la consulta real en PostgreSQL y emita el evento SSE event_kpis con resumen conversacional.
+   - Declarar e implementar con `@google/genai` Type Object las 4 nuevas tools:
+     * `getCashDrawerStatus`: Efectivo en gaveta, tarjetas, transferencias y último arqueo de cash_closings.
+     * `getSellerShiftReport`: Ranking y desglose de ventas por vendedor (User + Sale).
+     * `getProductionQueueStatus`: Obras en cola de taller (PENDIENTE, SEPARADO, A_PRODUCCION, IMPRESO).
+     * `checkInventoryStock`: Existencias y disponibilidad física en stand.
+
+4. System Prompt Estilo Asesor Estrella J.A.R.V.I.S. (P2-1, P2-2):
+   - Rediseño del Prompt Maestro: Tono cálido, amigable, apasionado por arte y cultura pop, trato de "tú", con directivas de upselling (recomendar Mediano Q65, tintas HP Látex >10 años y cinta tesa® 15s).
+   - Implementar pool de contingencia multi-modelo ante errores 429.
+
+5. Verificación Rigurosa:
+   - Ejecutar pruebas automatizadas unitarias y de integración.
+   - Comprobar que `npm run build` pase limpiamente.
+   - Validar que no se toquen bases de datos ni archivos fuera de Modulo_Ventas.

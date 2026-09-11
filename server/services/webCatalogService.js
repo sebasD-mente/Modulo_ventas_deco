@@ -157,6 +157,157 @@ async function getCachedProducts(tenantId) {
 }
 
 /**
+ * Extrae un slug normalizado e identificador visual a partir de una URL de imagen.
+ * Remueve parámetros de consulta, hashes, extensiones y sufijos de dimensiones (ej. -500x750, -thumb).
+ * @param {string} url - URL de la imagen del producto.
+ * @returns {string|null} - Slug identificador o null si no es válida.
+ */
+export function extractImageSlug(url) {
+  if (!url || typeof url !== 'string') return null;
+  const clean = url.trim();
+  if (!clean) return null;
+
+  try {
+    // 1. Quitar query parameters y fragmentos
+    const pathname = clean.split('?')[0].split('#')[0];
+    // 2. Obtener el nombre del archivo
+    let filename = pathname.split('/').filter(Boolean).pop();
+    if (!filename) return null;
+
+    // Decodificar si tiene encoding de URL
+    try {
+      filename = decodeURIComponent(filename);
+    } catch {
+      // Si falla la decodificación, continuar con el nombre original
+    }
+
+    // 3. Quitar extensión (.jpg, .jpeg, .png, .webp, .avif, .svg)
+    const nameWithoutExt = filename.replace(/\.[a-zA-Z0-9]+$/, '');
+
+    // 4. Normalizar a slug alfanumérico en minúsculas
+    let slug = nameWithoutExt
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    // 5. Quitar sufijos comunes de dimensiones o thumbnails para colapsar versiones
+    slug = slug.replace(/-\d+x\d+$/, '').replace(/-thumb$/, '').replace(/-preview$/, '');
+
+    return slug || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Obtiene el título representativo completo de un póster (artista + subtítulo de obra).
+ * @param {object} poster - Objeto del póster.
+ * @returns {string} - Título completo crudo.
+ */
+export function extractPosterTitle(poster) {
+  if (!poster || typeof poster !== 'object') return '';
+  if (poster.nombreCompleto && typeof poster.nombreCompleto === 'string') {
+    return poster.nombreCompleto;
+  }
+  if (poster.name && typeof poster.name === 'string') {
+    return poster.name;
+  }
+  if (poster.titulo && typeof poster.titulo === 'string') {
+    if (poster.subtitulo && typeof poster.subtitulo === 'string') {
+      return `${poster.titulo} - ${poster.subtitulo}`;
+    }
+    return poster.titulo;
+  }
+  if (poster.title && typeof poster.title === 'string') {
+    if (poster.subtitle && typeof poster.subtitle === 'string') {
+      return `${poster.title} - ${poster.subtitle}`;
+    }
+    return poster.title;
+  }
+  return '';
+}
+
+/**
+ * Normaliza un título para comparación semántica: minúsculas, sin acentos,
+ * sin signos de puntuación y con espacios colapsados.
+ * @param {string} rawTitle - Título en texto plano.
+ * @returns {string} - Cadena canónica normalizada.
+ */
+export function normalizePosterTitle(rawTitle) {
+  if (!rawTitle || typeof rawTitle !== 'string') return '';
+  return rawTitle
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['"`´’‘]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Deduplica una lista de pósters aplicando filtrado estricto bicapa:
+ * Capa 1: Unicidad por ID / SKU (identidad de base de datos).
+ * Capa 2A: Unicidad por imagen (imageSlug visual).
+ * Capa 2B: Unicidad por título normalizado completo (identidad semántica de la obra).
+ * 
+ * Preserva el orden original de relevancia de los resultados.
+ *
+ * @param {Array} posters - Colección de pósters a procesar.
+ * @returns {Array} - Colección sin obras duplicadas.
+ */
+export function deduplicatePosters(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) {
+    return [];
+  }
+
+  const seenIds = new Set();
+  const seenImageSlugs = new Set();
+  const seenNormalizedTitles = new Set();
+  const deduplicated = [];
+
+  for (const poster of posters) {
+    if (!poster || typeof poster !== 'object') continue;
+
+    // 1. Capa 1: Identificador único de registro (id o sku)
+    const id = poster.id ? String(poster.id).trim() : (poster.sku ? String(poster.sku).trim() : null);
+    const imageSlug = poster.imageSlug || extractImageSlug(poster.imageUrl || poster.thumbUrl);
+    const rawTitle = extractPosterTitle(poster);
+    const normalizedTitle = normalizePosterTitle(rawTitle);
+
+    // Ignorar objetos vacíos o inválidos que no tengan id, imagen ni título
+    if (!id && !imageSlug && !normalizedTitle) {
+      continue;
+    }
+
+    if (id && seenIds.has(id)) {
+      continue;
+    }
+
+    // 2. Capa 2A: Identidad visual de la obra (imageSlug)
+    if (imageSlug && seenImageSlugs.has(imageSlug)) {
+      continue;
+    }
+
+    // 3. Capa 2B: Identidad semántica de la obra (normalizedTitle completo)
+    if (normalizedTitle && seenNormalizedTitles.has(normalizedTitle)) {
+      continue;
+    }
+
+    // Si pasó todos los filtros, registrar en los Sets y agregar al resultado
+    if (id) seenIds.add(id);
+    if (imageSlug) seenImageSlugs.add(imageSlug);
+    if (normalizedTitle) seenNormalizedTitles.add(normalizedTitle);
+
+    deduplicated.push(poster);
+  }
+
+  return deduplicated;
+}
+
+/**
  * Busca pósters en la tabla local Product por nombre, subtítulo, categoría, tags o SKU.
  * Motor ultrarrápido con scoring de relevancia para autocompletado en stand POS.
  * @param {object} params - Parámetros de búsqueda.
@@ -239,10 +390,13 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       .filter((item) => item.score > 0);
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, limit).map((item) => item.p);
+    const sortedProducts = scored.map((item) => item.p);
+    const deduplicated = deduplicatePosters(sortedProducts);
+    return deduplicated.slice(0, limit);
   }
 
-  return filtered.slice(0, limit);
+  const deduplicated = deduplicatePosters(filtered);
+  return deduplicated.slice(0, limit);
 }
 
 /**
@@ -252,8 +406,9 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
  */
 export async function getAllWebPostersCatalogSummary(tenantId = null) {
   const products = await getCachedProducts(tenantId);
+  const deduplicated = deduplicatePosters(products);
 
-  return products.map((p) => ({
+  return deduplicated.map((p) => ({
     id: p.id,
     titulo: p.titulo,
     categoria: p.categoria,
@@ -312,3 +467,7 @@ export async function getWebPosterById(posterId, tenantId = null) {
     return null;
   }
 }
+
+// Alias de compatibilidad
+export const searchPosters = searchWebPosters;
+export const getCatalogPosters = searchWebPosters;

@@ -27,7 +27,33 @@ export async function authMiddleware(req, res, next) {
           },
         });
       } catch (dbErr) {
-        // En entorno de desarrollo o prueba si la DB no está accesible
+        if (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test') {
+          user = {
+            id: decoded.id,
+            email: decoded.email,
+            fullName: decoded.fullName || 'Administrador Stand',
+            role: decoded.role || 'SUPER_ADMIN',
+            roles: decoded.roles || ['SUPER_ADMIN'],
+            tenantId: decoded.tenantId || ENV.DEFAULT_TENANT_NAME,
+            assignedEventId: decoded.assignedEventId || null,
+            avatarUrl: decoded.avatarUrl || null,
+            status: 'ACTIVO',
+          };
+        }
+      }
+
+      if (!user && (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test') && decoded?.id) {
+        user = {
+          id: decoded.id,
+          email: decoded.email,
+          fullName: decoded.fullName || 'Administrador Stand',
+          role: decoded.role || 'SUPER_ADMIN',
+          roles: decoded.roles || ['SUPER_ADMIN'],
+          tenantId: decoded.tenantId || ENV.DEFAULT_TENANT_NAME,
+          assignedEventId: decoded.assignedEventId || null,
+          avatarUrl: decoded.avatarUrl || null,
+          status: 'ACTIVO',
+        };
       }
 
       if (!user) {

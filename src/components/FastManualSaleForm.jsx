@@ -21,6 +21,8 @@ const DEFAULT_SIZES = [
   { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
   { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
   { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+  { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+  { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
 ];
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
@@ -41,6 +43,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   const [paymentMethod, setPaymentMethod] = useState('EFECTIVO');
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
+  const [inputChannel, setInputChannel] = useState('MANUAL_RAPIDA');
+  const [attachments, setAttachments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
@@ -64,19 +68,51 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   useEffect(() => {
     if (initialDraft && initialDraft.items?.length > 0) {
       setCartItems(
-        initialDraft.items.map((it, idx) => ({
-          id: `draft-${idx}-${Date.now()}`,
-          productId: it.productId || null,
-          description: it.description,
-          unitPrice: Number(it.unitPrice),
-          quantity: it.quantity || 1,
-          subtotal: Number(it.quantity || 1) * Number(it.unitPrice),
-          thumbUrl: it.thumbUrl || it.imageUrl || null,
-          availableSizes: it.availableSizes || DEFAULT_SIZES,
-        }))
+        initialDraft.items.map((it, idx) => {
+          const resolvedSizeId = it.selectedSizeId || it.sizeId || null;
+          let sizes = it.availableSizes && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_SIZES;
+          if (resolvedSizeId && !sizes.some((s) => s.sizeId === resolvedSizeId)) {
+            const matchInDef = DEFAULT_SIZES.find((s) => s.sizeId === resolvedSizeId);
+            if (matchInDef) sizes = [...sizes, matchInDef];
+          }
+
+          return {
+            id: `draft-${idx}-${Date.now()}`,
+            productId: it.productId || null,
+            description: it.description,
+            unitPrice: Number(it.unitPrice),
+            quantity: it.quantity || 1,
+            subtotal: Number(it.quantity || 1) * Number(it.unitPrice),
+            thumbUrl: it.thumbUrl || it.imageUrl || null,
+            selectedSizeId: resolvedSizeId,
+            availableSizes: sizes,
+          };
+        })
       );
       if (initialDraft.paymentMethod) setPaymentMethod(initialDraft.paymentMethod);
       if (initialDraft.notes) setNotes(initialDraft.notes);
+      setInputChannel(initialDraft.inputChannel || 'MANUAL_RAPIDA');
+
+      let incomingAttachments = [];
+      if (Array.isArray(initialDraft.attachments) && initialDraft.attachments.length > 0) {
+        incomingAttachments = initialDraft.attachments;
+      } else if (initialDraft.audioUrl) {
+        incomingAttachments = [
+          {
+            fileUrl: initialDraft.audioUrl,
+            fileType: 'AUDIO_VOZ',
+            transcription: initialDraft.transcription || null,
+          },
+        ];
+      } else if (initialDraft.imageUrl) {
+        incomingAttachments = [
+          {
+            fileUrl: initialDraft.imageUrl,
+            fileType: initialDraft.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE',
+          },
+        ];
+      }
+      setAttachments(incomingAttachments);
     }
   }, [initialDraft]);
 
@@ -193,7 +229,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     setCartItems((prev) =>
       prev.map((it) => {
         if (it.id === id) {
-          const cleanDesc = it.description.replace(/\s*\((MINI|PEQUEÑO|PEQUENO|MEDIANO|GRANDE|GIGANTE)\)/gi, '').trim();
+          const cleanDesc = it.description.replace(/\s*\((MINI|PEQUEÑO|PEQUENO|MEDIANO|GRANDE|GIGANTE|PORTADA_ALBUM|PORTADA|PORTADA ÁLBUM)\)/gi, '').trim();
           const newPrice = Number(sz.precio);
           return {
             ...it,
@@ -244,7 +280,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       ],
       discount: Number(discount),
       notes: notes || null,
-      inputChannel: 'MANUAL_RAPIDA',
+      inputChannel: inputChannel || 'MANUAL_RAPIDA',
+      attachments: attachments && attachments.length > 0 ? attachments : [],
     };
 
     try {
@@ -275,6 +312,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       setSearchQuery('');
       setDiscount(0);
       setNotes('');
+      setAttachments([]);
+      setInputChannel('MANUAL_RAPIDA');
       if (onSaleRegistered) onSaleRegistered(json.data);
     } catch (err) {
       console.error(err);
@@ -487,6 +526,29 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
       {/* SECCIÓN 3: TICKET DE LA VENTA EN CURSO */}
       <div className="space-y-2">
+        {(attachments.length > 0 || inputChannel !== 'MANUAL_RAPIDA') && (
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-300">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">✨ Borrador transferido desde {inputChannel}</span>
+              {attachments.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px] font-semibold">
+                  📎 {attachments.length} archivo(s) adjunto(s)
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setAttachments([]);
+                setInputChannel('MANUAL_RAPIDA');
+              }}
+              className="text-neutral-400 hover:text-white text-[11px] underline cursor-pointer"
+            >
+              Desvincular
+            </button>
+          </div>
+        )}
+
         <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center justify-between">
           <span>2. Pósters en la Venta ({cartItems.length})</span>
           {cartItems.length > 0 && (
@@ -523,7 +585,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                   <span className="font-semibold text-white block truncate">{item.description}</span>
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     {(item.availableSizes || DEFAULT_SIZES).map((sz) => {
-                      const isSel = item.selectedSizeId === sz.sizeId || item.unitPrice === sz.precio;
+                      const isSel = item.selectedSizeId ? item.selectedSizeId === sz.sizeId : item.unitPrice === sz.precio;
                       return (
                         <button
                           key={sz.sizeId}

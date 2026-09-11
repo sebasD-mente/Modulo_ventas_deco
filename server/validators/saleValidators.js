@@ -17,6 +17,15 @@ export const salePaymentSchema = z.object({
   receiptUrl: z.string().url().optional().nullable(),
 });
 
+export const saleAttachmentSchema = z.object({
+  fileUrl: z.string().url('La URL del archivo adjunto debe ser válida'),
+  fileType: z.string().min(1, 'El tipo de archivo es requerido'),
+  fileName: z.string().optional().nullable(),
+  fileSize: z.number().nonnegative().optional().nullable(),
+  transcription: z.string().optional().nullable(),
+  aiMetadata: z.any().optional().nullable(),
+});
+
 export const createSaleSchema = z.object({
   eventId: z.string().uuid('El ID de evento debe ser un UUID válido'),
   items: z.array(saleItemSchema).min(1, 'La venta debe incluir al menos un producto'),
@@ -33,6 +42,7 @@ export const createSaleSchema = z.object({
     'IA_FOTO_ARTE',
     'IA_VIDEO_MOSTRADOR',
   ]).default('MANUAL_POS'),
+  attachments: z.array(saleAttachmentSchema).optional().default([]),
 });
 
 export const cashClosingSchema = z.object({
@@ -47,4 +57,5 @@ export const updateSaleSchema = z.object({
   payments: z.array(salePaymentSchema).min(1, 'Debe especificarse al menos un método de pago').optional(),
   discount: z.number().nonnegative('El descuento no puede ser negativo').optional(),
   notes: z.string().max(500).optional().nullable(),
+  attachments: z.array(saleAttachmentSchema).optional(),
 });

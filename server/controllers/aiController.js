@@ -8,6 +8,7 @@ import {
 import { searchWebPosters } from '../services/webCatalogService.js';
 import { uploadBufferToStorage } from '../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../services/llmObservabilityService.js';
+import { normalizeArtworkQuery } from '../services/semanticParserService.js';
 
 
 export async function handleVoiceSale(req, res) {
@@ -199,11 +200,12 @@ export async function handleChatQuery(req, res) {
         if (name === 'prepareSaleDraft' && args) {
           draft = await constructDraftPayload(tenantId, args, message.trim());
         } else if (name === 'searchCatalog' && args?.query) {
+          const resolvedQuery = normalizeArtworkQuery(args.query);
           const matches = await searchWebPosters({
             tenantId,
-            query: args.query,
+            query: resolvedQuery,
             category: args.category,
-            limit: 4,
+            limit: 12,
           });
           if (matches?.length > 0) {
             suggestedPosters = matches;
@@ -251,6 +253,16 @@ export async function handleChatQuery(req, res) {
           res.write(`event: draft_sale\ndata: ${JSON.stringify(chunk.data)}\n\n`);
         } else if (chunk.type === 'suggested_posters') {
           res.write(`event: suggested_posters\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'event_kpis') {
+          res.write(`event: event_kpis\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'cash_drawer_status') {
+          res.write(`event: cash_drawer_status\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'seller_shift_report') {
+          res.write(`event: seller_shift_report\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'production_queue_status') {
+          res.write(`event: production_queue_status\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+        } else if (chunk.type === 'inventory_stock') {
+          res.write(`event: inventory_stock\ndata: ${JSON.stringify(chunk.data)}\n\n`);
         }
       }
 

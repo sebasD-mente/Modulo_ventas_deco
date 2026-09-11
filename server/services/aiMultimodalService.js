@@ -4,6 +4,15 @@ import { ENV } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import { getEventKPIs } from './saleService.js';
 import { searchWebPosters, getAllWebPostersCatalogSummary } from './webCatalogService.js';
+import {
+  extractPaymentMethod,
+  resolveEntityAlias,
+  normalizeArtworkQuery,
+} from './semanticParserService.js';
+import {
+  executeWithModelFallback,
+  streamWithModelFallback,
+} from './geminiPoolService.js';
 
 /**
  * Normaliza cualquier denominación de tamaño o medidas en pulgadas / centímetros
@@ -37,7 +46,7 @@ export function normalizeCatalogSizeId(requestedSize) {
   if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact)) return 'MINI';
 
   // Portada de Álbum / Vinilo (30 x 30 cm / 12 x 12 pulgadas) -> Q55.00
-  if (/30x30|12x12|vinilo|album|álbum/.test(compact)) return 'PORTADA_ALBUM';
+  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact)) return 'PORTADA_ALBUM';
 
   // 2. Mapeo por términos textuales
   if (/gigante|extra\s*grande|xl\b/i.test(raw)) return 'GIGANTE';
@@ -45,6 +54,7 @@ export function normalizeCatalogSizeId(requestedSize) {
   if (/mediano|medio|medium|m\b/i.test(raw)) return 'MEDIANO';
   if (/peque[ñn]o|chico|small|s\b/i.test(raw)) return 'PEQUENO';
   if (/mini|miniatura|xs\b/i.test(raw)) return 'MINI';
+  if (/portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco/i.test(raw)) return 'PORTADA_ALBUM';
 
   return raw.toUpperCase();
 }
@@ -56,8 +66,8 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (!query) return null;
   const clean = String(query).trim();
 
-  // 1. Buscar en los 233 pósters con motor de scoring multi-token
-  const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 3 });
+  // 1. Buscar en los 233 pósters con motor de scoring multi-token (expandido a 12)
+  const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 12 });
   if (webMatches.length > 0) {
     const matched = webMatches[0];
     
@@ -75,6 +85,14 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       );
       if (foundSize) {
         selectedSize = foundSize;
+      } else if (normalizedSizeId === 'PORTADA_ALBUM') {
+        selectedSize = {
+          sizeId: 'PORTADA_ALBUM',
+          nombre: 'Portada de Álbum',
+          dimensiones: '30 x 30 cm',
+          precio: 55,
+          badge: 'Formato vinilo cuadrado para música',
+        };
       } else {
         const fallbackBySizeId = matched.sizes.find(s => s.sizeId === normalizedSizeId);
         if (fallbackBySizeId) selectedSize = fallbackBySizeId;
@@ -800,10 +818,78 @@ export const getEventKPIsDeclaration = {
     properties: {
       eventId: {
         type: Type.STRING,
-        description: 'Identificador único del evento activo.',
+        description: 'Identificador único opcional del evento activo (si se omite, se usa el evento del contexto).',
+      },
+      date: {
+        type: Type.STRING,
+        description: 'Fecha opcional en formato YYYY-MM-DD para consultar métricas históricas o de un día específico.',
       },
     },
-    required: ['eventId'],
+  },
+};
+
+export const getCashDrawerStatusDeclaration = {
+  name: 'getCashDrawerStatus',
+  description: 'Consulta el estado del efectivo en gaveta del stand, total en tarjetas, transferencias y último arqueo de caja registrado.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      eventId: {
+        type: Type.STRING,
+        description: 'Identificador único opcional del evento activo.',
+      },
+    },
+  },
+};
+
+export const getSellerShiftReportDeclaration = {
+  name: 'getSellerShiftReport',
+  description: 'Consulta el ranking y métricas de ventas por vendedor en el evento activo (ventas totales, monto total, ticket promedio).',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      eventId: {
+        type: Type.STRING,
+        description: 'Identificador único opcional del evento activo.',
+      },
+      sellerId: {
+        type: Type.STRING,
+        description: 'Identificador único opcional del vendedor para ver su reporte individual.',
+      },
+    },
+  },
+};
+
+export const getProductionQueueStatusDeclaration = {
+  name: 'getProductionQueueStatus',
+  description: 'Consulta el estado de la cola de impresión y producción de obras en taller (PENDIENTE, SEPARADO, A_PRODUCCION, IMPRESO) y demoras.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      eventId: {
+        type: Type.STRING,
+        description: 'Identificador único opcional del evento activo.',
+      },
+    },
+  },
+};
+
+export const checkInventoryStockDeclaration = {
+  name: 'checkInventoryStock',
+  description: 'Verifica las existencias y disponibilidad física de una obra en el stand o catálogo.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      query: {
+        type: Type.STRING,
+        description: 'Nombre o alias de la obra, personaje o póster a consultar.',
+      },
+      sizeId: {
+        type: Type.STRING,
+        description: 'Tamaño opcional consultado: MINI, PEQUENO, MEDIANO, GRANDE, GIGANTE, PORTADA_ALBUM, o medidas como 18x24, etc.',
+      },
+    },
+    required: ['query'],
   },
 };
 
@@ -813,9 +899,826 @@ export const salesAssistantTools = [
       prepareSaleDraftDeclaration,
       searchCatalogDeclaration,
       getEventKPIsDeclaration,
+      getCashDrawerStatusDeclaration,
+      getSellerShiftReportDeclaration,
+      getProductionQueueStatusDeclaration,
+      checkInventoryStockDeclaration,
     ],
   },
 ];
+
+/**
+ * Consulta en tiempo real el estado del efectivo en gaveta y conciliación contra el último arqueo
+ */
+export async function executeGetCashDrawerStatus(tenantId, eventId) {
+  try {
+    let effectiveEventId = eventId;
+    if (!effectiveEventId || effectiveEventId === 'current' || effectiveEventId === 'activo') {
+      const activeEvent = await prisma.event.findFirst({
+        where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) },
+        select: { id: true, name: true, location: true },
+      });
+      if (activeEvent) {
+        effectiveEventId = activeEvent.id;
+      }
+    }
+
+    if (!effectiveEventId) {
+      return {
+        eventId: null,
+        eventName: 'Sin evento activo',
+        location: 'Stand',
+        currency: 'GTQ',
+        currencySymbol: 'Q',
+        currentCashInDrawer: 0,
+        cashSinceLastClosing: 0,
+        salesCountSinceLastClosing: 0,
+        totalSalesInCash: 0,
+        cashTransactionsCount: 0,
+        totalCardInSales: 0,
+        cardTransactionsCount: 0,
+        totalTransferInSales: 0,
+        transferTransactionsCount: 0,
+        grossSalesTotal: 0,
+        lastClosing: null,
+        summaryText: '💵 No hay un evento activo seleccionado para consultar el estado de la gaveta.',
+      };
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: effectiveEventId },
+      select: { id: true, name: true, location: true, status: true },
+    });
+
+    const saleWhere = {
+      eventId: effectiveEventId,
+      ...(tenantId ? { tenantId } : {}),
+      status: { not: 'ANULADA' },
+    };
+
+    const [paymentsByMethod, lastClosing] = await Promise.all([
+      prisma.salePayment.groupBy({
+        by: ['method'],
+        where: { sale: saleWhere },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      prisma.cashClosing.findFirst({
+        where: {
+          eventId: effectiveEventId,
+          ...(tenantId ? { tenantId } : {}),
+        },
+        orderBy: { closingDate: 'desc' },
+        include: {
+          closedBy: {
+            select: { id: true, fullName: true, email: true },
+          },
+        },
+      }),
+    ]);
+
+    let totalCash = 0;
+    let cashCount = 0;
+    let totalCard = 0;
+    let cardCount = 0;
+    let totalTransfer = 0;
+    let transferCount = 0;
+    let totalOther = 0;
+    let otherCount = 0;
+
+    paymentsByMethod.forEach((group) => {
+      const amount = Number(Number(group._sum?.amount || 0).toFixed(2));
+      const count = group._count?.id || 0;
+      if (group.method === 'EFECTIVO') {
+        totalCash = amount;
+        cashCount = count;
+      } else if (group.method === 'TARJETA') {
+        totalCard = amount;
+        cardCount = count;
+      } else if (group.method === 'TRANSFERENCIA') {
+        totalTransfer = amount;
+        transferCount = count;
+      } else {
+        totalOther += amount;
+        otherCount += count;
+      }
+    });
+
+    const grossSalesTotal = Number((totalCash + totalCard + totalTransfer + totalOther).toFixed(2));
+
+    let cashSinceLastClosing = totalCash;
+    let salesCountSinceLastClosing = cashCount;
+
+    if (lastClosing) {
+      const postClosingAgg = await prisma.salePayment.aggregate({
+        where: {
+          method: 'EFECTIVO',
+          sale: {
+            ...saleWhere,
+            createdAt: { gt: lastClosing.createdAt },
+          },
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      });
+
+      cashSinceLastClosing = Number(Number(postClosingAgg._sum?.amount || 0).toFixed(2));
+      salesCountSinceLastClosing = postClosingAgg._count?.id || 0;
+    }
+
+    let discrepancyStatus = 'SIN_ARQUEOS';
+    let diffAmount = 0;
+    let lastClosingInfo = null;
+
+    if (lastClosing) {
+      diffAmount = Number(lastClosing.cashDifference || 0);
+      discrepancyStatus = diffAmount === 0 ? 'CUADRADO' : diffAmount > 0 ? 'SOBRANTE' : 'FALTANTE';
+      lastClosingInfo = {
+        id: lastClosing.id,
+        closingDate: lastClosing.closingDate,
+        closedBy: lastClosing.closedBy?.fullName || 'Vendedor',
+        closingType: lastClosing.closingType,
+        calculatedCash: Number(lastClosing.totalCashCalculated || 0),
+        reportedCash: Number(lastClosing.totalCashReported || 0),
+        difference: diffAmount,
+        discrepancyStatus,
+        observations: lastClosing.observations || null,
+      };
+    }
+
+    const estimatedPhysicalCashInDrawer = lastClosing
+      ? Number((Number(lastClosing.totalCashReported || 0) + cashSinceLastClosing).toFixed(2))
+      : totalCash;
+
+    const summaryText = lastClosingInfo
+      ? `💵 **Estado de Gaveta — "${event?.name || 'Evento'}":** Hay aprox. **Q ${estimatedPhysicalCashInDrawer.toFixed(2)}** en efectivo. Último arqueo: ${new Date(lastClosingInfo.closingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} por ${lastClosingInfo.closedBy} (${discrepancyStatus}, dif: Q ${lastClosingInfo.difference.toFixed(2)}). Ingresos post-arqueo: Q ${cashSinceLastClosing.toFixed(2)} en ${salesCountSinceLastClosing} cobros. Tarjeta: Q ${totalCard.toFixed(2)} | Transferencias: Q ${totalTransfer.toFixed(2)}.`
+      : `💵 **Estado de Gaveta — "${event?.name || 'Evento'}":** Hay **Q ${totalCash.toFixed(2)}** en efectivo físico acumulado (${cashCount} cobros). Sin arqueos registrados todavía. Cobros en tarjeta: Q ${totalCard.toFixed(2)} | Transferencias: Q ${totalTransfer.toFixed(2)} (Total general: Q ${grossSalesTotal.toFixed(2)}).`;
+
+    return {
+      eventId: effectiveEventId,
+      eventName: event?.name || 'Evento Activo',
+      location: event?.location || 'Stand',
+      currency: 'GTQ',
+      currencySymbol: 'Q',
+      currentCashInDrawer: estimatedPhysicalCashInDrawer,
+      cashSinceLastClosing,
+      salesCountSinceLastClosing,
+      totalSalesInCash: totalCash,
+      cashTransactionsCount: cashCount,
+      totalCardInSales: totalCard,
+      cardTransactionsCount: cardCount,
+      totalTransferInSales: totalTransfer,
+      transferTransactionsCount: transferCount,
+      grossSalesTotal,
+      lastClosing: lastClosingInfo,
+      summaryText,
+    };
+  } catch (dbErr) {
+    console.warn('⚠️ [executeGetCashDrawerStatus] Error o base de datos no disponible:', dbErr.message);
+    return {
+      eventId: eventId || null,
+      eventName: 'Stand (Modo Resiliente)',
+      location: 'Stand',
+      currency: 'GTQ',
+      currencySymbol: 'Q',
+      currentCashInDrawer: 0,
+      cashSinceLastClosing: 0,
+      salesCountSinceLastClosing: 0,
+      totalSalesInCash: 0,
+      cashTransactionsCount: 0,
+      totalCardInSales: 0,
+      cardTransactionsCount: 0,
+      totalTransferInSales: 0,
+      transferTransactionsCount: 0,
+      grossSalesTotal: 0,
+      lastClosing: null,
+      summaryText: '💵 Estado de Gaveta: No se pudo consultar la base de datos de caja o no hay conexión activa.',
+      error: dbErr.message,
+    };
+  }
+}
+
+/**
+ * Consulta en tiempo real el desempeño y ranking de vendedores en PostgreSQL
+ */
+export async function executeGetSellerShiftReport(tenantId, eventId, sellerId = null) {
+  try {
+    let effectiveEventId = eventId;
+    if (!effectiveEventId || effectiveEventId === 'current' || effectiveEventId === 'activo') {
+      const activeEvent = await prisma.event.findFirst({
+        where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) },
+        select: { id: true, name: true },
+      });
+      if (activeEvent) {
+        effectiveEventId = activeEvent.id;
+      }
+    }
+
+    if (!effectiveEventId) {
+      return {
+        eventId: null,
+        eventName: 'Sin evento activo',
+        totalSellersActive: 0,
+        eventTotalRevenue: 0,
+        eventTotalTransactions: 0,
+        topSeller: null,
+        ranking: [],
+        seller: null,
+        summaryText: '🏆 No hay un evento activo seleccionado para consultar el reporte de vendedores.',
+      };
+    }
+
+    const saleWhere = {
+      eventId: effectiveEventId,
+      status: { not: 'ANULADA' },
+      ...(tenantId ? { tenantId } : {}),
+    };
+
+    const [event, salesBySeller] = await Promise.all([
+      prisma.event.findUnique({
+        where: { id: effectiveEventId },
+        select: { id: true, name: true, location: true },
+      }),
+      prisma.sale.groupBy({
+        by: ['sellerId'],
+        where: saleWhere,
+        _count: { id: true },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+
+    salesBySeller.sort((a, b) => Number(b._sum?.totalAmount || 0) - Number(a._sum?.totalAmount || 0));
+
+    const sellerIds = salesBySeller.map((s) => s.sellerId).filter(Boolean);
+    if (sellerId && !sellerIds.includes(sellerId)) {
+      sellerIds.push(sellerId);
+    }
+
+    let userMap = new Map();
+    if (sellerIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: {
+          id: { in: sellerIds },
+          ...(tenantId ? { tenantId } : {}) ,
+        },
+        select: { id: true, fullName: true, email: true, role: true },
+      });
+      userMap = new Map(users.map((u) => [u.id, u]));
+    }
+
+    const eventTotalRevenue = Number(
+      salesBySeller.reduce((acc, s) => acc + Number(s._sum?.totalAmount || 0), 0).toFixed(2)
+    );
+    const eventTotalTransactions = salesBySeller.reduce((acc, s) => acc + (s._count?.id || 0), 0);
+
+    const ranking = await Promise.all(
+      salesBySeller.map(async (group, index) => {
+        const seller = userMap.get(group.sellerId);
+        const totalAmount = Number(Number(group._sum?.totalAmount || 0).toFixed(2));
+        const transactionCount = group._count?.id || 0;
+        const averageTicket =
+          transactionCount > 0 ? Number((totalAmount / transactionCount).toFixed(2)) : 0;
+        const sharePercentage =
+          eventTotalRevenue > 0
+            ? Number(((totalAmount / eventTotalRevenue) * 100).toFixed(1))
+            : 0;
+
+        let unitsSold = 0;
+        try {
+          const unitsAgg = await prisma.saleItem.aggregate({
+            where: {
+              sale: {
+                eventId: effectiveEventId,
+                sellerId: group.sellerId,
+                status: { not: 'ANULADA' },
+                ...(tenantId ? { tenantId } : {}),
+              },
+            },
+            _sum: { quantity: true },
+          });
+          unitsSold = unitsAgg._sum?.quantity || 0;
+        } catch {
+          // fallback
+        }
+
+        const paymentsBreakdown = {
+          EFECTIVO: { amount: 0, count: 0 },
+          TARJETA: { amount: 0, count: 0 },
+          TRANSFERENCIA: { amount: 0, count: 0 },
+        };
+
+        try {
+          const paymentsAgg = await prisma.salePayment.groupBy({
+            by: ['method'],
+            where: {
+              sale: {
+                eventId: effectiveEventId,
+                sellerId: group.sellerId,
+                status: { not: 'ANULADA' },
+                ...(tenantId ? { tenantId } : {}),
+              },
+            },
+            _sum: { amount: true },
+            _count: { id: true },
+          });
+
+          paymentsAgg.forEach((p) => {
+            if (paymentsBreakdown[p.method]) {
+              paymentsBreakdown[p.method].amount = Number(Number(p._sum?.amount || 0).toFixed(2));
+              paymentsBreakdown[p.method].count = p._count?.id || 0;
+            }
+          });
+        } catch {
+          // fallback
+        }
+
+        return {
+          position: index + 1,
+          sellerId: group.sellerId,
+          sellerName: seller?.fullName || 'Vendedor',
+          sellerEmail: seller?.email || '',
+          role: seller?.role || 'VENDEDOR',
+          totalAmount,
+          transactionCount,
+          averageTicket,
+          unitsSold,
+          sharePercentage,
+          payments: paymentsBreakdown,
+        };
+      })
+    );
+
+    if (sellerId) {
+      const specificSeller = ranking.find((r) => r.sellerId === sellerId);
+      if (!specificSeller) {
+        const u = userMap.get(sellerId);
+        return {
+          eventId: effectiveEventId,
+          eventName: event?.name || 'Evento Activo',
+          filterSellerId: sellerId,
+          seller: {
+            sellerId,
+            sellerName: u?.fullName || 'Vendedor',
+            totalAmount: 0,
+            transactionCount: 0,
+            averageTicket: 0,
+            unitsSold: 0,
+            position: null,
+            sharePercentage: 0,
+          },
+          ranking,
+          summaryText: `El vendedor ${u?.fullName || 'indicado'} aún no registra ventas completadas en "${event?.name || 'el evento'}".`,
+        };
+      }
+
+      const medal = specificSeller.position === 1 ? '🥇' : specificSeller.position === 2 ? '🥈' : specificSeller.position === 3 ? '🥉' : '🎖️';
+      const summaryText = `${medal} **Desempeño de ${specificSeller.sellerName} en "${event?.name || 'Evento'}":** Posición #${specificSeller.position} de ${ranking.length}. Total vendido: **Q ${specificSeller.totalAmount.toFixed(2)}** en ${specificSeller.transactionCount} ventas (${specificSeller.unitsSold} obras entregadas). Ticket promedio: Q ${specificSeller.averageTicket.toFixed(2)} (${specificSeller.sharePercentage}% del evento). Cobros: Q ${specificSeller.payments.EFECTIVO.amount.toFixed(2)} efectivo, Q ${specificSeller.payments.TARJETA.amount.toFixed(2)} tarjeta, Q ${specificSeller.payments.TRANSFERENCIA.amount.toFixed(2)} transferencias.`;
+
+      return {
+        eventId: effectiveEventId,
+        eventName: event?.name || 'Evento Activo',
+        filterSellerId: sellerId,
+        seller: specificSeller,
+        ranking,
+        summaryText,
+      };
+    }
+
+    const medalIcons = ['🥇', '🥈', '🥉'];
+    const rankingSummaryLines = ranking
+      .slice(0, 5)
+      .map(
+        (r, idx) =>
+          `${medalIcons[idx] || '🎖️'} #${r.position} **${r.sellerName}**: Q ${r.totalAmount.toFixed(2)} (${r.transactionCount} ventas, ${r.unitsSold} obras — ${r.sharePercentage}%)`
+      )
+      .join('\n');
+
+    const summaryText = ranking.length > 0
+      ? `🏆 **Ranking de Vendedores en "${event?.name || 'Evento'}":**\n${rankingSummaryLines}\n\n• **Total recaudado:** Q ${eventTotalRevenue.toFixed(2)} (${eventTotalTransactions} transacciones globales).`
+      : `Aún no se registran ventas de vendedores en "${event?.name || 'el evento'}".`;
+
+    return {
+      eventId: effectiveEventId,
+      eventName: event?.name || 'Evento Activo',
+      totalSellersActive: ranking.length,
+      eventTotalRevenue,
+      eventTotalTransactions,
+      topSeller: ranking[0] || null,
+      ranking,
+      summaryText,
+    };
+  } catch (dbErr) {
+    console.warn('⚠️ [executeGetSellerShiftReport] Error o base de datos no disponible:', dbErr.message);
+    return {
+      eventId: eventId || null,
+      eventName: 'Evento (Modo Resiliente)',
+      totalSellersActive: 0,
+      eventTotalRevenue: 0,
+      eventTotalTransactions: 0,
+      topSeller: null,
+      ranking: [],
+      seller: null,
+      summaryText: '🏆 Ranking de Vendedores: No se pudo conectar a la base de datos para consultar el desempeño.',
+      error: dbErr.message,
+    };
+  }
+}
+
+/**
+ * Consulta en tiempo real el estado de la cola de producción y taller
+ */
+export async function executeGetProductionQueueStatus(tenantId, eventId) {
+  try {
+    let effectiveEventId = eventId;
+    if (!effectiveEventId || effectiveEventId === 'current' || effectiveEventId === 'activo') {
+      const activeEvent = await prisma.event.findFirst({
+        where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) },
+        select: { id: true, name: true },
+      });
+      if (activeEvent) {
+        effectiveEventId = activeEvent.id;
+      }
+    }
+
+    if (!effectiveEventId) {
+      return {
+        eventId: null,
+        eventName: 'Sin evento activo',
+        health: 'OPTIMO',
+        counts: { pending: 0, separated: 0, inProduction: 0, printed: 0, total: 0, activeQueueCount: 0 },
+        timing: { averageQueueWaitMinutes: 0, maxWaitMinutes: 0, averagePrintTurnaroundMinutes: null, stalledThresholdMinutes: 30 },
+        stalledJobs: [],
+        stalledCount: 0,
+        summary: 'Cola de taller: No hay un evento activo seleccionado para consultar el estado del taller.',
+      };
+    }
+
+    const now = new Date();
+    const whereBase = {
+      sale: {
+        eventId: effectiveEventId,
+        status: { not: 'ANULADA' },
+        ...(tenantId ? { tenantId } : {}),
+      },
+    };
+
+    const [statusGroups, activeItems, recentPrinted, eventInfo] = await Promise.all([
+      prisma.saleItem.groupBy({
+        by: ['productionStatus'],
+        where: whereBase,
+        _count: { id: true },
+        _sum: { quantity: true },
+      }),
+      prisma.saleItem.findMany({
+        where: {
+          ...whereBase,
+          productionStatus: { in: ['PENDIENTE', 'A_PRODUCCION'] },
+        },
+        include: {
+          sale: {
+            select: {
+              saleNumber: true,
+              createdAt: true,
+              seller: { select: { fullName: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.saleItem.findMany({
+        where: {
+          ...whereBase,
+          productionStatus: 'IMPRESO',
+          impresoAt: { not: null },
+        },
+        select: {
+          createdAt: true,
+          impresoAt: true,
+        },
+        take: 20,
+        orderBy: { impresoAt: 'desc' },
+      }),
+      prisma.event.findUnique({
+        where: { id: effectiveEventId },
+        select: { id: true, name: true, location: true },
+      }),
+    ]);
+
+    const counts = {
+      PENDIENTE: 0,
+      SEPARADO: 0,
+      A_PRODUCCION: 0,
+      IMPRESO: 0,
+      total: 0,
+    };
+
+    for (const g of statusGroups) {
+      const st = g.productionStatus;
+      const c = g._count?.id || 0;
+      if (counts[st] !== undefined) {
+        counts[st] = c;
+      }
+      counts.total += c;
+    }
+
+    let totalWaitMinutes = 0;
+    let maxWaitMinutes = 0;
+    const stalledThresholdMinutes = 30;
+    const criticalThresholdMinutes = 45;
+    const stalledJobs = [];
+
+    for (const item of activeItems) {
+      const itemDate = new Date(item.createdAt);
+      const waitMinutes = Math.max(0, Math.round((now.getTime() - itemDate.getTime()) / 60000));
+      totalWaitMinutes += waitMinutes;
+      if (waitMinutes > maxWaitMinutes) {
+        maxWaitMinutes = waitMinutes;
+      }
+
+      if (waitMinutes >= stalledThresholdMinutes) {
+        stalledJobs.push({
+          saleItemId: item.id,
+          saleNumber: item.sale?.saleNumber || 'S/N',
+          description: item.description,
+          quantity: item.quantity,
+          status: item.productionStatus,
+          minutesInQueue: waitMinutes,
+          urgency: waitMinutes >= criticalThresholdMinutes ? 'CRITICA' : 'ALTA',
+          sellerName: item.sale?.seller?.fullName || 'Vendedor',
+          createdAt: item.createdAt,
+        });
+      }
+    }
+
+    const activeQueueCount = counts.PENDIENTE + counts.A_PRODUCCION;
+    const averageQueueWaitMinutes = activeQueueCount > 0
+      ? Math.round(totalWaitMinutes / activeQueueCount)
+      : 0;
+
+    let averagePrintTurnaroundMinutes = null;
+    if (recentPrinted.length > 0) {
+      const sumPrint = recentPrinted.reduce((acc, it) => {
+        const diff = Math.max(0, (new Date(it.impresoAt).getTime() - new Date(it.createdAt).getTime()) / 60000);
+        return acc + diff;
+      }, 0);
+      averagePrintTurnaroundMinutes = Math.round(sumPrint / recentPrinted.length);
+    }
+
+    let health = 'OPTIMO';
+    if (stalledJobs.some((j) => j.urgency === 'CRITICA') || activeQueueCount > 15) {
+      health = 'CRITICO';
+    } else if (stalledJobs.length > 0 || activeQueueCount > 8) {
+      health = 'SATURADO';
+    } else if (activeQueueCount > 3) {
+      health = 'MODERADO';
+    }
+
+    const summary = `🖨️ **Estado del Taller y Producción — "${eventInfo?.name || 'Evento'}":**\n` +
+      `• **Salud operativa:** ${health === 'OPTIMO' ? '🟢 ÓPTIMO' : health === 'MODERADO' ? '🟡 MODERADO' : '🔴 SATURADO'}\n` +
+      `• **En impresión activa (A_PRODUCCION):** ${counts.A_PRODUCCION} obras\n` +
+      `• **Pendientes de clasificar:** ${counts.PENDIENTE} obras\n` +
+      `• **Despachadas de stock mostrador:** ${counts.SEPARADO} | **Finalizadas en taller:** ${counts.IMPRESO}\n` +
+      `• **Tiempo promedio de espera:** ${averageQueueWaitMinutes} min (máx: ${maxWaitMinutes} min)\n` +
+      (stalledJobs.length > 0
+        ? `⚠️ **Atención:** Hay ${stalledJobs.length} órdenes rezagadas (> ${stalledThresholdMinutes} min).\n` +
+          stalledJobs.slice(0, 3).map(j => `  - Ticket ${j.saleNumber}: ${j.description} (${j.minutesInQueue} min de espera)`).join('\n')
+        : '• **Flujo de taller:** Operando al día sin cuellos de botella.');
+
+    return {
+      eventId: effectiveEventId,
+      eventName: eventInfo?.name || 'Evento Activo',
+      health,
+      counts: {
+        pending: counts.PENDIENTE,
+        separated: counts.SEPARADO,
+        inProduction: counts.A_PRODUCCION,
+        printed: counts.IMPRESO,
+        total: counts.total,
+        activeQueueCount,
+      },
+      timing: {
+        averageQueueWaitMinutes,
+        maxWaitMinutes,
+        averagePrintTurnaroundMinutes,
+        stalledThresholdMinutes,
+      },
+      stalledJobs,
+      stalledCount: stalledJobs.length,
+      summary,
+    };
+  } catch (dbErr) {
+    console.warn('⚠️ [executeGetProductionQueueStatus] Error o base de datos no disponible:', dbErr.message);
+    return {
+      eventId: eventId || null,
+      eventName: 'Evento (Modo Resiliente)',
+      health: 'OPTIMO',
+      counts: {
+        pending: 0,
+        separated: 0,
+        inProduction: 0,
+        printed: 0,
+        total: 0,
+        activeQueueCount: 0,
+      },
+      timing: {
+        averageQueueWaitMinutes: 0,
+        maxWaitMinutes: 0,
+        averagePrintTurnaroundMinutes: null,
+        stalledThresholdMinutes: 30,
+      },
+      stalledJobs: [],
+      stalledCount: 0,
+      summary: '🖨️ Estado de Taller: No se pudo consultar la base de datos de producción en este momento.',
+      error: dbErr.message,
+    };
+  }
+}
+
+/**
+ * Verifica existencias, variantes y modalidad de entrega física para una obra
+ */
+export async function executeCheckInventoryStock(tenantId, query, sizeId = null, eventId = null) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return {
+      found: false,
+      message: 'Debe especificar el nombre o alias de la obra a consultar.',
+      suggestedPosters: [],
+    };
+  }
+
+  try {
+    const aliasRes = resolveEntityAlias(query.trim());
+    const resolvedQuery = aliasRes.matched ? aliasRes.searchQuery : normalizeArtworkQuery(query.trim());
+    const requestedSizeNorm = sizeId
+      ? normalizeCatalogSizeId(sizeId)
+      : (aliasRes.matched && aliasRes.defaultSizeId ? aliasRes.defaultSizeId : null);
+
+    const matches = await searchWebPosters({
+      tenantId,
+      query: resolvedQuery,
+      limit: 6,
+    });
+
+    const posterMatches = Array.isArray(matches) ? [...matches] : [];
+
+    if (posterMatches.length === 0) {
+      if (aliasRes.matched) {
+        posterMatches.push({
+          id: `alias-${aliasRes.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          sku: `DV-${aliasRes.canonicalTitle.substring(0, 4).toUpperCase()}`,
+          titulo: aliasRes.canonicalTitle,
+          subtitulo: 'Catálogo Oficial Deco Vintage',
+          categoria: aliasRes.category || 'ARTE',
+          imageUrl: null,
+          thumbUrl: null,
+          precioMinimo: aliasRes.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65,
+          sizes: [
+            { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
+            { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+            { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' },
+            { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
+            { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+          ],
+        });
+      } else {
+        return {
+          found: false,
+          query: query.trim(),
+          resolvedQuery,
+          message: `No se encontró la obra "${query}" en el catálogo oficial de Deco Vintage.`,
+          availableInCatalog: false,
+          suggestedPosters: [],
+        };
+      }
+    }
+
+    const primaryMatch = posterMatches[0];
+    const allSizes = Array.isArray(primaryMatch.sizes) && primaryMatch.sizes.length > 0
+      ? [...primaryMatch.sizes]
+      : [
+          { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
+          { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+          { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' },
+          { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
+          { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+        ];
+
+    const isMusic = (primaryMatch.categoria || '').toUpperCase() === 'MUSICA';
+    if (isMusic && !allSizes.some((s) => s.sizeId === 'PORTADA_ALBUM')) {
+      allSizes.unshift({
+        sizeId: 'PORTADA_ALBUM',
+        nombre: 'Portada de Álbum',
+        dimensiones: '30 x 30 cm',
+        precio: 55,
+        badge: 'Formato vinilo cuadrado para música',
+      });
+    }
+
+    let matchedSizeInfo = null;
+    if (requestedSizeNorm) {
+      matchedSizeInfo = allSizes.find((s) => s.sizeId === requestedSizeNorm);
+      if (!matchedSizeInfo) {
+        let fallbackPrice = 65;
+        if (requestedSizeNorm === 'MINI') fallbackPrice = 25;
+        else if (requestedSizeNorm === 'PEQUENO') fallbackPrice = 35;
+        else if (requestedSizeNorm === 'MEDIANO') fallbackPrice = 65;
+        else if (requestedSizeNorm === 'GRANDE') fallbackPrice = 125;
+        else if (requestedSizeNorm === 'GIGANTE') fallbackPrice = 180;
+        else if (requestedSizeNorm === 'PORTADA_ALBUM') fallbackPrice = 55;
+
+        matchedSizeInfo = {
+          sizeId: requestedSizeNorm,
+          nombre: requestedSizeNorm,
+          precio: fallbackPrice,
+          dimensiones: requestedSizeNorm === 'PORTADA_ALBUM' ? '30 x 30 cm' : 'Estándar',
+        };
+      }
+    }
+
+    let eventStockHistory = null;
+    if (eventId && primaryMatch.id) {
+      try {
+        const itemsHistory = await prisma.saleItem.groupBy({
+          by: ['productionStatus'],
+          where: {
+            OR: [
+              { productId: primaryMatch.id },
+              { description: { contains: primaryMatch.titulo, mode: 'insensitive' } },
+            ],
+            sale: {
+              eventId,
+              status: { not: 'ANULADA' },
+              ...(tenantId ? { tenantId } : {}),
+            },
+          },
+          _count: { id: true },
+        });
+        const hist = { SEPARADO: 0, A_PRODUCCION: 0, IMPRESO: 0, PENDIENTE: 0 };
+        itemsHistory.forEach((g) => {
+          if (hist[g.productionStatus] !== undefined) {
+            hist[g.productionStatus] = g._count.id || 0;
+          }
+        });
+        eventStockHistory = hist;
+      } catch (dbErr) {
+        console.warn('⚠️ [executeCheckInventoryStock] Error consultando histórico en PostgreSQL:', dbErr.message);
+      }
+    }
+
+    const targetSizeId = matchedSizeInfo?.sizeId || 'MEDIANO';
+    const isDirectStockCandidate = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
+
+    const stockAvailability = {
+      availableInCatalog: true,
+      standPhysicalStock: isDirectStockCandidate ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER',
+      estimatedWaitMinutes: isDirectStockCandidate ? 0 : 12,
+      tallerCapability: 'Impresión al instante con tintas HP Látex (>10 años de durabilidad garantizada)',
+      deliveryMode: isDirectStockCandidate
+        ? 'Entrega inmediata en mostrador o producción en taller si se agotan copias'
+        : 'Producción personalizada en taller del stand (~10-15 minutos)',
+    };
+
+    const responseSummary = `🎨 **Disponibilidad de Obra — "${primaryMatch.titulo}":**\n` +
+      `• **Catálogo:** Disponible en catálogo oficial de Deco Vintage (${primaryMatch.categoria}).\n` +
+      (matchedSizeInfo
+        ? `• **Tamaño consultado:** ${matchedSizeInfo.nombre} (${matchedSizeInfo.dimensiones || ''}) — **Q ${matchedSizeInfo.precio.toFixed(2)}**.\n`
+        : `• **Tamaños disponibles:** ${allSizes.map((s) => `${s.nombre} (Q ${s.precio})`).join(', ')}.\n`) +
+      `• **Modalidad de entrega:** ${stockAvailability.deliveryMode}.\n` +
+      (stockAvailability.estimatedWaitMinutes === 0
+        ? '⚡ Listo para entregar de inmediato al cliente.'
+        : `⏱️ Tiempo estimado de impresión: ~${stockAvailability.estimatedWaitMinutes} minutos en plotter HP Látex.`);
+
+    return {
+      found: true,
+      query: query.trim(),
+      artwork: {
+        id: primaryMatch.id,
+        sku: primaryMatch.sku,
+        title: primaryMatch.titulo,
+        subtitle: primaryMatch.subtitulo || '',
+        category: primaryMatch.categoria,
+        imageUrl: primaryMatch.imageUrl,
+        thumbUrl: primaryMatch.thumbUrl,
+        basePrice: primaryMatch.precioMinimo,
+      },
+      requestedSize: matchedSizeInfo,
+      allAvailableSizes: allSizes,
+      stockAvailability,
+      eventStockHistory,
+      suggestedPosters: matches,
+      summary: responseSummary,
+    };
+  } catch (err) {
+    console.warn('⚠️ [executeCheckInventoryStock] Error consultando inventario:', err.message);
+    return {
+      found: false,
+      query: query.trim(),
+      message: `Error al consultar stock de "${query}": ${err.message}`,
+      availableInCatalog: false,
+      suggestedPosters: [],
+    };
+  }
+}
 
 export const salesAssistantSafetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -834,15 +1737,28 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
   const enrichedItems = [];
   let grandTotal = 0;
 
+  // Extracción determinística de método de pago del mensaje del usuario o notas
+  const textToScan = [userMessage, args?.notes].filter(Boolean).join(' ');
+  const detectedPayment = extractPaymentMethod(textToScan);
+  const finalPaymentMethod = detectedPayment || args?.paymentMethod || 'EFECTIVO';
+
   for (const it of rawItems) {
-    const queryName = it.productName || it.title || it.description || 'Póster';
-    const requestedSize = it.size || 'MEDIANO';
+    const rawName = it.productName || it.title || it.description || 'Póster';
+    const aliasRes = resolveEntityAlias(rawName);
+    const queryName = aliasRes.matched ? aliasRes.searchQuery : rawName;
+    const requestedSize = it.size || (aliasRes.matched && aliasRes.defaultSizeId) || 'MEDIANO';
     const matched = await matchPosterEverywhere(tenantId, queryName, requestedSize);
     const quantity = Math.max(1, Math.round(Number(it.quantity) || 1));
     const qty = quantity;
+    const normSize = normalizeCatalogSizeId(requestedSize);
 
     if (matched) {
-      const unitPrice = matched.unitPrice || Number(it.unitPrice) || 65.0;
+      let unitPrice = matched.unitPrice;
+      if (matched.sizeId === 'PORTADA_ALBUM' || normSize === 'PORTADA_ALBUM') {
+        unitPrice = 55.0;
+      } else if (!unitPrice) {
+        unitPrice = Number(it.unitPrice) || 65.0;
+      }
       const subtotal = Number((qty * unitPrice).toFixed(2));
       grandTotal += subtotal;
 
@@ -850,18 +1766,17 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
         productId: matched.productId || null,
         webPosterId: matched.posterId || null,
         description: matched.description,
-        baseTitle: matched.baseTitle || queryName,
-        category: matched.category || 'ARTE',
+        baseTitle: matched.baseTitle || rawName,
+        category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
         thumbUrl: matched.thumbUrl || null,
         imageUrl: matched.imageUrl || null,
         quantity: qty,
         unitPrice,
         subtotal,
-        sizeId: matched.sizeId || 'MEDIANO',
+        sizeId: matched.sizeId || normSize,
         availableSizes: matched.availableSizes || [],
       });
     } else {
-      const normSize = normalizeCatalogSizeId(requestedSize);
       let fallbackPrice = 65.0;
       if (normSize === 'MINI') fallbackPrice = 25.0;
       else if (normSize === 'PEQUENO') fallbackPrice = 35.0;
@@ -870,13 +1785,19 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
       else if (normSize === 'GIGANTE') fallbackPrice = 180.0;
       else if (normSize === 'PORTADA_ALBUM') fallbackPrice = 55.0;
 
-      const unitPrice = Number(it.unitPrice) || fallbackPrice;
+      let unitPrice = Number(it.unitPrice);
+      if (!unitPrice || (normSize === 'PORTADA_ALBUM' && (unitPrice === 65.0 || unitPrice <= 0))) {
+        unitPrice = fallbackPrice;
+      }
+      if (normSize === 'PORTADA_ALBUM') {
+        unitPrice = 55.0;
+      }
       const subtotal = Number((qty * unitPrice).toFixed(2));
       grandTotal += subtotal;
 
       enrichedItems.push({
-        description: `${queryName} (${normSize})`,
-        baseTitle: queryName,
+        description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`,
+        baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName,
         quantity: qty,
         unitPrice,
         subtotal,
@@ -885,14 +1806,12 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     }
   }
 
-  const total = args?.total != null && Number(args.total) > 0
-    ? Number(Number(args.total).toFixed(2))
-    : Number(grandTotal.toFixed(2));
+  const total = Number(grandTotal.toFixed(2));
 
   return {
     items: enrichedItems,
     total,
-    paymentMethod: args?.paymentMethod || 'EFECTIVO',
+    paymentMethod: finalPaymentMethod,
     inputChannel: 'IA_CHAT_TEXTO',
     notes: args?.notes || 'Venta dictada por STAND IA Chat',
     customerName: args?.customerName || null,
@@ -901,11 +1820,146 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
 }
 
 /**
+ * Genera el System Prompt Maestro para STAND {IA} estilo J.A.R.V.I.S.
+ * Centraliza personalidad, directivas de venta, upselling, resolución visual y tools de DB.
+ *
+ * @param {object} opts
+ * @param {object} [opts.event]
+ * @param {object} [opts.resolvedContextData={}]
+ * @param {object} [opts.pendingDraft=null]
+ * @returns {string}
+ */
+export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendingDraft = null }) {
+  const eventName = event?.name || resolvedContextData?.evento || 'el evento';
+  const eventLocation = event?.location || resolvedContextData?.ubicacion || 'el stand principal';
+
+  const draftContext = (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0)
+    ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BORRADOR ACTIVO EN PANTALLA (EDICIÓN CONVERSACIONAL EN CURSO):
+${JSON.stringify({
+  items: pendingDraft.items.map(it => ({
+    title: it.baseTitle || it.description,
+    size: it.sizeId || 'MEDIANO',
+    quantity: it.quantity,
+    unitPrice: it.unitPrice,
+    subtotal: it.subtotal
+  })),
+  total: pendingDraft.total,
+  paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
+  notes: pendingDraft.notes || ''
+}, null, 2)}
+
+DIRECTIVAS PARA EDICIÓN DEL BORRADOR:
+- Si el usuario o cliente pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", "agrega uno de Batman", "quita el primero"):
+  * Preserva todos los ítems actuales a menos que pidan removerlos.
+  * Modifica cantidades, tamaños o método de pago según lo pedido.
+  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : '';
+
+  return `Eres STAND {IA}, el Asistente Estrella de Ventas, Curador de Arte Pop y Consultor de Mostrador para Deco Vintage Guate y Deko Labs en "${eventName}" (${eventLocation}).
+
+Tu personalidad y estilo de comunicación están inspirados en J.A.R.V.I.S.: extraordinariamente inteligente, impecablemente eficiente, empático, carismático, sofisticado y enérgico. Amas la cultura pop (anime, música, cine clásico y moderno, cómics, videojuegos y arte retro). Estás al servicio del vendedor del stand y de los clientes que se acercan al mostrador.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. REGLAS INQUEBRANTABLES DE TONO Y TRATO (ESTILO J.A.R.V.I.S.):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- TRATO EXCLUSIVO DE "TÚ": Habla siempre de "tú" con cercanía, calidez y camaradería respetuosa.
+  * PROHIBIDO terminantemente usar "usted", "su persona", "le asisto", "su revisión" o fórmulas burocráticas frías.
+  * Usa expresiones amigables y cómplices: "¡Claro que sí!", "¡Excelente elección!", "Te preparé el borrador en pantalla", "¿Qué te parece esta opción?".
+- PASIÓN CULTURAL AUTÉNTICA: Si te hablan de anime (Goku, Chainsaw Man, Demon Slayer), música (Bad Bunny, Taylor Swift, The Beatles), superhéroes (Spider-Man, Batman), autos (Porsche, Checo Pérez) o cine, responde con genuino entusiasmo de conocedor.
+- RITMO DE STAND DE EVENTO: En un evento masivo el ritmo es rápido y vibrante. Sé conciso, dinámico y resolutivo. Nada de párrafos eternos ni rodeos innecesarios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DIRECTIVAS DE VENTA, ASESORAMIENTO Y UPSELLING ACTIVO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Cuando asesores a un cliente indeciso, recomiendes obras o hables de tamaños y calidad, promueve activamente estos 4 pilares comerciales:
+
+1. TAMAÑO ESTRELLA — MEDIANO (30x45 cm / 12x18 pulg a Q65.00):
+   - Es el tamaño más popular y vendido de Deco Vintage.
+   - El punto de equilibrio perfecto: impacto visual impresionante para recámaras, salas, oficinas o setups de gaming, a un precio sumamente accesible (Q65.00). Si el cliente duda del tamaño, recomiéndale siempre el Mediano.
+
+2. CALIDAD DE IMPRESIÓN INSUPERABLE — HP LÁTEX ECOLÓGICO:
+   - Destaca que no son pósters de papel común: son impresiones de alta definición con tecnología y tintas ecológicas originales HP Látex base agua.
+   - Durabilidad UV superior a 10 años sin decoloración ni pérdida de nitidez, resistentes a la luz ambiental y libres de olores tóxicos.
+
+3. MONTAJE ULTRA RÁPIDO — CINTA tesa® ORIGINAL EN 15 SEGUNDOS:
+   - Resalta que cada cuadro viene listo para colocar con cinta de montaje rápido de alta adherencia tesa®.
+   - Se instala en la pared en sólo 15 segundos sin usar clavos, tornillos, martillos ni taladros. ¡Cero agujeros y cero daños a la pintura!
+
+4. ESPECIAL MELÓMANOS — PORTADA DE ÁLBUM (30x30 cm a Q55.00):
+   - Si el cliente pregunta por música, discos o portadas de vinilo (ej. Bad Bunny, Taylor Swift, Pink Floyd, The Beatles), recomienda el formato cuadrado Portada de Álbum (30x30 cm / 12x12 pulg) a Q55.00, ideal para crear galerías musicales en pared.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. CATÁLOGO OFICIAL DE MEDIDAS Y EQUIVALENCIAS (GUATEMALA - QUETZALES):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Mini (Q25.00): 14x21 cm (~5x7 o 6x8 pulg) -> Colecciones de escritorio y espacios pequeños.
+- Pequeño (Q35.00): 21x27 cm (~8x10 u 8.5x11 pulg) -> Repisas y rincones compactos.
+- Portada de Álbum (Q55.00): 30x30 cm (~12x12 pulg) -> Formato cuadrado exclusivo música / vinilo.
+- Mediano [OPCIÓN ESTRELLA] (Q65.00): 30x45 cm (~12x18 pulg) -> El más vendido y recomendado.
+- Grande (Q125.00): 45x60 cm (~18x24 pulg) -> Pared principal, impacto visual alto.
+- Gigante (Q180.00): 60x90 cm (~24x36 pulg) -> Formato galería imponente para salas principales.
+
+REGLAS ESTRICTAS DE MAPEO DE MEDIDAS:
+- Si piden "18x24" o "45x60", asignar SIEMPRE tamaño "GRANDE" (Q125.00).
+- Si piden "24x36" o "60x90", asignar SIEMPRE tamaño "GIGANTE" (Q180.00).
+- Si piden "12x18" o "30x45", asignar SIEMPRE tamaño "MEDIANO" (Q65.00).
+- Si piden "portada", "disco", "vinilo", "álbum" o "30x30", asignar SIEMPRE tamaño "PORTADA_ALBUM" (Q55.00).
+- Si no especifican tamaño al ordenar una venta general, asume por defecto "MEDIANO" (Q65.00).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. PROTOCOLO DE HERRAMIENTAS Y FUNCTION CALLING (@google/genai):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Cuentas con 7 herramientas oficiales conectadas a PostgreSQL y al motor de catálogo. Debes utilizarlas proactivamente según la necesidad:
+
+1. "prepareSaleDraft" (GENERACIÓN Y EDICIÓN PROACTIVA DE VENTAS):
+   - Invoca esta herramienta cuando:
+     a) El vendedor registre una venta directa: "vendí 1 de Spiderman", "anota venta de...", "acabo de cobrar 2 de Goku en efectivo".
+     b) El cliente muestre CLARA INTENCIÓN DE COMPRA: "me llevo el de Batman", "quiero el de Taylor Swift en mediano", "dame 2 portadas de Bad Bunny", "voy a pagar con tarjeta". ¡Sé proactivo y deja listo el borrador para que el vendedor solo lo confirme!
+     c) Se solicite modificar el borrador activo en pantalla.
+   - Parámetros requeridos: items (con productName, quantity, unitPrice, size), total, paymentMethod ("EFECTIVO", "TARJETA", "TRANSFERENCIA"), notes, customerName.
+   - PROHIBIDO generar bloques de texto markdown falsos (\`\`\`json_sale o \`\`\`json) en tu respuesta. La venta se estructura exclusivamente con esta tool.
+
+2. "searchCatalog":
+   - Invoca para buscar en los 233 pósters de la web ante preguntas de disponibilidad, recomendaciones o estilos artísticos (ej. "¿tienen algo de anime?", "¿qué pósters de Star Wars hay?").
+
+3. "checkInventoryStock":
+   - Invoca cuando pregunten específicamente si una obra está físicamente en el stand, lista para entrega inmediata o en qué tamaños queda disponible.
+
+4. "getEventKPIs":
+   - Invoca cuando pregunten por el desempeño global del evento (ventas totales acumuladas, número de transacciones, ticket promedio, desglose de cobros).
+
+5. "getCashDrawerStatus":
+   - Invoca cuando pregunten por el dinero en gaveta física del stand, cobros en tarjeta, transferencias bancarias o el último arqueo de caja registrado.
+
+6. "getSellerShiftReport":
+   - Invoca cuando pregunten por el ranking de vendedores, quién lidera las ventas o el reporte individual de un vendedor.
+
+7. "getProductionQueueStatus":
+   - Invoca cuando pregunten por el estado del taller, obras pendientes de impresión o enmarcado, trabajos rezagados o tiempos estimados de entrega.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. RESOLUCIÓN DE REFERENCIAS ORDINALES A OBRAS EN PANTALLA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Si el usuario dice "la segunda que me mostraste", "la primera", "la de en medio", "la última" o "las dos primeras":
+  * Lee el bloque "[Contexto de obras mostradas en pantalla al cliente en este turno: ...]" del mensaje anterior en el historial.
+  * Mapea con precisión: Opción #1 -> la primera; Opción #2 -> la segunda; etc.
+  * Toma directamente el título y datos de esa obra para preparar el borrador con "prepareSaleDraft" o responder sin pedirle al usuario que repita el nombre.
+
+${draftContext}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATOS OPERATIVOS DEL EVENTO EN VIVO (POSTGRESQL):
+${JSON.stringify(resolvedContextData, null, 2)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+}
+
+/**
  * 5. CHAT ANALÍTICO DE VENTAS: Consultas en lenguaje natural ("STAND IA de Stand")
  */
 
-export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null }) {
-  const gemini = getGeminiClient();
+export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = null }) {
+  const gemini = geminiClient || getGeminiClient();
 
   let kpis = null;
   let event = null;
@@ -943,59 +1997,11 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     })) : [],
   };
 
-  const draftContext = (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0)
-    ? `
-BORRADOR DE VENTA ACTUAL EN PANTALLA (EDICIÓN CONVERSACIONAL ACTIVA):
-${JSON.stringify({
-  items: pendingDraft.items.map(it => ({
-    title: it.baseTitle || it.description,
-    size: it.sizeId || 'MEDIANO',
-    quantity: it.quantity,
-    unitPrice: it.unitPrice,
-    subtotal: it.subtotal
-  })),
-  total: pendingDraft.total,
-  paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
-  notes: pendingDraft.notes || ''
-}, null, 2)}
-
-INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR:
-- Si el usuario solicita modificar o ajustar la venta actual (ejemplos: "cámbialo a tamaño grande", "ponle 2 unidades", "cambia a tarjeta", "agrega uno de Batman", "elimina el primero"):
-  * Preserva las obras existentes del borrador a menos que el usuario indique removerlas.
-  * Aplica los cambios solicitados (tamaño, cantidad, método de pago o adición de obras).
-  * Invoca la herramienta formal prepareSaleDraft con la totalidad de los ítems actualizados y el total recalculado.
-` : '';
-
-  const systemPrompt = `Eres STAND IA, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || 'el evento'}".
-
-
-REGLAS ESTRICTAS DE HERRAMIENTAS Y FUNCTION CALLING:
-
-1. MODO CONSULTA Y ATENCIÓN AL CLIENTE:
-   - Si el usuario pregunta por disponibilidad de obras, recomendaciones o artistas, invoca la herramienta "searchCatalog".
-   - Si el usuario pregunta por métricas, ventas totales, tickets o dinero en caja, invoca la herramienta "getEventKPIs".
-   - Responde de forma concisa, profesional y cordial.
-   - NUNCA invoques "prepareSaleDraft" para preguntas informativas o saludos.
-
-2. MODO REGISTRO DE VENTA (SÓLO ANTE ÓRDENES EXPLÍCITAS DE VENTA O COBRO):
-   - ÚNICAMENTE cuando el usuario confirme o indique que vendió o cobró una obra (ejemplos claros: "vendí 1 póster de Batman", "anota venta de...", "acabo de cobrar...", "cliente paga 1 de Spiderman en efectivo", "1 póster de Pablo sonrisa y 1 de Olivia en tarjeta"), o solicite modificar el borrador activo en pantalla:
-   - Invoca ÚNICAMENTE la herramienta formal "prepareSaleDraft" especificando cada ítem con productName, quantity, unitPrice, size ("MINI", "PEQUENO", "MEDIANO", "GRANDE", "GIGANTE", "PORTADA_ALBUM"), total y paymentMethod ("EFECTIVO", "TARJETA", "TRANSFERENCIA").
-   - Queda TERMINANTEMENTE PROHIBIDO generar bloques de texto markdown (como json_sale o json) en el cuerpo de tu respuesta. La venta se debe estructurar exclusivamente llamando a la herramienta formal "prepareSaleDraft".
-   - Devuelve un mensaje cordial aclarando que preparaste el borrador de la venta para su revisión y confirmación en el mostrador.
-
-Catálogo oficial de Deco Vintage y equivalencias de medidas:
-- Precios estándar:
-  * Mini (Q25): 14x21 cm (~5x7 o 6x8 pulgadas)
-  * Pequeño (Q35): 21x27 cm (~8x10 u 8.5x11 pulgadas)
-  * Mediano (Q65): 30x45 cm (~12x18 pulgadas)
-  * Grande (Q125): 45x60 cm (~18x24 pulgadas) -> Si piden "18x24", asignar SIEMPRE tamaño "GRANDE" (Q125).
-  * Gigante (Q180): 60x90 cm (~24x36 pulgadas) -> Si piden "24x36", asignar SIEMPRE tamaño "GIGANTE" (Q180).
-  * Portada de Álbum de música: Formato vinilo 30x30 cm (~12x12 pulgadas) (Q55).
-
-${draftContext}
-
-Métricas en vivo de PostgreSQL:
-${JSON.stringify(contextData, null, 2)}`;
+  const systemPrompt = buildSalesSystemPrompt({
+    event,
+    resolvedContextData: contextData,
+    pendingDraft,
+  });
 
   if (!gemini) {
     const isSaleKeyword = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
@@ -1017,7 +2023,6 @@ ${JSON.stringify(contextData, null, 2)}`;
 
   try {
     const formattedContents = [
-      { role: 'user', parts: [{ text: systemPrompt }] },
       ...history.map(h => ({
         role: h.role === 'user' ? 'user' : 'model',
         parts: [{ text: h.text || h.content || '' }],
@@ -1025,17 +2030,31 @@ ${JSON.stringify(contextData, null, 2)}`;
       { role: 'user', parts: [{ text: message }] },
     ];
 
-    const response = await gemini.models.generateContent({
-      model: ENV.GEMINI_MODEL,
-      contents: formattedContents,
-      config: {
-        tools: salesAssistantTools,
+    const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
+      taskFn: async ({ model, client }) => {
+        return await client.models.generateContent({
+          model,
+          contents: formattedContents,
+          config: {
+            systemInstruction: systemPrompt,
+            tools: salesAssistantTools,
+          },
+        });
       },
+      actionName: 'AI_CHAT',
+      tenantId,
+      context: { eventId },
+      client: gemini,
     });
 
     const rawText = response.text?.trim() || '';
     let draftSale = null;
     let suggestedPosters = [];
+    let eventKpis = null;
+    let cashDrawerStatus = null;
+    let sellerShiftReport = null;
+    let productionQueueStatus = null;
+    let inventoryStock = null;
     const functionCalls = response.functionCalls || [];
 
     // Procesar llamadas a herramientas nativas de Gemini 2.5 Flash
@@ -1043,35 +2062,76 @@ ${JSON.stringify(contextData, null, 2)}`;
       if (call.name === 'prepareSaleDraft' && call.args) {
         draftSale = await constructDraftPayload(tenantId, call.args, message);
       } else if (call.name === 'searchCatalog' && call.args?.query) {
+        const resolvedQuery = normalizeArtworkQuery(call.args.query);
         const matches = await searchWebPosters({
           tenantId,
-          query: call.args.query,
+          query: resolvedQuery,
           category: call.args.category,
-          limit: 4,
+          limit: 12,
         });
         if (matches?.length > 0) {
           suggestedPosters = matches;
         }
       } else if (call.name === 'getEventKPIs') {
-        // Métricas ya se encuentran integradas en el contexto activo
+        const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo') ? call.args.eventId : eventId;
+        const targetDate = call.args?.date || date || null;
+        try {
+          eventKpis = await getEventKPIs({ tenantId, eventId: targetEventId, date: targetDate });
+        } catch (kpiErr) {
+          console.warn('⚠️ [chatWithSalesAssistant] Error consultando KPIs:', kpiErr.message);
+        }
+      } else if (call.name === 'getCashDrawerStatus') {
+        const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo') ? call.args.eventId : eventId;
+        cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, targetEventId);
+      } else if (call.name === 'getSellerShiftReport') {
+        const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo') ? call.args.eventId : eventId;
+        const targetSellerId = call.args?.sellerId || null;
+        sellerShiftReport = await executeGetSellerShiftReport(tenantId, targetEventId, targetSellerId);
+      } else if (call.name === 'getProductionQueueStatus') {
+        const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo') ? call.args.eventId : eventId;
+        productionQueueStatus = await executeGetProductionQueueStatus(tenantId, targetEventId);
+      } else if (call.name === 'checkInventoryStock' && call.args?.query) {
+        const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo') ? call.args.eventId : eventId;
+        inventoryStock = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, targetEventId);
+        if (inventoryStock?.suggestedPosters?.length > 0 && suggestedPosters.length === 0) {
+          suggestedPosters = inventoryStock.suggestedPosters;
+        }
       }
     }
 
     let cleanReply = rawText;
-    if (!cleanReply && draftSale) {
-      cleanReply = 'He preparado el borrador de la venta para su revisión y confirmación en el mostrador.';
+    if (!cleanReply && cashDrawerStatus) {
+      cleanReply = cashDrawerStatus.summaryText;
+    } else if (!cleanReply && sellerShiftReport) {
+      cleanReply = sellerShiftReport.summaryText;
+    } else if (!cleanReply && productionQueueStatus) {
+      cleanReply = productionQueueStatus.summary;
+    } else if (!cleanReply && inventoryStock) {
+      cleanReply = inventoryStock.summary;
+    } else if (!cleanReply && eventKpis) {
+      cleanReply = `📊 Ventas en tiempo real: Q ${eventKpis.totalAmount?.toFixed(2) || '0.00'} en ${eventKpis.totalTransactions || 0} transacciones (${eventKpis.totalUnits || 0} obras vendidas).`;
+    } else if (!cleanReply && draftSale) {
+      cleanReply = '¡Listo! He preparado el borrador de la venta en tu pantalla con todos los detalles. Revísalo y confírmalo en el mostrador para emitir el ticket.';
     } else if (!cleanReply && suggestedPosters.length > 0) {
-      cleanReply = 'Aquí tienes los pósters encontrados en el catálogo para tu consulta:';
+      cleanReply = '¡Por supuesto! Aquí tienes las opciones más destacadas de nuestro catálogo para ti:';
     } else if (!cleanReply) {
-      cleanReply = 'Entendido.';
+      cleanReply = '¡Entendido! Con gusto te apoyo con cualquier otra consulta o venta en el stand.';
     }
 
     return {
       reply: cleanReply,
       draftSale,
       suggestedPosters,
+      eventKpis,
+      cashDrawerStatus,
+      sellerShiftReport,
+      productionQueueStatus,
+      inventoryStock,
       toolCalls: functionCalls,
       functionCalls,
+      usedModel,
+      fallbackOccurred,
+      initialModel,
     };
   } catch (err) {
     console.error('❌ Error en chatWithSalesAssistant:', err);
@@ -1092,9 +2152,10 @@ export async function* streamChatWithSalesAssistant(
   messageOrOptions,
   historyParam = [],
   pendingDraftParam = null,
-  contextDataParam = {}
+  contextDataParam = {},
+  geminiClientParam = null
 ) {
-  let message, history, pendingDraft, contextData, tenantId, eventId, date;
+  let message, history, pendingDraft, contextData, tenantId, eventId, date, geminiClient;
   if (
     messageOrOptions &&
     typeof messageOrOptions === 'object' &&
@@ -1108,6 +2169,7 @@ export async function* streamChatWithSalesAssistant(
     eventId = messageOrOptions.eventId;
     date = messageOrOptions.date || null;
     contextData = messageOrOptions.contextData || {};
+    geminiClient = messageOrOptions.geminiClient || null;
   } else {
     message = messageOrOptions;
     history = historyParam || [];
@@ -1116,9 +2178,10 @@ export async function* streamChatWithSalesAssistant(
     tenantId = contextData.tenantId;
     eventId = contextData.eventId;
     date = contextData.date || null;
+    geminiClient = geminiClientParam || null;
   }
 
-  const gemini = getGeminiClient();
+  const gemini = geminiClient || getGeminiClient();
 
   let kpis = null;
   let event = null;
@@ -1158,59 +2221,11 @@ export async function* streamChatWithSalesAssistant(
     })) : (contextData?.ultimasVentas || []),
   };
 
-  const draftContext = (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0)
-    ? `
-BORRADOR DE VENTA ACTUAL EN PANTALLA (EDICIÓN CONVERSACIONAL ACTIVA):
-${JSON.stringify({
-  items: pendingDraft.items.map(it => ({
-    title: it.baseTitle || it.description,
-    size: it.sizeId || 'MEDIANO',
-    quantity: it.quantity,
-    unitPrice: it.unitPrice,
-    subtotal: it.subtotal
-  })),
-  total: pendingDraft.total,
-  paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
-  notes: pendingDraft.notes || ''
-}, null, 2)}
-
-INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR:
-- Si el usuario solicita modificar o ajustar la venta actual (ejemplos: "cámbialo a tamaño grande", "ponle 2 unidades", "cambia a tarjeta", "agrega uno de Batman", "elimina el primero"):
-  * Preserva las obras existentes del borrador a menos que el usuario indique removerlas.
-  * Aplica los cambios solicitados (tamaño, cantidad, método de pago o adición de obras).
-  * Invoca la herramienta formal prepareSaleDraft con la totalidad de los ítems actualizados y el total recalculado.
-` : '';
-
-  const systemInstruction = `Eres STAND IA, el Asistente Inteligente de Ventas y Consultor de Stand para Deco Vintage Guate en "${event?.name || resolvedContextData.evento || 'el evento'}".
-
-
-REGLAS ESTRICTAS DE HERRAMIENTAS Y FUNCTION CALLING:
-
-1. MODO CONSULTA Y ATENCIÓN AL CLIENTE:
-   - Si el usuario pregunta por disponibilidad de obras, recomendaciones o artistas, invoca la herramienta "searchCatalog".
-   - Si el usuario pregunta por métricas, ventas totales, tickets o dinero en caja, invoca la herramienta "getEventKPIs".
-   - Responde de forma concisa, profesional y cordial.
-   - NUNCA invoques "prepareSaleDraft" para preguntas informativas o saludos.
-
-2. MODO REGISTRO DE VENTA (SÓLO ANTE ÓRDENES EXPLÍCITAS DE VENTA O COBRO):
-   - ÚNICAMENTE cuando el usuario confirme o indique que vendió o cobró una obra (ejemplos claros: "vendí 1 póster de Batman", "anota venta de...", "acabo de cobrar...", "cliente paga 1 de Spiderman en efectivo", "1 póster de Pablo sonrisa y 1 de Olivia en tarjeta"), o solicite modificar el borrador activo en pantalla:
-   - Invoca ÚNICAMENTE la herramienta formal "prepareSaleDraft" especificando cada ítem con productName, quantity, unitPrice, size ("MINI", "PEQUENO", "MEDIANO", "GRANDE", "GIGANTE", "PORTADA_ALBUM"), total y paymentMethod ("EFECTIVO", "TARJETA", "TRANSFERENCIA").
-   - Queda TERMINANTEMENTE PROHIBIDO generar bloques de texto markdown (como json_sale o json) en el cuerpo de tu respuesta. La venta se debe estructurar exclusivamente llamando a la herramienta formal "prepareSaleDraft".
-   - Devuelve un mensaje cordial aclarando que preparaste el borrador de la venta para su revisión y confirmación en el mostrador.
-
-Catálogo oficial de Deco Vintage y equivalencias de medidas:
-- Precios estándar:
-  * Mini (Q25): 14x21 cm (~5x7 o 6x8 pulgadas)
-  * Pequeño (Q35): 21x27 cm (~8x10 u 8.5x11 pulgadas)
-  * Mediano (Q65): 30x45 cm (~12x18 pulgadas)
-  * Grande (Q125): 45x60 cm (~18x24 pulgadas) -> Si piden "18x24", asignar SIEMPRE tamaño "GRANDE" (Q125).
-  * Gigante (Q180): 60x90 cm (~24x36 pulgadas) -> Si piden "24x36", asignar SIEMPRE tamaño "GIGANTE" (Q180).
-  * Portada de Álbum de música: Formato vinilo 30x30 cm (~12x12 pulgadas) (Q55).
-
-${draftContext}
-
-Métricas en vivo de PostgreSQL:
-${JSON.stringify(resolvedContextData, null, 2)}`;
+  const systemInstruction = buildSalesSystemPrompt({
+    event,
+    resolvedContextData,
+    pendingDraft,
+  });
 
   if (!gemini) {
     const isSaleKeyword = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
@@ -1222,7 +2237,6 @@ ${JSON.stringify(resolvedContextData, null, 2)}`;
   }
 
   const formattedContents = [
-    { role: 'user', parts: [{ text: systemInstruction }] },
     ...history.map((h) => ({
       role: h.role === 'user' ? 'user' : 'model',
       parts: [{ text: h.text || h.content || '' }],
@@ -1230,38 +2244,171 @@ ${JSON.stringify(resolvedContextData, null, 2)}`;
     { role: 'user', parts: [{ text: message }] },
   ];
 
-  const stream = await gemini.models.generateContentStream({
-    model: ENV.GEMINI_MODEL,
-    contents: formattedContents,
-    config: {
-      systemInstruction,
-      tools: salesAssistantTools,
-      safetySettings: salesAssistantSafetySettings,
+  let effectiveModel = ENV.GEMINI_MODEL || 'gemini-2.5-flash';
+  const stream = streamWithModelFallback({
+    buildContentsAndConfig: ({ model }) => ({
+      contents: formattedContents,
+      config: {
+        systemInstruction,
+        tools: salesAssistantTools,
+        safetySettings: salesAssistantSafetySettings,
+      },
+    }),
+    onModelSelected: (selectedModel) => {
+      effectiveModel = selectedModel;
     },
+    client: gemini,
   });
 
+  const executedCalls = new Set();
+  let hasTextTokens = false;
+  const toolSummaries = [];
+
   for await (const chunk of stream) {
+    if (chunk.type) {
+      yield chunk;
+      if (chunk.type === 'token' && chunk.text) {
+        hasTextTokens = true;
+      }
+      continue;
+    }
+
     if (chunk.text) {
+      hasTextTokens = true;
       yield { type: 'token', text: chunk.text };
     }
 
     if (chunk.functionCalls && chunk.functionCalls.length > 0) {
       for (const call of chunk.functionCalls) {
+        if (!call || !call.name) continue;
+        const callSignature = `${call.name}:${JSON.stringify(call.args || {})}`;
+        if (executedCalls.has(callSignature)) {
+          continue;
+        }
+        executedCalls.add(callSignature);
+
         if (call.name === 'prepareSaleDraft' && call.args) {
           const draft = await constructDraftPayload(tenantId, call.args, message);
           yield { type: 'draft_sale', data: draft };
         } else if (call.name === 'searchCatalog' && call.args?.query) {
+          const resolvedQuery = normalizeArtworkQuery(call.args.query);
           const posters = await searchWebPosters({
             tenantId,
-            query: call.args.query,
+            query: resolvedQuery,
             category: call.args.category,
-            limit: 4,
+            limit: 12,
           });
           yield { type: 'suggested_posters', data: posters || [] };
         } else if (call.name === 'getEventKPIs') {
-          // KPIs ya integrados en el contexto activo
+          let effectiveEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo')
+            ? call.args.eventId
+            : (eventId || contextData?.eventId);
+          const effectiveTenantId = tenantId || contextData?.tenantId || null;
+          const effectiveDate = call.args?.date || date || contextData?.date || null;
+
+          if (!effectiveEventId) {
+            try {
+              const activeEvent = await prisma.event.findFirst({
+                where: { status: 'ACTIVO', ...(effectiveTenantId ? { tenantId: effectiveTenantId } : {}) },
+                select: { id: true },
+              });
+              effectiveEventId = activeEvent?.id || null;
+            } catch (evErr) {
+              console.warn('⚠️ [streamChatWithSalesAssistant] Error buscando evento activo:', evErr.message);
+            }
+          }
+
+          let freshKpis = null;
+          try {
+            freshKpis = await getEventKPIs({
+              tenantId: effectiveTenantId,
+              eventId: effectiveEventId,
+              date: effectiveDate,
+            });
+          } catch (kpiErr) {
+            console.warn('⚠️ [streamChatWithSalesAssistant] Error consultando KPIs en PostgreSQL:', kpiErr.message);
+            freshKpis = {
+              eventId: effectiveEventId || 'offline',
+              event: { id: effectiveEventId, name: resolvedContextData.evento || 'Evento Activo', location: resolvedContextData.ubicacion || 'Stand' },
+              date: effectiveDate,
+              totalTransactions: resolvedContextData.transaccionesTotales || 0,
+              totalAmount: typeof resolvedContextData.totalVendido === 'string' ? Number(resolvedContextData.totalVendido.replace(/[^0-9.]/g, '')) || 0 : (resolvedContextData.totalVendido || 0),
+              totalRevenue: typeof resolvedContextData.totalVendido === 'string' ? Number(resolvedContextData.totalVendido.replace(/[^0-9.]/g, '')) || 0 : (resolvedContextData.totalVendido || 0),
+              totalUnits: resolvedContextData.unidadesVendidas || 0,
+              totalItemsSold: resolvedContextData.unidadesVendidas || 0,
+              averageTicket: typeof resolvedContextData.ticketPromedio === 'string' ? Number(resolvedContextData.ticketPromedio.replace(/[^0-9.]/g, '')) || 0 : (resolvedContextData.ticketPromedio || 0),
+              paymentBreakdown: {
+                EFECTIVO: { count: 0, amount: 0 },
+                TARJETA: { count: 0, amount: 0 },
+                TRANSFERENCIA: { count: 0, amount: 0 },
+                OTRO: { count: 0, amount: 0 },
+              },
+              topProducts: resolvedContextData.topProductos || [],
+              recentSales: resolvedContextData.ultimasVentas || [],
+            };
+          }
+
+          if (freshKpis) {
+            yield { type: 'event_kpis', data: freshKpis };
+
+            const kpiSummary = `📊 **Estado de ventas en tiempo real — "${freshKpis.event?.name || 'Evento Activo'}":**\n\n` +
+              `• **Total vendido:** Q ${freshKpis.totalAmount?.toFixed(2) || '0.00'}\n` +
+              `• **Transacciones:** ${freshKpis.totalTransactions || 0} ventas (${freshKpis.totalUnits || 0} obras)\n` +
+              `• **Ticket promedio:** Q ${freshKpis.averageTicket?.toFixed(2) || '0.00'}\n` +
+              `• **Desglose de cobros:** Efectivo: Q ${freshKpis.paymentBreakdown?.EFECTIVO?.amount?.toFixed(2) || '0.00'} | Tarjeta: Q ${freshKpis.paymentBreakdown?.TARJETA?.amount?.toFixed(2) || '0.00'} | Transferencia: Q ${freshKpis.paymentBreakdown?.TRANSFERENCIA?.amount?.toFixed(2) || '0.00'}\n` +
+              (freshKpis.topProducts?.length > 0 ? `• **Más vendidos:** ${freshKpis.topProducts.slice(0, 3).map(p => `${p.name} (${p.quantity})`).join(', ')}` : '');
+            toolSummaries.push(kpiSummary);
+          }
+        } else if (call.name === 'getCashDrawerStatus') {
+          const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo')
+            ? call.args.eventId
+            : (eventId || contextData?.eventId);
+          const cashStatus = await executeGetCashDrawerStatus(tenantId, targetEventId);
+          yield { type: 'cash_drawer_status', data: cashStatus };
+          if (cashStatus?.summaryText) {
+            toolSummaries.push(cashStatus.summaryText);
+          }
+        } else if (call.name === 'getSellerShiftReport') {
+          const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo')
+            ? call.args.eventId
+            : (eventId || contextData?.eventId);
+          const targetSellerId = call.args?.sellerId || null;
+          const report = await executeGetSellerShiftReport(tenantId, targetEventId, targetSellerId);
+          yield { type: 'seller_shift_report', data: report };
+          if (report?.summaryText) {
+            toolSummaries.push(report.summaryText);
+          }
+        } else if (call.name === 'getProductionQueueStatus') {
+          const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo')
+            ? call.args.eventId
+            : (eventId || contextData?.eventId);
+          const queue = await executeGetProductionQueueStatus(tenantId, targetEventId);
+          yield { type: 'production_queue_status', data: queue };
+          if (queue?.summary) {
+            toolSummaries.push(queue.summary);
+          }
+        } else if (call.name === 'checkInventoryStock' && call.args?.query) {
+          const targetEventId = (call.args?.eventId && call.args.eventId !== 'current' && call.args.eventId !== 'activo')
+            ? call.args.eventId
+            : (eventId || contextData?.eventId);
+          const stock = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, targetEventId);
+          yield { type: 'inventory_stock', data: stock };
+          if (stock?.suggestedPosters?.length > 0) {
+            yield { type: 'suggested_posters', data: stock.suggestedPosters };
+          }
+          if (stock?.summary) {
+            toolSummaries.push(stock.summary);
+          }
         }
       }
+    }
+  }
+
+  // Si el modelo sólo emitió llamadas a herramientas y no generó tokens de texto,
+  // proveer el resumen conversacional cálido de las herramientas ejecutadas.
+  if (!hasTextTokens && toolSummaries.length > 0) {
+    for (const summary of toolSummaries) {
+      yield { type: 'token', text: summary.trim() };
     }
   }
 }

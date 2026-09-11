@@ -13,16 +13,18 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
 
-// Gemini 2.5 Flash pricing (USD per token — update when prices change)
-const PRICING = {
-  'gemini-2.5-flash': { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
-  'gemini-2.0-flash': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
-  'gemini-1.5-flash': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
+// Gemini pricing reference (USD per token — update when prices change)
+export const PRICING = {
+  'gemini-2.5-flash-lite': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
+  'gemini-2.5-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-2.0-flash':      { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
+  'gemini-1.5-flash':      { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
 };
 
-function estimateCostUsd(model, tokensIn, tokensOut) {
-  const key = Object.keys(PRICING).find((k) => model && model.startsWith(k)) || 'gemini-2.5-flash';
-  const price = PRICING[key];
+export function estimateCostUsd(model, tokensIn, tokensOut) {
+  const sortedKeys = Object.keys(PRICING).sort((a, b) => b.length - a.length);
+  const key = sortedKeys.find((k) => model && (model === k || model.startsWith(k))) || 'gemini-2.5-flash';
+  const price = PRICING[key] || PRICING['gemini-2.5-flash'];
   const inputCost  = (tokensIn  || 0) * price.inputPerToken;
   const outputCost = (tokensOut || 0) * price.outputPerToken;
   return Number((inputCost + outputCost).toFixed(8));
@@ -41,9 +43,37 @@ function estimateCostUsd(model, tokensIn, tokensOut) {
  * @param {number} opts.latencyMs          - Wall-clock time for the Gemini call (ms)
  * @param {object} [opts.details]          - Arbitrary extra JSON (query, eventId, etc.)
  * @param {string|null} [opts.ipAddress]   - Requester IP
+ * @param {boolean} [opts.fallbackActivated] - Whether model fallback was activated
+ * @param {string} [opts.effectiveModel]   - The model actually used if fallback occurred
+ * @param {string} [opts.initialModel]     - The primary model originally targeted
  */
-export function recordLlmInteraction({ tenantId, userId, action, model, tokensIn, tokensOut, latencyMs, details, ipAddress }) {
-  const costUsd = estimateCostUsd(model, tokensIn, tokensOut);
+export function recordLlmInteraction({
+  tenantId,
+  userId,
+  action,
+  model,
+  tokensIn,
+  tokensOut,
+  latencyMs,
+  details,
+  ipAddress,
+  fallbackActivated,
+  effectiveModel,
+  initialModel,
+}) {
+  const usedModel = effectiveModel || model || ENV.GEMINI_MODEL || 'gemini-2.5-flash';
+  const costUsd = estimateCostUsd(usedModel, tokensIn, tokensOut);
+
+  const mergedDetails = details ? { ...details } : {};
+  if (fallbackActivated !== undefined) {
+    mergedDetails.fallbackActivated = Boolean(fallbackActivated);
+  }
+  if (effectiveModel) {
+    mergedDetails.effectiveModel = effectiveModel;
+  }
+  if (initialModel) {
+    mergedDetails.initialModel = initialModel;
+  }
 
   // Fire-and-forget: never blocks the HTTP response
   prisma.auditLog.create({
@@ -52,9 +82,9 @@ export function recordLlmInteraction({ tenantId, userId, action, model, tokensIn
       userId: userId || null,
       action: action || 'AI_INTERACTION',
       entity: 'LLM',
-      details: details ? JSON.parse(JSON.stringify(details)) : null,
+      details: Object.keys(mergedDetails).length > 0 ? JSON.parse(JSON.stringify(mergedDetails)) : null,
       ipAddress: ipAddress || null,
-      llmModel:    model    || ENV.GEMINI_MODEL || 'gemini-2.5-flash',
+      llmModel:    usedModel,
       llmTokensIn:  tokensIn  ? Math.round(tokensIn)  : null,
       llmTokensOut: tokensOut ? Math.round(tokensOut) : null,
       llmLatencyMs: latencyMs ? Math.round(latencyMs) : null,

@@ -14,6 +14,11 @@ import {
   Plus,
   Minus,
   Search,
+  BarChart3,
+  Wallet,
+  Users,
+  Printer,
+  Package,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -136,18 +141,27 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   const audioContextRef = useRef(null);   // R1: VAD AudioContext
   const vadTimerRef = useRef(null);       // R1: VAD silence timeout
   const abortControllerRef = useRef(null); // R4: Circuit Breaker AbortController
+  const rafIdRef = useRef(null);          // M2: requestAnimationFrame token render buffer
+  const chatContainerRef = useRef(null);  // M2: Contenedor con scroll desacoplado
+  const isPinnedToBottomRef = useRef(true); // M2: Control de anclaje de scroll
 
   const fileInputRef = useRef(null);
   const chatBottomRef = useRef(null);
 
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (isPinnedToBottomRef.current && chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [messages, pendingDraft, isRecording]);
 
-  // Limpieza estricta de pistas de audio, VAD context y temporizador al desmontar componente
+  // Limpieza estricta de pistas de audio, VAD context, temporizador y rAF al desmontar componente
   useEffect(() => {
     return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try {
           mediaRecorderRef.current.stop();
@@ -423,7 +437,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         await handleAudioSale(audioBlob);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       setIsRecording(true);
       setVadActive(false);
       setRecordingSeconds(0);
@@ -437,6 +451,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
           const audioCtx = new AudioCtx();
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+          }
           audioContextRef.current = audioCtx;
           const source = audioCtx.createMediaStreamSource(stream);
           const analyser = audioCtx.createAnalyser();
@@ -638,6 +655,8 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     if (!query || isLoading) return;
 
     setInputText('');
+    isPinnedToBottomRef.current = true;
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     const userTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setMessages((prev) => [
@@ -683,10 +702,27 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
             eventId,
             pendingDraft: pendingDraft || null,
             stream: true,
-            history: messages.slice(-6).map((m) => ({
-              role: m.sender === 'user' ? 'user' : 'model',
-              text: m.text,
-            })),
+            history: messages.slice(-6).map((m) => {
+              let textContent = m.text || '';
+              if (m.sender === 'ai' && Array.isArray(m.suggestedPosters) && m.suggestedPosters.length > 0) {
+                const postersSummary = m.suggestedPosters
+                  .map((p, idx) => {
+                    const title = p.titulo || p.nombreCompleto || p.name || 'Póster';
+                    const sub = p.subtitulo ? ` - ${p.subtitulo}` : '';
+                    const price = p.precioMinimo ? ` (Precio: Q${p.precioMinimo})` : (p.basePrice ? ` (Precio: Q${p.basePrice})` : '');
+                    const cat = p.categoria ? ` [Cat: ${p.categoria}]` : '';
+                    const id = p.id ? ` [ID: ${p.id}]` : '';
+                    return `Opción #${idx + 1}: ${title}${sub}${id}${cat}${price}`;
+                  })
+                  .join('\n');
+                const visualContext = `\n\n[Contexto de obras mostradas en pantalla al cliente en este turno:\n${postersSummary}]`;
+                textContent = `${textContent}${visualContext}`.trim();
+              }
+              return {
+                role: m.sender === 'user' ? 'user' : 'model',
+                text: textContent,
+              };
+            }),
           }),
           signal: controller.signal,
         });
@@ -732,6 +768,18 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         let buffer = '';
         let accumulatedText = '';
         let currentEvent = 'message';
+        let rafScheduled = false;
+
+        const scheduleTokenUpdate = () => {
+          if (rafScheduled) return;
+          rafScheduled = true;
+          rafIdRef.current = requestAnimationFrame(() => {
+            rafScheduled = false;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === aiMsgId ? { ...m, text: accumulatedText } : m))
+            );
+          });
+        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -760,9 +808,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                 if (currentEvent === 'token') {
                   const tokenText = data.text !== undefined ? data.text : (data.delta || '');
                   accumulatedText += tokenText;
-                  setMessages((prev) =>
-                    prev.map((m) => (m.id === aiMsgId ? { ...m, text: accumulatedText } : m))
-                  );
+                  scheduleTokenUpdate();
                 } else if (currentEvent === 'draft_sale') {
                   const draftData = data.draftSale || data;
                   if (draftData) {
@@ -773,7 +819,37 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                   setMessages((prev) =>
                     prev.map((m) => (m.id === aiMsgId ? { ...m, suggestedPosters: posters } : m))
                   );
+                } else if (currentEvent === 'event_kpis') {
+                  const kpis = data.kpis || data;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, eventKpis: kpis } : m))
+                  );
+                } else if (currentEvent === 'cash_drawer_status') {
+                  const cash = data.cashStatus || data;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, cashDrawerStatus: cash } : m))
+                  );
+                } else if (currentEvent === 'seller_shift_report') {
+                  const report = data.report || data;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, sellerShiftReport: report } : m))
+                  );
+                } else if (currentEvent === 'production_queue_status') {
+                  const queue = data.queue || data;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, productionQueueStatus: queue } : m))
+                  );
+                } else if (currentEvent === 'inventory_stock') {
+                  const stock = data.stock || data;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === aiMsgId ? { ...m, inventoryStock: stock } : m))
+                  );
                 } else if (currentEvent === 'done') {
+                  if (rafIdRef.current) {
+                    cancelAnimationFrame(rafIdRef.current);
+                    rafIdRef.current = null;
+                    rafScheduled = false;
+                  }
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === aiMsgId
@@ -786,6 +862,11 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                     )
                   );
                 } else if (currentEvent === 'error') {
+                  if (rafIdRef.current) {
+                    cancelAnimationFrame(rafIdRef.current);
+                    rafIdRef.current = null;
+                    rafScheduled = false;
+                  }
                   throw new Error(data.error || 'Error en stream SSE');
                 }
               } catch (parseErr) {
@@ -795,9 +876,13 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           }
         }
 
-        // Finalizar streaming
+        // Finalizar streaming y asegurar flush del texto final
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
         setMessages((prev) =>
-          prev.map((m) => (m.id === aiMsgId ? { ...m, isStreaming: false } : m))
+          prev.map((m) => (m.id === aiMsgId ? { ...m, isStreaming: false, text: accumulatedText || m.text } : m))
         );
       } else {
         // Fallback síncrono para respuestas tradicionales JSON
@@ -818,6 +903,11 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                   isStreaming: false,
                   text: json.reply,
                   suggestedPosters: json.suggestedPosters || [],
+                  eventKpis: json.eventKpis || null,
+                  cashDrawerStatus: json.cashDrawerStatus || null,
+                  sellerShiftReport: json.sellerShiftReport || null,
+                  productionQueueStatus: json.productionQueueStatus || null,
+                  inventoryStock: json.inventoryStock || null,
                 }
               : m
           )
@@ -873,10 +963,12 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       discount: Number(pendingDraft.discount || 0),
       notes: pendingDraft.notes || null,
       inputChannel: pendingDraft.inputChannel || 'IA_CHAT_TEXTO',
-      attachments: pendingDraft.audioUrl
+      attachments: Array.isArray(pendingDraft.attachments) && pendingDraft.attachments.length > 0
+        ? pendingDraft.attachments
+        : pendingDraft.audioUrl
         ? [{ fileUrl: pendingDraft.audioUrl, fileType: 'AUDIO_VOZ', transcription: pendingDraft.transcription }]
         : pendingDraft.imageUrl
-        ? [{ fileUrl: pendingDraft.imageUrl, fileType: 'FOTO_ARTE' }]
+        ? [{ fileUrl: pendingDraft.imageUrl, fileType: pendingDraft.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }]
         : [],
     };
 
@@ -954,7 +1046,18 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       </div>
 
       {/* Historial de Mensajes (Fondo Negro Puro) */}
-      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 no-scrollbar bg-black min-h-[380px] max-h-[460px]">
+      <div
+        ref={chatContainerRef}
+        onScroll={() => {
+          const container = chatContainerRef.current;
+          if (!container) return;
+          const threshold = 80;
+          const distanceFromBottom =
+            container.scrollHeight - container.scrollTop - container.clientHeight;
+          isPinnedToBottomRef.current = distanceFromBottom <= threshold;
+        }}
+        className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 no-scrollbar bg-black min-h-[380px] max-h-[460px]"
+      >
         {messages.map((m) => (
           <div key={m.id} className="space-y-2">
             <div className={`flex items-start gap-2.5 sm:gap-3 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -976,6 +1079,207 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                     <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />
                   )}
                 </div>
+
+                {/* Tarjeta Visual de Métricas / KPIs del Evento */}
+                {m.eventKpis && (
+                  <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                        <BarChart3 className="w-3.5 h-3.5" /> Métricas en Vivo
+                      </span>
+                      <span className="text-[10px] text-neutral-400 truncate max-w-[140px]">
+                        {m.eventKpis.event?.name || m.eventKpis.eventName || 'Evento Activo'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Total Vendido</span>
+                        <strong className="text-xs sm:text-sm text-emerald-400 font-black">
+                          Q {Number(m.eventKpis.totalAmount || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Ventas</span>
+                        <strong className="text-xs sm:text-sm text-white font-black">
+                          {m.eventKpis.totalTransactions || 0}
+                        </strong>
+                      </div>
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Obras</span>
+                        <strong className="text-xs sm:text-sm text-white font-black">
+                          {m.eventKpis.totalUnits || 0}
+                        </strong>
+                      </div>
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Ticket Promedio</span>
+                        <strong className="text-xs sm:text-sm text-amber-400 font-black">
+                          Q {Number(m.eventKpis.averageTicket || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                    {m.eventKpis.paymentBreakdown && (
+                      <div className="flex items-center justify-between text-[10px] text-neutral-400 px-1 pt-1 border-t border-neutral-800/80">
+                        <span>💵 Ef: Q{Number(m.eventKpis.paymentBreakdown.EFECTIVO?.amount || 0).toFixed(0)}</span>
+                        <span>💳 Tarj: Q{Number(m.eventKpis.paymentBreakdown.TARJETA?.amount || 0).toFixed(0)}</span>
+                        <span>🏦 Transf: Q{Number(m.eventKpis.paymentBreakdown.TRANSFERENCIA?.amount || 0).toFixed(0)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tarjeta Visual de Estado de Gaveta y Arqueo */}
+                {m.cashDrawerStatus && (
+                  <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5" /> Estado de Gaveta
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono">
+                        {m.cashDrawerStatus.lastClosing?.discrepancyStatus || 'SIN_ARQUEO'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center">
+                      <div className="bg-[#181818] p-2 rounded-xl col-span-2 sm:col-span-1">
+                        <span className="text-[9px] text-neutral-400 block">Efectivo en Gaveta</span>
+                        <strong className="text-xs sm:text-sm text-emerald-400 font-black">
+                          Q {Number(m.cashDrawerStatus.currentCashInDrawer || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Ventas Tarjeta</span>
+                        <strong className="text-xs sm:text-sm text-white font-black">
+                          Q {Number(m.cashDrawerStatus.totalCardInSales || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                      <div className="bg-[#181818] p-2 rounded-xl">
+                        <span className="text-[9px] text-neutral-400 block">Transferencias</span>
+                        <strong className="text-xs sm:text-sm text-white font-black">
+                          Q {Number(m.cashDrawerStatus.totalTransferInSales || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                    {m.cashDrawerStatus.lastClosing && (
+                      <div className="text-[10px] text-neutral-400 bg-neutral-900/80 p-2 rounded-xl border border-neutral-800">
+                        <span>Último arqueo por <strong>{m.cashDrawerStatus.lastClosing.closedBy}</strong>: reportado Q{Number(m.cashDrawerStatus.lastClosing.reportedCash || 0).toFixed(2)} (Dif: Q{Number(m.cashDrawerStatus.lastClosing.difference || 0).toFixed(2)})</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tarjeta Visual de Ranking y Reporte de Vendedores */}
+                {m.sellerShiftReport && (
+                  <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2">
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" /> Desempeño de Vendedores
+                      </span>
+                      <span className="text-[10px] text-neutral-400">
+                        {m.sellerShiftReport.eventName || 'Stand'}
+                      </span>
+                    </div>
+                    {m.sellerShiftReport.seller ? (
+                      <div className="bg-[#181818] p-2.5 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <strong className="text-white">{m.sellerShiftReport.seller.sellerName}</strong>
+                          <span className="text-emerald-400 font-black">Q {Number(m.sellerShiftReport.seller.totalAmount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="text-[10px] text-neutral-400 flex justify-between">
+                          <span>{m.sellerShiftReport.seller.transactionCount} ventas ({m.sellerShiftReport.seller.unitsSold} obras)</span>
+                          <span>Ticket Prom: Q{Number(m.sellerShiftReport.seller.averageTicket || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(m.sellerShiftReport.ranking || []).slice(0, 4).map((r) => (
+                          <div key={r.sellerId} className="flex items-center justify-between p-2 rounded-xl bg-[#181818] text-xs">
+                            <span className="text-white truncate">
+                              {r.position === 1 ? '🥇' : r.position === 2 ? '🥈' : r.position === 3 ? '🥉' : '🎖️'} #{r.position} {r.sellerName}
+                            </span>
+                            <span className="text-emerald-400 font-bold ml-2">Q {Number(r.totalAmount || 0).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tarjeta Visual de Cola de Taller */}
+                {m.productionQueueStatus && (
+                  <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2">
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+                        <Printer className="w-3.5 h-3.5" /> Taller de Impresión
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        m.productionQueueStatus.health === 'OPTIMO' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                        m.productionQueueStatus.health === 'MODERADO' ? 'bg-amber-950 text-amber-400 border border-amber-800' :
+                        'bg-red-950 text-red-400 border border-red-800'
+                      }`}>
+                        {m.productionQueueStatus.health || 'OPERANDO'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5 text-center">
+                      <div className="bg-[#181818] p-1.5 rounded-xl">
+                        <span className="text-[8px] text-cyan-400 block font-bold">A Taller</span>
+                        <strong className="text-xs text-white">{m.productionQueueStatus.counts?.inProduction || 0}</strong>
+                      </div>
+                      <div className="bg-[#181818] p-1.5 rounded-xl">
+                        <span className="text-[8px] text-amber-400 block font-bold">Pendiente</span>
+                        <strong className="text-xs text-white">{m.productionQueueStatus.counts?.pending || 0}</strong>
+                      </div>
+                      <div className="bg-[#181818] p-1.5 rounded-xl">
+                        <span className="text-[8px] text-emerald-400 block font-bold">Stock</span>
+                        <strong className="text-xs text-white">{m.productionQueueStatus.counts?.separated || 0}</strong>
+                      </div>
+                      <div className="bg-[#181818] p-1.5 rounded-xl">
+                        <span className="text-[8px] text-neutral-400 block font-bold">Impresos</span>
+                        <strong className="text-xs text-white">{m.productionQueueStatus.counts?.printed || 0}</strong>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-neutral-400 flex justify-between px-1">
+                      <span>Espera prom: ~{m.productionQueueStatus.timing?.averageQueueWaitMinutes || 0} min</span>
+                      {m.productionQueueStatus.stalledCount > 0 && (
+                        <span className="text-amber-400 font-bold">⚠️ {m.productionQueueStatus.stalledCount} rezagos</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tarjeta Visual de Stock e Inventario */}
+                {m.inventoryStock && (
+                  <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2">
+                    <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5" /> Disponibilidad en Stand
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">
+                        {m.inventoryStock.stockAvailability?.standPhysicalStock === 'DISPONIBLE_MOSTRADOR' ? '⚡ Entrega Inmediata' : '🖨️ En Taller (~12m)'}
+                      </span>
+                    </div>
+                    {m.inventoryStock.artwork && (
+                      <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#181818]">
+                        <img
+                          src={m.inventoryStock.artwork.thumbUrl || m.inventoryStock.artwork.imageUrl}
+                          alt={m.inventoryStock.artwork.title}
+                          className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900"
+                        />
+                        <div className="flex-1 min-w-0 text-xs">
+                          <span className="font-bold text-white block truncate">{m.inventoryStock.artwork.title}</span>
+                          <span className="text-[10px] text-neutral-400 block">{m.inventoryStock.artwork.category}</span>
+                          {m.inventoryStock.requestedSize ? (
+                            <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
+                              {m.inventoryStock.requestedSize.nombre}: Q{m.inventoryStock.requestedSize.precio}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
+                              Desde Q{m.inventoryStock.artwork.basePrice}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Tarjetas de Sugerencias Visuales de Catálogo */}
                 {m.suggestedPosters && m.suggestedPosters.length > 0 && (
@@ -1177,8 +1481,31 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
                   <button
                     type="button"
                     onClick={() => {
-                      if (onPopulateManualForm) onPopulateManualForm(pendingDraft);
-                      setPendingDraft(null);
+                      if (onPopulateManualForm && pendingDraft) {
+                        const normalizedAttachments = Array.isArray(pendingDraft.attachments) && pendingDraft.attachments.length > 0
+                          ? pendingDraft.attachments
+                          : pendingDraft.audioUrl
+                          ? [{ fileUrl: pendingDraft.audioUrl, fileType: 'AUDIO_VOZ', transcription: pendingDraft.transcription || null }]
+                          : pendingDraft.imageUrl
+                          ? [{ fileUrl: pendingDraft.imageUrl, fileType: pendingDraft.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }]
+                          : [];
+
+                        const normalizedItems = (pendingDraft.items || []).map((it) => ({
+                          ...it,
+                          selectedSizeId: it.selectedSizeId || it.sizeId || null,
+                          sizeId: it.sizeId || it.selectedSizeId || null,
+                        }));
+
+                        const draftToTransfer = {
+                          ...pendingDraft,
+                          inputChannel: pendingDraft.inputChannel || 'IA_CHAT_TEXTO',
+                          attachments: normalizedAttachments,
+                          items: normalizedItems,
+                        };
+
+                        onPopulateManualForm(draftToTransfer);
+                        setPendingDraft(null);
+                      }
                     }}
                     className="px-3 py-1 rounded-lg bg-black hover:bg-neutral-800 text-neutral-300 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer"
                   >
