@@ -252,7 +252,16 @@ model AuditLog {
   ipAddress String?
   createdAt DateTime @default(now())
 
+  // ── LLM Observability (Gemini API telemetry) ──────────────────────────────
+  llmModel       String?  @map("llm_model")      // e.g. "gemini-2.5-flash"
+  llmTokensIn    Int?     @map("llm_tokens_in")   // prompt token count
+  llmTokensOut   Int?     @map("llm_tokens_out")  // completion token count
+  llmLatencyMs   Int?     @map("llm_latency_ms")  // wall-clock ms for the API call
+  llmCostUsd     Decimal? @map("llm_cost_usd") @db.Decimal(12, 8) // estimated cost in USD
+  saleConfirmed  Boolean? @map("sale_confirmed")  // whether AI draft led to confirmed sale
+
   @@index([tenantId, createdAt])
   @@index([userId])
+  @@index([tenantId, action])
   @@map("audit_logs")
 }

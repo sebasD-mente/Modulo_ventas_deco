@@ -7,6 +7,8 @@ import {
 } from '../services/aiMultimodalService.js';
 import { searchWebPosters } from '../services/webCatalogService.js';
 import { uploadBufferToStorage } from '../services/gcsStorageService.js';
+import { recordLlmInteraction } from '../services/llmObservabilityService.js';
+
 
 export async function handleVoiceSale(req, res) {
   try {
@@ -36,13 +38,26 @@ export async function handleVoiceSale(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir audio en GCS:', gcsErr.message);
     }
 
-    // 2. Extraer venta con Gemini 2.5 Flash
+    // 2. Extraer venta con Gemini 2.5 Flash + telemetría LLM
+    const t0Voice = Date.now();
     const draft = await processVoiceSaleAudio({
       audioBuffer: file.buffer,
       mimeType: file.mimetype || 'audio/webm',
       tenantId,
       eventId,
     });
+    recordLlmInteraction({
+      tenantId,
+      userId: req.userId || null,
+      action: 'AI_VOICE_SALE',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      tokensIn: null,
+      tokensOut: null,
+      latencyMs: Date.now() - t0Voice,
+      ipAddress: req.ip,
+      details: { eventId, confidence: draft.confidence },
+    });
+
 
     return res.json({
       success: true,
@@ -91,13 +106,26 @@ export async function handleBatchPhoto(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir foto en GCS:', gcsErr.message);
     }
 
-    // 2. Analizar códigos QR / barras con Gemini 2.5 Flash Vision
+    // 2. Analizar códigos QR / barras con Gemini 2.5 Flash Vision + telemetría LLM
+    const t0Batch = Date.now();
     const analysis = await processPostersBatchPhoto({
       imageBuffer: file.buffer,
       mimeType: file.mimetype || 'image/jpeg',
       tenantId,
       eventId,
     });
+    recordLlmInteraction({
+      tenantId,
+      userId: req.userId || null,
+      action: 'AI_BATCH_QR_SCAN',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      tokensIn: null,
+      tokensOut: null,
+      latencyMs: Date.now() - t0Batch,
+      ipAddress: req.ip,
+      details: { eventId, codesDetected: analysis.detectedCodes?.length || 0 },
+    });
+
 
     return res.json({
       success: true,
@@ -140,6 +168,7 @@ export async function handleChatQuery(req, res) {
 
     if (!isStream) {
       // Consultar motor IA con Gemini 2.5 Flash y Function Calling nativo (modo tradicional JSON)
+      const t0Chat = Date.now();
       const result = await chatWithSalesAssistant({
         message: message.trim(),
         history: history || [],
@@ -147,6 +176,17 @@ export async function handleChatQuery(req, res) {
         eventId,
         date: date || null,
         pendingDraft: pendingDraft || null,
+      });
+      recordLlmInteraction({
+        tenantId,
+        userId: req.userId || null,
+        action: 'AI_CHAT',
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        tokensIn:  null,
+        tokensOut: result.reply ? Math.ceil(result.reply.length / 4) : null, // ~4 chars/token
+        latencyMs: Date.now() - t0Chat,
+        ipAddress: req.ip,
+        details: { eventId, toolCalls: (result.toolCalls || []).map((t) => t.name) },
       });
 
       let draft = result.draftSale || null;
@@ -191,6 +231,7 @@ export async function handleChatQuery(req, res) {
     res.flushHeaders?.();
 
     let fullText = '';
+    const t0Stream = Date.now();
 
     try {
       const streamGenerator = streamChatWithSalesAssistant({
@@ -212,6 +253,18 @@ export async function handleChatQuery(req, res) {
           res.write(`event: suggested_posters\ndata: ${JSON.stringify(chunk.data)}\n\n`);
         }
       }
+
+      recordLlmInteraction({
+        tenantId,
+        userId: req.userId || null,
+        action: 'AI_CHAT_STREAM',
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        tokensIn:  null,
+        tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
+        latencyMs: Date.now() - t0Stream,
+        ipAddress: req.ip,
+        details: { eventId },
+      });
 
       res.write(`event: done\ndata: ${JSON.stringify({ fullText })}\n\n`);
       res.end();

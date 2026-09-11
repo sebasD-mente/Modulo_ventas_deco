@@ -31,7 +31,7 @@ STAND {IA} (Deko EventSales) es el sistema POS inteligente de alta concurrencia 
 | M3 | Agregaciones SQL Nativas O(1) y Paginación en Backend | F3 | none | DONE |
 | M4 | Code-Splitting Frontend y Optimización de Bundle (<250 kB) | F4 | none | DONE |
 | M5 | Saneamiento Forense de Código Muerto, Dependencias y Assets | F5 | none | DONE |
-| M6 | Verificación Integral, Despliegue Dokploy y Pruebas en Vivo | F6 | M1, M2, M3, M4, M5 | IN_PROGRESS |
+| M6 | Verificación Integral, Despliegue Dokploy y Pruebas en Vivo | F6 | M1, M2, M3, M4, M5 | DONE |
 
 ---
 

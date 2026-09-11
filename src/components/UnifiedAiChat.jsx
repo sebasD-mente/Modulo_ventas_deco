@@ -25,6 +25,83 @@ const DEFAULT_EVENT_SIZES = [
   { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
 ];
 
+// ── R4: Offline Heuristic Engine ─────────────────────────────────────────────
+// Parses a free-text sales query into a draft sale without any network call.
+// Used as fallback when the Gemini API is unreachable (circuit breaker fires).
+const SIZE_PRICE_MAP = {
+  MINI: 25, PEQUENO: 35, MEDIANO: 65, GRANDE: 125, GIGANTE: 180,
+};
+const SIZE_ALIASES = [
+  { re: /\b(gigante|extra\s*grande|24[xX]36|60[xX]90)\b/i, id: 'GIGANTE' },
+  { re: /\b(grande|18[xX]24|45[xX]60)\b/i,                  id: 'GRANDE' },
+  { re: /\b(mediano?|medio|12[xX]18|30[xX]45)\b/i,           id: 'MEDIANO' },
+  { re: /\b(peque[ñn]o|chico|8[xX]10|21[xX]27)\b/i,         id: 'PEQUENO' },
+  { re: /\b(mini|5[xX]7|14[xX]21)\b/i,                       id: 'MINI' },
+];
+const PAYMENT_ALIASES = [
+  { re: /\b(tarjeta|card)\b/i, method: 'TARJETA' },
+  { re: /\b(transfer|transf)\b/i, method: 'TRANSFERENCIA' },
+];
+
+function buildOfflineFallbackReply(query) {
+  const q = query.trim();
+
+  // Extract quantity (e.g. "2 spiderman", "tres batman")
+  const qtyWords = { uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5 };
+  let quantity = 1;
+  const qtyNumMatch = q.match(/\b([2-9]|10)\b/);
+  if (qtyNumMatch) quantity = parseInt(qtyNumMatch[1], 10);
+  else {
+    for (const [word, val] of Object.entries(qtyWords)) {
+      if (new RegExp(`\\b${word}\\b`, 'i').test(q)) { quantity = val; break; }
+    }
+  }
+
+  // Extract size
+  let sizeId = 'MEDIANO';
+  for (const { re, id } of SIZE_ALIASES) {
+    if (re.test(q)) { sizeId = id; break; }
+  }
+  const price = SIZE_PRICE_MAP[sizeId] || 65;
+  const sizeObj = DEFAULT_EVENT_SIZES.find((s) => s.sizeId === sizeId) || DEFAULT_EVENT_SIZES[2];
+
+  // Extract payment method
+  let paymentMethod = 'EFECTIVO';
+  for (const { re, method } of PAYMENT_ALIASES) {
+    if (re.test(q)) { paymentMethod = method; break; }
+  }
+
+  // Extract poster name (everything not a size/number/payment word)
+  const posterName = q
+    .replace(/\b(mini|pequeño|mediano|grande|gigante|extra\s*grande|18x24|12x18|24x36|tarjeta|transfer|efectivo|uno|dos|tres|cuatro|cinco|[0-9]+)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim() || 'Póster';
+
+  const subtotal = quantity * price;
+  const draft = {
+    items: [{
+      description: `${posterName} (${sizeObj.nombre})`,
+      quantity,
+      unitPrice: price,
+      subtotal,
+      sizeId,
+      availableSizes: DEFAULT_EVENT_SIZES,
+    }],
+    total: subtotal,
+    paymentMethod,
+    inputChannel: 'IA_CHAT_TEXTO',
+    notes: '[Modo offline — verificar obra antes de confirmar]',
+  };
+
+  return {
+    text: `📡 **Sin conexión a Gemini.** Generé un borrador aproximado con motor local:\n"${posterName} × ${quantity} (${sizeObj.nombre}) = Q${subtotal}"\n⚠️ Por favor verifica el nombre y precio antes de confirmar.`,
+    draft,
+  };
+}
+// ── End Offline Engine ────────────────────────────────────────────────────────
+
+
+
 export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateManualForm }) {
   const { authFetch } = useAuth();
   const [messages, setMessages] = useState([
@@ -50,19 +127,24 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   // Estados de grabación de voz
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [vadActive, setVadActive] = useState(false); // Shows "Silence detected…" indicator
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const audioContextRef = useRef(null);   // R1: VAD AudioContext
+  const vadTimerRef = useRef(null);       // R1: VAD silence timeout
+  const abortControllerRef = useRef(null); // R4: Circuit Breaker AbortController
 
   const fileInputRef = useRef(null);
   const chatBottomRef = useRef(null);
+
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, pendingDraft, isRecording]);
 
-  // Limpieza estricta de pistas de audio y temporizador al desmontar componente
+  // Limpieza estricta de pistas de audio, VAD context y temporizador al desmontar componente
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -78,8 +160,23 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
+      // R1: Close VAD AudioContext
+      if (vadTimerRef.current) {
+        clearTimeout(vadTimerRef.current);
+        vadTimerRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      // R4: Cancel in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
   }, []);
+
 
   // Actualizar tamaño de un ítem en el borrador con recálculo dinámico de precios
   const updateDraftItemSize = (idx, newSizeId) => {
@@ -287,7 +384,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     return '';
   };
 
-  // Iniciar grabación de audio con directivas de supresión de ruido y negociación de códec
+  // Iniciar grabación de audio con VAD (Voice Activity Detection) + supresión de ruido + negociación de códec
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -317,15 +414,77 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
+        // Close VAD context
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+          audioContextRef.current.close().catch(() => {});
+          audioContextRef.current = null;
+        }
         await handleAudioSale(audioBlob);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
+      setVadActive(false);
       setRecordingSeconds(0);
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
+
+      // ── R1: Voice Activity Detection (VAD) via Web Audio API ──────────────
+      // Silence threshold: -50 dBFS, silence window: 1500ms
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 512;
+          analyser.smoothingTimeConstant = 0.8;
+          source.connect(analyser);
+          const buffer = new Float32Array(analyser.fftSize);
+
+          const SILENCE_THRESHOLD = 0.003; // ~-50 dBFS
+          const SILENCE_WINDOW_MS = 1500;  // 1.5 seconds of continuous silence
+          let lastSoundAt = Date.now();
+
+          const vadPoll = setInterval(() => {
+            if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+              clearInterval(vadPoll);
+              return;
+            }
+            analyser.getFloatTimeDomainData(buffer);
+            // Compute RMS amplitude
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) rms += buffer[i] * buffer[i];
+            rms = Math.sqrt(rms / buffer.length);
+
+            if (rms > SILENCE_THRESHOLD) {
+              lastSoundAt = Date.now();
+              setVadActive(false);
+            } else if (Date.now() - lastSoundAt > SILENCE_WINDOW_MS) {
+              // Silence detected for 1.5s → auto-stop recording
+              clearInterval(vadPoll);
+              setVadActive(false);
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+                setIsRecording(false);
+                if (recordingTimerRef.current) {
+                  clearInterval(recordingTimerRef.current);
+                  recordingTimerRef.current = null;
+                }
+              }
+            } else {
+              // In the silence window — show indicator after 500ms
+              if (Date.now() - lastSoundAt > 500) setVadActive(true);
+            }
+          }, 100);
+        }
+      } catch (vadErr) {
+        // VAD is non-critical — recording still works without it
+        console.warn('[VAD] AudioContext not available, auto-stop disabled:', vadErr.message);
+      }
+      // ── End VAD ───────────────────────────────────────────────────────────
     } catch (err) {
       console.error('Error accediendo al micrófono:', err);
       if (streamRef.current) {
@@ -335,6 +494,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       alert('No se pudo acceder al micrófono o tu navegador no soporta grabación de audio. Por favor verifica los permisos.');
     }
   };
+
 
   // Detener grabación de audio
   const stopRecording = () => {
@@ -504,23 +664,64 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     ]);
 
     try {
-      const res = await authFetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-        },
-        body: JSON.stringify({
-          message: query,
-          eventId,
-          pendingDraft: pendingDraft || null,
-          stream: true,
-          history: messages.slice(-6).map((m) => ({
-            role: m.sender === 'user' ? 'user' : 'model',
-            text: m.text,
-          })),
-        }),
-      });
+      // ── R4: Circuit Breaker — AbortController with 8s timeout ─────────────
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const circuitBreakerTimeout = setTimeout(() => controller.abort(), 8000);
+
+      let res;
+      try {
+        res = await authFetch('/api/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+          body: JSON.stringify({
+            message: query,
+            eventId,
+            pendingDraft: pendingDraft || null,
+            stream: true,
+            history: messages.slice(-6).map((m) => ({
+              role: m.sender === 'user' ? 'user' : 'model',
+              text: m.text,
+            })),
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        clearTimeout(circuitBreakerTimeout);
+        abortControllerRef.current = null;
+
+        // ── Offline Heuristic Engine ─────────────────────────────────────────
+        // Triggered when network is down or timeout fires. Parses the user
+        // query locally to generate a sale draft without Gemini.
+        const isOfflineOrTimeout = fetchErr.name === 'AbortError' || !navigator.onLine;
+        if (isOfflineOrTimeout) {
+          const offlineReply = buildOfflineFallbackReply(query);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    text: offlineReply.text,
+                  }
+                : m
+            )
+          );
+          if (offlineReply.draft) {
+            setPendingDraft(offlineReply.draft);
+          }
+          setIsLoading(false);
+          setProcessingNote('');
+          return;
+        }
+        throw fetchErr;
+      }
+      clearTimeout(circuitBreakerTimeout);
+      abortControllerRef.current = null;
+      // ── End Circuit Breaker ───────────────────────────────────────────────
 
       const contentType = res.headers.get('content-type') || '';
 
@@ -639,6 +840,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       setProcessingNote('');
     }
   };
+
 
   // Confirmar y asentar la venta detectada directamente en PostgreSQL
   const confirmPendingSale = async () => {
@@ -1091,9 +1293,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         {isRecording ? (
           <div className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-black text-white shadow-md">
             <div className="flex items-center gap-2.5">
-              <span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
-              <span className="text-xs font-bold text-red-400">
-                Dictando venta: {formatTime(recordingSeconds)}
+              <span className={`w-3 h-3 rounded-full ${vadActive ? 'bg-amber-400 animate-pulse' : 'bg-red-500 animate-ping'}`}></span>
+              <span className={`text-xs font-bold ${vadActive ? 'text-amber-400' : 'text-red-400'}`}>
+                {vadActive ? 'Detectando silencio…' : `Dictando: ${formatTime(recordingSeconds)}`}
               </span>
             </div>
             <button
@@ -1105,6 +1307,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
               <span>Finalizar</span>
             </button>
           </div>
+
         ) : (
           <form
             onSubmit={(e) => {
