@@ -299,9 +299,9 @@ describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {
       const stockEvents = emitted.filter(e => e.type === 'inventory_stock');
       assert.strictEqual(stockEvents.length, 1, 'Debe emitir 1 evento inventory_stock');
       assert.strictEqual(stockEvents[0].data.found, true);
-
       const postersEvents = emitted.filter(e => e.type === 'suggested_posters');
-      assert.ok(postersEvents.length >= 1, 'Debe emitir las opciones encontradas como suggested_posters para UI');
+      assert.strictEqual(postersEvents.length, 0, 'No debe emitir suggested_posters redundantes para checkInventoryStock (R5)');
     });
+
   });
 });

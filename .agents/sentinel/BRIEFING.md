@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-12T07:33:00Z
+# BRIEFING — 2026-09-12T19:44:30Z
 
 ## Mission
-REHACER FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexión Viva de STAND {IA}. Ejecución rigurosa de RF1 a RF7 (eliminación de duplicación y corrupción de mensajes, timeout de 25s, fallback offline solo sin internet, normalización MIME WebRTC en Multer, blindaje UUID en borrador, cuadre de descuentos, talla canónica PORTADA_ALBUM Q55, parser SSE por bloques dobles \n\n) con verificación visual en vivo vía Chrome DevTools MCP y auditoría independiente.
+FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}. Ejecución rigurosa de R1 a R5 (Closed-Loop Function Calling en streaming, erradicación de hasTextTokens y streaming dual simultáneo, memoria de 20 turnos con edición interactiva en cadena de borrador, eliminación de N+1 en reportes de turno vía aiShiftReportService, y depuración quirúrgica de UI en ChatToolCards.jsx sin contenedores huérfanos). Auditoría independiente de victoria culminada con éxito irrefutable (VICTORY CONFIRMED).
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -27,8 +27,10 @@ REHACER FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexió
 - Orchestrator (Auditoría Forense 360 STAND IA): e1b926ca-db1d-45ad-9385-7a7a940f1c72 (orchestrator_12, completed)
 - Victory Auditor (Auditoría Forense 360 STAND IA): 21069150-5191-410b-b878-407fe086fb8a (victory_auditor_12, VICTORY CONFIRMED)
 - Orchestrator (Fase 1 Estabilización STAND IA): orchestrator_13 (superseded)
-- Orchestrator (REHACER Fase 1 Conexión Viva STAND IA): f7ea2546-0c7d-497d-97e8-791a3e75db08 (orchestrator_14, paused awaiting user credential)
-- Victory Auditor (REHACER Fase 1 Conexión Viva STAND IA): f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, VICTORY REJECTED)
+- Orchestrator (REHACER Fase 1 Conexión Viva STAND IA): f7ea2546-0c7d-497d-97e8-791a3e75db08 (orchestrator_14, completed in production 1d41cec)
+- Victory Auditor (REHACER Fase 1 Conexión Viva STAND IA): f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, closed)
+- Orchestrator (FASE 2 Closed-Loop STAND IA): 3098e265-0f6c-4aa8-8742-949cf2bf333c (orchestrator_15, completed)
+- Victory Auditor (FASE 2 Closed-Loop STAND IA): 4d8c7534-6abd-4e0a-9a54-076dbf70b380 (victory_auditor_sentinel_15, VICTORY CONFIRMED)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -48,27 +50,33 @@ REHACER FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexió
 - Master report published at c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_12/AUDIT_REPORT_STAND_IA.md
 - Cero tolerancia a respuestas de buildOfflineFallbackReply en pruebas de IA: la IA debe responder en vivo desde Gemini.
 - Cero mutación de mensajes de usuario y cero colisiones de ID en el chat.
+- FASE 2 Line limits: aiStreamService < 150, aiToolsService < 200, useAiChatStream < 160, ChatToolCards < 140 lines
+- Closed-loop function calling with continuous dual streaming (eradicate hasTextTokens)
+- Multi-turn conversational memory (20 turns) with chain-of-thought draft editing
+- Eradicate N+1 queries in seller shift report via aiShiftReportService
+- UI cleanup for inventory stock and zero orphan empty containers
 
 ## User Context
-- **Last user request**: REHACER POR COMPLETO LA FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexión Viva de STAND {IA}. Cumplir RF1 a RF7, verificar en navegador real sin caídas offline y certificar con Victory Auditor.
-- **Pending clarifications**: GEMINI_API_KEY autorizada para Modulo_Ventas y cadena de conexión a PostgreSQL accesible desde Windows.
-- **Delivered results**: Código fuente 100% blindado (RF1-RF7), arnés verde. Auditoría rechazó victoria por ejecución offline. Freno de mano activo según Regla 6. Crons silenciados formalmente.
+- **Last user request**: FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}.
+- **Pending clarifications**: none
+- **Delivered results**: Fase 1 certificada en producción (`1d41cec`). Fase 2 con ingeniería 100% completada, arnés verde y VICTORY CONFIRMED emitido por el Auditor Independiente. Listo para despliegue por Gary (CTO) y verificación visual en navegador real.
 
 ## Project Status
-- **Phase**: paused_awaiting_credentials
+- **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: f7ea2546-0c7d-497d-97e8-791a3e75db08 (Fred, orchestrator_14, paused)
-- **Active Auditor**: f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, report delivered)
-- **Monitoring Crons**: none (cancelled per parent directive)
+- **Active Orchestrator**: 3098e265-0f6c-4aa8-8742-949cf2bf333c (Fred, orchestrator_15, completed)
+- **Active Auditor**: 4d8c7534-6abd-4e0a-9a54-076dbf70b380 (victory_auditor_sentinel_15, VICTORY CONFIRMED)
+- **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
 - **Triggered**: yes
-- **Verdict**: VICTORY REJECTED
-- **Retry count**: 1
+- **Verdict**: VICTORY CONFIRMED
+- **Retry count**: 0
 
 ## Artifact Index
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel final handoff report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_14/DISPATCH.md — Orchestrator Fred dispatch instructions
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_sentinel_14/handoff.md — Master Independent Victory Audit Report (VICTORY REJECTED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/DISPATCH.md — Orchestrator Fred dispatch instructions
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/handoff.md — Orchestrator Fred handoff report
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/GATE_STATUS.md — Quality Gate M4 verdicts
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_sentinel_15/handoff.md — Master Independent Victory Audit Report (VICTORY CONFIRMED)

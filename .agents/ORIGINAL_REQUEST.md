@@ -982,3 +982,223 @@ En la prueba en vivo capturada en navegador real se demostró que:
 - [ ] **Harness 100% Verde**: `npm run harness:check` aprobado (security, secrets, monoliths, build).
 - [ ] **Prueba Visual en Vivo con Chrome DevTools MCP**: Navegación real en navegador, ejecución de venta por chat y captura de pantalla de alta resolución demostrando el chat limpio y la venta asentada.
 - [ ] **Certificación de Victoria**: `VICTORY CONFIRMED` emitido por el Auditor Independiente de Victoria.
+
+## 2026-09-12T19:00:00Z
+
+# Teamwork Project Prompt — FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}
+
+> **Status**: Ready for Dispatch  
+> **Target System**: Agente de Inteligencia Artificial Multimodal STAND {IA}  
+> **Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`  
+> **Integrity mode**: development  
+> **Requested team**: Fred (`teamwork_preview_orchestrator`)  
+> **Mandato de Sebastián Jiménez & Gary (CTO)**: Despacho oficial de la **FASE 2** tras la certificación y cierre definitivo de la Fase 1 en producción (`https://ventas.decovintage.online/`). La Fase 2 eleva a STAND {IA} de un ejecutor unario de herramientas a un asesor comercial de alta gama con **Closed-Loop Function Calling**, streaming dual de razonamiento + datos estructurados (erradicación de `hasTextTokens`), memoria conversacional de 20 turnos con edición en cadena del borrador activo, optimización anti-N+1 en PostgreSQL y depuración quirúrgica de la UI.
+
+---
+
+### 🚨 1. Contexto y Objetivos Estratégicos
+En la Fase 1 se logró la estabilidad de conexión viva a Gemini, el parser SSE determinista, la talla canónica `PORTADA_ALBUM` (Q55) y la confirmación de venta en un solo toque en PostgreSQL.
+En esta **Fase 2**, eliminamos la desconexión entre la ejecución de herramientas y el lenguaje natural:
+1. **Closed-Loop Real**: Cuando Gemini ejecuta una tool (`prepareSaleDraft`, `searchCatalog`, etc.), el resultado se reenvía al modelo en el mismo turno (`role: 'tool'`), para que Gemini explique con calidez qué preparó, qué encontró y proponga venta cruzada (*upselling*) con el tamaño Mediano Q65 o la Portada Álbum Q55.
+2. **Streaming Dual sin Supresión**: Erradicar `hasTextTokens`. La UI debe recibir tanto los eventos estructurados (`draft_sale`, `suggested_posters`, etc.) como el flujo de tokens explicativos de la IA.
+3. **Memoria Conversacional y Edición en Cadena (20 turnos)**: El usuario puede modificar el borrador conversacionalmente ("cámbiala a grande", "hazle Q10 de descuento", "agrega otra portada") sin que el sistema pierda el estado ni obligue a reescribir todo.
+4. **Cero N+1 en Reportes**: Optimizar `executeGetSellerShiftReport` con agregaciones nativas de PostgreSQL en Prisma.
+5. **UI Limpia**: `ChatToolCards.jsx` no debe renderizar tarjetas vacías o rotas ante `found: false`, ni emitir eventos duplicados de stock.
+
+---
+
+### 🧱 2. Directivas Sagradas y Reglas de Compromiso (<RULE[user_global]>)
+1. **Aislamiento Sagrado de Infraestructura**: Todo el desarrollo y pruebas ocurren 100% dentro de `Modulo_Ventas` y `deko_eventsales_db`. Prohibido tocar o referenciar infraestructura ajena.
+2. **Zero-Trust de Credenciales**: Cero secretos, tokens o correos expuestos en código o tests.
+3. **Cero Suposiciones y Cero Mocks**: Cero respuestas simuladas en producción. Todo debe ser verificado con conexiones reales a Gemini y PostgreSQL.
+4. **Vigilancia de Techos de Líneas (Arnés Anti-Monolitos)**:
+   - `server/services/ai/aiStreamService.js` < 150 líneas.
+   - `server/services/ai/aiToolsService.js` < 200 líneas.
+   - `src/components/ai-chat/hooks/useAiChatStream.js` < 160 líneas.
+   - `src/components/ai-chat/ChatToolCards.jsx` < 140 líneas.
+   - *Directiva de Modularización*: Cualquier lógica compleja adicional DEBE extraerse en servicios satélite dedicados:
+     - `server/services/ai/aiClosedLoopService.js` (para orquestar el reenvío de tools a Gemini).
+     - `server/services/ai/aiShiftReportService.js` (para agregaciones y consultas SQL/Prisma de vendedores).
+5. **Harness 100% Verde**: Mantener `npm run harness:check` (`test:security`, `audit:secrets`, `audit:monoliths`, `build`) en verde inmutable.
+6. **Zero-Claim Policy**: Fred y sus workers no emiten declaraciones de victoria sin pruebas automatizadas verdes. Gary realiza el despliegue mecánico (`npm run deploy`) y la verificación en vivo con Chrome DevTools MCP.
+
+---
+
+### 📋 3. Requerimientos Técnicos Detallados de Fase 2 (F2.1 a F2.5)
+
+#### F2.1. Arquitectura Closed-Loop Function Calling en Streaming
+- **Archivos**: `server/services/ai/aiStreamService.js`, `server/services/ai/aiClosedLoopService.js` (nuevo módulo modular).
+- **Acción Obligatoria**:
+  * Al detectar `functionCalls` en el stream de Gemini (`prepareSaleDraft`, `searchCatalog`, `getEventKPIs`, etc.):
+    1. Ejecutar la herramienta en backend inmediatamente.
+    2. Emitir de inmediato el evento estructurado correspondiente por SSE (`event: draft_sale`, `event: suggested_posters`, etc.) para que la tarjeta visual se monte instantáneamente en el frontend.
+    3. Construir el turno de respuesta de herramienta con el contrato oficial de `@google/genai`:
+       `{ role: 'tool', parts: [{ functionResponse: { name: call.name, response: toolResult } }] }`.
+    4. Invocar el stream de cierre con Gemini (`streamWithModelFallback` o `models.generateContentStream`) con el historial extendido y la respuesta de la tool, para que el modelo emita tokens de explicación natural, entusiasmo comercial y recomendaciones de upselling en streaming directo.
+  * Si la llamada closed-loop falla por timeout o error de red, emitir un cierre cordial seguro sin tumbar la conexión SSE (`type: 'token'`).
+
+#### F2.2. Erradicación de `hasTextTokens` y Streaming Dual Simultáneo
+- **Archivos**: `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`, `src/components/ai-chat/hooks/useAiChatStream.js`.
+- **Acción Obligatoria**:
+  * Eliminar la bandera `hasTextTokens` y la lógica condicional que suprimía tokens si existía una llamada a herramienta o viceversa.
+  * Garantizar que la tubería SSE soporte la emisión limpia tanto de tokens de texto continuos como de eventos de tarjeta intercalados.
+  * En `useAiChatStream.js`, verificar que la acumulación de texto mediante `requestAnimationFrame` opere en paralelo con la recepción de eventos `draft_sale` y `suggested_posters`, sin sobreescribir ni resetear el texto en streaming.
+
+#### F2.3. Memoria Conversacional Multi-Turno y Edición en Cadena del Borrador (20 turnos)
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `server/services/ai/aiPromptService.js`, `server/services/ai/aiStreamService.js`.
+- **Acción Obligatoria**:
+  * Ampliar el historial enviado por el frontend a **20 turnos** (`messages.slice(-20)`), preservando los roles `user` y `model` con sus contenidos limpios.
+  * Inyectar determinísticamente `pendingDraft` en el payload (`POST /api/ai/chat`), y en el prompt del sistema (`buildSalesSystemPrompt`).
+  * Soportar edición fluida en cadena del borrador:
+    - *"Cámbialo a tamaño grande"* -> Actualiza el ítem a tamaño `GRANDE` (Q125.00) recalculando el total.
+    - *"Hazle Q10 de descuento"* -> Aplica descuento de Q10, ajustando el neto contable exacto.
+    - *"Va a pagar con tarjeta"* -> Cambia el método de pago a `TARJETA`.
+    - *"Agrega una portada de álbum de Taylor Swift"* -> Agrega el segundo ítem al borrador preservando el anterior.
+
+#### F2.4. Erradicación del Cuello de Botella N+1 en Reportes de Turno
+- **Archivos**: `server/services/ai/aiToolsService.js`, `server/services/ai/aiShiftReportService.js` (nuevo módulo para evitar monolitos).
+- **Acción Obligatoria**:
+  * Refactorizar `executeGetSellerShiftReport`: Erradicar el bucle `salesGroup.map(async (g) => prisma.salePayment.groupBy(...))`.
+  * Realizar la agregación de pagos agrupados en una sola consulta o mediante agregación SQL eficiente, indexada por `eventId` y `sellerId`.
+  * Reducir `aiToolsService.js` para mantenerlo cómodamente por debajo de 200 líneas (ideal < 140 líneas).
+
+#### F2.5. Depuración de UI en Tarjetas y Supresión de Eventos Duplicados
+- **Archivos**: `src/components/ai-chat/ChatToolCards.jsx`, `server/services/ai/aiStreamService.js`.
+- **Acción Obligatoria**:
+  * En `ChatToolCards.jsx`: Blindar el renderizado de `inventoryStock` (`inv`). Si `inv.found === false` o no hay obra (`!inv.artwork`), NO renderizar un contenedor vacío ni bordes huérfanos.
+  * En `aiStreamService.js`: Al ejecutar `checkInventoryStock`, no emitir un evento redundante `suggested_posters` que duplique tarjetas en el chat si `inventoryStock` ya contiene los datos.
+  * Mantener `ChatToolCards.jsx` en `< 140 líneas`.
+
+---
+
+### ✅ 4. Criterios Inquebrantables de Aceptación (Condición de Entrega)
+- [ ] **Closed-Loop Operativo**: Tras generar un borrador o buscar en catálogo, Gemini responde en streaming con lenguaje natural, tono vendedor y argumentos comerciales reales (cero monosílabos, cero respuestas vacías).
+- [ ] **Dual Stream Funcional**: El chat muestra tanto el texto conversacional en streaming como las tarjetas interactivas (borrador, pósters o KPIs).
+- [ ] **Edición en Cadena Verificada**: Se puede modificar un borrador existente por texto ("cámbiala a grande", "descuento de Q10") y el borrador en pantalla se actualiza reactivamente sin reiniciarse.
+- [ ] **Cero N+1 en Base de Datos**: Las consultas de reporte de vendedores y gaveta se ejecutan sin bucles de consultas concurrentes individuales.
+- [ ] **UI de Tarjetas Impecable**: Cero tarjetas rotas o vacías ante búsquedas sin stock (`found: false`).
+- [ ] **Límites de Líneas y Arnés 100% Verde**: `npm run harness:check` aprueba `test:security`, `audit:secrets`, `audit:monoliths` y `build` con cero advertencias.
+- [ ] **Verificación y Despliegue Oficial**: Fred entrega el código limpio a Gary. Gary ejecuta `npm run deploy`, confirma el commit en Dokploy, inyecta sesión en Chrome DevTools MCP y prueba en vivo la edición en cadena con captura visual de evidencia.
+
+## 2026-09-12T19:07:46Z
+
+# Teamwork Project Prompt — FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}
+
+> **Status**: Launched
+> **Goal**: Craft prompt → get user approval → delegate to `teamwork_preview`
+> **Requested team**: Fred (`teamwork_preview_orchestrator`)
+
+Transformar el agente STAND {IA} en un asesor comercial conversacional de alta gama con Closed-Loop Function Calling, streaming dual simultáneo continuo (erradicando `hasTextTokens`), memoria de 20 turnos con edición interactiva en cadena de borradores de venta, erradicación de consultas N+1 en PostgreSQL y depuración quirúrgica de tarjetas de interfaz.
+
+**Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`  
+**Integrity mode**: development  
+**Target Production**: `https://ventas.decovintage.online/`  
+**Context Reference**: Mandato oficial de Sebastián Jiménez & Gary (CTO) tras cierre y certificación en producción de Fase 1 (commit Dokploy `1d41cec`).
+
+---
+
+## Directivas Sagradas e Inviolables (<RULE[user_global]>)
+1. **Aislamiento Sagrado de Infraestructura**: Todo el desarrollo y pruebas ocurren 100% dentro de `Modulo_Ventas` y sobre la base de datos `deko_eventsales_db`. Prohibido tocar o referenciar infraestructura externa o bases de datos de otros proyectos.
+2. **Zero-Trust de Credenciales**: Cero secretos, API keys o tokens expuestos en código o tests.
+3. **Cero Suposiciones y Cero Mocks**: Cero respuestas simuladas en producción. Operar exclusivamente con conexiones reales a Gemini (`@google/genai`) y PostgreSQL (`@prisma/client`).
+4. **Vigilancia Militar de Techos de Líneas (Arnés Anti-Monolitos)**:
+   - `server/services/ai/aiStreamService.js`: Techo estricto **< 150 líneas**.
+   - `server/services/ai/aiToolsService.js`: Techo estricto **< 200 líneas** (objetivo: < 140 líneas).
+   - `src/components/ai-chat/hooks/useAiChatStream.js`: Techo estricto **< 160 líneas**.
+   - `src/components/ai-chat/ChatToolCards.jsx`: Techo estricto **< 140 líneas**.
+   - **Módulos Satélite Obligatorios**:
+     * `server/services/ai/aiClosedLoopService.js`: Orquestación del reenvío de tools a Gemini y ciclo continuo.
+     * `server/services/ai/aiShiftReportService.js`: Agregaciones nativas consolidada de ventas y métricas de turno sin N+1.
+5. **Harness 100% Verde Inmutable**: Mantener `npm run harness:check` (`test:security`, `audit:secrets`, `audit:monoliths`, `build`) en verde inmutable.
+6. **Zero-Claim Policy**: No declarar victoria sin verificación automatizada. Gary (CTO) realiza el despliegue mecánico (`npm run deploy`) y la verificación en vivo en navegador real con Chrome DevTools MCP.
+
+---
+
+## Requirements
+
+### R1. Arquitectura Closed-Loop Function Calling en Streaming
+- **Módulos**: `server/services/ai/aiStreamService.js`, `server/services/ai/aiClosedLoopService.js` (nuevo).
+- Cuando Gemini invoque una herramienta (`prepareSaleDraft`, `searchCatalog`, `getEventKPIs`, etc.):
+  1. Ejecutar inmediatamente la herramienta en PostgreSQL / Catálogo.
+  2. Emitir de inmediato el evento estructurado por SSE (`event: draft_sale`, `event: suggested_posters`, etc.) para que la tarjeta se monte instantáneamente en el frontend sin esperar el texto.
+  3. Construir el turno de respuesta de herramienta con el contrato oficial de `@google/genai`:  
+     `{ role: 'tool', parts: [{ functionResponse: { name: call.name, response: toolResult } }] }`.
+  4. Reenviar de inmediato a Gemini el historial con el turno de la tool en el mismo ciclo.
+  5. Gemini emitirá en streaming sus tokens explicativos con calidez, lenguaje comercial natural, confirmación clara de lo preparado y sugerencias de upselling (tamaño Mediano Q65, Portada Álbum Q55 o cinta tesa®).
+  6. En caso de timeout o contingencia, emitir cierre cordial sin romper el canal SSE.
+
+### R2. Erradicación de `hasTextTokens` y Streaming Dual Simultáneo
+- **Módulos**: `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`, `src/components/ai-chat/hooks/useAiChatStream.js`.
+- Eliminar la variable `hasTextTokens` y cualquier lógica condicional que suprima tokens si hay herramientas o viceversa.
+- Garantizar que el canal SSE transmita de forma intercalada y limpia tanto tokens de texto (`event: token`) como eventos estructurados (`event: draft_sale`, `event: suggested_posters`, etc.).
+- En `useAiChatStream.js`, verificar que el acumulador con `requestAnimationFrame` renderice el texto progresivo sin colisionar ni resetearse cuando llega un evento de tarjeta.
+
+### R3. Memoria Conversacional Multi-Turno y Edición en Cadena (20 turnos)
+- **Módulos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `server/services/ai/aiPromptService.js`, `server/services/ai/aiStreamService.js`.
+- Ampliar la ventana de historial enviada en `useAiChatStream.js` a **20 turnos** (`messages.slice(-20)`), estructurando roles `user` y `model`.
+- Enviar consistentemente en el cuerpo de la petición `pendingDraft: pendingDraft || null`.
+- Garantizar la edición en cadena conversacional del borrador en mostrador:
+  * *"Cámbiala a grande"* -> Gemini actualiza el ítem a tamaño `GRANDE` (Q125.00) y recalcula el total, preservando el título.
+  * *"Hazle Q10 de descuento"* -> Aplica descuento de Q10, calculando el total neto exacto.
+  * *"Va a pagar con tarjeta"* -> Actualiza el método de pago a `TARJETA`.
+  * *"Agrega una portada de álbum de Taylor Swift"* -> Añade el segundo ítem al borrador manteniendo el ítem previo.
+- La tarjeta `ChatDraftCard.jsx` refleja los cambios en pantalla inmediatamente al recibir el nuevo evento `draft_sale`.
+
+### R4. Erradicación del Bucle N+1 en Reportes de Turno
+- **Módulos**: `server/services/ai/aiToolsService.js`, `server/services/ai/aiShiftReportService.js` (nuevo).
+- Refactorizar `executeGetSellerShiftReport`: Erradicar el bucle `salesGroup.map(async (g) => prisma.salePayment.groupBy(...))`.
+- Realizar la agregación contable de pagos agrupados en una sola consulta indexada en PostgreSQL por `eventId` y `sellerId`.
+- Reducir `aiToolsService.js` para mantenerlo holgadamente por debajo de 200 líneas (< 140 líneas).
+
+### R5. Depuración Quirúrgica de UI y Tarjetas
+- **Módulos**: `src/components/ai-chat/ChatToolCards.jsx`, `server/services/ai/aiStreamService.js`.
+- En `ChatToolCards.jsx`: Blindar el renderizado de `inventoryStock` (`inv`). Si `inv.found === false` o no existe obra (`!inv.artwork`), NO renderizar ningún contenedor vacío ni marcos negros huérfanos.
+- En `aiStreamService.js`: Al ejecutar `checkInventoryStock`, no emitir un evento redundante `suggested_posters` si `inventoryStock` ya encapsula los resultados, evitando tarjetas duplicadas en la UI.
+- Mantener `ChatToolCards.jsx` en `< 140 líneas`.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. `npm run harness:check`: Ejecuta `test:security`, `audit:secrets`, `audit:monoliths` y `build` con 0 errores y 0 advertencias.
+2. Pruebas de unidad e integración de Closed-Loop: Verificar que al ejecutar una tool, Gemini recibe el `functionResponse` y genera tokens cálidos de respuesta.
+3. Pruebas de agregación sin N+1: Verificar que `executeGetSellerShiftReport` emite métricas idénticas o superiores ejecutando una sola consulta agrupada.
+
+### Manual Verification (Handoff a Gary / Chrome DevTools MCP)
+1. Despliegue en producción vía `npm run deploy` y verificación del commit en Dokploy.
+2. Navegación en vivo en `https://ventas.decovintage.online/` con sesión activa.
+3. Prueba interactiva de edición en cadena de borrador:
+   - Dictar *"1 mediano de Spider-Man"* -> Verificar tarjeta borrador + explicación cálida en streaming dual.
+   - Enviar *"cámbiala a grande"* -> Verificar actualización inmediata de tarjeta a Q125.00 sin perder título ni reiniciar.
+   - Enviar *"va a pagar con tarjeta"* -> Verificar cambio de método de pago a TARJETA.
+4. Evidencia fotográfica de alta resolución capturada con Chrome DevTools MCP.
+
+---
+
+## Acceptance Criteria
+
+### Closed-Loop & Streaming Dual
+- [ ] Tras invocar `prepareSaleDraft` o `searchCatalog`, Gemini continúa el stream emitiendo texto conversacional cálido con detalles y recomendaciones (cero respuestas vacías, cero monosílabos).
+- [ ] No existe la variable ni lógica de supresión `hasTextTokens`. Tokens de texto y eventos de tarjetas se transmiten de forma limpia y simultánea.
+- [ ] La interfaz acumula y muestra el texto progresivo en tiempo real sin colisión con las tarjetas.
+
+### Memoria y Edición en Cadena
+- [ ] El payload de chat incluye los últimos 20 turnos de mensajes con estructura `user` y `model`.
+- [ ] Las modificaciones conversacionales al borrador activo ("cámbiala a grande", "hazle Q10 de descuento", "va a pagar con tarjeta") actualizan la tarjeta activa en tiempo real preservando el contexto previo.
+
+### Rendimiento & Base de Datos
+- [ ] `executeGetSellerShiftReport` no ejecuta llamadas iterativas por vendedor en PostgreSQL (cero N+1).
+- [ ] Todas las consultas de agregación de turno y caja se completan en tiempos mínimos de respuesta.
+
+### UI & Calidad Visual
+- [ ] Búsquedas con `found: false` no muestran bordes huérfanos ni tarjetas vacías en mostrador.
+- [ ] `checkInventoryStock` no duplica tarjetas de pósters en la pantalla.
+
+### Límites de Líneas y Arnés
+- [ ] `server/services/ai/aiStreamService.js` < 150 líneas.
+- [ ] `server/services/ai/aiToolsService.js` < 200 líneas (objetivo < 140 líneas).
+- [ ] `src/components/ai-chat/hooks/useAiChatStream.js` < 160 líneas.
+- [ ] `src/components/ai-chat/ChatToolCards.jsx` < 140 líneas.
+- [ ] `npm run harness:check` 100% verde (0 fallos, 0 violaciones).
+- [ ] Captura de pantalla de alta resolución en producción en vivo certificando la edición en cadena.

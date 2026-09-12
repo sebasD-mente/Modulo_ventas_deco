@@ -593,7 +593,7 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
       assert.ok(types.includes('seller_shift_report'), 'Debe emitir seller_shift_report');
       assert.ok(types.includes('production_queue_status'), 'Debe emitir production_queue_status');
       assert.ok(types.includes('inventory_stock'), 'Debe emitir inventory_stock');
-      assert.ok(types.includes('suggested_posters'), 'Debe emitir suggested_posters cuando hay coincidencias');
+      assert.ok(!types.includes('suggested_posters'), 'No debe emitir suggested_posters redundantes para checkInventoryStock (R5)');
 
       const kpisEv = emitted.find(e => e.type === 'event_kpis');
       assert.ok(kpisEv.data !== undefined);
@@ -742,6 +742,45 @@ describe('🔥 Suite Adversarial Empírica: 5 Herramientas de Base de Datos y St
 
       const textTokensB = emittedB.filter(e => e.type === 'token').map(e => e.text).join('');
       assert.ok(textTokensB.includes('Estado de Gaveta') || textTokensB.includes('💵'), 'Debe emitir el summaryText en tokens si Gemini no dio texto');
+    });
+
+    it('3.3b Interrupción mid-stream con break generic ("Respuesta finalizada") no suprime buildFallbackSummaries', async () => {
+      const client = getGeminiClient();
+      let callCount = 0;
+      client.models.generateContentStream = async function* () {
+        callCount++;
+        if (callCount === 1) {
+          yield {
+            functionCalls: [
+              {
+                name: 'prepareSaleDraft',
+                args: {
+                  items: [{ productName: 'Spider-Man Vintage Comic', quantity: 1, size: 'MEDIANO', unitPrice: 65 }],
+                  paymentMethod: 'EFECTIVO',
+                },
+              },
+            ],
+          };
+        } else {
+          // Segundo turno: lanza error simulado 429
+          throw new Error('429 Resource has been exhausted');
+        }
+      };
+
+      const stream = streamChatWithSalesAssistant({
+        message: '1 póster de Spider-Man mediano en efectivo',
+        tenantId: 'test-tenant',
+        eventId: 'ev-break-test',
+      });
+
+      const emitted = [];
+      for await (const ev of stream) {
+        emitted.push(ev);
+      }
+
+      const textTokens = emitted.filter(e => e.type === 'token').map(e => e.text).join('');
+      assert.ok(textTokens.includes('Respuesta finalizada'), 'Debe emitir la nota de corte');
+      assert.ok(textTokens.includes('Total') || textTokens.includes('Confirmar Venta'), 'Debe emitir el resumen de borrador itemizado sin ser suprimido por el break string');
     });
 
     it('3.4 Validación de Wire-Format SSE para el controlador Express (RFC EventStream)', async () => {

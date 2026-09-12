@@ -16,7 +16,6 @@ export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDec
 const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 }, { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55, badge: '🎵 Vinilo / 30x30' }, { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 }];
 const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s === 'PEQUENO' ? 35.0 : s === 'GRANDE' ? 125.0 : s === 'GIGANTE' ? 180.0 : 65.0;
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
-
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
   const act = await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true } });
@@ -73,48 +72,7 @@ export async function executeGetCashDrawerStatus(tenantId, eventId) {
     return { eventId: eventId || null, eventName: 'Stand (Modo Resiliente)', location: 'Stand', currency: 'GTQ', currencySymbol: 'Q', currentCashInDrawer: 0, cashSinceLastClosing: 0, salesCountSinceLastClosing: 0, totalSalesInCash: 0, cashTransactionsCount: 0, totalCardInSales: 0, cardTransactionsCount: 0, totalTransferInSales: 0, transferTransactionsCount: 0, grossSalesTotal: 0, lastClosing: null, summaryText: '💵 Estado de Gaveta: No se pudo consultar la base de datos.', error: err.message };
   }
 }
-
-export async function executeGetSellerShiftReport(tenantId, eventId, sellerId = null) {
-  try {
-    const effEventId = await resolveActiveEvent(tenantId, eventId);
-    if (!effEventId) return { eventId: null, eventName: 'Sin evento activo', totalSellersActive: 0, eventTotalRevenue: 0, eventTotalTransactions: 0, topSeller: null, ranking: [], seller: null, summaryText: '🏆 No hay evento activo.' };
-    const saleWhere = { eventId: effEventId, status: { not: 'ANULADA' }, ...(tenantId ? { tenantId } : {}) };
-    const [event, salesBySeller] = await Promise.all([prisma.event?.findUnique?.({ where: { id: effEventId }, select: { id: true, name: true, location: true } }), prisma.sale?.groupBy?.({ by: ['sellerId'], where: saleWhere, _count: { id: true }, _sum: { totalAmount: true } })]);
-    const sorted = [...(salesBySeller || [])].sort((a, b) => Number(b._sum?.totalAmount || 0) - Number(a._sum?.totalAmount || 0));
-    const sellerIds = sorted.map((s) => s.sellerId).filter(Boolean);
-    if (sellerId && !sellerIds.includes(sellerId)) sellerIds.push(sellerId);
-    let userMap = new Map();
-    if (sellerIds.length > 0) {
-      const users = await prisma.user?.findMany?.({ where: { id: { in: sellerIds }, ...(tenantId ? { tenantId } : {}) }, select: { id: true, fullName: true, email: true, role: true } }) || [];
-      userMap = new Map(users.map((u) => [u.id, u]));
-    }
-    const totalRevenue = Number(sorted.reduce((acc, s) => acc + Number(s._sum?.totalAmount || 0), 0).toFixed(2));
-    const totalTransactions = sorted.reduce((acc, s) => acc + (s._count?.id || 0), 0);
-    const ranking = await Promise.all(sorted.map(async (g, idx) => {
-      const u = userMap.get(g.sellerId), amt = Number(Number(g._sum?.totalAmount || 0).toFixed(2)), cnt = g._count?.id || 0;
-      let unitsSold = 0;
-      try {
-        const uAgg = await prisma.saleItem?.aggregate?.({ where: { sale: { eventId: effEventId, sellerId: g.sellerId, status: { not: 'ANULADA' }, ...(tenantId ? { tenantId } : {}) } }, _sum: { quantity: true } });
-        unitsSold = uAgg?._sum?.quantity || 0;
-      } catch {}
-      const payments = { EFECTIVO: { amount: 0, count: 0 }, TARJETA: { amount: 0, count: 0 }, TRANSFERENCIA: { amount: 0, count: 0 } };
-      try {
-        const pAgg = await prisma.salePayment?.groupBy?.({ by: ['method'], where: { sale: { eventId: effEventId, sellerId: g.sellerId, status: { not: 'ANULADA' }, ...(tenantId ? { tenantId } : {}) } }, _sum: { amount: true }, _count: { id: true } }) || [];
-        pAgg.forEach((p) => { if (payments[p.method]) { payments[p.method].amount = Number(Number(p._sum?.amount || 0).toFixed(2)); payments[p.method].count = p._count?.id || 0; } });
-      } catch {}
-      return {
-        position: idx + 1, sellerId: g.sellerId, sellerName: u?.fullName || 'Vendedor', sellerEmail: u?.email || '', role: u?.role || 'VENDEDOR',
-        totalAmount: amt, transactionCount: cnt, averageTicket: cnt > 0 ? Number((amt / cnt).toFixed(2)) : 0, unitsSold,
-        sharePercentage: totalRevenue > 0 ? Number(((amt / totalRevenue) * 100).toFixed(1)) : 0, payments,
-      };
-    }));
-    const foundSeller = sellerId ? (ranking.find((r) => r.sellerId === sellerId) || { sellerId, sellerName: userMap.get(sellerId)?.fullName || 'Vendedor', totalAmount: 0, transactionCount: 0, averageTicket: 0, unitsSold: 0, position: null, sharePercentage: 0 }) : null;
-    return { eventId: effEventId, eventName: event?.name || 'Evento Activo', totalSellersActive: ranking.length, eventTotalRevenue: totalRevenue, eventTotalTransactions: totalTransactions, topSeller: ranking[0] || null, ranking, seller: foundSeller, summaryText: ranking.length > 0 ? `🏆 Ranking en "${event?.name || 'Evento'}": Total Q ${totalRevenue.toFixed(2)} (${totalTransactions} ventas). Líder: ${ranking[0].sellerName} (Q ${ranking[0].totalAmount.toFixed(2)}).` : 'Sin ventas registradas.' };
-  } catch (err) {
-    return { eventId: eventId || null, eventName: 'Evento (Modo Resiliente)', totalSellersActive: 0, eventTotalRevenue: 0, eventTotalTransactions: 0, topSeller: null, ranking: [], seller: sellerId ? { sellerId, sellerName: 'Vendedor', totalAmount: 0 } : null, summaryText: '🏆 Ranking de Vendedores: No se pudo conectar a la base de datos.', error: err.message };
-  }
-}
-
+export { executeGetSellerShiftReport } from './aiShiftReportService.js';
 export async function executeGetProductionQueueStatus(tenantId, eventId) {
   try {
     const effEventId = await resolveActiveEvent(tenantId, eventId);

@@ -89,7 +89,7 @@ export default function ChatToolCards({ message, msg, onAddPosterToDraft, onAddP
           </div>
         </div>
       )}
-      {inv && (
+      {inv?.found && inv?.artwork && (
         <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
             <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1"><Package className="w-3.5 h-3.5" /> Disponibilidad en Stand</span>
