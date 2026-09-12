@@ -535,5 +535,198 @@ Integrity mode: development
 - [ ] El auditor independiente inspecciona el resultado y certifica `VICTORY CONFIRMED`.
 - [ ] Verificación activa con Chrome DevTools en vivo con capturas de pantalla de alta resolución demostrando la UI de eventos operativa.
 
+## 2026-09-12T01:33:17Z
 
+# Teamwork Project Prompt — Phase 4: Modular Refactoring of FastManualSaleForm.jsx
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Fred (`teamwork_preview_orchestrator`)
+
+Refactorizar modularmente el componente monolítico `src/components/FastManualSaleForm.jsx` (749 líneas) en una arquitectura atómica desacoplada bajo `src/components/manual-sale/`, reduciendo el contenedor maestro canónico a menos de 70 líneas sin romper su contrato público de props `{ eventId, onSaleRegistered, initialDraft = null }` ni su integración con `src/App.jsx`.
+
+Working directory: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+Integrity mode: `development`
+
+---
+
+## Requested Team & Orchestration Roadmap
+Orquestado por **Fred** (`teamwork_preview_orchestrator`), quien coordinará el despiece a través de subagentes especializados y un auditor independiente:
+
+- **M0: Survey & Contract Mapping**: Mapear el flujo del carrito, autocompletado de catálogo `/api/catalog/search`, inyección de `initialDraft` desde el chat de IA, y liquidación de ventas vía `POST /api/sales`.
+- **M1: Constants & Reactive Hooks Architecture**:
+  - `src/components/manual-sale/manualSaleConstants.js` (< 40 líneas): `DEFAULT_SIZES` canónicos y mapas de precios.
+  - `src/components/manual-sale/hooks/useCatalogSearch.js` (< 90 líneas): Buscador debounceado con autocompletado y dismiss de dropdown.
+  - `src/components/manual-sale/hooks/useManualSaleCart.js` (< 150 líneas): Estado reactivo del carrito, cálculo de subtotal/descuento/total, mutaciones, soporte para `initialDraft` y confirmación de venta con confetti.
+- **M2: UI Submodules (Search, Configurator & Cart)**:
+  - `src/components/manual-sale/CatalogSearchInput.jsx` (< 100 líneas): Input de búsqueda con dropdown flotante de pósters.
+  - `src/components/manual-sale/PosterConfigurator.jsx` (< 120 líneas): Tarjeta de póster seleccionado, selector de tallas y selector de cantidad.
+  - `src/components/manual-sale/SaleCartList.jsx` (< 120 líneas): Lista de pósters en la venta actual con modificadores (+/-) y eliminar.
+- **M3: Payment & Settlement Shell**:
+  - `src/components/manual-sale/PaymentSummaryBar.jsx` (< 110 líneas): Selector de método de pago (Efectivo/Tarjeta/Transfer), descuento, notas y botón principal de cobro.
+  - `src/components/FastManualSaleForm.jsx` (< 70 líneas): Contenedor maestro canónico que preserva `{ eventId, onSaleRegistered, initialDraft = null }`.
+- **M4: Quality Gate & Independent Victory Audit**:
+  - `npm run harness:check` (Zero-Trust, auditoría de secretos, auditoría de monolitos y compilación Vite).
+  - Suite de pruebas unitarias/adversariales (`tests/manual-sale/`) aprobada al 100%.
+  - Certificación independiente `VICTORY CONFIRMED` con capturas de pantalla de alta resolución mediante Chrome DevTools MCP.
+
+---
+
+## Requirements
+
+### R1. Constantes y Hooks Centrales (`src/components/manual-sale/hooks/`)
+- **`manualSaleConstants.js` (< 40 líneas)**:
+  - Exportar array `DEFAULT_SIZES` (`MINI`, `PEQUENO`, `MEDIANO`, `GRANDE`, `GIGANTE`, `PORTADA_ALBUM`) con sus precios canónicos.
+- **`useCatalogSearch.js` (< 90 líneas)**:
+  - Estados: `searchQuery`, `searchResults`, `isSearching`, `showDropdown`.
+  - Búsqueda reactiva con debounce contra `/api/catalog/search?q=...`.
+  - Cierre automático al hacer clic fuera del contenedor (ref-based).
+- **`useManualSaleCart.js` (< 150 líneas)**:
+  - Manejo del carrito: `cartItems`, `addItem`, `removeItem`, `updateItemQty`, `clearCart`.
+  - Sincronización reactiva automática ante cambios en `initialDraft` (cuando proviene de sugerencias de la IA).
+  - Estados de venta: `paymentMethod` (default `EFECTIVO`), `discount`, `notes`, `isSubmitting`.
+  - Función de liquidación `confirmSale()`: validaciones de stock/evento, llamada a `POST /api/sales`, disparo de confetti, reset y ejecución de `onSaleRegistered()`.
+  - Techo estricto: **< 150 líneas**.
+
+### R2. Submódulos Visuales Atómicos (`src/components/manual-sale/`)
+- **`CatalogSearchInput.jsx` (< 100 líneas)**:
+  - Input oscuro con icono de lupa, botón limpiar y dropdown con scroll de resultados con miniatura y precio.
+- **`PosterConfigurator.jsx` (< 120 líneas)**:
+  - Tarjeta de póster activo, grid de píldoras de tallas con precio dinámico, contador numérico y botón "Agregar a la venta".
+- **`SaleCartList.jsx` (< 120 líneas)**:
+  - Lista de ítems del ticket, badge de tamaño, controles numéricos (+ / -), botón de papelera y estado vacío amigable.
+- **`PaymentSummaryBar.jsx` (< 110 líneas)**:
+  - Botones de método de pago con 1 solo toque (`Efectivo`, `Tarjeta`, `Transferencia`).
+  - Inputs para descuento opcional y nota de cliente.
+  - Desglose de totales y botón gigante de cobro con estado de carga.
+
+### R3. Contenedor Maestro Canónico (`src/components/FastManualSaleForm.jsx` — < 70 líneas)
+- Ensamblar limpiamente `useCatalogSearch`, `useManualSaleCart`, `CatalogSearchInput`, `PosterConfigurator`, `SaleCartList` y `PaymentSummaryBar`.
+- **Contrato público obligatorio**: `export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null })`.
+- Cero breaking changes en `src/App.jsx`.
+- Techo estricto: **< 70 líneas** (reducción >90% respecto a las 749 líneas originales).
+
+### R4. Seguridad, Aislamiento y Calidad Estricta
+- Cero fugas de credenciales, secretos hardcodeados o acoplamiento de infraestructura.
+- Todas las dependencias e importaciones de React, Canvas Confetti y Lucide React deben ser genuinas y funcionales.
+
+---
+
+## Acceptance Criteria
+
+### Monolito & Despiece Arquitectónico
+- [ ] `src/components/FastManualSaleForm.jsx` tiene menos de 70 líneas de código efectivas.
+- [ ] Todos los submódulos en `src/components/manual-sale/` cumplen estrictamente con sus techos de líneas:
+  - `manualSaleConstants.js` < 40 líneas.
+  - `useCatalogSearch.js` < 90 líneas.
+  - `useManualSaleCart.js` < 150 líneas.
+  - `CatalogSearchInput.jsx` < 100 líneas.
+  - `PosterConfigurator.jsx` < 120 líneas.
+  - `SaleCartList.jsx` < 120 líneas.
+  - `PaymentSummaryBar.jsx` < 110 líneas.
+- [ ] Ningún archivo en el proyecto supera los límites del arnés ni añade nueva deuda técnica.
+- [ ] El conteo de monolitos reportado por `npm run audit:monoliths` se reduce de 16 a 15 archivos.
+
+### Integración y Contrato Funcional
+- [ ] El componente `FastManualSaleForm` mantiene su firma exacta `{ eventId, onSaleRegistered, initialDraft = null }` y se integra fluidamente con `src/App.jsx`.
+- [ ] La búsqueda de catálogo responde reactivamente con debounce contra el endpoint real.
+- [ ] La carga de `initialDraft` (cuando se despachan ventas desde el agente IA) pobla correctamente el carrito.
+- [ ] El cálculo de totales, descuentos y métodos de pago es exacto y se envía exitosamente a `POST /api/sales`.
+- [ ] El efecto visual de confetti y el reset del formulario operan sin fallos en el navegador.
+
+### Quality Gate & Auditoría
+- [ ] `npm run test:security`: 9/9 pruebas aprobadas (cero regresiones).
+- [ ] `npm run audit:secrets`: 0 violaciones detectadas.
+- [ ] `npm run audit:monoliths`: 15 archivos o menos (sin FastManualSaleForm en la lista).
+- [ ] `npm run build`: Vite build compila con código de salida 0.
+- [ ] Suite de pruebas unitarias/adversariales (`tests/manual-sale/`) creada y aprobada al 100%.
+- [ ] Verificación en vivo realizada con Chrome DevTools MCP y certificación `VICTORY CONFIRMED` con evidencia visual.
+
+## 2026-09-12T03:41:02Z
+
+# Teamwork Project Prompt — Phase 5: Complete Frontend Monolith Eradication (`UserManagement`, `MonitorDashboard`, `ProductionManagement`, `EditSaleModal`, `CashClosing`)
+
+> **Status**: Launched  
+> **Goal**: Erradicar el 100% de la deuda monolítica restante en el frontend de STAND {IA}, despiezando modularmente los 5 componentes visuales administrativos (1,915 líneas totales) en submódulos atómicos especializados bajo sus respectivos directorios desacoplados. Cada contenedor maestro canónico debe quedar estrictamente por debajo de las 70 líneas, ningún submódulo puede superar las 140 líneas, reduciendo el inventario global de monolitos de 15 a 10 archivos sin romper ningún contrato público ni la integración con `src/App.jsx`.  
+> **Requested team**: Orquestado por Fred (`teamwork_preview_orchestrator`), coordinando subagentes especializados (Exploradores, Workers modulares, Enjambre de Revisores y Desafiantes, Worker de QA en vivo con Chrome DevTools) y un Auditor Independiente de Victoria post-ejecución.  
+
+---
+
+### 📍 Working Directory & Environment
+- **Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+- **Integrity mode**: development
+- **Live Preview URL**: `http://localhost:5173/` (Vite) / Producción Dokploy: `https://ventas.decovintage.online/`
+- **Base Branch**: `main`
+
+---
+
+### 🧱 Requirements & Scope of Decomposition
+
+#### R1. Despiece Modular de `UserManagementView.jsx` (528 líneas ➔ < 70 líneas)
+Crear el directorio `src/components/users/`:
+- `hooks/useUsersManager.js` (< 140 líneas): Consulta de usuarios (`/api/users`), mutaciones de roles (`PATCH /api/users/:id/role`), creación/edición y manejo reactivo de estados con `authFetch`.
+- `UserTable.jsx` (< 120 líneas): Renderizado responsivo de la tabla de usuarios, badges de roles (`SUPER_ADMIN`, `VENDEDOR`), avatares de Google y acciones.
+- `UserFilterBar.jsx` (< 70 líneas): Barra de búsqueda, filtro por rol y botón CTA para nuevo usuario.
+- `modals/UserEditModal.jsx` (< 110 líneas): Modal atómico para actualización de roles y asignación de eventos.
+- `src/components/UserManagementView.jsx` (< 70 líneas): Contenedor maestro canónico que preserva su contrato e integración con `src/App.jsx`.
+
+#### R2. Despiece Modular de `MonitorDashboardView.jsx` (422 líneas ➔ < 70 líneas)
+Crear el directorio `src/components/monitor/`:
+- `hooks/useMonitorDashboard.js` (< 130 líneas): Polling reactivo, consulta de KPIs globales y desglose por evento vía `authFetch`.
+- `MonitorKpiGrid.jsx` (< 100 líneas): Tarjetas métricas de alta jerarquía (Total Vendido, Transacciones, Ticket Promedio, Última Venta).
+- `PaymentMethodsBreakdown.jsx` (< 90 líneas): Gráfica/desglose visual porcentual (Efectivo, Tarjeta, Transferencia).
+- `EventsPerformanceList.jsx` (< 120 líneas): Acordeones de eventos activos con métricas consolidadas y badge `STAND ACTIVO`.
+- `src/components/MonitorDashboardView.jsx` (< 70 líneas): Contenedor maestro canónico preservando su contrato en `src/App.jsx`.
+
+#### R3. Despiece Modular de `ProductionManagementView.jsx` (410 líneas ➔ < 70 líneas)
+Crear el directorio `src/components/production/`:
+- `hooks/useProductionQueue.js` (< 130 líneas): Carga reactiva de cola de taller (`/api/production/queue`), actualización de estados de póster (`PENDIENTE`, `IMPRESO`, `ENTREGADO`).
+- `ProductionFilterTabs.jsx` (< 70 líneas): Tabs de estado de producción con contadores reactivos.
+- `ProductionOrderCard.jsx` (< 120 líneas): Tarjeta de póster a producir: thumbnail, tamaño, notas de cliente, timestamp y botón de transición de estado con 1 toque.
+- `src/components/ProductionManagementView.jsx` (< 70 líneas): Contenedor maestro canónico (< 70 líneas).
+
+#### R4. Despiece Modular de `EditSaleModal.jsx` (330 líneas ➔ < 70 líneas)
+Crear el directorio `src/components/sales/edit/`:
+- `hooks/useEditSaleForm.js` (< 120 líneas): Lógica reactiva de edición, re-cálculo de totales/descuentos y envío a `PUT /api/sales/:id`.
+- `EditSaleItemsTable.jsx` (< 110 líneas): Lista editable de pósters en la venta, selector de tamaño y cantidad.
+- `src/components/EditSaleModal.jsx` (< 70 líneas): Contenedor modal maestro con backdrop accesible y botones de guardar/cancelar.
+
+#### R5. Despiece Modular de `CashClosingView.jsx` (325 líneas ➔ < 70 líneas)
+Crear el directorio `src/components/closing/`:
+- `hooks/useCashClosing.js` (< 130 líneas): Cálculo de arqueo de caja, totales teóricos vs reales y cierre final de jornada.
+- `CashDenominationGrid.jsx` (< 110 líneas): Contador de billetes y monedas en Quetzales (Q200, Q100, Q50, Q20, Q10, Q5, Q1).
+- `CashClosingSummary.jsx` (< 90 líneas): Comparativa de efectivo declarado vs registrado y discrepancias.
+- `src/components/CashClosingView.jsx` (< 70 líneas): Contenedor maestro canónico (< 70 líneas).
+
+---
+
+### 🔒 Strict Constraints & Security
+1. **Regla Sagrada de Monolitos**:
+   - NINGÚN archivo nuevo o modificado puede superar las 200 líneas bajo ninguna circunstancia.
+   - Los 5 contenedores maestros canónicos deben medir estrictamente menos de 70 líneas.
+   - Todos los submódulos deben mantenerse entre 40 y 140 líneas.
+2. **Protocolo Zero-Trust y Aislamiento (<RULE[user_global]>)**:
+   - Prohibido hardcodear credenciales, correos @gmail.com o conectar a infraestructura externa ajena.
+   - Mantener el aislamiento estricto de base de datos y contenedores Dokploy.
+3. **Cero Breaking Changes**:
+   - Las importaciones y props en `src/App.jsx` deben permanecer 100% idénticas y funcionales.
+   - Prohibido crear stubs, mocks o comentarios `TODO/FIXME`.
+4. **Reducción del Inventario**:
+   - El comando `node scripts/audit-monoliths.js` debe pasar de 15 a **10 archivos o menos** (Cero monolitos en el frontend).
+
+---
+
+### ✅ Acceptance Criteria & Quality Gates
+1. **Calidad de Arnés Automático (`npm run harness:check`)**:
+   - `npm run test:security`: 9/9 pruebas aprobadas (pass 9, fail 0).
+   - `npm run audit:secrets`: 0 violaciones detectadas en todos los archivos de producción.
+   - `npm run audit:monoliths`: Reporta exactamente <= 10 archivos (todos en backend; 0 en frontend).
+   - `npm run build`: Vite build compila limpiamente para producción con código de salida 0.
+2. **Suites de Pruebas Modulares**:
+   - Pruebas unitarias completas creadas para los nuevos hooks y submódulos aprobadas al 100%.
+3. **Verificación en Vivo con Chrome DevTools MCP**:
+   - Navegación e interacción real con cada una de las 5 vistas en el navegador.
+   - Capturas de pantalla de alta resolución demostrando que no existen regresiones visuales ni funcionales.
+4. **Certificación Independiente de Victoria**:
+   - El auditor independiente (`teamwork_preview_victory_auditor`) debe inspeccionar la entrega y emitir el veredicto oficial `VICTORY CONFIRMED` antes del reporte final.
 
