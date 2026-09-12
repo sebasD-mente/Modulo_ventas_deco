@@ -35,13 +35,27 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 // Servir archivos estáticos locales de uploads
 app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));
 
-// Health check endpoint con verificación en vivo de base de datos
+function getGitCommit() {
+  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
+  try {
+    const vPath = path.resolve(__dirname, 'config/version.json');
+    if (fs.existsSync(vPath)) {
+      const v = JSON.parse(fs.readFileSync(vPath, 'utf-8'));
+      if (v.gitCommit) return v.gitCommit;
+    }
+  } catch {}
+  return 'development';
+}
+
+// Health check endpoint con verificación en vivo de base de datos y commit hash
 app.get('/health', async (req, res) => {
+  const gitCommit = getGitCommit();
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({
       status: 'ok',
       db: 'connected',
+      gitCommit,
       time: new Date().toISOString(),
       uptime: process.uptime(),
       env: ENV.NODE_ENV,
@@ -50,6 +64,7 @@ app.get('/health', async (req, res) => {
     res.status(503).json({
       status: 'degraded',
       db: 'disconnected',
+      gitCommit,
       error: err.message,
       time: new Date().toISOString(),
       uptime: process.uptime(),

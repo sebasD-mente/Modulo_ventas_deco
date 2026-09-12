@@ -15,6 +15,8 @@
     "audit:secrets": "node scripts/audit-secrets.js",
     "audit:monoliths": "node scripts/audit-monoliths.js",
     "harness:check": "npm run test:security && npm run audit:secrets && npm run audit:monoliths && npm run build",
+    "deploy": "node scripts/deploy-dokploy.js",
+    "devtools:auth": "node scripts/auth-devtools.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "node prisma/seed.js"
