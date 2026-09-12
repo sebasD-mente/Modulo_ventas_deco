@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-11T23:29:09Z
+# BRIEFING — 2026-09-12T00:41:51Z
 
 ## Mission
-Refactorización modular del componente monolítico `src/components/UnifiedAiChat.jsx` (1,694 líneas) en submódulos atómicos bajo `src/components/ai-chat/`, reduciendo el contenedor maestro a menos de 80 líneas sin romper su contrato público de props ni la funcionalidad en producción, con cero deuda técnica y arnés 100% verde.
+Refactorización modular del componente monolítico `src/components/EventsManagementView.jsx` (1,111 líneas) en submódulos atómicos especializados bajo `src/components/events/`, reduciendo el contenedor maestro a menos de 70 líneas sin romper su contrato público de props `{ onEventActivated }` ni la integración con `src/App.jsx`.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -22,6 +22,8 @@ Refactorización modular del componente monolítico `src/components/UnifiedAiCha
 - Victory Auditor (Cirugía Modular aiMultimodalService): 5f048d08-8f81-426b-a2d5-455b57d00f68 (VICTORY CONFIRMED, victory_auditor_7)
 - Orchestrator (Modular Refactor UnifiedAiChat): 77de464d-cbe1-4d4d-b079-fc3688d9c5ea (completed, orchestrator_8)
 - Victory Auditor (Modular Refactor UnifiedAiChat): 38786f75-8cd6-4fd8-a321-0adeffbf37c6 (VICTORY CONFIRMED, victory_auditor_8)
+- Orchestrator (Phase 3 Refactor EventsManagementView): 3984481d-f6d5-430f-bedd-75ffd00ba8cc (active, orchestrator_9)
+- Victory Auditor (Phase 3 Refactor EventsManagementView): [to be spawned on victory claim]
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -45,18 +47,21 @@ Refactorización modular del componente monolítico `src/components/UnifiedAiCha
 - Cirugía modular de `src/components/UnifiedAiChat.jsx` (1,694 líneas) en submódulos atómicos bajo `src/components/ai-chat/` con techos de líneas: chatConstants (<60), useAiVoiceRecorder (<140), useAiChatStream (<160), ChatMessageList (<100), ChatToolCards (<140), ChatDraftCard (<140), ChatSwapModal (<100), ChatHeader (<50), ChatInputBar (<80), UnifiedAiChat maestro (<80), ningún archivo >200 líneas.
 - Cero breaking changes en App.jsx y contrato público `{ eventId, onSaleRegistered, onPopulateManualForm }` intacto.
 - Arnés de calidad Deko Labs: test:security (9/9), audit:secrets (0), audit:monoliths (<=17), npm run build limpio y npm run harness:check (exit 0).
+- Phase 3 Modular Refactoring of EventsManagementView.jsx (< 70 lines) into atomic modules under src/components/events/: useEventsManager (<150), EventCard (<140), EventsFilterBar (<70), CreateEventModal (<120), ActivateEventModal (<100), EventSalesModal (<130), EventActionModals (<90), no file > 200 lines.
+- Zero breaking changes to public props { onEventActivated } or src/App.jsx.
+- Quality harness: test:security (9/9), audit:secrets (0), audit:monoliths (<=16), build clean (exit 0), unit tests 100% pass.
 
 ## User Context
-- **Last user request**: Refactorizar modularmente `src/components/UnifiedAiChat.jsx` (1,694 líneas) en submódulos atómicos bajo `src/components/ai-chat/`, reduciendo el contenedor maestro a <80 líneas con equipo de 4 especialistas + orquestador Fred.
+- **Last user request**: Refactorizar modularmente el componente monolítico `src/components/EventsManagementView.jsx` (1,111 líneas) en submódulos atómicos especializados bajo `src/components/events/`, reduciendo el contenedor maestro canónico a menos de 70 líneas sin romper su contrato público de props `{ onEventActivated }` ni la integración con `src/App.jsx`.
 - **Pending clarifications**: none
-- **Delivered results**: Refactorización modular de UnifiedAiChat.jsx (1,694L reducidas a 58L, -96.6%) en 9 submódulos atómicos bajo src/components/ai-chat/ con techos de líneas respetados, cero deuda técnica, arnés 100% verde (9/9 security, 0 secrets, 17 monoliths, build code 0, 78/78 tests pass) y verificación visual real en navegador Chrome DevTools MCP.
+- **Delivered results**: Phase 3 Modular Refactoring of EventsManagementView.jsx complete (reduced from 1,111 lines to 64 lines, >94% reduction) into 7 atomic submodules under src/components/events/, monolith inventory reduced from 17 to 16, 100% green on all quality harness checks, 9 high-resolution live screenshots captured, and independently certified with VICTORY CONFIRMED.
 
 ## Project Status
 - **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: none (completed and cleaned up)
-- **Active Auditor**: none (completed and cleaned up)
-- **Monitoring Crons**: none (cancelled)
+- **Active Orchestrator**: 3984481d-f6d5-430f-bedd-75ffd00ba8cc (orchestrator_9, completed)
+- **Active Auditor**: 6e585cc2-da6c-4933-aa73-5809a145318e (victory_auditor_9, completed)
+- **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
 - **Triggered**: yes
@@ -65,9 +70,9 @@ Refactorización modular del componente monolítico `src/components/UnifiedAiCha
 
 ## Artifact Index
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_8/handoff.md — Master Orchestrator Fred Handoff Report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_8/handoff.md — Independent Victory Auditor Report (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_8/screenshot_live_chat_verified.png — Auditor live visual evidence
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/worker_5_live_qa/screenshot_chat_live.png — Worker 5 live visual evidence
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_9/handoff.md — Master Orchestrator Fred Handoff Report
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_9/handoff.md — Independent Victory Auditor Report (VICTORY CONFIRMED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/teamwork_preview_worker_m4_qa/screenshots/ — High-resolution live browser verification screenshots
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel final handoff report
+

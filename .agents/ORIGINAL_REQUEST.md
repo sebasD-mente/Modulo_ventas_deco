@@ -454,4 +454,86 @@ Ensamblar los hooks y componentes atómicos en un contenedor maestro (<80 línea
 - [ ] `npm run build` compila con Vite sin errores de JSX, imports rotos o tipos (código de salida 0).
 - [ ] `npm run harness:check` ejecuta todos los checks en cadena con éxito absoluto.
 
+## 2026-09-12T00:41:51Z
+
+# Teamwork Project Prompt — Phase 3: Modular Refactoring of EventsManagementView.jsx
+
+> Goal: Refactorizar modularmente el componente monolítico `src/components/EventsManagementView.jsx` (1,111 líneas) en submódulos atómicos especializados bajo `src/components/events/`, reduciendo el contenedor maestro canónico a menos de 70 líneas sin romper su contrato público de props `{ onEventActivated }` ni la integración con `src/App.jsx`.  
+> Requested team: Orquestado por Fred (`teamwork_preview_orchestrator`), quien coordinará el despiece a través de subagentes especializados y un auditor independiente.
+
+Refactorizar modularmente el componente monolítico `src/components/EventsManagementView.jsx` (1,111 líneas) en una arquitectura atómica desacoplada bajo `src/components/events/`, garantizando cero breaking changes, cumplimiento del arnés Zero-Trust y reducción del inventario de monolitos.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+---
+
+## Requirements
+
+### R1. Hook Reactivo Central (`src/components/events/hooks/useEventsManager.js` — < 150 líneas)
+- Encapsular la lógica de negocio y comunicación con la API autenticada (`authFetch`):
+  - Consulta y recarga de eventos (`/api/events`), métricas consolidadas y estados.
+  - Creación de eventos (`POST /api/events`).
+  - Activación de evento con asignación de vendedor Google (`POST /api/events/:id/activate`).
+  - Archivo y reactivación de eventos (`PATCH /api/events/:id/archive`).
+  - Eliminación con validación de seguridad (`DELETE /api/events/:id`).
+  - Historial de ventas de evento (`GET /api/sales/events/:id`).
+- Manejo reactivo de estados: `events`, `isLoading`, `errorMsg`, modales activos y estados de envío (`isSubmitting...`).
+- Techo estricto: **< 150 líneas**.
+
+### R2. Tarjeta de Evento & Barra de Filtros
+- **`src/components/events/EventCard.jsx` (< 140 líneas)**:
+  - Renderizado de tarjeta de evento: badge de estado (Activo, Próximo, Finalizado, Archivado), fechas formateadas, ubicación, vendedor asignado y métricas de venta.
+  - Acciones: Botón Activar (con callback `onEventActivated`), Ver Ventas, Archivar/Reactivar, Eliminar.
+  - Techo estricto: **< 140 líneas**.
+- **`src/components/events/EventsFilterBar.jsx` (< 70 líneas)**:
+  - Input de búsqueda reactivo con icono.
+  - Tabs de filtro de estado (Todos, Activos, Próximos, Archivados).
+  - Botón principal de acción: "Nuevo Evento".
+  - Techo estricto: **< 70 líneas**.
+
+### R3. Suite Atómica de Modales (`src/components/events/modals/`)
+- **`CreateEventModal.jsx` (< 120 líneas)**: Formulario de alta con validación de nombre, ubicación, fechas y metas.
+- **`ActivateEventModal.jsx` (< 100 líneas)**: Formulario de activación asignando Google Email del vendedor y nombre de cajero.
+- **`EventSalesModal.jsx` (< 130 líneas)**: Modal/Drawer de auditoría con desglose de ventas del evento, métodos de pago y totales.
+- **`EventActionModals.jsx` (< 90 líneas)**: Diálogos de confirmación de Archivo y Eliminación con alertas preventivas.
+- Ningún modal debe superar las **140 líneas**.
+
+### R4. Contenedor Maestro Canónico (`src/components/EventsManagementView.jsx` — < 70 líneas)
+- Orquestar `useEventsManager`, `EventsFilterBar`, `EventCard` y los modales especializados.
+- **Contrato público obligatorio**: Exportar por defecto `EventsManagementView({ onEventActivated })`.
+- Cero breaking changes en `src/App.jsx`.
+- Techo estricto: **< 70 líneas** (reducción >93% respecto a las 1,111 líneas originales).
+
+---
+
+## Strict Constraints & Security
+- **Regla Sagrada de Monolitos**: NINGÚN archivo nuevo o modificado puede superar las **200 líneas de código**. Todos los componentes visuales deben mantenerse entre 40 y 140 líneas.
+- **Protocolo Zero-Trust y Aislamiento**: Prohibido hardcodear correos, secretos o conectar infraestructura externa (<RULE[user_global]>).
+- **Cero Suposiciones e Integridad Funcional**: Prohibido crear mocks ficticios o dejar comentarios TODO/FIXME. Toda la funcionalidad preexistente debe seguir operativa.
+
+---
+
+## Acceptance Criteria
+
+### 1. Erradicación del Monolito y Estructura
+- [ ] `src/components/EventsManagementView.jsx` tiene menos de 70 líneas.
+- [ ] `src/components/events/hooks/useEventsManager.js` existe y tiene menos de 150 líneas.
+- [ ] `src/components/events/EventCard.jsx` existe y tiene menos de 140 líneas.
+- [ ] `src/components/events/EventsFilterBar.jsx` existe y tiene menos de 70 líneas.
+- [ ] Todos los modales en `src/components/events/modals/` existen y tienen menos de 140 líneas cada uno.
+- [ ] NINGÚN archivo en `src/components/events/` supera las 200 líneas.
+
+### 2. Calidad de Arnés & Calificación Técnica
+- [ ] `npm run test:security` ejecuta y aprueba 9/9 tests (pass 9, fail 0).
+- [ ] `npm run audit:secrets` reporta 0 violaciones en todos los archivos de producción.
+- [ ] `npm run audit:monoliths` reporta `<= 16` archivos (con `EventsManagementView.jsx` eliminado de la lista de monolitos).
+- [ ] `npm run build` compila con éxito mediante Vite (código de salida 0).
+- [ ] Suite de pruebas unitarias/modulares creada para los nuevos submódulos y pasando al 100%.
+
+### 3. Verificación en Vivo & Certificación Visual
+- [ ] El auditor independiente inspecciona el resultado y certifica `VICTORY CONFIRMED`.
+- [ ] Verificación activa con Chrome DevTools en vivo con capturas de pantalla de alta resolución demostrando la UI de eventos operativa.
+
+
 
