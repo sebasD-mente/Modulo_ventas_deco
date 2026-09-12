@@ -18,28 +18,18 @@ async function sleep(ms) {
 }
 
 async function runPreFlightChecks() {
-  console.log('🛡️ [Paso 1/5] Ejecutando Puerta de Calidad Local (npm run harness:check)...');
+  console.log('🛡️ [Paso 1/4] Ejecutando Puerta de Calidad Local (npm run harness:check)...');
   try {
     execSync('npm run harness:check', { stdio: 'inherit' });
-    console.log('✅ [Paso 1/5] Arnés de calidad aprobado en verde.');
+    console.log('✅ [Paso 1/4] Arnés de calidad aprobado en verde.');
   } catch (err) {
     console.error('\n❌ [ABORTADO] La puerta de calidad local falló. Corrige los errores antes de desplegar.');
     process.exit(1);
   }
 }
 
-function syncVersionJson(commitHash) {
-  const versionPath = path.resolve('server/config/version.json');
-  const payload = {
-    gitCommit: commitHash,
-    updatedAt: new Date().toISOString()
-  };
-  fs.writeFileSync(versionPath, JSON.stringify(payload, null, 2) + '\n');
-  console.log(`📦 [Paso 2/5] Hash de versión sincronizado: ${commitHash}`);
-}
-
 async function triggerDokployWebhook() {
-  console.log('🚀 [Paso 3/5] Disparando Webhook oficial de Dokploy...');
+  console.log('🚀 [Paso 3/4] Disparando Webhook oficial de Dokploy...');
   const res = await fetch(DOKPLOY_WEBHOOK_URL, {
     method: 'POST',
     headers: {
@@ -53,15 +43,14 @@ async function triggerDokployWebhook() {
   if (!res.ok) {
     throw new Error(`Fallo HTTP ${res.status} al disparar webhook: ${text}`);
   }
-  console.log(`✅ [Paso 3/5] Webhook aceptado por Dokploy: ${text.trim()}`);
+  console.log(`✅ [Paso 3/4] Webhook aceptado por Dokploy: ${text.trim()}`);
 }
 
 async function pollUntilDeployed(localCommit, deployStartTime) {
-  console.log(`⏳ [Paso 4/5] Monitoreando reinicio del contenedor en ${HEALTH_URL}...`);
+  console.log(`⏳ [Paso 4/4] Monitoreando reinicio del contenedor en ${HEALTH_URL}...`);
   console.log(`🎯 Objetivo: gitCommit === "${localCommit}" Y reinicio post-deploy.`);
 
   const start = Date.now();
-  let lastUptime = null;
   let attempts = 0;
 
   while (Date.now() - start < MAX_WAIT_MS) {
@@ -71,7 +60,7 @@ async function pollUntilDeployed(localCommit, deployStartTime) {
     try {
       const res = await fetch(HEALTH_URL, { cache: 'no-store' });
       if (!res.ok && res.status !== 503) {
-        console.log(`[Intento ${attempts}] Servidor respondió HTTP ${res.status}. Posible reinicio de contenedor...`);
+        process.stdout.write(`\r[T+${Math.round((Date.now() - start) / 1000)}s] Servidor respondió HTTP ${res.status}. Posible reinicio de contenedor... `);
         continue;
       }
 
@@ -88,7 +77,7 @@ async function pollUntilDeployed(localCommit, deployStartTime) {
       const containerFresh = remoteUptime < 120;
 
       if (commitMatches && containerFresh) {
-        console.log('\n\n🎉 [Paso 5/5] ¡DESPLIEGUE CONFIRMADO EN PRODUCCIÓN!');
+        console.log('\n\n🎉 [Victoria] ¡DESPLIEGUE CONFIRMADO EN PRODUCCIÓN!');
         const receipt = {
           status: 'DEPLOY_SUCCESS',
           localCommit,
@@ -104,7 +93,7 @@ async function pollUntilDeployed(localCommit, deployStartTime) {
         return receipt;
       }
     } catch (fetchErr) {
-      console.log(`\n[T+${Math.round((Date.now() - start) / 1000)}s] Contenedor reiniciando / temporalmente inaccesible (${fetchErr.message})...`);
+      process.stdout.write(`\r[T+${Math.round((Date.now() - start) / 1000)}s] Contenedor reiniciando / temporalmente inaccesible... `);
     }
   }
 
@@ -121,29 +110,27 @@ async function main() {
   // 1. Puerta de Calidad Local
   await runPreFlightChecks();
 
-  // 2. Hash Local
-  const localCommit = execSync('git rev-parse --short HEAD').toString().trim();
-  syncVersionJson(localCommit);
-
-  // Asegurar que si version.json cambió, se comitea antes de push
-  const gitDiff = execSync('git status --porcelain').toString().trim();
-  if (gitDiff.includes('server/config/version.json')) {
-    execSync('git add server/config/version.json');
-    execSync(`git commit -m "chore(version): sync version.json with commit ${localCommit}"`);
+  // 2. Comprobar que el árbol de trabajo esté limpio antes de desplegar
+  const status = execSync('git status --porcelain').toString().trim();
+  if (status) {
+    console.error('❌ [ABORTADO] Hay cambios locales sin commitear. Haz commit antes de desplegar:\n' + status);
+    process.exit(1);
   }
 
-  const finalLocalCommit = execSync('git rev-parse --short HEAD').toString().trim();
+  // 3. Hash Local actual
+  const localCommit = execSync('git rev-parse --short HEAD').toString().trim();
+  console.log(`📌 Commit local a desplegar: ${localCommit}`);
 
-  // 3. Git Push
-  console.log(`\n📤 [Paso 2.5/5] Enviando cambios a GitHub (origin/main)...`);
+  // 4. Git Push
+  console.log(`\n📤 [Paso 2/4] Enviando cambios a GitHub (origin/main)...`);
   execSync('git push origin main', { stdio: 'inherit' });
 
-  // 4. Webhook Dokploy
+  // 5. Webhook Dokploy
   const deployStartTime = Date.now();
   await triggerDokployWebhook();
 
-  // 5. Polling Determinista
-  await pollUntilDeployed(finalLocalCommit, deployStartTime);
+  // 6. Polling Determinista
+  await pollUntilDeployed(localCommit, deployStartTime);
 }
 
 main().catch((err) => {

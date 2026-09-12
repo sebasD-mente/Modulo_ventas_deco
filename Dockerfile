@@ -72,8 +72,9 @@ COPY --chown=node:node package*.json ./
 # Copy compiled frontend distribution from builder stage
 COPY --chown=node:node --from=builder /app/dist ./dist
 
-# Copy backend server source
+# Copy backend server source and git metadata
 COPY --chown=node:node server ./server
+COPY --chown=node:node .git ./.git
 
 # Copy static assets
 COPY --chown=node:node public ./public

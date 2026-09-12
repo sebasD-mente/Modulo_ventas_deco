@@ -38,6 +38,23 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads'))
 function getGitCommit() {
   if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
   try {
+    const gitHeadPath = path.resolve(__dirname, '../.git/HEAD');
+    if (fs.existsSync(gitHeadPath)) {
+      const headContent = fs.readFileSync(gitHeadPath, 'utf-8').trim();
+      if (headContent.startsWith('ref: ')) {
+        const refPath = path.resolve(__dirname, '../.git', headContent.slice(5));
+        if (fs.existsSync(refPath)) return fs.readFileSync(refPath, 'utf-8').trim().slice(0, 7);
+        const packedPath = path.resolve(__dirname, '../.git/packed-refs');
+        if (fs.existsSync(packedPath)) {
+          const m = fs.readFileSync(packedPath, 'utf-8').split('\n').find((l) => l.includes(headContent.slice(5)));
+          if (m) return m.split(' ')[0].trim().slice(0, 7);
+        }
+      } else {
+        return headContent.slice(0, 7);
+      }
+    }
+  } catch {}
+  try {
     const vPath = path.resolve(__dirname, 'config/version.json');
     if (fs.existsSync(vPath)) {
       const v = JSON.parse(fs.readFileSync(vPath, 'utf-8'));
