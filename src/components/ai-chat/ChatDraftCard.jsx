@@ -16,6 +16,7 @@ export default function ChatDraftCard({
   const discard = onDiscard || discardDraft;
   const confirm = onConfirmSale || confirmPendingSale;
   const openSwap = onOpenSwapModal || openSwapModal;
+  const getSizes = (it) => { const raw = it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES; return raw.some((s) => s.sizeId === 'PORTADA_ALBUM') ? raw : [...raw, DEFAULT_EVENT_SIZES.find((s) => s.sizeId === 'PORTADA_ALBUM') || { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 }]; };
 
   const handleModify = () => {
     if (transferDraftToManualForm) { transferDraftToManualForm(); return; }
@@ -58,7 +59,7 @@ export default function ChatDraftCard({
                   onChange={(e) => updateSize?.(idx, e.target.value)}
                   className="bg-[#222222] border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-white font-bold focus:outline-none focus:border-white cursor-pointer"
                 >
-                  {(it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES).map((s) => (
+                  {getSizes(it).map((s) => (
                     <option key={s.sizeId} value={s.sizeId}>{s.nombre} (Q{s.precio})</option>
                   ))}
                 </select>
@@ -105,8 +106,9 @@ export default function ChatDraftCard({
             ))}
           </div>
           <div className="text-right">
-            <span className="text-[10px] text-neutral-400 mr-1">Total:</span>
-            <strong className="text-emerald-400 text-sm font-black">Q {Number(pendingDraft.total || 0).toFixed(2)}</strong>
+            {Number(pendingDraft.discount || 0) > 0 && <span className="block text-[10px] text-amber-400 font-semibold">Desc: -Q{Number(pendingDraft.discount).toFixed(2)}</span>}
+            <span className="text-[10px] text-neutral-400 mr-1">{Number(pendingDraft.discount || 0) > 0 ? 'Total Neto:' : 'Total:'}</span>
+            <strong className="text-emerald-400 text-sm font-black">Q {Number(Math.max(0, (pendingDraft.total || 0) - (pendingDraft.discount || 0))).toFixed(2)}</strong>
           </div>
         </div>
 

@@ -1,14 +1,16 @@
 export const DEFAULT_EVENT_SIZES = [
   { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
   { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+  { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
   { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
   { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
   { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
 ];
-export const SIZE_PRICE_MAP = { MINI: 25, PEQUENO: 35, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
+export const SIZE_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
 export const SIZE_ALIASES = [
   { re: /\b(gigante|extra\s*grande|24[xX]36|60[xX]90)\b/i, id: 'GIGANTE' },
   { re: /\b(grande|18[xX]24|45[xX]60)\b/i, id: 'GRANDE' },
+  { re: /\b(portada|album|[aá]lbum|vinilo|disco|cuadrad[oa]|30[xX]30)\b/i, id: 'PORTADA_ALBUM' },
   { re: /\b(mediano?|medio|12[xX]18|30[xX]45)\b/i, id: 'MEDIANO' },
   { re: /\b(peque[ñn]o|chico|8[xX]10|21[xX]27)\b/i, id: 'PEQUENO' },
   { re: /\b(mini|5[xX]7|14[xX]21)\b/i, id: 'MINI' },

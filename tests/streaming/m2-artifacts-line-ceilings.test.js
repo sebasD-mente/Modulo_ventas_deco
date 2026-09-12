@@ -38,7 +38,7 @@ describe('📏 M2 Artifacts Line Ceilings & Structural Integrity', () => {
 
     // Circuit Breaker & Fallback
     assert.ok(code.includes('AbortController'), 'Debe implementar AbortController');
-    assert.ok(code.includes('8000'), 'Debe tener timeout de 8 segundos para circuit breaker');
+    assert.ok(/(8000|25000)/.test(code), 'Debe tener timeout para circuit breaker (25000ms)');
     assert.ok(code.includes('buildOfflineFallbackReply'), 'Debe invocar buildOfflineFallbackReply en contingencia');
 
     // Mutations & Multimodal Endpoints

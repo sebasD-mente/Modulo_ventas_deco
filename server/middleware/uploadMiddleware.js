@@ -39,7 +39,9 @@ export const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 export const fileFilter = (req, file, cb) => {
-  const mimetype = (file.mimetype || '').toLowerCase();
+  const rawMimetype = (file.mimetype || '').toLowerCase();
+  const mimetype = rawMimetype.split(';')[0].trim();
+  file.mimetype = mimetype;
 
   // Validación granular por nombre de campo en formulario multipart
   if (file.fieldname === 'audio') {

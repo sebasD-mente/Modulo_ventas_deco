@@ -730,3 +730,255 @@ Crear el directorio `src/components/closing/`:
 4. **Certificación Independiente de Victoria**:
    - El auditor independiente (`teamwork_preview_victory_auditor`) debe inspeccionar la entrega y emitir el veredicto oficial `VICTORY CONFIRMED` antes del reporte final.
 
+## 2026-09-12T05:32:41Z
+
+# Teamwork Project Prompt — Auditoría Forense 360° y Diagnóstico de Arquitectura Enterprise del Agente STAND {IA}
+
+> **Status**: Launched  
+> **Target System**: Agente de Inteligencia Artificial Multimodal STAND {IA}  
+> **Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`  
+> **Integrity mode**: development  
+> **Requested team**: Fred (`teamwork_preview_orchestrator`)  
+> **Mandato de Sebastián Jiménez & Gary (CTO)**: /teamwork-preview Realizar una radiografía profunda, quirúrgica y exhaustiva de cada línea de código, script, herramienta, esquema de Function Calling, puente con PostgreSQL y tubería de streaming del agente STAND {IA}. Identificar con precisión matemática por qué actualmente falla al registrar ventas, dar reportes y responder sobre el catálogo, y entregar el mapa de ruta definitivo para elevarlo al estándar enterprise de nivel mundial.
+
+---
+
+### 🧱 1. Directivas Sagradas y Reglas de Compromiso (<RULE[user_global]>)
+1. **Aislamiento Sagrado de Infraestructura**: Toda la auditoría e inspección ocurre 100% dentro de `Modulo_Ventas` y sobre la base de datos `deko_eventsales_db`. Prohibido tocar o referenciar infraestructura externa.
+2. **Zero-Trust de Credenciales**: Cero secretos, tokens o correos en texto plano.
+3. **Cero Suposiciones y Cero Mocks**: Prohibido alucinar diagnósticos teóricos. Todo problema señalado debe estar referenciado con archivo exacto, número de línea (`file:///...#Lxx`) y comprobado mediante pruebas empíricas reales.
+4. **Fase de Inspección Pura**: Prohibido alterar o parchar código fuente de producción durante esta fase. El objetivo exclusivo de este sprint es el diagnóstico forense, trazabilidad de fallos y diseño de la solución arquitectónica.
+
+---
+
+### 📋 2. Requerimientos Modulares de Auditoría (R1 a R6)
+
+#### R1. Auditoría de la Tubería Conversacional, Streaming SSE y Gestión de Contexto
+Inspeccionar a fondo la comunicación asíncrona entre el cliente y el servidor:
+- **Archivos bajo lupa**:
+  * Frontend: `src/components/ai-chat/hooks/useAiChatStream.js`, `src/components/ai-chat/ChatMessageList.jsx`, `src/components/ai-chat/UnifiedAiChat.jsx`.
+  * Backend: `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`.
+- **Puntos críticos a diagnosticar**:
+  1. Identificar por qué ocurren respuestas vacías o degradadas cuando Gemini ejecuta herramientas (`functionCalls`).
+  2. Evaluar el procesamiento del stream SSE (`ReadableStream`, decodificación de chunks y renderizado con `requestAnimationFrame`).
+  3. Diagnosticar la pérdida de memoria conversacional multi-turno: ¿por qué el agente no resuelve pronombres ni continuidad básica de venta (ej. si el cliente dice *"¿tienes de Batman?"* y luego *"¿a cuánto el mediano?"*)?
+  4. Revisar la estrategia de podado de historial en `UnifiedAiChat.jsx` y su impacto en la coherencia del diálogo.
+
+#### R2. Auditoría del Sistema de Function Calling y Acceso a Base de Datos
+Inspeccionar la declaración, despacho y retorno de las herramientas formales de `@google/genai`:
+- **Archivos bajo lupa**:
+  * Backend: `server/services/ai/aiToolsService.js`, `server/config/prisma.js`.
+  * Frontend: `src/components/ai-chat/ChatToolCards.jsx`.
+- **Puntos críticos a diagnosticar**:
+  1. Revisar las 7 declaraciones de tools: `prepareSaleDraft`, `searchCatalog`, `getEventKPIs`, `getCashDrawerStatus`, `getSellerShiftReport`, `getProductionQueueStatus`, `checkInventoryStock`.
+  2. Diagnosticar por qué el modelo decide o no disparar cada herramienta ante intenciones explícitas del usuario.
+  3. Auditar la consistencia entre los tipos de datos declarados en los esquemas y las consultas reales a PostgreSQL (`prisma.$queryRaw`, agregaciones de ventas, usuarios y arqueos).
+  4. Verificar cómo viajan los eventos SSE de tools hacia el frontend y por qué las tarjetas visuales (`ChatToolCards.jsx`) fallan en renderizar datos vivos de producción.
+
+#### R3. Auditoría del Flujo de Registro de Ventas y Borrador Interactivo (Human-in-the-Loop)
+Inspeccionar el ciclo completo desde que el cliente dicta una orden hasta que se asienta contablemente en el evento:
+- **Archivos bajo lupa**:
+  * Frontend: `src/components/ai-chat/ChatDraftCard.jsx`, `src/components/ai-chat/hooks/useAiVoiceRecorder.js`, `src/components/manual-sale/hooks/useManualSaleCart.js`.
+  * Backend: `server/services/ai/aiMediaService.js`, `server/services/semanticParserService.js`, `server/services/saleService.js`.
+- **Puntos críticos a diagnosticar**:
+  1. Mapeo semántico de lenguaje natural: ¿por qué fallan frases complejas como *"1 de un verano sin ti portada en tarjeta y 2 de star wars mediano en efectivo"*?
+  2. Extracción y normalización de tallas canónicas (`MINI`, `PEQUENO`, `MEDIANO`, `GRANDE`, `GIGANTE`, `PORTADA_ALBUM`) y precios de venta fijos.
+  3. Identificar si el borrador (`pendingDraft`) se genera con todos los datos necesarios para confirmar con 1 solo toque (`POST /api/sales`) sin obligar al cajero a usar formularios manuales.
+  4. Auditar la robustez del canal de voz (`Web Audio API`, VAD y transcripción multimodal) ante ruido ambiente típico de convenciones o ferias.
+
+#### R4. Auditoría de Consultas de Catálogo, Grounding y Búsqueda Semántica
+Inspeccionar el acceso al inventario real de obras de arte:
+- **Archivos bajo lupa**:
+  * Backend: `server/services/webCatalogService.js`, `server/services/catalogSyncService.js`, `prisma/schema.prisma` (tabla `Product`).
+- **Puntos críticos a diagnosticar**:
+  1. Evaluar la cobertura y sincronización de las 233 obras del catálogo oficial de Deco Vintage Guate.
+  2. Diagnosticar por qué se truncan o limitan las búsquedas y cómo opera la deduplicación bicapa (por ID, slug de imagen y título normalizado).
+  3. Evaluar el grounding de Gemini: ¿el agente conoce los detalles del producto (tintas ecológicas HP Látex, duración >10 años, instalación con cinta tesa® en 15 segundos) o responde como un bot genérico de internet?
+  4. Auditar la disponibilidad física y verificación de stock en el stand.
+
+#### R5. Auditoría del Pool de Modelos, Latencia y Resiliencia ante Fallos
+Inspeccionar la infraestructura de inferencia y consumo de APIs de Google Cloud:
+- **Archivos bajo lupa**:
+  * Backend: `server/services/geminiPoolService.js`, `server/services/ai/aiPromptService.js`, `server/config/env.js`.
+- **Puntos críticos a diagnosticar**:
+  1. Diagnosticar la compatibilidad estricta con el SDK moderno `@google/genai` y el uso de modelos actuales (`gemini-3.6-flash` titular, `gemini-3.5-flash-lite` backup).
+  2. Evaluar el manejo de contingencias: ¿qué sucede ante errores HTTP 429 (rate limits) o caídas de red en el evento? ¿El fallback offline (`buildOfflineFallbackReply`) aporta valor o es un callejón sin salida?
+  3. Medir el Time-To-First-Byte (TTFB) y la latencia de respuesta en turnos conversacionales y de ejecución de herramientas.
+
+#### R6. Matriz de Brechas (Gap Analysis) y Plan Maestro de Solución Definitiva
+Elaborar el informe final consolidado:
+- **Clasificación por severidad**: P0 (Bloqueantes comerciales), P1 (Alta prioridad funcional), P2 (Optimizaciones de experiencia y velocidad).
+- **Para cada hallazgo**:
+  * Archivo exacto y líneas de código (`file:///...#Lxx`).
+  * Causa raíz técnica comprobada.
+  * Impacto operativo en el stand de ventas.
+  * Solución arquitectónica definitiva (sin parches provisionales ni deuda técnica).
+
+---
+
+### ✅ 3. Criterios de Aceptación y Certificación de Victoria
+- [x] **Cobertura 100%**: Inspección sin omisiones de la totalidad de archivos del subsistema de IA en frontend (`src/components/ai-chat/`) y backend (`server/services/ai/`, `server/controllers/aiController.js`, `server/services/semanticParserService.js`).
+- [x] **Cero Mocks en Diagnóstico**: Cada fallo reportado verificado directamente en el código o mediante inspección y scripts empíricos en `scratch/`.
+- [x] **Aislamiento Sagrado Verificado**: Cero alteraciones de esquemas ajenos ni credenciales no autorizadas; operación confinada a `Modulo_Ventas` y `deko_eventsales_db`.
+- [x] **Informe Consolidado**: Publicación del reporte maestro en `.agents/orchestrator_12/AUDIT_REPORT_STAND_IA.md`.
+- [x] **Certificación Independiente de Victoria**: `VICTORY CONFIRMED` emitido por `victory_auditor_12`.
+
+## 2026-09-12T06:30:00Z
+
+# Teamwork Project Prompt — REHACER FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexión Viva de STAND {IA}
+
+> **Status**: Relaunched (Mandato de Rehacer Fase 1 por Rechazo de Auditoría)  
+> **Target System**: Agente de Inteligencia Artificial Multimodal STAND {IA}  
+> **Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`  
+> **Integrity mode**: development  
+> **Requested team**: Fred (`teamwork_preview_orchestrator`)  
+> **Mandato Supremo de Sebastián Jiménez & Gary (CTO)**: /teamwork-preview **REHACER POR COMPLETO LA FASE 1**. La entrega anterior fue RECHAZADA tajantemente en la auditoría en vivo con evidencia visual irrefutable: el agente NO se comunicó con Gemini, entró en timeout de 8 segundos, cayó en el fallback offline local (`buildOfflineFallbackReply`), machacó el mensaje del usuario y duplicó grotescamente la burbuja de error en la interfaz. Queda TERMINANTEMENTE PROHIBIDO pasar a la Fase 2 hasta que la Fase 1 esté 100% operativa con conexión viva a Gemini, sin mensajes duplicados, sin caídas en modo offline y con confirmación de ventas 1-touch funcionando en el navegador real.
+
+---
+
+### 🚨 1. Diagnóstico de la Evidencia que Causó el Rechazo
+En la prueba en vivo capturada en navegador real se demostró que:
+1. **Gemini NUNCA respondió**: Saltó el Circuit Breaker de 8 segundos (`AbortError`) en `useAiChatStream.js#L101`. El sistema cayó en el bloque `catch` que ejecutó `buildOfflineFallbackReply` en `chatConstants.js`. Lo que calculó los Q55 fue un regex estático de emergencia, NO la IA.
+2. **Corrupción y Duplicación Visual**: La burbuja derecha del usuario (que debía decir la orden de compra) fue sustituida por el texto del error offline (`📡 Sin conexión a Gemini...`), y la burbuja izquierda del bot repitió exactamente el mismo mensaje. El estado de `messages` en `useAiChatStream.js` se corrompió.
+3. **Falso Éxito**: Dar por buena una pantalla que grita en el centro "Sin conexión a Gemini" es inaceptable.
+
+---
+
+### 🧱 2. Directivas Sagradas y Reglas de Compromiso (<RULE[user_global]>)
+1. **Aislamiento Sagrado**: Operar 100% dentro de `Modulo_Ventas` y `deko_eventsales_db`.
+2. **Zero-Trust de Credenciales**: Cero secretos o tokens expuestos.
+3. **Cero Mocks y Cero Autoengaños**: Una respuesta proveniente de `buildOfflineFallbackReply` es considerada un **FALLO TOTAL** de la prueba. Solo se acepta como válida una respuesta con tokens reales generados por Gemini.
+4. **Arnés de Calidad Inviolable**: Mantener en verde `npm run harness:check` (`test:security`, `audit:secrets`, `audit:monoliths`, `build`).
+
+---
+
+### 📋 3. Requerimientos Obligatorios de Rehacer Fase 1 (RF1 a RF7)
+
+#### RF1. Erradicación de Corrupción y Duplicación de Mensajes en el Chat
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `src/components/ai-chat/ChatMessageList.jsx`, `src/components/ai-chat/ChatInputBar.jsx`.
+- **Causa a corregir**: `id: Date.now()` y `aiMsgId = Date.now() + 1` generan colisiones de claves en React y permiten que `updateAiMsg` machaque el mensaje del usuario si los IDs coinciden o si el array se reasigna. Además, `ChatInputBar` debe limpiar el input de forma reactiva determinista.
+- **Acción Obligatoria**:
+  - Usar IDs estables y únicos garantizados (`crypto.randomUUID()` o contador incremental inmutable).
+  - El mensaje del usuario (`sender: 'user'`) debe ser **estrictamente inmutable**: una vez insertado en `messages`, ninguna función de error o fallback puede alterar su propiedad `text`.
+  - Asegurar que `updateAiMsg` solo modifique de forma atómica el mensaje de la IA con `sender: 'ai'`.
+
+#### RF2. Blindaje del Timeout y Tubería de Comunicación con Gemini
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`.
+- **Causa a corregir**: El timeout de 8 segundos (`circuitBreakerTimeout`) es excesivamente agresivo para inferencias de LLM con Function Calling en frío, provocando que cualquier demora normal de red aborte la conexión y caiga en el fallback offline.
+- **Acción Obligatoria**:
+  - Elevar el timeout a **25 segundos** en `useAiChatStream.js`.
+  - Asegurar que el backend capture fallos de red sin colapsar el stream y que devuelva el stream SSE correctamente con tokens y eventos estructurados.
+  - Asegurar que el fallback offline SOLO se active si el navegador está literalmente sin internet (`!navigator.onLine`), y que NUNCA altere ni mute el mensaje del usuario ni duplique burbujas.
+
+#### RF3. Normalización de MIME Types en Multer (Voz en Chrome/Android)
+- **Archivos**: `server/middleware/uploadMiddleware.js`.
+- **Acción Obligatoria**: Normalizar `file.mimetype.split(';')[0].trim().toLowerCase()`. Garantizar que `audio/webm;codecs=opus` sea aceptado por la lista blanca.
+
+#### RF4. Blindaje de UUID en Borrador de Venta (1-Touch Sale sin Error 400)
+- **Archivos**: `server/services/ai/aiToolsService.js`, `src/components/ai-chat/hooks/useAiChatStream.js`, `server/validators/saleValidators.js`.
+- **Acción Obligatoria**: Si una obra no tiene UUID en la base de datos (obras bajo demanda o personalizadas de alias), normalizar determinísticamente `productId = null`. Asegurar que `confirmPendingSale` (`POST /api/sales`) asiente la venta con código 201 en 1 solo toque.
+
+#### RF5. Cuadre Contable de Descuentos
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`.
+- **Acción Obligatoria**: Asignar al pago el total neto descontado exacto: `netTotal = Math.max(0, grandTotal - (pendingDraft.discount || 0))`. Cero rechazos contables por centavos.
+
+#### RF6. Talla Canónica `PORTADA_ALBUM` (Q55.00)
+- **Archivos**: `src/components/ai-chat/chatConstants.js`, `src/components/ai-chat/ChatDraftCard.jsx`, `server/services/ai/aiToolsService.js`.
+- **Acción Obligatoria**: `{ sizeId: 'PORTADA_ALBUM', name: 'Portada Álbum (30x30 cm)', price: 55 }` registrado universalmente con precio Q55.00.
+
+#### RF7. Parser SSE por Bloques Dobles `\n\n`
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`.
+- **Acción Obligatoria**: Acumulador estricto por bloques `\n\n` que decodifique `event:` y `data:` sin perder paquetes fragmentados.
+
+---
+
+### ✅ 4. Criterios Inquebrantables de Aceptación (Condición para pasar a Fase 2)
+- [ ] **Cero Mensajes de "Sin conexión a Gemini"**: El chat debe comunicarse en vivo con Gemini y emitir respuesta real.
+- [ ] **Cero Duplicación de Burbujas**: El mensaje del usuario permanece a la derecha con su texto original; la respuesta de la IA aparece a la izquierda sin clonarse.
+- [ ] **Borrador Interactivo Operativo**: La tarjeta de borrador se genera y permite cambiar talla a `Portada Álbum (Q55)`.
+- [ ] **Confirmación 1-Touch Exitosa**: Al presionar `Confirmar Venta`, la venta se registra en PostgreSQL sin error 400.
+- [ ] **Harness 100% Verde**: `test:security`, `audit:secrets`, `audit:monoliths`, `build` aprobados.
+- [ ] **Prueba Visual en Vivo con Chrome DevTools MCP**: Capturas de pantalla que demuestren el chat limpio, sin errores y con la venta asentada.
+- [ ] **Certificación de Victoria**: `VICTORY CONFIRMED` emitido por el Auditor Independiente.
+
+
+
+
+
+
+
+## 2026-09-12T06:36:48Z
+
+# Teamwork Project Prompt — REHACER FASE 1: Estabilización Real, Erradicación de Falsos Éxitos y Conexión Viva de STAND {IA}
+
+> **Status**: Launched  
+> **Target System**: Agente de Inteligencia Artificial Multimodal STAND {IA}  
+> **Working directory**: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`  
+> **Integrity mode**: development  
+> **Requested team**: Fred (`teamwork_preview_orchestrator`)  
+> **Mandato de Sebastián Jiménez & Gary (CTO)**: /teamwork-preview REHACER POR COMPLETO LA FASE 1. La entrega anterior fue RECHAZADA tajantemente en la auditoría en vivo con evidencia visual irrefutable: el agente NO se comunicó con Gemini, entró en timeout de 8 segundos, cayó en el fallback offline local (buildOfflineFallbackReply), machacó el mensaje del usuario y duplicó grotescamente la burbuja de error en la interfaz. Queda TERMINANTEMENTE PROHIBIDO pasar a la Fase 2 hasta que la Fase 1 esté 100% operativa con conexión viva a Gemini, sin mensajes duplicados, sin caídas en modo offline y con confirmación de ventas 1-touch funcionando en el navegador real.
+
+---
+
+### 🚨 1. Diagnóstico de la Evidencia que Causó el Rechazo
+1. **Gemini NUNCA respondió**: Saltó el Circuit Breaker prematuro de 8 segundos (`AbortError`) en `useAiChatStream.js`. El sistema cayó en el bloque catch que ejecutó `buildOfflineFallbackReply` en `chatConstants.js`. Lo que calculó los Q55 fue un regex estático de emergencia, NO la IA.
+2. **Corrupción y Duplicación Visual**: La burbuja derecha del usuario (que debía decir la orden de compra) fue sustituida por el texto del error offline (*"📡 Sin conexión a Gemini..."*), y la burbuja izquierda del bot repitió exactamente el mismo mensaje. El estado de `messages` en `useAiChatStream.js` se corrompió debido a colisión de IDs basados en `Date.now()` y mutación no segregada por rol.
+3. **Falso Éxito**: Dar por buena una pantalla que muestra *"Sin conexión a Gemini"* es inaceptable y viola las directivas de cero suposiciones y pruebas en vivo obligatorias.
+
+---
+
+### 🧱 2. Directivas Sagradas y Reglas de Compromiso (<RULE[user_global]>)
+1. **Aislamiento Sagrado de Infraestructura**: Toda la auditoría e inspección ocurre 100% dentro de `Modulo_Ventas` y sobre la base de datos `deko_eventsales_db`. Prohibido tocar o referenciar infraestructura externa.
+2. **Zero-Trust de Credenciales**: Cero secretos, tokens o correos en texto plano.
+3. **Cero Suposiciones y Cero Mocks**: Cero respuestas simuladas de IA en producción. Todo debe ser verificado con conexiones reales a Gemini y PostgreSQL.
+4. **Verificación Visual Obligatoria en Vivo**: El trabajo solo se considera terminado cuando se navegue en el navegador real vía Chrome DevTools MCP, se interactúe con el chat, se reciba respuesta real de Gemini y se capture evidencia visual irrefutable.
+
+---
+
+### 📋 3. Requerimientos Obligatorios de Rehacer Fase 1 (RF1 a RF7)
+
+#### RF1. Erradicación de Corrupción y Duplicación de Mensajes en el Chat
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `src/components/ai-chat/ChatMessageList.jsx`, `src/components/ai-chat/ChatInputBar.jsx`.
+- **Acción Obligatoria**:
+  * Usar IDs únicos e inmutables garantizados (`crypto.randomUUID()` o generador atómico garantizado) erradicando cualquier colisión por `Date.now()`.
+  * El mensaje del usuario (`sender: 'user'`) es estrictamente inmutable: una vez renderizado con el texto que escribió el usuario, ninguna rutina de error o fallback puede alterar su propiedad `text`.
+  * `updateAiMsg` solo puede modificar de forma atómica el mensaje con `sender: 'ai' && m.id === aiMsgId`.
+
+#### RF2. Blindaje del Timeout y Tubería de Comunicación con Gemini
+- **Archivos**: `src/components/ai-chat/hooks/useAiChatStream.js`, `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`.
+- **Acción Obligatoria**:
+  * Elevar el timeout del Circuit Breaker a 25 segundos en `useAiChatStream.js` para no abortar prematuramente llamadas de LLM en frío o con latencia de red.
+  * Asegurar que el endpoint `/api/ai/chat` capture fallos sin tumbar la conexión y emita tokens reales en streaming SSE.
+  * El fallback offline SOLO se permite si el navegador está literalmente sin internet (`!navigator.onLine`), y NUNCA altera el mensaje del usuario ni duplica burbujas.
+
+#### RF3. Normalización de MIME Types en Multer (Voz en Chrome/Android)
+- **Archivo**: `server/middleware/uploadMiddleware.js`.
+- **Acción Obligatoria**: Preservar y blindar la normalización `file.mimetype.split(';')[0].trim().toLowerCase()` para que grabaciones WebRTC `audio/webm;codecs=opus` sean aceptadas limpiamente.
+
+#### RF4. Blindaje de UUID en Borrador de Venta (1-Touch Sale sin Error 400)
+- **Archivos**: `server/services/ai/aiToolsService.js`, `src/components/ai-chat/hooks/useAiChatStream.js`, `server/validators/saleValidators.js`.
+- **Acción Obligatoria**: Si una obra no tiene UUID en la base de datos (obras bajo demanda o personalizadas de alias), normalizar determinísticamente `productId = null`. Asegurar que `confirmPendingSale` (`POST /api/sales`) asiente la venta con código 201 en 1 solo toque.
+
+#### RF5. Cuadre Contable de Descuentos
+- **Archivo**: `src/components/ai-chat/hooks/useAiChatStream.js`.
+- **Acción Obligatoria**: Asignar al pago el total neto descontado exacto: `netTotal = Math.max(0, grandTotal - (pendingDraft.discount || 0))`. Cero discrepancias por centavos en backend.
+
+#### RF6. Talla Canónica PORTADA_ALBUM (Q55.00)
+- **Archivos**: `src/components/ai-chat/chatConstants.js`, `src/components/ai-chat/ChatDraftCard.jsx`, `server/services/ai/aiToolsService.js`.
+- **Acción Obligatoria**: `{ sizeId: 'PORTADA_ALBUM', name: 'Portada Álbum (30x30 cm)', price: 55 }` registrado universalmente en frontend y backend con precio Q55.00.
+
+#### RF7. Parser SSE por Bloques Dobles \n\n
+- **Archivo**: `src/components/ai-chat/hooks/useAiChatStream.js`.
+- **Acción Obligatoria**: Acumulador estricto por bloques `\n\n` que decodifique `event:` y `data:` sin perder paquetes fragmentados.
+- **Restricción**: Mantener `chatConstants.js` en `< 60` líneas y `useAiChatStream.js` en `< 160` líneas.
+
+---
+
+### ✅ 4. Criterios Inquebrantables de Aceptación (Condición para pasar a Fase 2)
+- [ ] **Cero Mensajes de "Sin conexión a Gemini"**: El chat debe comunicarse en vivo con Gemini y emitir respuesta real del modelo.
+- [ ] **Cero Duplicación de Burbujas**: El mensaje del usuario permanece a la derecha con su texto original; la respuesta de la IA aparece a la izquierda sin clonarse.
+- [ ] **Borrador Interactivo Operativo**: La tarjeta de borrador se genera con datos reales y permite cambiar talla a Portada Álbum (Q55).
+- [ ] **Confirmación 1-Touch Exitosa**: Al presionar "Confirmar Venta", la venta se registra en PostgreSQL sin error 400 ni fallo contable.
+- [ ] **Harness 100% Verde**: `npm run harness:check` aprobado (security, secrets, monoliths, build).
+- [ ] **Prueba Visual en Vivo con Chrome DevTools MCP**: Navegación real en navegador, ejecución de venta por chat y captura de pantalla de alta resolución demostrando el chat limpio y la venta asentada.
+- [ ] **Certificación de Victoria**: `VICTORY CONFIRMED` emitido por el Auditor Independiente de Victoria.

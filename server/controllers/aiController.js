@@ -234,6 +234,8 @@ export async function handleChatQuery(req, res) {
     res.flushHeaders?.();
 
     let fullText = '';
+    let isClientClosed = false;
+    req.on('close', () => { isClientClosed = true; });
     const t0Stream = Date.now();
 
     try {
@@ -247,6 +249,7 @@ export async function handleChatQuery(req, res) {
       });
 
       for await (const chunk of streamGenerator) {
+        if (isClientClosed || res.writableEnded || res.destroyed) break;
         if (chunk.type === 'token') {
           fullText += chunk.text;
           res.write(`event: token\ndata: ${JSON.stringify({ text: chunk.text, delta: chunk.text })}\n\n`);
@@ -279,12 +282,16 @@ export async function handleChatQuery(req, res) {
         details: { eventId },
       });
 
-      res.write(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!' })}\n\n`);
-      res.end();
+      if (!isClientClosed && !res.writableEnded && !res.destroyed) {
+        res.write(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!' })}\n\n`);
+        res.end();
+      }
     } catch (streamErr) {
       console.error('❌ Error durante el streaming SSE:', streamErr);
-      res.write(`event: error\ndata: ${JSON.stringify({ error: streamErr.message })}\n\n`);
-      res.end();
+      if (!isClientClosed && !res.writableEnded && !res.destroyed) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: streamErr.message })}\n\n`);
+        res.end();
+      }
     }
   } catch (err) {
     console.error('❌ Error en handleChatQuery:', err);

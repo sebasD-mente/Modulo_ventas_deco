@@ -45,6 +45,7 @@ public/uploads/*
 
 # Test artifacts and screenshots
 tests/*.png
+scratch/
 
 
 # Application and package manager logs

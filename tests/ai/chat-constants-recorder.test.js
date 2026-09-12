@@ -13,9 +13,9 @@ import {
 import { getSupportedAudioMimeType } from '../../src/components/ai-chat/hooks/useAiVoiceRecorder.js';
 
 describe('chatConstants & useAiVoiceRecorder Suite', () => {
-  test('DEFAULT_EVENT_SIZES contains 5 valid event sizes', () => {
-    assert.strictEqual(DEFAULT_EVENT_SIZES.length, 5);
-    const expectedIds = ['MINI', 'PEQUENO', 'MEDIANO', 'GRANDE', 'GIGANTE'];
+  test('DEFAULT_EVENT_SIZES contains 6 valid event sizes', () => {
+    assert.strictEqual(DEFAULT_EVENT_SIZES.length, 6);
+    const expectedIds = ['MINI', 'PEQUENO', 'PORTADA_ALBUM', 'MEDIANO', 'GRANDE', 'GIGANTE'];
     expectedIds.forEach((id) => {
       const found = DEFAULT_EVENT_SIZES.find((s) => s.sizeId === id);
       assert.ok(found, `Size ${id} must exist`);
@@ -26,6 +26,7 @@ describe('chatConstants & useAiVoiceRecorder Suite', () => {
   test('SIZE_PRICE_MAP matches size prices correctly', () => {
     assert.strictEqual(SIZE_PRICE_MAP.MINI, 25);
     assert.strictEqual(SIZE_PRICE_MAP.PEQUENO, 35);
+    assert.strictEqual(SIZE_PRICE_MAP.PORTADA_ALBUM, 55);
     assert.strictEqual(SIZE_PRICE_MAP.MEDIANO, 65);
     assert.strictEqual(SIZE_PRICE_MAP.GRANDE, 125);
     assert.strictEqual(SIZE_PRICE_MAP.GIGANTE, 180);

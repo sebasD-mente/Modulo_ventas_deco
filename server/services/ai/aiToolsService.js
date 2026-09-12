@@ -4,7 +4,7 @@ import { searchWebPosters } from '../webCatalogService.js';
 import { extractPaymentMethod, resolveEntityAlias, normalizeArtworkQuery } from '../semanticParserService.js';
 import { normalizeCatalogSizeId, matchPosterEverywhere } from './aiMediaService.js';
 
-export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
+export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, discount: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
 export const searchCatalogDeclaration = { name: 'searchCatalog', description: 'Busca obras y pósters en el catálogo oficial de Deco Vintage por palabras clave, personaje, franquicia o artista. Acompaña siempre la búsqueda con recomendaciones proactivas.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, category: { type: Type.STRING } }, required: ['query'] } };
 export const getEventKPIsDeclaration = { name: 'getEventKPIs', description: 'Obtiene las métricas y KPIs en tiempo real del evento activo en PostgreSQL: total vendido, transacciones, etc.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, date: { type: Type.STRING } } } };
 export const getCashDrawerStatusDeclaration = { name: 'getCashDrawerStatus', description: 'Consulta el estado del efectivo en gaveta del stand, total en tarjetas, transferencias y último arqueo de caja registrado.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING } } } };
@@ -13,8 +13,9 @@ export const getProductionQueueStatusDeclaration = { name: 'getProductionQueueSt
 export const checkInventoryStockDeclaration = { name: 'checkInventoryStock', description: 'Verifica las existencias y disponibilidad física de una obra en el stand o catálogo.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, sizeId: { type: Type.STRING } }, required: ['query'] } };
 export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
 
-const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 }];
+const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 }, { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55, badge: '🎵 Vinilo / 30x30' }, { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 }];
 const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s === 'PEQUENO' ? 35.0 : s === 'GRANDE' ? 125.0 : s === 'GIGANTE' ? 180.0 : 65.0;
+const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
@@ -41,12 +42,12 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     const subtotal = Number((qty * unitPrice).toFixed(2));
     grandTotal += subtotal;
     if (matched) {
-      enrichedItems.push({ productId: matched.productId || null, webPosterId: matched.posterId || null, description: matched.description, baseTitle: matched.baseTitle || rawName, category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'), thumbUrl: matched.thumbUrl || null, imageUrl: matched.imageUrl || null, quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [] });
+      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched.posterId || null, description: matched.description, baseTitle: matched.baseTitle || rawName, category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'), thumbUrl: matched.thumbUrl || null, imageUrl: matched.imageUrl || null, quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [] });
     } else {
-      enrichedItems.push({ description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`, baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName, quantity: qty, unitPrice, subtotal, sizeId: normSize });
+      enrichedItems.push({ productId: null, description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`, baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName, quantity: qty, unitPrice, subtotal, sizeId: normSize });
     }
   }
-  return { items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };
+  return { items: enrichedItems, total: Number(grandTotal.toFixed(2)), discount: Number(args?.discount || 0), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };
 }
 
 export async function executeGetCashDrawerStatus(tenantId, eventId) {

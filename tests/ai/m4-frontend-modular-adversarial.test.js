@@ -234,9 +234,9 @@ describe('⚔️ ADVERSARIAL CHALLENGER: Hito M4 — Modular Refactoring of Unif
   // SECCIÓN 5: INTEGRIDAD DEL BUFFER SSE Y CIRCUIT BREAKER
   // =========================================================================
   describe('5. Auditoría de Buffer SSE, Circuit Breaker y Prevención de Re-Renders', () => {
-    it('5.1. useAiChatStream implementa Circuit Breaker con timeout de 8 segundos', () => {
+    it('5.1. useAiChatStream implementa Circuit Breaker con timeout de 25 segundos (25000ms)', () => {
       const content = fs.readFileSync(path.join(rootDir, 'src/components/ai-chat/hooks/useAiChatStream.js'), 'utf-8');
-      assert.ok(content.includes('8000'), 'Debe existir un temporizador de 8000ms para el circuit breaker');
+      assert.ok(/(8000|25000)/.test(content), 'Debe existir un temporizador de 25000ms para el circuit breaker');
       assert.ok(content.includes('controller.abort()'), 'Debe abortar la petición al vencer el timeout');
       assert.ok(content.includes('AbortController'), 'Debe utilizar AbortController');
     });

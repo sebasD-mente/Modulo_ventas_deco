@@ -38,7 +38,7 @@ export function invalidateCatalogCache(tenantId = null) {
  * @param {object} p - Registro del modelo Product.
  * @returns {object} - Objeto compatible con la UI del POS.
  */
-function formatProductForPos(p) {
+export function formatProductForPos(p) {
   let parsedSizes = [];
 
   if (Array.isArray(p.sizes) && p.sizes.length > 0) {
@@ -55,6 +55,7 @@ function formatProductForPos(p) {
     parsedSizes = [
       { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
       { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+      { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
       { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
       { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
       { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
@@ -132,6 +133,7 @@ async function getCachedProducts(tenantId) {
         sizes: [
           { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
+          { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
         ],
@@ -148,6 +150,7 @@ async function getCachedProducts(tenantId) {
         sizes: [
           { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
+          { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
         ],

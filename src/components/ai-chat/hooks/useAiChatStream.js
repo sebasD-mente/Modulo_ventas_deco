@@ -2,24 +2,23 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_EVENT_SIZES, buildOfflineFallbackReply } from '../chatConstants';
-
 const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
-
+const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm } = {}) {
-  const { authFetch } = useAuth(), [messages, setMessages] = useState([{ id: 1, sender: 'ai', text: '¡Hola! Soy STAND IA y estoy listo para registrar ventas y dar reportes, ¿con qué comenzamos?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+  const { authFetch } = useAuth(), [messages, setMessages] = useState([{ id: genId(), sender: 'ai', text: '¡Hola! Soy STAND IA y estoy listo para registrar ventas y dar reportes, ¿con qué comenzamos?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
   const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState('');
   const [pendingDraft, setPendingDraft] = useState(null), [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false);
   const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null);
-
   const getNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const pushAiMsg = (text) => setMessages((p) => [...p, { id: Date.now() + 1, sender: 'ai', text, timestamp: getNow() }]);
+  const pushAiMsg = (text) => setMessages((p) => [...p, { id: genId(), sender: 'ai', text, timestamp: getNow() }]);
   const recalculateTotal = (items) => Number(items.reduce((s, i) => s + (i.subtotal || i.quantity * i.unitPrice), 0).toFixed(2));
   const cancelRaf = () => { if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; } };
   const getAtts = (p) => Array.isArray(p.attachments) && p.attachments.length ? p.attachments : p.audioUrl ? [{ fileUrl: p.audioUrl, fileType: 'AUDIO_VOZ', transcription: p.transcription || null }] : p.imageUrl ? [{ fileUrl: p.imageUrl, fileType: p.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }] : [];
-
   const updateDraftItemSize = (idx, newSizeId) => pendingDraft?.items?.[idx] && setPendingDraft((prev) => {
-    const items = [...prev.items], it = items[idx], sizes = it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === newSizeId) || sizes[0];
-    items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})` };
+    const items = [...prev.items], it = items[idx], raw = it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES;
+    const sizes = raw.some((s) => s.sizeId === 'PORTADA_ALBUM') ? raw : [...raw, DEFAULT_EVENT_SIZES.find((s) => s.sizeId === 'PORTADA_ALBUM') || { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 }];
+    const target = sizes.find((s) => s.sizeId === newSizeId) || sizes[0];
+    items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})`, availableSizes: sizes };
     return { ...prev, items, total: recalculateTotal(items) };
   });
   const updateDraftItemQty = (idx, delta) => pendingDraft?.items?.[idx] && setPendingDraft((prev) => {
@@ -54,13 +53,12 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
 
   const uploadMedia = async (url, form, userText, note, onDone) => {
     setIsLoading(true); setProcessingNote(note);
-    setMessages((p) => [...p, { id: Date.now(), sender: 'user', text: userText, timestamp: getNow() }]);
+    setMessages((p) => [...p, { id: genId(), sender: 'user', text: userText, timestamp: getNow() }]);
     try {
       const res = await authFetch(url, { method: 'POST', body: form }), data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando');
       setPendingDraft(data.draftSale); onDone(data);
-    } catch (err) { pushAiMsg(`⚠️ ${err.message}`); }
-    finally { setIsLoading(false); setProcessingNote(''); }
+    } catch (err) { pushAiMsg(`⚠️ ${err.message}`); } finally { setIsLoading(false); setProcessingNote(''); }
   };
   const handleVoiceUpload = (audioBlob) => {
     const ext = audioBlob.type.includes('mp4') ? 'mp4' : audioBlob.type.includes('aac') ? 'aac' : 'webm', form = new FormData(); form.append('audio', audioBlob, `voice-sale.${ext}`); form.append('eventId', eventId);
@@ -72,21 +70,20 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada para reconocimiento visual]', 'Gemini Vision analizando arte contra los 233 pósters del catálogo...', (d) => pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`));
     if (e.target) e.target.value = '';
   };
-
   const confirmPendingSale = async () => {
     if (!pendingDraft?.items?.length) return;
     setIsLoading(true); setProcessingNote('Asentando venta inmutable en PostgreSQL...');
-    const grandTotal = recalculateTotal(pendingDraft.items);
-    const salePayload = { eventId, items: pendingDraft.items.map((i) => ({ productId: i.productId || null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })), payments: [{ method: pendingDraft.paymentMethod || 'EFECTIVO', amount: grandTotal, reference: pendingDraft.notes || null }], discount: Number(pendingDraft.discount || 0), notes: pendingDraft.notes || null, inputChannel: pendingDraft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(pendingDraft) };
+    const grandTotal = recalculateTotal(pendingDraft.items), discount = Number(pendingDraft.discount || 0), netTotal = Number(Math.max(0, grandTotal - discount).toFixed(2));
+    const isUuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+    const salePayload = { eventId, items: pendingDraft.items.map((i) => ({ productId: isUuid(i.productId) ? i.productId : null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })), payments: [{ method: pendingDraft.paymentMethod || 'EFECTIVO', amount: netTotal, reference: pendingDraft.notes || null }], discount, notes: pendingDraft.notes || null, inputChannel: pendingDraft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(pendingDraft) };
     try {
       const res = await authFetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(salePayload) }), json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error registrando la venta');
       try { confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 }, colors: ['#F59E0B', '#10B981', '#3B82F6'] }); } catch (_) {}
-      pushAiMsg(`🎉 ¡Venta ${json.data.saleNumber} asentada con éxito por Q ${grandTotal.toFixed(2)} en PostgreSQL!`);
+      pushAiMsg(`🎉 ¡Venta ${json.data.saleNumber} asentada con éxito por Q ${netTotal.toFixed(2)} en PostgreSQL!`);
       setPendingDraft(null); if (onSaleRegistered) onSaleRegistered(json.data);
     } catch (err) { console.error(err); alert(`Error confirmando venta: ${err.message}`); } finally { setIsLoading(false); setProcessingNote(''); }
   };
-
   const transferDraftToManualForm = () => {
     if (!onPopulateManualForm || !pendingDraft) return;
     const items = (pendingDraft.items || []).map((it) => ({ ...it, selectedSizeId: it.selectedSizeId || it.sizeId || null, sizeId: it.sizeId || it.selectedSizeId || null }));
@@ -95,48 +92,51 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
 
   const handleSendText = async (customText = null) => {
     const query = (customText || inputText).trim(); if (!query || isLoading) return;
-    setInputText(''); const aiMsgId = Date.now() + 1;
-    setMessages((p) => [...p, { id: Date.now(), sender: 'user', text: query, timestamp: getNow() }, { id: aiMsgId, sender: 'ai', text: '', isStreaming: true, suggestedPosters: [], timestamp: getNow() }]);
-    const updateAiMsg = (updater) => setMessages((p) => p.map((m) => (m.id === aiMsgId ? updater(m) : m)));
-    const controller = new AbortController(); abortControllerRef.current = controller;
-    const circuitBreakerTimeout = setTimeout(() => controller.abort(), 8000);
+    setInputText(''); const userMsgId = genId(), aiMsgId = genId();
+    setMessages((p) => [...p, { id: userMsgId, sender: 'user', text: query, timestamp: getNow() }, { id: aiMsgId, sender: 'ai', text: '', isStreaming: true, suggestedPosters: [], timestamp: getNow() }]);
+    const updateAiMsg = (updater) => setMessages((p) => p.map((m) => (m.sender === 'ai' && m.id === aiMsgId ? updater(m) : m)));
+    const controller = new AbortController(); abortControllerRef.current = controller; const circuitBreakerTimeout = setTimeout(() => controller.abort(), 25000);
     try {
       let res;
       try {
         const history = messages.slice(-6).map((m) => ({ role: m.sender === 'user' ? 'user' : 'model', text: `${m.text || ''}${m.sender === 'ai' && m.suggestedPosters?.length ? `\n\n[Contexto de obras:\n${m.suggestedPosters.map((p, i) => `Opción #${i + 1}: ${p.titulo || p.name || 'Póster'}${p.subtitulo ? ` - ${p.subtitulo}` : ''} [ID: ${p.id}] (Precio: Q${p.precioMinimo || 65})`).join('\n')}]` : ''}`.trim() }));
         res = await authFetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ message: query, eventId, pendingDraft: pendingDraft || null, stream: true, history }), signal: controller.signal });
       } catch (fetchErr) {
-        if (fetchErr.name === 'AbortError' || !navigator.onLine) {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
           const off = buildOfflineFallbackReply(query); updateAiMsg((m) => ({ ...m, isStreaming: false, text: off.text }));
-          if (off.draft) setPendingDraft(off.draft);
-          return;
+          if (off.draft) setPendingDraft(off.draft); return;
         }
-        throw fetchErr;
+        const isTimeout = fetchErr.name === 'AbortError';
+        updateAiMsg((m) => ({ ...m, isStreaming: false, text: isTimeout ? '⚠️ La consulta a Gemini tardó más de 25 segundos. Por favor intenta nuevamente.' : `⚠️ Error consultando IA: ${fetchErr.message}` }));
+        return;
       } finally { clearTimeout(circuitBreakerTimeout); abortControllerRef.current = null; }
 
       if ((res.headers.get('content-type') || '').includes('text/event-stream')) {
         const reader = res.body.getReader(), decoder = new TextDecoder('utf-8');
-        let buffer = '', accumulatedText = '', currentEvent = 'message', rafScheduled = false;
+        let buffer = '', accumulatedText = '', rafScheduled = false;
         const scheduleTokenUpdate = () => { if (!rafScheduled) { rafScheduled = true; rafIdRef.current = requestAnimationFrame(() => { rafScheduled = false; updateAiMsg((m) => ({ ...m, text: accumulatedText })); }); } };
         while (true) {
           const { done, value } = await reader.read(); if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n'); buffer = lines.pop() || '';
-          for (const rawLine of lines) {
-            const line = rawLine.trim(); if (!line) { currentEvent = 'message'; continue; }
-            if (line.startsWith('event:')) { currentEvent = line.replace(/^event:\s*/, '').trim(); continue; }
-            if (!line.startsWith('data:')) continue;
-            const dataStr = line.replace(/^data:\s*/, '').trim(); if (!dataStr) continue;
+          buffer = buffer.replace(/\r\n/g, '\n');
+          const blocks = buffer.split('\n\n'); buffer = blocks.pop() || '';
+          for (const block of blocks) {
+            const rawBlock = block.trim(); if (!rawBlock) continue;
+            let ev = 'message', dataLines = [];
+            for (const rL of rawBlock.split('\n')) {
+              const l = rL.trim();
+              if (l.startsWith('event:')) ev = l.replace(/^event:\s*/, '').trim();
+              else if (l.startsWith('data:')) dataLines.push(l.replace(/^data:\s*/, ''));
+            }
+            if (!dataLines.length) continue;
             try {
-              const data = JSON.parse(dataStr);
-              if (currentEvent === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
-              else if (currentEvent === 'draft_sale') { if (data.draftSale || data) setPendingDraft(data.draftSale || data); }
-              else if (currentEvent === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
-              else if (currentEvent === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
-              else if (data && TOOL_EVENT_MAP[currentEvent]) {
-                updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[currentEvent]]: currentEvent === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[currentEvent] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
-              }
-            } catch (parseErr) { console.warn('⚠️ [SSE Parse Error]', parseErr, dataStr); }
+              const data = JSON.parse(dataLines.join('\n'));
+              if (ev === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
+              else if (ev === 'draft_sale') { if (data.draftSale || data) setPendingDraft(data.draftSale || data); }
+              else if (ev === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
+              else if (ev === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
+              else if (data && TOOL_EVENT_MAP[ev]) updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[ev]]: ev === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[ev] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
+            } catch (parseErr) { console.warn('⚠️ [SSE Parse Error]', parseErr); }
           }
         }
         cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (pendingDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') }));
@@ -145,8 +145,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
         if (json.draftSale || json.draft) setPendingDraft(json.draftSale || json.draft);
         updateAiMsg((m) => ({ ...m, isStreaming: false, text: json.reply, suggestedPosters: json.suggestedPosters || [], eventKpis: json.eventKpis || null, cashDrawerStatus: json.cashDrawerStatus || null, sellerShiftReport: json.sellerShiftReport || null, productionQueueStatus: json.productionQueueStatus || null, inventoryStock: json.inventoryStock || null }));
       }
-    } catch (err) { updateAiMsg((m) => ({ ...m, isStreaming: false, text: `⚠️ No pude responder: ${err.message}` })); }
-    finally { setIsLoading(false); setProcessingNote(''); }
+    } catch (err) { updateAiMsg((m) => ({ ...m, isStreaming: false, text: `⚠️ No pude responder: ${err.message}` })); } finally { setIsLoading(false); setProcessingNote(''); }
   };
 
   useEffect(() => () => { cancelRaf(); abortControllerRef.current?.abort(); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); }, []);

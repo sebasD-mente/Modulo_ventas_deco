@@ -3,6 +3,8 @@ import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_SIZES, SIZE_CLEANUP_REGEX } from '../manualSaleConstants';
 
+const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
 export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = null }) {
   const { authFetch } = useAuth();
   const [cartItems, setCartItems] = useState([]);
@@ -28,7 +30,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
         const qty = Number(it.quantity) || 1;
         return {
           id: `draft-${idx}-${Date.now()}`,
-          productId: it.productId || null, posterId: it.posterId || it.productId || null,
+          productId: isUuid(it.productId) ? it.productId : null, posterId: it.posterId || it.productId || null,
           description: it.description, unitPrice, quantity: qty,
           subtotal: Number((qty * unitPrice).toFixed(2)),
           thumbUrl: it.thumbUrl || it.imageUrl || null, imageUrl: it.imageUrl || it.thumbUrl || null,
@@ -60,7 +62,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
     const qty = Number(quantity) || 1;
     const newItem = {
       id: `${poster.id}-${size.sizeId}-${Date.now()}`,
-      productId: poster.id, posterId: poster.id,
+      productId: isUuid(poster.id) ? poster.id : null, posterId: poster.id,
       description: `Póster ${title} (${size.nombre || size.sizeId})`,
       unitPrice, quantity: qty, subtotal: Number((qty * unitPrice).toFixed(2)),
       thumbUrl: poster.thumbUrl || poster.imageUrl || null,
@@ -99,7 +101,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
     setErrorMsg(null);
     const salePayload = {
       eventId,
-      items: cartItems.map((i) => ({ productId: i.productId || null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
+      items: cartItems.map((i) => ({ productId: isUuid(i.productId) ? i.productId : null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
       payments: [{ method: paymentMethod, amount: grandTotal, reference: notes || null }],
       discount: Number(discount) || 0,
       notes: notes || null,

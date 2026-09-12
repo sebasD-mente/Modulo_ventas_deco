@@ -36,7 +36,7 @@ export const envSchema = z.object({
       message: 'SUPER_ADMIN_EMAILS debe contener al menos un correo electrónico válido.',
     }),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GCS_BUCKET_NAME: z.string().default('deko-eventsales-media'),
   GCS_CREDENTIALS_BASE64: z.string().optional(),
   GCS_PROJECT_ID: z.string().optional(),
