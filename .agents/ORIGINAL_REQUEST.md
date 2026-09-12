@@ -357,3 +357,101 @@ Garantizar compatibilidad retroactiva total para que ningún controlador, ruta n
 - [ ] `npm run build` (Vite) compila exitosamente para producción sin errores de importación.
 - [ ] `npm run harness:check` culmina en estado de salida 0 (100% VERDE).
 
+## 2026-09-11T23:29:09Z
+
+# Teamwork Project Prompt — Final
+
+> Status: Launched
+> Goal: Execute modular refactoring of UnifiedAiChat.jsx with zero technical debt
+> Requested team: 4 specialized subagents + Orchestrator (Fred)
+
+Refactorizar modularmente el componente monolítico `src/components/UnifiedAiChat.jsx` (1,694 líneas) en submódulos atómicos bajo `src/components/ai-chat/`, reduciendo el contenedor maestro a menos de 80 líneas sin romper su contrato público de props ni la funcionalidad en producción.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Voice & Audio Architecture (`src/components/ai-chat/hooks/useAiVoiceRecorder.js`)
+Extraer y encapsular la gestión completa de audio y detección de actividad de voz en un hook reactivo (<140 líneas):
+- Parámetro de entrada: `onRecordingComplete(audioBlob)` callback.
+- Negociación dinámica de códecs cross-browser (`audio/webm;codecs=opus`, `audio/mp4`, `audio/aac`, etc.).
+- MediaRecorder, MediaStream (`echoCancellation`, `noiseSuppression`, `autoGainControl`).
+- Voice Activity Detection (VAD) mediante Web Audio API (`AudioContext`, `AnalyserNode`, umbral RMS ~-50 dBFS, ventana de silencio de 1.5s).
+- Temporizador de grabación, estados reactivos (`isRecording`, `recordingSeconds`, `vadActive`) y función de auto-cierre y cleanup estricto de pistas.
+- Al terminar o silenciarse la grabación, emitir `onRecordingComplete(audioBlob)` con el blob y tipo MIME correcto.
+
+### R2. Streaming SSE & Chat Engine (`src/components/ai-chat/hooks/useAiChatStream.js` y `ChatMessageList.jsx`)
+Extraer el motor de comunicación asíncrona y la lista de mensajes:
+- Hook `useAiChatStream` (<160 líneas):
+  - Recibe `{ eventId, onSaleRegistered, onPopulateManualForm }`.
+  - Expone: `{ messages, inputText, setInputText, isLoading, processingNote, pendingDraft, setPendingDraft, handleSendText, handleVoiceUpload, handleImageUpload, confirmPendingSale, updateDraftItemSize, updateDraftItemQty, removeDraftItem, updateDraftPaymentMethod, discardDraft, addPosterToDraft, selectSwapPoster }`.
+  - Conexión SSE al endpoint `/api/ai/chat` (streaming token a token vía `ReadableStream` y `TextDecoder`), buffer desacoplado con `requestAnimationFrame` (`rafIdRef`), Circuit Breaker con `AbortController` (timeout 8s), fallback con motor heurístico local (`buildOfflineFallbackReply`), y captura de eventos SSE (`token`, `draft_sale`, `suggested_posters`, `event_kpis`, `cash_drawer_status`, `sellerShiftReport`, `productionQueueStatus`, `inventoryStock`, `done`, `error`).
+  - `handleVoiceUpload(audioBlob)`: Envía formData al endpoint `/api/ai/voice-sale`, crea mensaje de usuario `🎙️ [Venta dictada por voz]`, procesa la respuesta y actualiza `pendingDraft` y mensaje del asistente.
+  - `handleImageUpload(e)`: Envía formData al endpoint `/api/ai/recognize-artwork`, procesa análisis visual y actualiza `pendingDraft`.
+  - `confirmPendingSale()`: Envía POST `/api/sales` con confetti y ejecuta `onSaleRegistered`.
+- Componente `ChatMessageList` (<100 líneas): Renderizado del feed de mensajes con scroll anclado (`chatContainerRef`, `isPinnedToBottomRef`, `chatBottomRef`), avatares, formato Markdown con cursor titilante en streaming, timestamps y llamada a tarjetas de herramientas embebidas (`ChatToolCards`) y sugerencias de catálogo.
+
+### R3. Tool Cards & Interactive Draft (`ChatToolCards.jsx`, `ChatDraftCard.jsx`, `ChatSwapModal.jsx`)
+Modularizar las tarjetas de base de datos y la gestión del borrador interactivo:
+- `ChatToolCards.jsx` (<140 líneas): Renderizado condicional de las 5 tarjetas de herramientas embebidas en el chat (`eventKpis`, `cashDrawerStatus`, `sellerShiftReport`, `productionQueueStatus`, `inventoryStock`).
+- `ChatDraftCard.jsx` (<140 líneas): Tarjeta interactiva del borrador Human-in-the-Loop (`pendingDraft`):
+  - Miniaturas WebP de obras.
+  - Selector interactivo de tamaños (`DEFAULT_EVENT_SIZES`) con recálculo dinámico de precios (`updateDraftItemSize`).
+  - Control de cantidades (+ / -) (`updateDraftItemQty`) y eliminación de ítems (`removeDraftItem`).
+  - Selector de método de pago (`EFECTIVO`, `TARJETA`, `TRANSFERENCIA`).
+  - Botones de acción: Descartar (`discardDraft`), Modificar (puebla manual form y resetea draft), y Confirmar Venta (`confirmPendingSale`).
+- `ChatSwapModal.jsx` (<100 líneas): Modal / overlay para sustituir un diseño del borrador con búsqueda interactiva con debounce hacia `/api/catalog/web-posters` y selección inmediata (`selectSwapPoster`).
+
+### R4. Header & Input Controls (`ChatHeader.jsx` y `ChatInputBar.jsx`)
+Extraer los elementos visuales de la interfaz de usuario:
+- `ChatHeader.jsx` (<50 líneas): Squircle con logo Origami STAND {IA}, título "Asistente IA" y badge "ON LINE" esmeralda con pulso.
+- `ChatInputBar.jsx` (<80 líneas): Barra inferior con selector de archivo de cámara oculto (`input capture="environment"`), botón de micrófono reactivo, botón de cámara/arte, input de texto píldora y botón de envío. Estado dinámico cuando está grabando (temporizador rojo o indicador ámbar VAD con botón "Finalizar").
+
+### R5. Constantes y Utilidades (`chatConstants.js`)
+- `chatConstants.js` (<60 líneas):
+  - `DEFAULT_EVENT_SIZES`
+  - `SIZE_PRICE_MAP`, `SIZE_ALIASES`, `PAYMENT_ALIASES`
+  - `buildOfflineFallbackReply(query)`
+  - `formatTime(seconds)`
+
+### R6. Contenedor Maestro Canónico (`src/components/UnifiedAiChat.jsx`)
+Ensamblar los hooks y componentes atómicos en un contenedor maestro (<80 líneas):
+- Firma pública intacta: `UnifiedAiChat({ eventId, onSaleRegistered, onPopulateManualForm })`.
+- Integración limpia:
+  ```jsx
+  const chatStream = useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm });
+  const voiceRecorder = useAiVoiceRecorder({ onRecordingComplete: chatStream.handleVoiceUpload });
+  ```
+- Cero breaking changes para `src/App.jsx`.
+- Cero deuda técnica: Ningún archivo creado puede exceder las 200 líneas (componentes visuales <60-100 líneas). Prohibidos parches o hacks.
+
+### R7. Aislamiento Sagrado & Zero-Trust
+- Todas las operaciones deben ocurrir estrictamente dentro de `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`.
+- Prohibido tocar repositorios o carpetas vecinas como `Web Deco Vintage Proyect`.
+- Cero claves o secretos hardcodeados.
+
+## Acceptance Criteria
+
+### Integridad Arquitectónica y Límites de Líneas
+- [ ] `src/components/UnifiedAiChat.jsx` contiene menos de 80 líneas de código.
+- [ ] Todos los archivos creados en `src/components/ai-chat/` respetan sus techos de líneas:
+  - `src/components/ai-chat/chatConstants.js` < 60 líneas.
+  - `src/components/ai-chat/hooks/useAiVoiceRecorder.js` < 140 líneas.
+  - `src/components/ai-chat/hooks/useAiChatStream.js` < 160 líneas.
+  - `src/components/ai-chat/ChatMessageList.jsx` < 100 líneas.
+  - `src/components/ai-chat/ChatToolCards.jsx` < 140 líneas.
+  - `src/components/ai-chat/ChatDraftCard.jsx` < 140 líneas.
+  - `src/components/ai-chat/ChatSwapModal.jsx` < 100 líneas.
+  - `src/components/ai-chat/ChatHeader.jsx` < 50 líneas.
+  - `src/components/ai-chat/ChatInputBar.jsx` < 80 líneas.
+- [ ] Ningún archivo nuevo o modificado supera las 200 líneas de código.
+
+### Auditoría y Arnés de Calidad Deko
+- [ ] `npm run test:security` finaliza en VERDE con 9/9 pruebas aprobadas.
+- [ ] `npm run audit:secrets` finaliza con 0 violaciones detectadas.
+- [ ] `npm run audit:monoliths` reporta 17 o menos archivos excedidos (`UnifiedAiChat.jsx` eliminado de la lista de monolitos).
+- [ ] `npm run build` compila con Vite sin errores de JSX, imports rotos o tipos (código de salida 0).
+- [ ] `npm run harness:check` ejecuta todos los checks en cadena con éxito absoluto.
+
+
