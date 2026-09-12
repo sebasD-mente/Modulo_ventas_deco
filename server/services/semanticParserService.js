@@ -216,7 +216,7 @@ export const STAND_ENTITY_ALIASES = [
   // ── SUPERHÉROES & CÓMICS ──────────────────────────────────────────────────
   {
     canonicalTitle: 'Spider-Man Vintage Comic',
-    searchQuery: 'Spider-Man Vintage Comic Marvel',
+    searchQuery: 'Spider-Man',
     category: 'SUPERHEROES',
     aliases: [
       'spiderman', 'spider-man', 'el hombre arana', 'el hombre araña', 'hombre arana',
@@ -225,7 +225,7 @@ export const STAND_ENTITY_ALIASES = [
   },
   {
     canonicalTitle: 'Batman - The Dark Knight',
-    searchQuery: 'Batman Dark Knight DC',
+    searchQuery: 'Batman',
     category: 'SUPERHEROES',
     aliases: [
       'batman', 'el caballero de la noche', 'dark knight', 'el bati', 'bruce wayne', 'batman vintage'
@@ -253,7 +253,7 @@ export const STAND_ENTITY_ALIASES = [
   // ── ANIME & MANGA ─────────────────────────────────────────────────────────
   {
     canonicalTitle: 'Dragon Ball - Goku Ultra Instinct',
-    searchQuery: 'Goku Dragon Ball Ultra Instinct',
+    searchQuery: 'Dragon Ball Goku',
     category: 'ANIME',
     aliases: [
       'goku', 'dragon ball', 'dragon ball z', 'kakaroto', 'sayayin', 'supersayayin',

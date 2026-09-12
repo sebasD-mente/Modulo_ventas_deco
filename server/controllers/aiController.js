@@ -279,7 +279,7 @@ export async function handleChatQuery(req, res) {
         details: { eventId },
       });
 
-      res.write(`event: done\ndata: ${JSON.stringify({ fullText })}\n\n`);
+      res.write(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!' })}\n\n`);
       res.end();
     } catch (streamErr) {
       console.error('❌ Error durante el streaming SSE:', streamErr);

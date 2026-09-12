@@ -1,4 +1,4 @@
-import { getGeminiClient } from '../../config/gemini.js';
+﻿import { getGeminiClient } from '../../config/gemini.js';
 import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { getEventKPIs } from '../saleService.js';
@@ -56,7 +56,17 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     for (const call of functionCalls) {
       const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
       if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message);
-      else if (call.name === 'searchCatalog' && call.args?.query) { const m = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 }); if (m?.length) suggestedPosters = m; }
+      else if (call.name === 'searchCatalog' && call.args?.query) {
+        const queryNorm = normalizeArtworkQuery(call.args.query);
+        let m = await searchWebPosters({ tenantId, query: queryNorm, category: call.args.category, limit: 12 });
+        if (!m?.length) {
+          const aliasRes = resolveEntityAlias(call.args.query);
+          if (aliasRes.matched) {
+            m = [{ id: `alias-${aliasRes.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${aliasRes.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: aliasRes.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: aliasRes.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: aliasRes.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
+          }
+        }
+        if (m?.length) suggestedPosters = m;
+      }
       else if (call.name === 'getEventKPIs') { try { eventKpis = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); } catch (e) { console.warn('KPI err:', e.message); } }
       else if (call.name === 'getCashDrawerStatus') cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, effEvId);
       else if (call.name === 'getSellerShiftReport') sellerShiftReport = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null);
@@ -70,8 +80,16 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
       else if (productionQueueStatus) cleanReply = productionQueueStatus.summary;
       else if (inventoryStock) cleanReply = inventoryStock.summary;
       else if (eventKpis) cleanReply = `📊 Ventas en vivo: Q ${eventKpis.totalAmount?.toFixed(2) || '0.00'} (${eventKpis.totalTransactions || 0} transacciones).`;
-      else if (draftSale) cleanReply = '¡Listo! He preparado el borrador de la venta en tu pantalla con todos los detalles.';
-      else cleanReply = '¡Entendido! Con gusto te apoyo con cualquier consulta o venta en el stand.';
+      else if (draftSale) {
+        const itemsList = (draftSale.items || []).map((it) => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
+        cleanReply = `🎉 **¡Listo! Te preparé el borrador de venta en pantalla:**
+${itemsList}
+
+💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}).
+Presiona **"Confirmar Venta"** para registrarla.`;
+      }
+      else if (suggestedPosters?.length) cleanReply = `¡Buenísima elección! Aquí tienes las opciones encontradas en catálogo.\n\n🌟 **Recomendación:** Nuestro tamaño estrella y más vendido es el **Mediano (30x45 cm a Q65.00)** con tintas ecológicas HP Látex y montaje en 15s con cinta tesa® original. ¿Cuál te gusta más o te preparo el borrador de una vez?`;
+      else cleanReply = '¡Con gusto te asesoro! Dime qué temática, franquicia o artista buscas y te muestro las mejores opciones de nuestro catálogo.';
     }
     return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
   } catch (err) {
@@ -118,8 +136,27 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
         if (executedCalls.has(sig)) continue;
         executedCalls.add(sig);
         const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : (eventId || contextData?.eventId);
-        if (call.name === 'prepareSaleDraft' && call.args) yield { type: 'draft_sale', data: await constructDraftPayload(tenantId, call.args, message) };
-        else if (call.name === 'searchCatalog' && call.args?.query) yield { type: 'suggested_posters', data: (await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 })) || [] };
+        if (call.name === 'prepareSaleDraft' && call.args) {
+          const draft = await constructDraftPayload(tenantId, call.args, message);
+          yield { type: 'draft_sale', data: draft };
+          const itemsList = (draft.items || []).map((it) => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
+          toolSummaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${itemsList}\n\n💳 **Total:** Q ${Number(draft.total || 0).toFixed(2)} (${draft.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
+        } else if (call.name === 'searchCatalog' && call.args?.query) {
+          const queryNorm = normalizeArtworkQuery(call.args.query);
+          let matches = await searchWebPosters({ tenantId, query: queryNorm, category: call.args.category, limit: 12 });
+          if (!matches?.length) {
+            const aliasRes = resolveEntityAlias(call.args.query);
+            if (aliasRes.matched) {
+              matches = [{ id: `alias-${aliasRes.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${aliasRes.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: aliasRes.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: aliasRes.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: aliasRes.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
+            }
+          }
+          yield { type: 'suggested_posters', data: matches || [] };
+          if (matches?.length > 0) {
+            toolSummaries.push(`¡Buenísima elección! Aquí tienes las opciones de **${call.args.query}** en catálogo.\n\n🌟 **Recomendación:** Nuestro tamaño estrella es el **Mediano (30x45 cm a Q65.00)** con tintas HP Látex y cinta tesa®. ¿Cuál te gusta o te preparo el borrador de una vez?`);
+          } else {
+            toolSummaries.push(`No encontré esa obra exacta en mostrador, pero **¡podemos imprimir cualquier diseño bajo demanda en nuestro taller en ~12 minutos!** 🖨️✨\n\n¿Te gustaría que te prepare un pedido personalizado en tamaño **Mediano (30x45 cm a Q65.00)**?`);
+          }
+        }
         else if (call.name === 'getEventKPIs') {
           let k = null;
           try { k = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); }
@@ -139,7 +176,11 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       }
     }
   }
-  if (!hasTextTokens && toolSummaries.length) {
-    for (const sum of toolSummaries) yield { type: 'token', text: sum.trim() };
+  if (!hasTextTokens) {
+    if (toolSummaries.length) {
+      for (const sum of toolSummaries) yield { type: 'token', text: sum.trim() };
+    } else {
+      yield { type: 'token', text: '¡Con gusto te asesoro! Dime qué póster, personaje o artista buscas y te muestro las mejores opciones de nuestro catálogo.' };
+    }
   }
 }

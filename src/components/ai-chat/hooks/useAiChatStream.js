@@ -131,7 +131,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
               const data = JSON.parse(dataStr);
               if (currentEvent === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
               else if (currentEvent === 'draft_sale') { if (data.draftSale || data) setPendingDraft(data.draftSale || data); }
-              else if (currentEvent === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || 'Entendido.' })); }
+              else if (currentEvent === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
               else if (currentEvent === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
               else if (data && TOOL_EVENT_MAP[currentEvent]) {
                 updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[currentEvent]]: currentEvent === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[currentEvent] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
@@ -139,7 +139,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
             } catch (parseErr) { console.warn('⚠️ [SSE Parse Error]', parseErr, dataStr); }
           }
         }
-        cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text }));
+        cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (pendingDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') }));
       } else {
         const json = await res.json(); if (!res.ok || !json.success) throw new Error(json.error || 'Error al comunicarse con la IA');
         if (json.draftSale || json.draft) setPendingDraft(json.draftSale || json.draft);
