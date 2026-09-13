@@ -36,8 +36,10 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - Victory Auditor (Modernización Gen 3 & Resiliencia): 15479362-8856-47fd-8842-f53a371c3b40 (victory_auditor_sentinel_16, VICTORY CONFIRMED)
 - Orchestrator (Auditoría Forense 360 & Blueprint STAND IA): 44270e0b-1540-4a69-abea-7df48f0385e2 (orchestrator_18, completed)
 - Victory Auditor (Auditoría Forense 360 & Blueprint STAND IA): 74d11d9a-455c-4c21-a28d-37e837e7f261 (victory_auditor_18, VICTORY CONFIRMED)
-- Orchestrator (Cirugía Arquitectónica & Blindaje P0): to be spawned (orchestrator_19)
-- Victory Auditor (Cirugía Arquitectónica & Blindaje P0): to be spawned on victory claim
+- Orchestrator (Cirugía Arquitectónica & Blindaje P0): orchestrator_19 (completed)
+- Victory Auditor (Cirugía Arquitectónica & Blindaje P0): closed
+- Orchestrator (RAG Vectorial & Copiloto STAND IA): 6ddcf51f-f397-4dd4-ad16-5a76fa7c9097 (orchestrator_20, running)
+- Victory Auditor (RAG Vectorial & Copiloto STAND IA): to be spawned on victory claim
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -70,18 +72,22 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - P0 Blindaje de feria: catalogCacheService Map acumulativo hasta 300 obras; deko_auth_user en localStorage para persistencia offline; useAiVoiceRecorder 7s timeout y calibración 400ms; aiMediaService con executeWithModelFallback; requireEventAccess en PATCH /sales/:id y tenantId en userController; protección de /health/ai.
 - Higiene: npm uninstall bcryptjs qrcode; eliminar COPY .git de Dockerfile; migraciones formales en prisma/migrations.
 - Calidad 4/4: test:security, audit:secrets, npm test, npm run build limpios.
+- RAG Vectorial Híbrido en RAM: embeddingService.js < 150 líneas, text-embedding-004 / gemini-embedding-001, similitud coseno sub-15ms, MIN_SIMILARITY_THRESHOLD = 0.45 estricto sin falsos positivos irrelevantes.
+- Purga completa de textos enlatados ("tintas látex", "cintas tesa", "volumen alto de consultas").
+- Calibración de personalidad de mostrador: copiloto táctico de vendedor, rápido, enérgico, combos de feria (2xQ120, 3xQ180).
+- Verificación en vivo obligatoria con Chrome DevTools MCP y capturas de alta resolución.
 
 ## User Context
-- **Last user request**: Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módulo de punto de venta Stand {IA} de Deco Vintage Guate, despiezando quirúrgicamente los 3 monolitos peligrosos y blindando contingencias P0 sin dispersión de archivos ni sobreingeniería.
+- **Last user request**: Motor RAG vectorial híbrido con @google/genai, purga de enlatados, calibración de personalidad de mostrador y certificación en vivo vía Chrome DevTools MCP para Comic Con Guatemala 2026.
 - **Pending clarifications**: none
-- **Delivered results**: previous missions completed (VICTORY CONFIRMED); new surgery mission starting.
+- **Delivered results**: previous missions completed (VICTORY CONFIRMED); new mission launched to orchestrator_20.
 
 ## Project Status
 - **Phase**: in progress
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_19 (1b9755bb-6609-409e-9161-fefd19278594, running)
+- **Active Orchestrator**: orchestrator_20 (6ddcf51f-f397-4dd4-ad16-5a76fa7c9097, running)
 - **Active Auditor**: to be spawned on victory claim
-- **Monitoring Crons**: Cron 1 (task-30, 8m progress), Cron 2 (task-32, 10m liveness)
+- **Monitoring Crons**: Cron 1 (task-32, 8m progress), Cron 2 (task-34, 10m liveness)
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -92,4 +98,3 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/AUDITORIA_360_STAND_IA.md — Master deliverable in repository root (91.6 KB, 870 lines)
