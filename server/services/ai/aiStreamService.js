@@ -30,8 +30,8 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
   };
 }
 
-export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = null }) {
-  const explicitClient = geminiClient || null;
+export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = undefined } = {}) {
+  const explicitClient = (geminiClient !== undefined && geminiClient !== null) ? geminiClient : null;
   const isAvailable = geminiClient === null ? false : Boolean(explicitClient || getGeminiClient());
   const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date });
   const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
@@ -72,11 +72,12 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
   }
 }
 
-export async function* streamChatWithSalesAssistant(messageOrOptions, historyParam = [], pendingDraftParam = null, contextDataParam = {}, geminiClientParam = null) {
+export async function* streamChatWithSalesAssistant(messageOrOptions, historyParam = [], pendingDraftParam = null, contextDataParam = {}, geminiClientParam = undefined) {
   const o = (messageOrOptions && typeof messageOrOptions === 'object' && !Array.isArray(messageOrOptions) && messageOrOptions.message !== undefined) ? messageOrOptions : { message: messageOrOptions, history: historyParam, pendingDraft: pendingDraftParam, contextData: contextDataParam, geminiClient: geminiClientParam };
   const { message, history = [], pendingDraft = null, contextData = {}, tenantId = o.contextData?.tenantId, eventId = o.contextData?.eventId, date = o.contextData?.date || null } = o;
-  const explicitClient = o.geminiClient || geminiClientParam || null;
-  const isAvailable = (o.geminiClient === null || geminiClientParam === null) ? false : Boolean(explicitClient || getGeminiClient());
+  const clientArg = o.geminiClient !== undefined ? o.geminiClient : geminiClientParam;
+  const explicitClient = (clientArg !== undefined && clientArg !== null) ? clientArg : null;
+  const isAvailable = clientArg === null ? false : Boolean(explicitClient || getGeminiClient());
 
   const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
   const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
@@ -86,7 +87,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     return;
   }
   const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
-  const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: explicitClient });
+  const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: explicitClient || undefined });
   const executedCalls = new Set();
   const executedTools = [];
   let trailingTextTokens = 0, hasEmittedTokens = false;
@@ -118,7 +119,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   }
 
   if (executedTools.length > 0) {
-    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient, trailingTextTokens });
+    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient || undefined, trailingTextTokens });
   } else if (!hasEmittedTokens) {
     yield { type: 'token', text: 'Indica el personaje o franquicia que busca el cliente y te muestro las opciones de inmediato.' };
   }

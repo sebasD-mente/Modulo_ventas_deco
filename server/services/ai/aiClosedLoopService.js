@@ -82,7 +82,7 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
     const followUpStream = streamWithModelFallback({
       buildContentsAndConfig: () => ({ contents: closedLoopContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
       models: getActivePool(),
-      client,
+      client: (client !== null && client !== undefined) ? client : undefined,
     });
     for await (const chunk of followUpStream) {
       const text = chunk.text || '';

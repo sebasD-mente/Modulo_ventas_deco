@@ -223,13 +223,13 @@ export async function* streamWithModelFallback({
   buildContentsAndConfig,
   models = MODEL_PRIORITY_POOL,
   onModelSelected = () => {},
-  client = null,
+  client = undefined,
 }) {
   let stream = null;
   let activeModel = models[0];
   let lastError = null;
 
-  if (client === null || (!client && getAvailableKeys().length === 0)) {
+  if (client === null) {
     yield { type: 'token', text: '[Modo Offline] El asistente de IA no está conectado actualmente.' };
     return;
   }
