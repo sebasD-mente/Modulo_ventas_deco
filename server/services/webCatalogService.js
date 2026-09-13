@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { invalidateVectorCache, searchHybridPosters, searchPostersByEmbedding } from './embeddingService.js';
 
 /**
  * Servicio Desacoplado de Catálogo de Pósters
@@ -31,6 +32,9 @@ export function invalidateCatalogCache(tenantId = null) {
   } else {
     productCache.clear();
   }
+  try {
+    invalidateVectorCache(tenantId);
+  } catch {}
 }
 
 /**
@@ -95,7 +99,7 @@ export function formatProductForPos(p) {
 /**
  * Obtiene los productos desde caché o recarga desde la base de datos si expiró.
  */
-async function getCachedProducts(tenantId) {
+export async function getCachedProducts(tenantId) {
   const key = tenantId || DEFAULT_TENANT_KEY;
   const now = Date.now();
   const cachedEntry = productCache.get(key);
@@ -474,3 +478,5 @@ export async function getWebPosterById(posterId, tenantId = null) {
 // Alias de compatibilidad
 export const searchPosters = searchWebPosters;
 export const getCatalogPosters = searchWebPosters;
+export { searchHybridPosters, searchPostersByEmbedding };
+

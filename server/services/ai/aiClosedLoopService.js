@@ -1,10 +1,8 @@
 import { ENV } from '../../config/env.js';
 import { getEventKPIs } from '../saleService.js';
-import { searchWebPosters } from '../webCatalogService.js';
-import { normalizeArtworkQuery, resolveEntityAlias } from '../semanticParserService.js';
 import { streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings } from './aiPromptService.js';
-import { salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
+import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 
@@ -15,7 +13,8 @@ function buildFallbackSummaries(executedTools) {
       const d = t.result, items = (d.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
       summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
     } else if (t.name === 'searchCatalog') {
-      summaries.push(`¡Buenísima elección! Aquí tienes las opciones encontradas en catálogo.\n\n🌟 **Recomendación:** Nuestro tamaño estrella es el **Mediano (30x45 cm a Q65.00)** con tintas HP Látex y cinta tesa®. ¿Cuál te gusta o te preparo el borrador de una vez?`);
+      const count = t.result?.matchesCount || (Array.isArray(t.result) ? t.result.length : 0);
+      summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla. ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
     } else if (t.name === 'checkInventoryStock' && t.result?.summary) {
       summaries.push(t.result.summary);
     } else if (t.name === 'getCashDrawerStatus' && t.result?.summaryText) {
@@ -28,7 +27,7 @@ function buildFallbackSummaries(executedTools) {
       summaries.push(`📊 **Ventas en tiempo real:** Q ${t.result.totalAmount?.toFixed(2) || '0.00'} (${t.result.totalTransactions || 0} ventas).`);
     }
   }
-  return summaries.length > 0 ? summaries : ['¡Con gusto te asesoro con cualquier duda o pedido!'];
+  return summaries.length > 0 ? summaries : ['Listo para registrar ventas o consultar catálogo en el stand.'];
 }
 
 export async function executeToolCall(call, { tenantId, eventId, date, message, resolved }) {
@@ -40,11 +39,7 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
       return { event: { type: 'draft_sale', data: draft }, toolRecord: { name: call.name, args: call.args, result: draft, id } };
     }
     if (call.name === 'searchCatalog' && call.args?.query) {
-      let matches = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 });
-      if (!matches?.length) {
-        const alias = resolveEntityAlias(call.args.query);
-        if (alias.matched) matches = [{ id: `alias-${alias.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${alias.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: alias.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: alias.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: alias.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
-      }
+      const matches = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);
       return { event: { type: 'suggested_posters', data: matches || [] }, toolRecord: { name: call.name, args: call.args, result: { matchesCount: matches?.length || 0, posters: (matches || []).slice(0, 6) }, id } };
     }
     if (call.name === 'getEventKPIs') {
@@ -82,6 +77,7 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
   const closedLoopContents = [...formattedContents, { role: 'model', parts: modelParts }, { role: 'tool', parts: toolParts }];
 
   let followUpTokensCount = 0;
+  let hadPoolError = false;
   try {
     const followUpStream = streamWithModelFallback({
       buildContentsAndConfig: () => ({ contents: closedLoopContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
@@ -89,15 +85,17 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
       client,
     });
     for await (const chunk of followUpStream) {
-      const isBreak = chunk.text?.includes('Respuesta finalizada') || chunk.text?.includes('volumen alto de consultas');
-      if (chunk.type === 'token' && chunk.text) { yield chunk; if (!isBreak) followUpTokensCount++; }
-      else if (chunk.text) { yield { type: 'token', text: chunk.text }; if (!isBreak) followUpTokensCount++; }
+      const text = chunk.text || '';
+      const isBreak = text.includes('Respuesta finalizada') || text.includes('Conexión con IA intermitente') || text.includes('volumen alto');
+      if (isBreak) hadPoolError = true;
+      if (chunk.type === 'token' && text) { yield chunk; if (!isBreak) followUpTokensCount++; }
+      else if (text) { yield { type: 'token', text }; if (!isBreak) followUpTokensCount++; }
     }
   } catch (err) {
     console.warn('[aiClosedLoopService] ⚠️ Error en closed-loop follow-up:', err.message);
   }
 
-  if (followUpTokensCount === 0) {
+  if (followUpTokensCount === 0 && !hadPoolError) {
     for (const text of buildFallbackSummaries(executedTools)) yield { type: 'token', text };
   }
 }

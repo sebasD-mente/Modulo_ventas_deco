@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { prisma } from '../../config/prisma.js';
-import { searchWebPosters } from '../webCatalogService.js';
+import { searchWebPosters, searchHybridPosters } from '../webCatalogService.js';
 import { extractPaymentMethod, resolveEntityAlias, normalizeArtworkQuery } from '../semanticParserService.js';
 import { normalizeCatalogSizeId, matchPosterEverywhere } from './aiMediaService.js';
 
@@ -18,8 +18,7 @@ const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s 
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
-  const act = await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true } });
-  return act?.id || null;
+  return (await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true } }))?.id || null;
 }
 
 export async function constructDraftPayload(tenantId, args, userMessage = '') {
@@ -70,9 +69,18 @@ export async function executeGetCashDrawerStatus(tenantId, eventId) {
     return { eventId: effEventId, eventName: event?.name || 'Evento Activo', location: event?.location || 'Stand', currency: 'GTQ', currencySymbol: 'Q', currentCashInDrawer: estimated, cashSinceLastClosing: postCash, salesCountSinceLastClosing: postCnt, totalSalesInCash: cash, cashTransactionsCount: cashCnt, totalCardInSales: card, cardTransactionsCount: cardCnt, totalTransferInSales: transfer, transferTransactionsCount: transferCnt, grossSalesTotal: Number((cash + card + transfer + other).toFixed(2)), lastClosing: lastClosingInfo, summaryText };
   } catch (err) {
     return { eventId: eventId || null, eventName: 'Stand (Modo Resiliente)', location: 'Stand', currency: 'GTQ', currencySymbol: 'Q', currentCashInDrawer: 0, cashSinceLastClosing: 0, salesCountSinceLastClosing: 0, totalSalesInCash: 0, cashTransactionsCount: 0, totalCardInSales: 0, cardTransactionsCount: 0, totalTransferInSales: 0, transferTransactionsCount: 0, grossSalesTotal: 0, lastClosing: null, summaryText: '💵 Estado de Gaveta: No se pudo consultar la base de datos.', error: err.message };
-  }
-}
+  } }
 export { executeGetSellerShiftReport } from './aiShiftReportService.js';
+export async function executeSearchCatalog(tenantId, query, category = null, limit = 12) {
+  if (!query || typeof query !== 'string' || !query.trim()) return [];
+  const clean = query.trim(), norm = normalizeArtworkQuery(clean);
+  let matches = await searchHybridPosters({ tenantId, query: norm, category, limit });
+  if (!matches?.length) {
+    const alias = resolveEntityAlias(clean);
+    if (alias.matched) matches = [{ id: `alias-${alias.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${alias.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: alias.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: alias.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: alias.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
+  }
+  return matches || [];
+}
 export async function executeGetProductionQueueStatus(tenantId, eventId) {
   try {
     const effEventId = await resolveActiveEvent(tenantId, eventId);
@@ -80,20 +88,12 @@ export async function executeGetProductionQueueStatus(tenantId, eventId) {
     const whereBase = { sale: { eventId: effEventId, status: { not: 'ANULADA' }, ...(tenantId ? { tenantId } : {}) } };
     const [groups, activeItems, recentPrinted, eventInfo] = await Promise.all([prisma.saleItem?.groupBy?.({ by: ['productionStatus'], where: whereBase, _count: { id: true } }) || [], prisma.saleItem?.findMany?.({ where: { ...whereBase, productionStatus: { in: ['PENDIENTE', 'A_PRODUCCION'] } }, include: { sale: { select: { saleNumber: true, createdAt: true, seller: { select: { fullName: true } } } } }, orderBy: { createdAt: 'asc' } }) || [], prisma.saleItem?.findMany?.({ where: { ...whereBase, productionStatus: 'IMPRESO', impresoAt: { not: null } }, select: { createdAt: true, impresoAt: true }, take: 20, orderBy: { impresoAt: 'desc' } }) || [], prisma.event?.findUnique?.({ where: { id: effEventId }, select: { id: true, name: true, location: true } })]);
     const counts = { pending: 0, separated: 0, inProduction: 0, printed: 0, total: 0, activeQueueCount: 0 };
-    (groups || []).forEach((g) => {
-      const c = g._count?.id || 0;
-      if (g.productionStatus === 'PENDIENTE') counts.pending = c; else if (g.productionStatus === 'SEPARADO') counts.separated = c; else if (g.productionStatus === 'A_PRODUCCION') counts.inProduction = c; else if (g.productionStatus === 'IMPRESO') counts.printed = c;
-      counts.total += c;
-    });
+    (groups || []).forEach((g) => { const c = g._count?.id || 0; if (g.productionStatus === 'PENDIENTE') counts.pending = c; else if (g.productionStatus === 'SEPARADO') counts.separated = c; else if (g.productionStatus === 'A_PRODUCCION') counts.inProduction = c; else if (g.productionStatus === 'IMPRESO') counts.printed = c; counts.total += c; });
     counts.activeQueueCount = counts.pending + counts.inProduction;
     const now = Date.now();
     let totalWait = 0, maxWait = 0;
     const stalledJobs = [];
-    (activeItems || []).forEach((item) => {
-      const wait = Math.max(0, Math.round((now - new Date(item.createdAt).getTime()) / 60000));
-      totalWait += wait; if (wait > maxWait) maxWait = wait;
-      if (wait >= 30) stalledJobs.push({ saleItemId: item.id, saleNumber: item.sale?.saleNumber || 'S/N', description: item.description, quantity: item.quantity, status: item.productionStatus, minutesInQueue: wait, urgency: wait >= 45 ? 'CRITICA' : 'ALTA', sellerName: item.sale?.seller?.fullName || 'Vendedor', createdAt: item.createdAt });
-    });
+    (activeItems || []).forEach((item) => { const wait = Math.max(0, Math.round((now - new Date(item.createdAt).getTime()) / 60000)); totalWait += wait; if (wait > maxWait) maxWait = wait; if (wait >= 30) stalledJobs.push({ saleItemId: item.id, saleNumber: item.sale?.saleNumber || 'S/N', description: item.description, quantity: item.quantity, status: item.productionStatus, minutesInQueue: wait, urgency: wait >= 45 ? 'CRITICA' : 'ALTA', sellerName: item.sale?.seller?.fullName || 'Vendedor', createdAt: item.createdAt }); });
     const avgWait = counts.activeQueueCount > 0 ? Math.round(totalWait / counts.activeQueueCount) : 0;
     let avgTurnaround = null;
     if (recentPrinted && recentPrinted.length > 0) {
@@ -127,10 +127,9 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
     if ((primaryMatch.categoria || '').toUpperCase() === 'MUSICA' && !allSizes.some((s) => s.sizeId === 'PORTADA_ALBUM')) {
       allSizes.unshift({ sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: 'Formato vinilo cuadrado para música' });
     }
-    let matchedSizeInfo = requestedSizeNorm ? (allSizes.find((s) => s.sizeId === requestedSizeNorm) || { sizeId: requestedSizeNorm, nombre: requestedSizeNorm, precio: sizePrice(requestedSizeNorm), dimensiones: requestedSizeNorm === 'PORTADA_ALBUM' ? '30 x 30 cm' : 'Estándar' }) : null;
-    const targetSizeId = matchedSizeInfo?.sizeId || 'MEDIANO';
-    const isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
-    const stockAvailability = { availableInCatalog: true, standPhysicalStock: isDirectStock ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER', estimatedWaitMinutes: isDirectStock ? 0 : 12, tallerCapability: 'Impresión al instante con tintas HP Látex (>10 años de durabilidad)', deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)' };
+    const matchedSizeInfo = requestedSizeNorm ? (allSizes.find((s) => s.sizeId === requestedSizeNorm) || { sizeId: requestedSizeNorm, nombre: requestedSizeNorm, precio: sizePrice(requestedSizeNorm), dimensiones: requestedSizeNorm === 'PORTADA_ALBUM' ? '30 x 30 cm' : 'Estándar' }) : null;
+    const targetSizeId = matchedSizeInfo?.sizeId || 'MEDIANO', isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
+    const stockAvailability = { availableInCatalog: true, standPhysicalStock: isDirectStock ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER', estimatedWaitMinutes: isDirectStock ? 0 : 12, tallerCapability: 'Impresión bajo demanda en taller (~12 min)', deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)' };
     return { found: true, query: cleanQuery, artwork: { id: primaryMatch.id, sku: primaryMatch.sku, title: primaryMatch.titulo, subtitle: primaryMatch.subtitulo || '', category: primaryMatch.categoria, imageUrl: primaryMatch.imageUrl, thumbUrl: primaryMatch.thumbUrl, basePrice: primaryMatch.precioMinimo }, requestedSize: matchedSizeInfo, allAvailableSizes: allSizes, stockAvailability, eventStockHistory: null, suggestedPosters: matches, summary: `🎨 Disponibilidad — "${primaryMatch.titulo}": ${stockAvailability.deliveryMode}.` };
   } catch (err) {
     return { found: false, query: query.trim(), message: `Error consultando stock: ${err.message}`, availableInCatalog: false, suggestedPosters: [] };

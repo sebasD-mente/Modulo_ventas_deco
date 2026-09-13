@@ -1,11 +1,9 @@
 import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { getEventKPIs } from '../saleService.js';
-import { searchWebPosters } from '../webCatalogService.js';
-import { normalizeArtworkQuery, resolveEntityAlias } from '../semanticParserService.js';
 import { executeWithModelFallback, streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
-import { salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
+import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
 import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService.js';
 import { getGeminiClient } from '../../config/gemini.js';
 
@@ -53,12 +51,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
       const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
       if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message);
       else if (call.name === 'searchCatalog' && call.args?.query) {
-        let matches = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(call.args.query), category: call.args.category, limit: 12 });
-        if (!matches?.length) {
-          const alias = resolveEntityAlias(call.args.query);
-          if (alias.matched) matches = [{ id: `alias-${alias.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${alias.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: alias.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: alias.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: alias.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
-        }
-        suggestedPosters = matches || [];
+        suggestedPosters = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);
       } else if (call.name === 'getEventKPIs') {
         try { eventKpis = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); } catch (e) { eventKpis = { event: { name: resolved.evento }, totalAmount: 0, totalTransactions: 0, totalUnits: 0, averageTicket: 0, paymentBreakdown: {} }; }
       } else if (call.name === 'getCashDrawerStatus') cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, effEvId); else if (call.name === 'getSellerShiftReport') sellerShiftReport = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null); else if (call.name === 'getProductionQueueStatus') productionQueueStatus = await executeGetProductionQueueStatus(tenantId, effEvId);
@@ -70,8 +63,8 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     let cleanReply = response.text || '';
     if (!cleanReply?.trim()) {
       if (draftSale) cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
-      else if (suggestedPosters?.length) cleanReply = `¡Buenísima elección! Aquí tienes las opciones encontradas en catálogo.\n\n🌟 **Recomendación:** Nuestro tamaño estrella y más vendido es el **Mediano (30x45 cm a Q65.00)** con tintas ecológicas HP Látex y montaje en 15s con cinta tesa® original. ¿Cuál te gusta más o te preparo el borrador de una vez?`;
-      else cleanReply = '¡Con gusto te asesoro! Dime qué temática, franquicia o artista buscas y te muestro las mejores opciones de nuestro catálogo.';
+      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla. ¿Cuál agregamos al borrador? Recuerda ofrecer los combos de 2x Q120 o 3x Q180.`;
+      else cleanReply = 'Indica el personaje, película o artista y busco de inmediato las obras disponibles en el stand.';
     }
     return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
   } catch (err) {
@@ -127,6 +120,6 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   if (executedTools.length > 0) {
     yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient, trailingTextTokens });
   } else if (!hasEmittedTokens) {
-    yield { type: 'token', text: '¡Con gusto te asesoro! Dime qué póster, personaje o artista buscas y te muestro las mejores opciones de nuestro catálogo.' };
+    yield { type: 'token', text: 'Indica el personaje o franquicia que busca el cliente y te muestro las opciones de inmediato.' };
   }
 }

@@ -299,7 +299,7 @@ export async function* streamWithModelFallback({
     console.error('[Gemini Stream Pool] 🚨 Fallaron todos los modelos del pool para streaming:', lastError?.message || lastError);
     yield {
       type: 'token',
-      text: 'En este momento la red de IA está recibiendo un volumen alto de consultas. Puedes registrar la venta directamente con el formulario manual ágil de abajo sin interrupciones.',
+      text: '⚠️ Conexión con IA intermitente en el stand. Puedes continuar registrando la venta con el formulario manual inferior.',
     };
     return;
   }
