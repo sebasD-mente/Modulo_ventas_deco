@@ -1,7 +1,7 @@
-﻿# BRIEFING — 2026-09-13T15:42:00Z
+# BRIEFING — 2026-09-13T17:33:00Z
 
 ## Mission
-Modernización Radical a Generación 3 Pura (Gemini 3.8 Flash), Pool Rotativo Multi-Key Resiliente ante HTTP 429, Audio Opus 24kbps con Decibelímetro, Snapshot de Catálogo Offline en localStorage y Motor de Upselling de Combos para STAND {IA}. Cumplimiento riguroso de R1 a R8. Auditoría independiente culminada con veredicto VICTORY CONFIRMED.
+Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módulo de punto de venta Stand {IA} de Deco Vintage Guate, despiezando quirúrgicamente los 3 monolitos peligrosos (saleService.js, semanticParserService.js, productionController.js) y blindando contingencias P0 sin dispersión de archivos ni sobreingeniería, cumpliendo R1-R3 y arnés de calidad al 100%.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -34,6 +34,10 @@ Modernización Radical a Generación 3 Pura (Gemini 3.8 Flash), Pool Rotativo Mu
 - Orchestrator (Modernización Gen 3 & Resiliencia): 8032eb16-445b-4b60-9d2c-03db10d5b529 (orchestrator_16, M1 completed, succeeded)
 - Orchestrator Successor: orchestrator_17 (completed M2, M3, M4)
 - Victory Auditor (Modernización Gen 3 & Resiliencia): 15479362-8856-47fd-8842-f53a371c3b40 (victory_auditor_sentinel_16, VICTORY CONFIRMED)
+- Orchestrator (Auditoría Forense 360 & Blueprint STAND IA): 44270e0b-1540-4a69-abea-7df48f0385e2 (orchestrator_18, completed)
+- Victory Auditor (Auditoría Forense 360 & Blueprint STAND IA): 74d11d9a-455c-4c21-a28d-37e837e7f261 (victory_auditor_18, VICTORY CONFIRMED)
+- Orchestrator (Cirugía Arquitectónica & Blindaje P0): to be spawned (orchestrator_19)
+- Victory Auditor (Cirugía Arquitectónica & Blindaje P0): to be spawned on victory claim
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -59,27 +63,33 @@ Modernización Radical a Generación 3 Pura (Gemini 3.8 Flash), Pool Rotativo Mu
 - Eradicate N+1 queries in seller shift report via aiShiftReportService
 - UI cleanup for inventory stock and zero orphan empty containers
 - FASE 3 Modernización Gen 3: aiKeyPoolService < 120, geminiPoolService <= 334, aiClosedLoopService < 120, aiStreamService < 150, aiToolsService < 140, useAiChatStream < 160, ChatToolCards < 140, catalogCacheService < 90, useAiChatAudio < 60
+- Master report published at AUDITORIA_360_STAND_IA.md in repository root
+- Zero code bloat added to audited files; npm run harness:check must pass 100%
+- REGLA SAGRADA ANTI-FILE SPRAWL: Prohibido despiezar o tocar los 7 archivos medianos (~250-300 líneas: userController.js, authController.js, catalogController.js, geminiPoolService.js, catalogSyncService.js, etc.).
+- Despiece quirúrgico exclusivo en los 3 Monolitos Peligrosos: saleService.js (< 35 líneas fachada), semanticParserService.js (< 30 líneas fachada), productionController.js (erradicación demoProductionItems, lógica en productionService.js).
+- P0 Blindaje de feria: catalogCacheService Map acumulativo hasta 300 obras; deko_auth_user en localStorage para persistencia offline; useAiVoiceRecorder 7s timeout y calibración 400ms; aiMediaService con executeWithModelFallback; requireEventAccess en PATCH /sales/:id y tenantId en userController; protección de /health/ai.
+- Higiene: npm uninstall bcryptjs qrcode; eliminar COPY .git de Dockerfile; migraciones formales en prisma/migrations.
+- Calidad 4/4: test:security, audit:secrets, npm test, npm run build limpios.
 
 ## User Context
-- **Last user request**: Modernización a Gemini 3.8 Flash, pool rotativo multi-key con cooldown 429, captura de audio Opus 24kbps + decibelímetro, catálogo offline en localStorage y motor de upselling de combos.
+- **Last user request**: Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módulo de punto de venta Stand {IA} de Deco Vintage Guate, despiezando quirúrgicamente los 3 monolitos peligrosos y blindando contingencias P0 sin dispersión de archivos ni sobreingeniería.
 - **Pending clarifications**: none
-- **Delivered results**: Requerimientos R1 a R8 completados al 100%. Auditoría forense independiente culminada con VICTORY CONFIRMED. Listo para despliegue por Gary (CTO) con npm run deploy.
+- **Delivered results**: previous missions completed (VICTORY CONFIRMED); new surgery mission starting.
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: in progress
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_17 (completed)
-- **Active Auditor**: victory_auditor_sentinel_16 (VICTORY CONFIRMED)
-- **Monitoring Crons**: none (cleaned up)
+- **Active Orchestrator**: orchestrator_19 (1b9755bb-6609-409e-9161-fefd19278594, running)
+- **Active Auditor**: to be spawned on victory claim
+- **Monitoring Crons**: Cron 1 (task-30, 8m progress), Cron 2 (task-32, 10m liveness)
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_16/handoff.md — Soft Handoff from orchestrator_16
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_17/handoff.md — Master Handoff from orchestrator_17
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_sentinel_16/handoff.md — Independent Victory Audit Report (VICTORY CONFIRMED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/AUDITORIA_360_STAND_IA.md — Master deliverable in repository root (91.6 KB, 870 lines)

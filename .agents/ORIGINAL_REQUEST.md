@@ -1292,3 +1292,154 @@ Integrity mode: development
 - [ ] `catalogCacheService.js` resuelve búsquedas en < 2s usando fallback local cuando la red falla o demora.
 - [ ] `ChatToolCards.jsx` muestra distintivo de combo cuando hay 2 o más pósters medianos en la orden.
 - [ ] `handoff.md` creado con directivas operativas completas para Dokploy.
+
+## 2026-09-13T16:28:10Z
+
+Execute an exhaustive 360° forensic audit and enterprise innovation blueprint for the STAND {IA} (Modulo_Ventas) event sales system, diagnosing architectural health across all tiers without adding code bloat, and formulating 10 high-value features for high-stress convention environments.
+
+Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Backend, Multimodal AI & Business Logic Forensic Audit (`server/`)
+- Audit all HTTP/SSE controllers (`aiController.js`, `saleController.js`, `productionController.js`, `eventController.js`, `catalogController.js`, `authController.js`, `cashClosingController.js`, `userController.js`), checking SSE lifecycles (`req.on('close')`), circuit breakers, and memory leaks.
+- Inspect the Multimodal AI engine and key pool (`geminiPoolService.js`, `aiKeyPoolService.js`, `aiClosedLoopService.js`, `aiStreamService.js`, `aiPromptService.js`, `aiToolsService.js`, `aiMultimodalService.js`). Confirm zero legacy fallback references (e.g. `gemini-1.5` or `gemini-2.5`) and verify HTTP 429 cooldown handling and Human-in-the-Loop draft hydration.
+- Audit domain services (`saleService.js`, `semanticParserService.js`, `webCatalogService.js`, `catalogSyncService.js`, `llmObservabilityService.js`) and formulate a single-responsibility modular decomposition plan (<150 lines per satellite) for the 10 flagged monolithic files.
+
+### R2. Frontend, State Management & Resilient UI Forensic Audit (`src/`)
+- Audit component hierarchy and decoupling across conversational UI (`UnifiedAiChat.jsx`, `ChatInputBar.jsx`, `ChatToolCards.jsx`, `ChatDraftCard.jsx`, `ChatSwapModal.jsx`, `ChatMessageList.jsx`) and operational views (`ManualSaleView.jsx`, `EventsManagementView.jsx`, `MonitorDashboardView.jsx`, `ProductionManagementView.jsx`, `CashClosingView.jsx`, `UserManagementView.jsx`).
+- Audit custom hooks (`useAiChatStream.js`, `useAiVoiceRecorder.js`, `useAiChatAudio.js`, `useCatalogSearch.js`, `useProductionQueue.js`, `useCashClosing.js`) for stale closures, uncleaned timers, unnecessary re-renders, and Web Worker/MediaStream memory leaks.
+- Audit local caching and offline resilience (`catalogCacheService.js`, `localStorage` limits, price desynchronization risks, quota handling) and auth session reconciliation (`AuthContext.jsx`, JWT expiration, `deko_auth_token` vs `token`).
+
+### R3. Relational Database, Prisma & PostgreSQL Concurrency Audit (`prisma/`)
+- Audit `prisma/schema.prisma` across all models (`Tenant`, `User`, `Event`, `Product`, `Sale`, `SaleItem`, `SalePayment`, `CashClosing`, `AuditLog`, `ProductionLog`, etc.), evaluating referential actions (`onDelete`), composite indexes (`@@index`, `@@unique`), and query optimization under high convention volume.
+- Inspect concurrency hazards and N+1 query patterns in `saleService.js`, `productionController.js`, and `cashClosingController.js`. Verify isolation and transactional safety (`prisma.$transaction`) during sequential ticket generation (`current_sale_sequence`) under multi-cashier load.
+
+### R4. Storage, Assets, Infrastructure & Deployment Audit
+- Audit file upload pipelines (`server/middleware/uploadMiddleware.js`) for MIME enforcement, strict size limits (audio <= 15MB, images/receipts <= 10MB), and immediate temp file cleanup on success/error.
+- Audit catalog asset resolution (`imageUrl`), GCS availability fallbacks, and local offline asset handling.
+- Audit containerization and deployment artifacts (`Dockerfile`, `docker-compose.yml`, `entrypoint.sh`, `scripts/deploy-dokploy.js`), enforcing `NODE_ENV=production`, dependency hygiene, memory limits, and crash recovery.
+
+### R5. Dead Code, Orphan Artifacts & High-Stress Comic Con SPOF Modeling
+- Scan for unused imports, unreachable functions, legacy roles (`ADMIN_EMPRESA`, `ENCARGADO_STAND`), legacy AI Studio references, or unprotected endpoints.
+- Model and stress-diagnose 5 convention catastrophe scenarios:
+  1. Convention center 4G/5G blackout.
+  2. Gemini pool saturation / simultaneous exhaustion across all configured keys.
+  3. Concurrent multi-cashier checkout collision on the same ticket.
+  4. Cash register closing with items pending in the workshop queue.
+  5. Audio input degradation under extreme ambient acoustic noise.
+
+### R6. Enterprise Innovation Plan: 10 Disruptive Features for STAND {IA}
+- Detail 10 high-impact commercial and operational innovations tailored for high-volume pop-culture convention booths.
+- For each innovation, document: Feature Name, Business Pain Resolved, Technical Architecture (backend, frontend, Gemini multimodal prompt/tool), and Estimated Impact on checkout velocity, average ticket value, or customer satisfaction.
+
+### R7. Master Deliverable & Zero-Regression Guardrail
+- Consolidate all findings, matrices, and proposals into `AUDITORIA_360_STAND_IA.md` in the repository root.
+- Ensure all findings include precise file paths and line number references (`path/to/file.ext:Lxx-Lyy`).
+- Maintain existing Zero-Trust security test suites and monolithic limits completely green (`npm run harness:check`). No code bloat added to audited files.
+
+## Acceptance Criteria
+
+### Master Audit Report Deliverable
+- [ ] `AUDITORIA_360_STAND_IA.md` is generated in the root of `Modulo_Ventas` containing all 8 mandated sections: Executive Summary, 360° Architectural Diagnostic with exact line citations, Dead Code & Technical Debt Catalog, Risk Matrix (P0/P1/P2), Monolithic File Decomposition Plan, 10 Disruptive Enterprise Innovations, and Surgical Refactoring Roadmap.
+- [ ] Every technical finding cites the exact file path and line range (`path/to/file.ext:Lxx-Lyy`).
+- [ ] All 10 monolithic files identified by `audit-monoliths.js` have a dedicated decomposition blueprint with modular satellite definitions under 150 lines each.
+- [ ] All 5 Comic Con catastrophe scenarios are analyzed with root-cause mechanics, impact severity, and concrete resilience mitigations.
+- [ ] 10 distinct, fully architected enterprise features are articulated with pain point, architecture (backend, frontend, Gemini prompt/tools), and business impact.
+
+### Repository Integrity & Harness
+- [ ] `npm run harness:check` runs and exits with code 0 (zero test failures, zero leaked secrets, zero added monolithic bloat, build succeeds).
+- [ ] Zero unauthorized connections, shared databases, or cross-project credential leaks. Strict isolation of `deko_eventsales_db` preserved.
+
+## 2026-09-13T17:32:10Z
+
+Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módulo de punto de venta Stand {IA} de Deco Vintage Guate, despiezando quirúrgicamente los 3 monolitos peligrosos y blindando las contingencias críticas de feria (P0) sin dispersión de archivos ni sobreingeniería.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+**Para:** Fred & Teamwork Core  
+**De:** Sebastián Jiménez (Dirección) & Gary (CTO)  
+**Objetivo:** Resolver quirúrgicamente las vulnerabilidades críticas detectadas en `AUDITORIA_360_STAND_IA.md`, aplicando el principio de **Cero Sobreingeniería**: despiezar ÚNICAMENTE los 3 monolitos peligrosos y blindar el sistema para la convención.
+
+---
+
+## 🚫 REGLA SAGRADA: PROHIBIDA LA DISPERSIÓN DE ARCHIVOS (ANTI-FILE SPRAWL)
+* **Veto a la fragmentación excesiva:** QUEDA TERMINANTEMENTE PROHIBIDO despiezar o tocar los 7 archivos de tamaño medio (~250-300 líneas: `userController.js`, `authController.js`, `catalogController.js`, `geminiPoolService.js`, `catalogSyncService.js`, etc.). Están probados, funcionan y no deben pulverizarse en mini-archivos.
+* **Despiece quirúrgico exclusivo en los 3 Monolitos Peligrosos:**
+  1. `server/services/saleService.js`
+  2. `server/services/semanticParserService.js`
+  3. `server/controllers/productionController.js`
+
+---
+
+## Requirements
+
+### R1. Despiece Quirúrgico de los 3 Monolitos Peligrosos
+1. **`server/services/saleService.js` ➔ Desacoplar Cobro Contable de Reportería:**
+   * Extraer `server/services/sales/saleTransactionService.js`: Lógica pura de creación y confirmación de ventas con transacciones ACID.
+   * Extraer `server/services/sales/saleNumberGenerator.js`: Generación atómica del número de ticket (`CC26-XXXX`) sin adquirir candados exclusivos de fila `FOR UPDATE` que bloqueen a otros cajeros concurrentes.
+   * Extraer `server/services/sales/saleKpiService.js`: Métricas, ventas por evento y dashboards de gerencia.
+   * Extraer `server/services/sales/cashClosingService.js`: Arqueos y cierres de caja atómicos.
+   * Dejar `server/services/saleService.js` como una **fachada canónica limpia (< 35 líneas)** que re-exporte todas las funciones para no romper ningún import existente ni contratos de consumo.
+2. **`server/services/semanticParserService.js` ➔ Separar Datos Estáticos de Lógica:**
+   * Extraer `server/services/semantic/entityAliases.js`: El array de más de 400 líneas `STAND_ENTITY_ALIASES`.
+   * Extraer `server/services/semantic/paymentExtractor.js`: Regex y lógica de detección de métodos de pago.
+   * Dejar `server/services/semanticParserService.js` como fachada canónica (< 30 líneas) re-exportando el pipeline semántico.
+3. **`server/controllers/productionController.js` ➔ Erradicación de Mocks:**
+   * Eliminar completamente el array residual `demoProductionItems` (94 líneas de datos falsos).
+   * Mover la lógica de taller a `server/services/productionService.js` con consultas reales a PostgreSQL vía Prisma, manteniendo en el controlador los métodos de respuesta HTTP (incluyendo captura `catch (dbErr)` con `res.status(500)` para cumplir con las pruebas adversariales existentes).
+
+### R2. Blindaje de Vulnerabilidades Críticas de Feria (P0)
+1. **Resiliencia de Caché Offline (`P0-1`):**
+   * En `src/services/catalogCacheService.js`, eliminar la sobreescritura destructiva de `localStorage.setItem`. Implementar fusión acumulativa (`Map` indexado por `id`, con tope de 300 obras) para que buscar una obra no borre las anteriores.
+2. **Bloqueo Offline de Terminal (`P0-2`):**
+   * En `src/context/AuthContext.jsx` y `src/App.jsx`, persistir el objeto `user` en `localStorage` (`deko_auth_user`). Si la terminal se recarga sin internet celular, permitir que el vendedor continúe cobrando en la venta manual sin ser expulsado a Google Login.
+3. **VAD de Micrófono ante Ruido de Convención (`P0-3`):**
+   * En `src/components/ai-chat/hooks/useAiVoiceRecorder.js`, implementar un hard timeout de seguridad (7 segundos) y calibración del piso de ruido en los primeros 400ms para que el micrófono no se quede trabado con los 95 dB de ruido del salón.
+4. **Protección contra Error HTTP 429 en Medios (`P0-4`):**
+   * En `server/services/ai/aiMediaService.js`, envolver las llamadas de audio, fotos y video dentro de `executeWithModelFallback` para que aprovechen la rotación automática del pool de claves Gemini en lugar de fallar con error 500.
+5. **Aislamiento de Rutas y Multitenant (`P0-6` y `P0-7`):**
+   * En `server/routes/apiRoutes.js`, añadir `requireEventAccess` a `PATCH /sales/:id`.
+   * En `server/controllers/userController.js`, forzar el filtro por `tenantId: req.tenantId` en todas las mutaciones sin fragmentar el archivo.
+6. **Protección de Diagnóstico (`P0-8`):**
+   * Proteger el endpoint `/health/ai` con autenticación o convertirlo en una verificación estática de variables para evitar que bots externos quemen tokens de Gemini en producción.
+
+### R3. Higiene de Dependencias, Docker y Migraciones
+1. **Desinstalar dependencias no utilizadas:**
+   * Ejecutar `npm uninstall bcryptjs qrcode`.
+2. **Sanear Docker (`Dockerfile` y `entrypoint.sh`):**
+   * Eliminar la copia de `.git` en el `Dockerfile` final (L77).
+   * Generar las migraciones formales en `prisma/migrations` para posibilitar `npx prisma migrate deploy` en lugar de requerir `prisma db push` en producción.
+3. **Aislamiento Sagrado y Zero-Trust:**
+   * Cero IPs o URLs foráneas ajenas, cero credenciales hardcodeadas, cero violación de multitenancy.
+
+---
+
+## Acceptance Criteria
+
+### Integridad Modular y Anti-Sprawl
+- [ ] `server/services/saleService.js` actúa como fachada canónica re-exportando la API pública completa en menos de 35 líneas.
+- [ ] `server/services/semanticParserService.js` actúa como fachada canónica re-exportando el analizador en menos de 30 líneas.
+- [ ] `demoProductionItems` ha sido erradicado por completo de `server/controllers/productionController.js`, y la lógica de base de datos reside en `server/services/productionService.js`.
+- [ ] Ninguno de los 7 archivos medianos preexistentes fue fragmentado en submódulos innecesarios.
+
+### Blindaje Operativo Offline y P0
+- [ ] En `catalogCacheService.js`, las consultas sucesivas agregan productos acumulativamente en `localStorage` hasta 300 obras sin truncar la memoria previa.
+- [ ] En `AuthContext.jsx` / `App.jsx`, una recarga en modo desconectado lee `deko_auth_user` de `localStorage` y mantiene abierta la pantalla de ventas sin redireccionar a Google Login.
+- [ ] En `useAiVoiceRecorder.js`, la grabación se corta forzosamente a los 7 segundos y calibra el piso de ruido ambiente en los primeros 400ms.
+- [ ] En `aiMediaService.js`, las llamadas de inferencia utilizan `executeWithModelFallback` para tolerar errores de cuota HTTP 429.
+- [ ] `PATCH /sales/:id` en `apiRoutes.js` cuenta con `requireEventAccess`, y las mutaciones en `userController.js` filtran por `tenantId`.
+- [ ] `/health/ai` no realiza llamadas activas que consuman cuotas de API sin autenticación.
+
+### Limpieza de Código y Contenedor
+- [ ] `package.json` no contiene `bcryptjs` ni `qrcode`.
+- [ ] `Dockerfile` no contiene la instrucción `COPY --chown=node:node .git ./.git`.
+- [ ] La carpeta `prisma/migrations` contiene la migración inicial estructurada y compatible con `prisma migrate deploy`.
+
+### Certificación del Arnés de Calidad (4/4 Verificaciones Limpias)
+- [ ] `npm run test:security`: Ejecuta y aprueba las 9/9 pruebas de seguridad Zero-Trust.
+- [ ] `npm run audit:secrets`: Reporta 0 secretos y 0 violaciones de aislamiento en el 100% de los archivos auditados.
+- [ ] `npm test`: Las suites de dominio (`tests/sales`, `tests/semantic`, `tests/production`) ejecutan con 100% de tests aprobados.
+- [ ] `npm run build`: El comando de empaquetado de Vite compila exitosamente con 0 errores.

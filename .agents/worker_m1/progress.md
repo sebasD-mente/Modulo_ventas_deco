@@ -1,16 +1,21 @@
 # Progress — Worker M1
 
-**Last visited**: 2026-09-13T14:26:00Z  
+**Last visited**: 2026-09-13T17:51:00Z  
 **Status**: COMPLETED  
 
 ## Steps
-- [x] Step 1: Initialize DISPATCH.md, BRIEFING.md, and investigate codebase survey
-- [x] Step 2: Update `server/config/env.js` (add `GEMINI_API_KEYS`, default `gemini-3.8-flash`) — 94 lines
-- [x] Step 3: Create `server/services/ai/aiKeyPoolService.js` (< 120 lines) — 68 lines
-- [x] Step 4: Refactor `server/services/geminiPoolService.js` (MUST be <= 334 lines) with Gen 3 pool & multi-key retry — 311 lines
-- [x] Step 5: Update `server/config/gemini.js` for seamless integration — 28 lines
-- [x] Step 6: Eradicate 1.5 and 2.5 across backend, controllers, observability, config, docs, frontend, schema comments
-- [x] Step 7: Create unit tests in `tests/ai/gemini-key-pool.test.js` — 12/12 passing
-- [x] Step 8: Update existing test suites (`gemini-pool.test.js`, adversarial tests, forensic audit) — 100% passing
-- [x] Step 9: Run tests, security audits (9/9), and monolith audits (geminiPoolService 311 <= 334 lines)
-- [x] Step 10: Generate `handoff.md` and report completion via `send_message`
+- [x] Step 1: Initialize DISPATCH.md, BRIEFING.md, and baseline test audit (120/120 tests PASS)
+- [x] Step 2: Implement `server/services/sales/saleNumberGenerator.js` (25 lines)
+- [x] Step 3: Implement `server/services/sales/saleTransactionService.js` (257 lines)
+- [x] Step 4: Implement `server/services/sales/saleKpiService.js` (328 lines)
+- [x] Step 5: Implement `server/services/sales/cashClosingService.js` (48 lines)
+- [x] Step 6: Refactor `server/services/saleService.js` to canonical facade (14 lines < 35)
+- [x] Step 7: Implement `server/services/semantic/paymentExtractor.js` (229 lines)
+- [x] Step 8: Implement `server/services/semantic/entityAliases.js` (434 lines)
+- [x] Step 9: Refactor `server/services/semanticParserService.js` to canonical facade (21 lines < 30)
+- [x] Step 10: Implement `server/services/productionService.js` (182 lines <= 200, zero mocks)
+- [x] Step 11: Refactor `server/controllers/productionController.js` (103 lines, zero mocks, preserve catch(dbErr) res.status(500))
+- [x] Step 12: Verify with `scripts/audit-monoliths.js` (confirm 10 -> 7 files) and all test suites (120/120 PASS, security 9/9, secrets 0, build PASS)
+- [x] Step 13: Write `handoff.md` and send completion message to orchestrator
+
+
