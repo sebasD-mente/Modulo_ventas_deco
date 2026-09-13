@@ -5,7 +5,7 @@ import { formatTime } from './chatConstants';
 export default function ChatInputBar({
   inputText = '', setInputText, onSendText, isLoading = false,
   isRecording = false, recordingSeconds = 0, vadActive = false,
-  onStartRecording, onStopRecording, onImageUpload,
+  audioLevel = 0, onStartRecording, onStopRecording, onImageUpload,
 }) {
   const fileInputRef = useRef(null);
 
@@ -23,6 +23,15 @@ export default function ChatInputBar({
             <span className={`text-xs font-bold ${vadActive ? 'text-amber-400' : 'text-red-400'}`}>
               {vadActive ? 'Detectando silencio... (1.5s)' : `Dictando: ${formatTime(recordingSeconds)}`}
             </span>
+            <div className="flex items-end gap-0.5 h-3.5 px-1 bg-neutral-900/80 rounded-md" title={`Nivel: ${audioLevel}%`}>
+              {[0.3, 0.6, 1.0, 0.5].map((scale, i) => (
+                <span
+                  key={i}
+                  className={`w-1 rounded-full transition-all duration-75 ${vadActive ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                  style={{ height: `${Math.max(3, Math.min(14, Math.round(audioLevel * scale * 0.14)))}px` }}
+                />
+              ))}
+            </div>
           </div>
           <button
             type="button" onClick={onStopRecording}

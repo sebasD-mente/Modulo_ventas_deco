@@ -1202,3 +1202,93 @@ Transformar el agente STAND {IA} en un asesor comercial conversacional de alta g
 - [ ] `src/components/ai-chat/ChatToolCards.jsx` < 140 líneas.
 - [ ] `npm run harness:check` 100% verde (0 fallos, 0 violaciones).
 - [ ] Captura de pantalla de alta resolución en producción en vivo certificando la edición en cadena.
+
+## 2026-09-13T14:04:36Z
+
+Llevar a STAND {IA} a su máxima expresión de robustez enterprise para eventos masivos de alto tráfico (Comic Con), erradicando modelos obsoletos de Generación 1.5 y 2.5 mediante modernización a Gemini 3.8 Flash, implementando un pool rotativo multi-key resiliente ante cuotas HTTP 429, captura de voz optimizada con Opus a 24kbps y decibelímetro visual, tolerancia a intermitencia con catálogo offline en localStorage y motor de upselling de combos.
+
+Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Modernización Radical a Generación 3 Pura (Erradicar 1.5 y 2.5)
+- Actualizar `server/config/env.js` para que `GEMINI_MODEL` tenga por defecto `'gemini-3.8-flash'`.
+- En `server/services/geminiPoolService.js`, redefinir `MODEL_PRIORITY_POOL` a:
+  ```javascript
+  export const MODEL_PRIORITY_POOL = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+  ];
+  ```
+- Erradicar cualquier string o fallback residual de `1.5-flash` o `2.5-flash` en todo el código fuente (`server/services/llmObservabilityService.js`, `server/services/ai/aiClosedLoopService.js`, `server/services/ai/aiStreamService.js`, `server/controllers/aiController.js`, `server/index.js`, `.env.example`, `docker-compose.yml`, `README.md`).
+- En `src/components/ai-chat/ChatHeader.jsx`, actualizar la insignia visual a `STAND {IA} • Gemini 3.8 Flash`.
+
+### R2. Pool Rotativo Multi-Key (`server/services/ai/aiKeyPoolService.js`)
+- Añadir en `server/config/env.js`: `GEMINI_API_KEYS: z.string().optional()`.
+- Crear el satélite modular `server/services/ai/aiKeyPoolService.js` (< 120 líneas) que gestione:
+  - Detección de claves disponibles (usa `GEMINI_API_KEYS` o cae en `GEMINI_API_KEY`).
+  - Rotación inteligente (Round-Robin).
+  - Cooldown temporal por clave ante errores HTTP 429 (`RESOURCE_EXHAUSTED`), marcando la clave en cooldown por 60 segundos y conmutando inmediatamente a la siguiente clave sana sin alertar al usuario.
+  - Provisión y cacheo de instancias cliente de `@google/genai` listas para usar.
+- Integrar con `streamWithModelFallback` y `executeWithModelFallback` en `geminiPoolService.js` para reintentar con la siguiente clave activa antes de conmutar de modelo.
+
+### R3. Resiliencia de Audio y Modo Feria Ruidosa
+- En `src/components/ai-chat/hooks/useAiVoiceRecorder.js` y el satélite `src/components/ai-chat/hooks/useAiChatAudio.js` (< 60 líneas):
+  - Optimizar la compresión a Opus a 24kbps (`audioBitsPerSecond: 24000`) para que una nota de voz de 3 segundos pese menos de 15 KB.
+  - Añadir feedback visual de volumen/decibelios en tiempo real (`audioLevel` 0-100) en el botón de micrófono/barra de chat para que el cajero sepa en tiempo real si el micrófono está captando su voz en entornos ruidosos.
+- Asegurar que el backend multimodal procese audio con `gemini-3.8-flash` con respuesta ultrarrápida.
+
+### R4. Snapshot Local del Catálogo & Tolerancia a Intermitencia
+- Crear `src/services/catalogCacheService.js` (< 90 líneas):
+  - Cachear en `localStorage` las obras principales y la lista de precios canónicos de Deco Vintage (`MINI: 25`, `PEQUENO: 35`, `PORTADA_ALBUM: 55`, `MEDIANO: 65`, `GRANDE: 125`, `GIGANTE: 180`).
+  - Si la búsqueda online de pósters (`searchWebPosters`) tarda más de 2 segundos o falla por red, resolver instantáneamente desde la caché local sin romper el flujo de la UI.
+- Conectar en `useAiChatStream.js` y `useCatalogSearch.js`.
+
+### R5. Motor de Combo y Upselling Proactivo en Gemini 3.8
+- En `server/services/ai/aiPromptService.js`, instruir al System Instruction de `gemini-3.8-flash`:
+  - Reconocer promociones de eventos: *"Combo 2 medianos por Q120 (ahorro de Q10)"* y *"Combo 3 medianos por Q180 (ahorro de Q15)"*.
+  - Al preparar un borrador de 1 mediano, incluir una breve sugerencia amistosa de combo en el follow-up comercial.
+- En `src/components/ai-chat/ChatToolCards.jsx`, mostrar un distintivo sutil de promoción cuando la orden califique para un combo.
+
+### R6. Techos Estrictos de Líneas (Cero Monolitos)
+- `server/services/ai/aiKeyPoolService.js`: **< 120 líneas**
+- `server/services/geminiPoolService.js`: **$\le$ 334 líneas** (prohibido añadir líneas al monolito existente)
+- `server/services/ai/aiClosedLoopService.js`: **< 120 líneas**
+- `server/services/ai/aiStreamService.js`: **< 150 líneas**
+- `server/services/ai/aiToolsService.js`: **< 140 líneas**
+- `src/components/ai-chat/hooks/useAiChatStream.js`: **< 160 líneas**
+- `src/components/ai-chat/ChatToolCards.jsx`: **< 140 líneas**
+- `src/services/catalogCacheService.js`: **< 90 líneas**
+
+### R7. Aislamiento Estricto y Arneses de Calidad
+- Aislamiento sagrado: Toda persistencia reside exclusivamente en `deko_eventsales_db`. Prohibido tocar otras bases de datos o servicios ajenos.
+- Protocolo Zero-Trust de credenciales y cero secretos expuestos.
+- `npm run harness:check` debe correr y pasar al 100% (seguridad Zero-Trust 9/9, cero secretos, build Vite limpio en dist/).
+
+### R8. Handoff Operativo
+- Generar `handoff.md` con las instrucciones de despliegue en Dokploy y validación para Gary.
+
+## Acceptance Criteria
+
+### Calidad y Seguridad
+- [ ] `npm run harness:check` termina con código de salida 0.
+- [ ] La suite de seguridad `npm run test:security` pasa al 100% (9/9 pruebas).
+- [ ] La auditoría de monolitos `npm run audit:monoliths` y secretos `npm run audit:secrets` terminan con código de salida 0.
+- [ ] Cada archivo modificado respeta escrupulosamente su techo presupuestario de líneas.
+
+### Pool Multi-Key y Modelos Gen 3
+- [ ] `GEMINI_MODEL` está configurado por defecto a `gemini-3.8-flash`.
+- [ ] Cero referencias residuales o fallbacks a `gemini-1.5-flash` o `gemini-2.5-flash` en el código fuente.
+- [ ] Pruebas unitarias para `aiKeyPoolService.js` verifican rotación Round-Robin y conmutación automática de clave ante HTTP 429 con cooldown de 60 segundos.
+- [ ] Las pruebas unitarias y adversariales de `tests/ai/gemini-pool.test.js` y `tests/adversarial/m4-pool-resilience-adversarial.test.js` pasan al 100% con los modelos Gen 3.
+
+### Audio, Catálogo y Frontend
+- [ ] `useAiVoiceRecorder.js` comprime audio a Opus 24kbps y expone decibelímetro en vivo.
+- [ ] `ChatHeader.jsx` muestra `STAND {IA} • Gemini 3.8 Flash`.
+- [ ] `catalogCacheService.js` resuelve búsquedas en < 2s usando fallback local cuando la red falla o demora.
+- [ ] `ChatToolCards.jsx` muestra distintivo de combo cuando hay 2 o más pósters medianos en la orden.
+- [ ] `handoff.md` creado con directivas operativas completas para Dokploy.

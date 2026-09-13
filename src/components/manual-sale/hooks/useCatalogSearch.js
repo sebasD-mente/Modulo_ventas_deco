@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
+import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
 
 export function useCatalogSearch() {
   const { authFetch } = useAuth();
@@ -35,11 +36,14 @@ export function useCatalogSearch() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const url = `/api/catalog/web-posters?q=${encodeURIComponent(searchQuery.trim())}&limit=8`;
-        const res = await authFetch(url);
-        const json = await res.json();
-        if (json.success && !isSelectingRef.current) {
-          setSearchResults(json.data || []);
+        const queryText = searchQuery.trim();
+        const results = await searchPostersWithFallback(async (signal) => {
+          const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(queryText)}&limit=8`, { signal });
+          const json = await res.json();
+          return json.success ? (json.data || []) : [];
+        }, queryText, 8);
+        if (!isSelectingRef.current) {
+          setSearchResults(results);
           setShowDropdown(true);
         }
       } catch (err) {

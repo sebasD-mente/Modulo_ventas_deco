@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  getSupportedAudioMimeType,
+  createOpusMediaRecorder,
+  setupAudioAnalyser,
+  calculateDecibelsAndLevel,
+} from './useAiChatAudio.js';
 
-export const getSupportedAudioMimeType = () => {
-  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
-  return candidates.find((mime) => MediaRecorder.isTypeSupported(mime)) || '';
-};
+export { getSupportedAudioMimeType };
 
 export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [vadActive, setVadActive] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -25,6 +28,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     setVadActive(false);
     setIsRecording(false);
+    setAudioLevel(0);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try { mediaRecorderRef.current.stop(); } catch (_) {}
     }
@@ -43,7 +47,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
       streamRef.current = stream;
 
       const selectedMime = getSupportedAudioMimeType();
-      const mediaRecorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : undefined);
+      const mediaRecorder = createOpusMediaRecorder(stream, selectedMime);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -68,20 +72,16 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
       setIsRecording(true);
       setVadActive(false);
       setRecordingSeconds(0);
+      setAudioLevel(0);
       recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
 
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
+        const audioSetup = setupAudioAnalyser(stream, AudioCtx);
+        if (audioSetup) {
+          const { ctx: audioCtx, analyser, buffer } = audioSetup;
           if (audioCtx.state === 'suspended') await audioCtx.resume();
           audioContextRef.current = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 512;
-          analyser.smoothingTimeConstant = 0.8;
-          source.connect(analyser);
-          const buffer = new Float32Array(analyser.fftSize);
           let lastSoundAt = Date.now();
 
           vadTimerRef.current = setInterval(() => {
@@ -90,10 +90,8 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
               vadTimerRef.current = null;
               return;
             }
-            analyser.getFloatTimeDomainData(buffer);
-            let sumSq = 0;
-            for (let i = 0; i < buffer.length; i++) sumSq += buffer[i] * buffer[i];
-            const rms = Math.sqrt(sumSq / buffer.length);
+            const { rms, level } = calculateDecibelsAndLevel(analyser, buffer);
+            setAudioLevel(level);
             if (rms > 0.003) {
               lastSoundAt = Date.now();
               setVadActive(false);
@@ -130,7 +128,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
     }
   }, []);
 
-  return { isRecording, recordingSeconds, vadActive, startRecording, stopRecording };
+  return { isRecording, recordingSeconds, vadActive, audioLevel, startRecording, stopRecording };
 }
 
 export default useAiVoiceRecorder;

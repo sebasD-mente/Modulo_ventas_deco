@@ -438,11 +438,13 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica para Hito M4 
   // =========================================================================
   describe('6. Resiliencia del Pool Multi-Modelo y Observabilidad de Degradación', () => {
 
-    it('6.1. Prioridad del pool: gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-1.5-flash', () => {
+    it('6.1. Prioridad del pool: gemini-3.8-flash -> 3.7 -> 3.6 -> 3.5 -> 3.1-lite', () => {
       assert.deepStrictEqual(MODEL_PRIORITY_POOL, [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-1.5-flash',
+        'gemini-3.8-flash',
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
       ]);
     });
 
@@ -468,11 +470,11 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica para Hito M4 
     });
 
     it('6.3. Pricing y observabilidad: sin colisión de prefijos entre flash y flash-lite', () => {
-      assert.ok(PRICING['gemini-2.5-flash-lite']);
-      assert.ok(PRICING['gemini-2.5-flash']);
+      assert.ok(PRICING['gemini-3.1-flash-lite']);
+      assert.ok(PRICING['gemini-3.8-flash']);
 
-      const costLite = estimateCostUsd('gemini-2.5-flash-lite', 100000, 100000);
-      const costFlash = estimateCostUsd('gemini-2.5-flash', 100000, 100000);
+      const costLite = estimateCostUsd('gemini-3.1-flash-lite', 100000, 100000);
+      const costFlash = estimateCostUsd('gemini-3.8-flash', 100000, 100000);
 
       // Lite debe ser significativamente más económico que Flash ($0.10/$0.40 vs $0.30/$2.50)
       assert.ok(costLite < costFlash, 'Cost de lite debe ser menor que flash');

@@ -15,6 +15,7 @@ process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
 process.env.JWT_SECRET = 'super_secure_forensic_auditor_secret_key_2026';
 process.env.GOOGLE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
 process.env.SUPER_ADMIN_EMAILS = 'superadmin@dekolabs.org';
+process.env.GEMINI_MODEL = 'gemini-3.8-flash';
 
 import {
   MODEL_PRIORITY_POOL,
@@ -47,26 +48,26 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
   // ==========================================================================
   describe('1. Inyección de Fallas 429 (Cuotas) y 503 (Sobrecarga) en Cadena', () => {
 
-    it('1.1 Cascada Doble 429: gemini-2.5-flash (429) -> gemini-2.5-flash-lite (429) -> gemini-1.5-flash (Éxito)', async () => {
+    it('1.1 Cascada Doble 429: gemini-3.8-flash (429) -> gemini-3.7-flash (429) -> gemini-3.6-flash (Éxito)', async () => {
       const callSequence = [];
       const mockClient = { models: {} };
 
       const res = await executeWithModelFallback({
-        models: MODEL_PRIORITY_POOL,
+        models: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         client: mockClient,
         taskFn: async ({ model }) => {
           callSequence.push(model);
-          if (model === 'gemini-2.5-flash') {
+          if (model === 'gemini-3.8-flash') {
             const err = new Error('GoogleGenerativeAIError: [429 Too Many Requests] RESOURCE_EXHAUSTED quota exceeded');
             err.status = 429;
             throw err;
           }
-          if (model === 'gemini-2.5-flash-lite') {
-            const err = new Error('GoogleGenerativeAIError: [429] Rate limit reached for flash-lite');
+          if (model === 'gemini-3.7-flash') {
+            const err = new Error('GoogleGenerativeAIError: [429] Rate limit reached for flash');
             err.status = 'RESOURCE_EXHAUSTED';
             throw err;
           }
-          if (model === 'gemini-1.5-flash') {
+          if (model === 'gemini-3.6-flash') {
             return { text: 'Respuesta exitosa desde modelo de contingencia final' };
           }
           throw new Error('Modelo desconocido: ' + model);
@@ -76,52 +77,52 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
       // Verificaciones estrictas
       assert.deepStrictEqual(
         callSequence,
-        ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'],
+        ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         'Debe haber intentado cada modelo exactamente una vez sin reintentos inútiles ante 429'
       );
-      assert.strictEqual(res.usedModel, 'gemini-1.5-flash', 'El modelo utilizado debe ser gemini-1.5-flash');
+      assert.strictEqual(res.usedModel, 'gemini-3.6-flash', 'El modelo utilizado debe ser gemini-3.6-flash');
       assert.strictEqual(res.fallbackOccurred, true, 'Debe marcar que ocurrió fallback');
-      assert.strictEqual(res.initialModel, 'gemini-2.5-flash', 'El modelo inicial debe ser gemini-2.5-flash');
+      assert.strictEqual(res.initialModel, 'gemini-3.8-flash', 'El modelo inicial debe ser gemini-3.8-flash');
       assert.strictEqual(res.result.text, 'Respuesta exitosa desde modelo de contingencia final');
     });
 
-    it('1.2 Cascada Mixta Compleja: 503 en flash (con 1 reintento jitter) -> 429 en flash-lite (inmediato) -> éxito en 1.5-flash', async () => {
+    it('1.2 Cascada Mixta Compleja: 503 en flash (con 1 reintento jitter) -> 429 en 3.7-flash (inmediato) -> éxito en 3.6-flash', async () => {
       const callSequence = [];
       let flash503Attempts = 0;
       const mockClient = { models: {} };
 
       const res = await executeWithModelFallback({
-        models: MODEL_PRIORITY_POOL,
+        models: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         client: mockClient,
         taskFn: async ({ model }) => {
           callSequence.push(model);
-          if (model === 'gemini-2.5-flash') {
+          if (model === 'gemini-3.8-flash') {
             flash503Attempts++;
             const err = new Error('503 Service Unavailable: The model is overloaded. Please try again later.');
             err.status = 503;
             throw err;
           }
-          if (model === 'gemini-2.5-flash-lite') {
+          if (model === 'gemini-3.7-flash') {
             const err = new Error('429 RESOURCE_EXHAUSTED: Daily quota reached');
             err.status = 429;
             throw err;
           }
-          if (model === 'gemini-1.5-flash') {
+          if (model === 'gemini-3.6-flash') {
             return { answer: 'Éxito tras cascada mixta' };
           }
           throw new Error('Inesperado');
         },
       });
 
-      // Para 503 debe haber intentado 2 veces (intento 0 y retry 1) en gemini-2.5-flash
-      // Para 429 en flash-lite debe haber intentado 1 sola vez y conmutado inmediatamente
-      assert.strictEqual(flash503Attempts, 2, 'gemini-2.5-flash debe haber recibido 2 intentos (intento inicial + 1 reintento jitter)');
+      // Para 503 debe haber intentado 2 veces (intento 0 y retry 1) en gemini-3.8-flash
+      // Para 429 en 3.7-flash debe haber intentado 1 sola vez y conmutado inmediatamente
+      assert.strictEqual(flash503Attempts, 2, 'gemini-3.8-flash debe haber recibido 2 intentos (intento inicial + 1 reintento jitter)');
       assert.deepStrictEqual(
         callSequence,
-        ['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'],
+        ['gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         'Secuencia exacta esperada de llamadas con retry en 503 e switch inmediato en 429'
       );
-      assert.strictEqual(res.usedModel, 'gemini-1.5-flash');
+      assert.strictEqual(res.usedModel, 'gemini-3.6-flash');
       assert.strictEqual(res.fallbackOccurred, true);
       assert.strictEqual(res.result.answer, 'Éxito tras cascada mixta');
     });
@@ -147,13 +148,13 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
       });
 
       assert.strictEqual(attempts, 2, 'Debió reintentar en el mismo modelo');
-      assert.deepStrictEqual(callSequence, ['gemini-2.5-flash', 'gemini-2.5-flash']);
-      assert.strictEqual(res.usedModel, 'gemini-2.5-flash');
+      assert.deepStrictEqual(callSequence, ['gemini-3.8-flash', 'gemini-3.8-flash']);
+      assert.strictEqual(res.usedModel, 'gemini-3.8-flash');
       assert.strictEqual(res.fallbackOccurred, false, 'No conmutó de modelo porque el reintento tuvo éxito');
       assert.strictEqual(res.result.reply, 'Recuperado en el mismo modelo tras micro-corte de red');
     });
 
-    it('1.4 Colapso Total del Pool: Si todos los 3 modelos se agotan, relanza el error original sin perder datos', async () => {
+    it('1.4 Colapso Total del Pool: Si todos los 5 modelos se agotan, relanza el error original sin perder datos', async () => {
       const callSequence = [];
       const mockClient = { models: {} };
 
@@ -173,13 +174,19 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
         },
         (err) => {
           assert.strictEqual(err.status, 429);
-          assert.strictEqual(err.customField, 'exhaustion-gemini-1.5-flash', 'Debe preservar el último error del pool');
-          assert.ok(err.message.includes('gemini-1.5-flash'));
+          assert.strictEqual(err.customField, 'exhaustion-gemini-3.1-flash-lite', 'Debe preservar el último error del pool');
+          assert.ok(err.message.includes('gemini-3.1-flash-lite'));
           return true;
         }
       );
 
-      assert.deepStrictEqual(callSequence, ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']);
+      assert.deepStrictEqual(callSequence, [
+        'gemini-3.8-flash',
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+      ]);
     });
 
     it('1.5 Error 400 Bad Request o 401 Unauthorized: Cero reintentos y Cero conmutación espuria', async () => {
@@ -207,7 +214,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
 
       assert.deepStrictEqual(
         callSequence,
-        ['gemini-2.5-flash'],
+        ['gemini-3.8-flash'],
         'No debe enmascarar errores de autorización ni iterar innecesariamente el pool'
       );
     });
@@ -226,17 +233,17 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
         models: {
           generateContentStream: async ({ model }) => {
             attempted.push(model);
-            if (model === 'gemini-2.5-flash') {
+            if (model === 'gemini-3.8-flash') {
               const err = new Error('429 RESOURCE_EXHAUSTED: Rate limit');
               err.status = 429;
               throw err;
             }
-            if (model === 'gemini-2.5-flash-lite') {
+            if (model === 'gemini-3.7-flash') {
               const err = new Error('503 UNAVAILABLE: Model overloaded');
               err.status = 503;
               throw err;
             }
-            if (model === 'gemini-1.5-flash') {
+            if (model === 'gemini-3.6-flash') {
               async function* stream() {
                 yield { text: '¡Hola! ' };
                 yield { text: '¿En qué te puedo asesorar hoy en el stand?' };
@@ -250,7 +257,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
 
       const generator = streamWithModelFallback({
         client: mockClient,
-        models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'],
+        models: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         buildContentsAndConfig: () => ({ contents: [], config: {} }),
         onModelSelected: (m) => {
           selectedModel = m;
@@ -262,8 +269,8 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
         chunks.push(chunk);
       }
 
-      assert.deepStrictEqual(attempted, ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']);
-      assert.strictEqual(selectedModel, 'gemini-1.5-flash');
+      assert.deepStrictEqual(attempted, ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']);
+      assert.strictEqual(selectedModel, 'gemini-3.6-flash');
       assert.strictEqual(chunks.length, 2);
       assert.strictEqual(chunks[0].text, '¡Hola! ');
       assert.strictEqual(chunks[1].text, '¿En qué te puedo asesorar hoy en el stand?');
@@ -282,7 +289,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
 
       const generator = streamWithModelFallback({
         client: mockClient,
-        models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'],
+        models: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'],
         buildContentsAndConfig: () => ({ contents: [], config: {} }),
       });
 
@@ -318,7 +325,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
 
       const generator = streamWithModelFallback({
         client: mockClient,
-        models: ['gemini-2.5-flash'],
+        models: ['gemini-3.8-flash'],
         buildContentsAndConfig: () => ({ contents: [], config: {} }),
       });
 
@@ -488,7 +495,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
         models: {
           generateContentStream: async ({ model }) => {
             attemptedModels.push(model);
-            if (model === 'gemini-2.5-flash') {
+            if (model === 'gemini-3.8-flash') {
               const err = new Error('429 Quota Exceeded');
               err.status = 429;
               throw err;
@@ -521,7 +528,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
       res.end();
 
       const wireOutput = res.getWrittenData();
-      assert.deepStrictEqual(attemptedModels, ['gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+      assert.deepStrictEqual(attemptedModels, ['gemini-3.8-flash', 'gemini-3.7-flash']);
       assert.ok(!wireOutput.includes('event: error'));
       assert.ok(wireOutput.includes('HP Látex con durabilidad superior'));
       assert.ok(wireOutput.includes('event: done'));
@@ -545,17 +552,17 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
           client: mockClient,
           taskFn: async ({ model }) => {
             const rand = (i + model.length) % 4;
-            if (rand === 0 && model === 'gemini-2.5-flash') {
+            if (rand === 0 && model === 'gemini-3.8-flash') {
               const err = new Error('429 Rate Limit');
               err.status = 429;
               throw err;
             }
-            if (rand === 1 && model === 'gemini-2.5-flash') {
+            if (rand === 1 && model === 'gemini-3.8-flash') {
               const err = new Error('503 Service Overloaded');
               err.status = 503;
               throw err;
             }
-            if (rand === 2 && (model === 'gemini-2.5-flash' || model === 'gemini-2.5-flash-lite')) {
+            if (rand === 2 && (model === 'gemini-3.8-flash' || model === 'gemini-3.7-flash')) {
               const err = new Error('429 Quota');
               err.status = 429;
               throw err;
@@ -574,8 +581,8 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
       }, {});
 
       // Verificar que el tráfico se distribuyó y resolvió a través del pool
-      assert.ok(byModel['gemini-2.5-flash'] > 0, 'Parte del tráfico debe haber sido atendido por flash');
-      assert.ok(byModel['gemini-2.5-flash-lite'] > 0 || byModel['gemini-1.5-flash'] > 0, 'Parte del tráfico debió conmutar a contingencia');
+      assert.ok(byModel['gemini-3.8-flash'] > 0, 'Parte del tráfico debe haber sido atendido por flash');
+      assert.ok(byModel['gemini-3.7-flash'] > 0 || byModel['gemini-3.6-flash'] > 0, 'Parte del tráfico debió conmutar a contingencia');
 
       const endHeap = process.memoryUsage().heapUsed;
       const heapDiffMb = (endHeap - startHeap) / (1024 * 1024);
@@ -602,7 +609,7 @@ describe('⚔️ CHALLENGER 1: Adversarial Stress-Testing — Multi-Model Contin
       const streamTasks = Array.from({ length: 30 }, async () => {
         const gen = streamWithModelFallback({
           client: mockClient,
-          models: ['gemini-2.5-flash'],
+          models: ['gemini-3.8-flash'],
           buildContentsAndConfig: () => ({ contents: [], config: {} }),
         });
         const chunks = [];

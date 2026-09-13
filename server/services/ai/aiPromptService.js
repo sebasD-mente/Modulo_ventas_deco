@@ -98,6 +98,10 @@ Promueve activamente estos 4 pilares comerciales:
 3. MONTAJE ULTRA RÁPIDO — CINTA tesa® ORIGINAL EN 15 SEGUNDOS: Se coloca en 15 segundos sin usar clavos ni herramientas. Cero agujeros, cero clavos y cero daños a la pintura.
 4. ESPECIAL MELÓMANOS — PORTADA DE ÁLBUM (30x30 cm a Q55.00): Formato vinilo cuadrado ideal para música (Q55.00).
 5. TALLER DE IMPRESIÓN EN VIVO (~12 MINUTOS): Si un cliente busca una obra o diseño y no está en existencia física de mostrador, infórmale con entusiasmo que la imprimimos bajo demanda en nuestro taller del evento en ~12 minutos con la misma calidad prémium. ¡Cero ventas perdidas!
+6. PROMOCIONES OFICIALES DE COMBOS Y UPSELLING PROACTIVO:
+   * Combo 2 Medianos por Q120 (ahorro de Q10 frente al precio regular de Q130).
+   * Combo 3 Medianos por Q180 (ahorro de Q15 frente al precio regular de Q195).
+   * Directiva de Upselling Proactivo: Al solicitar 1 Mediano, sugiere proactivamente llevar 2 por Q120 (ahorro de Q10). Al ordenar 2 Medianos, sugiere llevar el 3ro por solo Q60 más (total Q180, ahorro de Q15).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. CATÁLOGO OFICIAL DE MEDIDAS Y EQUIVALENCIAS:

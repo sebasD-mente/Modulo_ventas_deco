@@ -5,7 +5,7 @@
  *  - Model used, token counts (in/out), latency (ms), estimated cost (USD)
  *  - Whether the AI draft was ultimately confirmed as a real sale
  *
- * Pricing reference (Gemini 2.5 Flash, as of 2025):
+ * Pricing reference (Gemini 3.8 Flash, as of 2026):
  *   Input  : $0.30 / 1M tokens  → $0.0000003 per token
  *   Output : $2.50 / 1M tokens  → $0.0000025 per token
  */
@@ -13,18 +13,19 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
 
-// Gemini pricing reference (USD per token — update when prices change)
+// Gemini pricing reference (USD per token — Gen 3 models)
 export const PRICING = {
-  'gemini-2.5-flash-lite': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
-  'gemini-2.5-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
-  'gemini-2.0-flash':      { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
-  'gemini-1.5-flash':      { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
+  'gemini-3.8-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-3.7-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-3.6-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-3.5-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-3.1-flash-lite': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
 };
 
 export function estimateCostUsd(model, tokensIn, tokensOut) {
   const sortedKeys = Object.keys(PRICING).sort((a, b) => b.length - a.length);
-  const key = sortedKeys.find((k) => model && (model === k || model.startsWith(k))) || 'gemini-2.5-flash';
-  const price = PRICING[key] || PRICING['gemini-2.5-flash'];
+  const key = sortedKeys.find((k) => model && (model === k || model.startsWith(k))) || 'gemini-3.8-flash';
+  const price = PRICING[key] || PRICING['gemini-3.8-flash'];
   const inputCost  = (tokensIn  || 0) * price.inputPerToken;
   const outputCost = (tokensOut || 0) * price.outputPerToken;
   return Number((inputCost + outputCost).toFixed(8));
@@ -61,7 +62,7 @@ export function recordLlmInteraction({
   effectiveModel,
   initialModel,
 }) {
-  const usedModel = effectiveModel || model || ENV.GEMINI_MODEL || 'gemini-1.5-flash';
+  const usedModel = effectiveModel || model || ENV.GEMINI_MODEL || 'gemini-3.8-flash';
   const costUsd = estimateCostUsd(usedModel, tokensIn, tokensOut);
 
   const mergedDetails = details ? { ...details } : {};
@@ -138,7 +139,7 @@ export async function withLlmObservability(fn, { tenantId, userId, action, detai
       tenantId,
       userId,
       action,
-      model: model || ENV.GEMINI_MODEL || 'gemini-1.5-flash',
+      model: model || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
       tokensIn,
       tokensOut,
       latencyMs,

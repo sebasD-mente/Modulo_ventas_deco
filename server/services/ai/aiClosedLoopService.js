@@ -6,7 +6,7 @@ import { streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolServi
 import { salesAssistantSafetySettings } from './aiPromptService.js';
 import { salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
 
-const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-2.5-flash', ...MODEL_PRIORITY_POOL]));
+const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 
 function buildFallbackSummaries(executedTools) {
   const summaries = [];
@@ -90,9 +90,8 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
     });
     for await (const chunk of followUpStream) {
       const isBreak = chunk.text?.includes('Respuesta finalizada') || chunk.text?.includes('volumen alto de consultas');
-      if (isBreak) continue;
-      if (chunk.type === 'token' && chunk.text) { yield chunk; followUpTokensCount++; }
-      else if (chunk.text) { yield { type: 'token', text: chunk.text }; followUpTokensCount++; }
+      if (chunk.type === 'token' && chunk.text) { yield chunk; if (!isBreak) followUpTokensCount++; }
+      else if (chunk.text) { yield { type: 'token', text: chunk.text }; if (!isBreak) followUpTokensCount++; }
     }
   } catch (err) {
     console.warn('[aiClosedLoopService] ⚠️ Error en closed-loop follow-up:', err.message);

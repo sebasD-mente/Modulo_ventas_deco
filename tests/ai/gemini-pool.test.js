@@ -87,7 +87,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
   describe('2. Ejecución Unaria con Fallback Multi-Modelo (executeWithModelFallback)', () => {
     const mockClient = { models: {} };
 
-    it('2.1 Caso Exitoso: Resuelve inmediatamente con el modelo primario (gemini-2.5-flash)', async () => {
+    it('2.1 Caso Exitoso: Resuelve inmediatamente con el modelo primario (gemini-3.8-flash)', async () => {
       const callLog = [];
       const res = await executeWithModelFallback({
         models: MODEL_PRIORITY_POOL,
@@ -98,22 +98,22 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         },
       });
 
-      assert.strictEqual(res.usedModel, 'gemini-2.5-flash');
+      assert.strictEqual(res.usedModel, 'gemini-3.8-flash');
       assert.strictEqual(res.fallbackOccurred, false);
-      assert.strictEqual(res.initialModel, 'gemini-2.5-flash');
-      assert.deepStrictEqual(callLog, ['gemini-2.5-flash']);
-      assert.strictEqual(res.result.reply, 'Hola desde gemini-2.5-flash');
+      assert.strictEqual(res.initialModel, 'gemini-3.8-flash');
+      assert.deepStrictEqual(callLog, ['gemini-3.8-flash']);
+      assert.strictEqual(res.result.reply, 'Hola desde gemini-3.8-flash');
     });
 
-    it('2.2 Caso 429: Cuota agotada en gemini-2.5-flash conmuta inmediatamente a gemini-2.5-flash-lite', async () => {
+    it('2.2 Caso 429: Cuota agotada en gemini-3.8-flash conmuta inmediatamente a gemini-3.7-flash', async () => {
       const callLog = [];
       const res = await executeWithModelFallback({
         models: MODEL_PRIORITY_POOL,
         client: mockClient,
         taskFn: async ({ model }) => {
           callLog.push(model);
-          if (model === 'gemini-2.5-flash') {
-            const err = new Error('Resource exhausted: quota exceeded for model gemini-2.5-flash');
+          if (model === 'gemini-3.8-flash') {
+            const err = new Error('Resource exhausted: quota exceeded for model gemini-3.8-flash');
             err.status = 429;
             throw err;
           }
@@ -121,21 +121,20 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         },
       });
 
-      assert.strictEqual(res.usedModel, 'gemini-2.5-flash-lite');
+      assert.strictEqual(res.usedModel, 'gemini-3.7-flash');
       assert.strictEqual(res.fallbackOccurred, true);
-      assert.strictEqual(res.initialModel, 'gemini-2.5-flash');
-      // Debe haber intentado flash una sola vez y conmutado directamente a flash-lite
-      assert.deepStrictEqual(callLog, ['gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+      assert.strictEqual(res.initialModel, 'gemini-3.8-flash');
+      assert.deepStrictEqual(callLog, ['gemini-3.8-flash', 'gemini-3.7-flash']);
     });
 
-    it('2.3 Caso Cascada Doble 429: gemini-2.5-flash y lite agotados conmutan a gemini-1.5-flash', async () => {
+    it('2.3 Caso Cascada Doble 429: gemini-3.8-flash y 3.7-flash agotados conmutan a gemini-3.6-flash', async () => {
       const callLog = [];
       const res = await executeWithModelFallback({
         models: MODEL_PRIORITY_POOL,
         client: mockClient,
         taskFn: async ({ model }) => {
           callLog.push(model);
-          if (model === 'gemini-2.5-flash' || model === 'gemini-2.5-flash-lite') {
+          if (model === 'gemini-3.8-flash' || model === 'gemini-3.7-flash') {
             const err = new Error('429 RESOURCE_EXHAUSTED');
             err.status = 429;
             throw err;
@@ -144,9 +143,9 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         },
       });
 
-      assert.strictEqual(res.usedModel, 'gemini-1.5-flash');
+      assert.strictEqual(res.usedModel, 'gemini-3.6-flash');
       assert.strictEqual(res.fallbackOccurred, true);
-      assert.deepStrictEqual(callLog, ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']);
+      assert.deepStrictEqual(callLog, ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']);
     });
 
     it('2.4 Caso Error No Recuperable (400 / 401): Aborta inmediatamente sin iterar el pool', async () => {
@@ -167,8 +166,8 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         (err) => err.status === 400
       );
 
-      // Solo intentó una vez y no iteró hacia flash-lite
-      assert.deepStrictEqual(callLog, ['gemini-2.5-flash']);
+      // Solo intentó una vez y no iteró hacia el siguiente modelo
+      assert.deepStrictEqual(callLog, ['gemini-3.8-flash']);
     });
 
     it('2.5 Caso Agotamiento Total del Pool: Relanza último error si todos fallan', async () => {
@@ -198,7 +197,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         models: {
           generateContentStream: async ({ model }) => {
             attemptedModels.push(model);
-            if (model === 'gemini-2.5-flash') {
+            if (model === 'gemini-3.8-flash') {
               const err = new Error('RESOURCE_EXHAUSTED 429');
               err.status = 429;
               throw err;
@@ -206,7 +205,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
             // Modelo de contingencia responde
             async function* streamGen() {
               yield { text: '¡Hola! ' };
-              yield { text: 'Respuesta desde lite.' };
+              yield { text: 'Respuesta desde contingencia.' };
             }
             return streamGen();
           },
@@ -215,7 +214,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
 
       const generator = streamWithModelFallback({
         client: mockClient,
-        models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+        models: ['gemini-3.8-flash', 'gemini-3.7-flash'],
         buildContentsAndConfig: ({ model }) => ({ contents: [], config: {} }),
         onModelSelected: (m) => {
           selectedModel = m;
@@ -227,11 +226,11 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         chunks.push(chunk);
       }
 
-      assert.deepStrictEqual(attemptedModels, ['gemini-2.5-flash', 'gemini-2.5-flash-lite']);
-      assert.strictEqual(selectedModel, 'gemini-2.5-flash-lite');
+      assert.deepStrictEqual(attemptedModels, ['gemini-3.8-flash', 'gemini-3.7-flash']);
+      assert.strictEqual(selectedModel, 'gemini-3.7-flash');
       assert.strictEqual(chunks.length, 2);
       assert.strictEqual(chunks[0].text, '¡Hola! ');
-      assert.strictEqual(chunks[1].text, 'Respuesta desde lite.');
+      assert.strictEqual(chunks[1].text, 'Respuesta desde contingencia.');
     });
 
     it('3.2 Fase 2 (Mid-Stream): Interrupción durante emisión se captura cordialmente sin error fatal', async () => {
@@ -249,7 +248,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
 
       const generator = streamWithModelFallback({
         client: mockClient,
-        models: ['gemini-2.5-flash'],
+        models: ['gemini-3.8-flash'],
         buildContentsAndConfig: () => ({ contents: [], config: {} }),
       });
 
@@ -306,20 +305,20 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
   });
 
   describe('4. Observabilidad y Precios de Contingencia (llmObservabilityService)', () => {
-    it('4.1 PRICING incluye precios correctos para gemini-2.5-flash-lite', () => {
-      assert.ok(PRICING['gemini-2.5-flash-lite'], 'PRICING debe registrar gemini-2.5-flash-lite');
-      assert.strictEqual(PRICING['gemini-2.5-flash-lite'].inputPerToken, 0.0000001);
-      assert.strictEqual(PRICING['gemini-2.5-flash-lite'].outputPerToken, 0.0000004);
+    it('4.1 PRICING incluye precios correctos para gemini-3.1-flash-lite', () => {
+      assert.ok(PRICING['gemini-3.1-flash-lite'], 'PRICING debe registrar gemini-3.1-flash-lite');
+      assert.strictEqual(PRICING['gemini-3.1-flash-lite'].inputPerToken, 0.0000001);
+      assert.strictEqual(PRICING['gemini-3.1-flash-lite'].outputPerToken, 0.0000004);
     });
 
     it('4.2 estimateCostUsd calcula costos precisos sin colisión de prefijos', () => {
       // 1M tokens de entrada = 1,000,000 * 0.0000001 = $0.10
       // 1M tokens de salida  = 1,000,000 * 0.0000004 = $0.40
-      const costLite = estimateCostUsd('gemini-2.5-flash-lite', 1000000, 1000000);
+      const costLite = estimateCostUsd('gemini-3.1-flash-lite', 1000000, 1000000);
       assert.strictEqual(costLite, 0.50);
 
-      // gemini-2.5-flash cuesta 0.30 in y 2.50 out = 2.80
-      const costFlash = estimateCostUsd('gemini-2.5-flash', 1000000, 1000000);
+      // gemini-3.8-flash cuesta 0.30 in y 2.50 out = 2.80
+      const costFlash = estimateCostUsd('gemini-3.8-flash', 1000000, 1000000);
       assert.strictEqual(costFlash, 2.80);
     });
 
@@ -328,13 +327,13 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
         recordLlmInteraction({
           tenantId: 'test-tenant',
           action: 'AI_CHAT_FALLBACK_TEST',
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           tokensIn: 500,
           tokensOut: 150,
           latencyMs: 320,
           fallbackActivated: true,
-          effectiveModel: 'gemini-2.5-flash-lite',
-          initialModel: 'gemini-2.5-flash',
+          effectiveModel: 'gemini-3.7-flash',
+          initialModel: 'gemini-3.8-flash',
         });
       });
     });

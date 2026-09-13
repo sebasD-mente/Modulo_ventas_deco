@@ -36,7 +36,8 @@ export const envSchema = z.object({
       message: 'SUPER_ADMIN_EMAILS debe contener al menos un correo electrónico válido.',
     }),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_API_KEYS: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   GCS_BUCKET_NAME: z.string().default('deko-eventsales-media'),
   GCS_CREDENTIALS_BASE64: z.string().optional(),
   GCS_PROJECT_ID: z.string().optional(),
@@ -88,6 +89,6 @@ if (ENV.DATABASE_URL && FORBIDDEN_PATTERNS.some((forbidden) => ENV.DATABASE_URL.
   }
 }
 
-if (!ENV.GEMINI_API_KEY && !isTest) {
-  console.warn('⚠️ [Config Advertencia] GEMINI_API_KEY no está definida. Las funciones de IA multimodal operarán en modo heurístico/simulado.');
+if (!ENV.GEMINI_API_KEY && !ENV.GEMINI_API_KEYS && !isTest) {
+  console.warn('⚠️ [Config Advertencia] GEMINI_API_KEY / GEMINI_API_KEYS no está definida. Las funciones de IA multimodal operarán en modo heurístico/simulado.');
 }

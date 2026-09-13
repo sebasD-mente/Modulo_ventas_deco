@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-12T19:44:30Z
+﻿# BRIEFING — 2026-09-13T15:42:00Z
 
 ## Mission
-FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}. Ejecución rigurosa de R1 a R5 (Closed-Loop Function Calling en streaming, erradicación de hasTextTokens y streaming dual simultáneo, memoria de 20 turnos con edición interactiva en cadena de borrador, eliminación de N+1 en reportes de turno vía aiShiftReportService, y depuración quirúrgica de UI en ChatToolCards.jsx sin contenedores huérfanos). Auditoría independiente de victoria culminada con éxito irrefutable (VICTORY CONFIRMED).
+Modernización Radical a Generación 3 Pura (Gemini 3.8 Flash), Pool Rotativo Multi-Key Resiliente ante HTTP 429, Audio Opus 24kbps con Decibelímetro, Snapshot de Catálogo Offline en localStorage y Motor de Upselling de Combos para STAND {IA}. Cumplimiento riguroso de R1 a R8. Auditoría independiente culminada con veredicto VICTORY CONFIRMED.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -31,6 +31,9 @@ FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robus
 - Victory Auditor (REHACER Fase 1 Conexión Viva STAND IA): f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, closed)
 - Orchestrator (FASE 2 Closed-Loop STAND IA): 3098e265-0f6c-4aa8-8742-949cf2bf333c (orchestrator_15, completed)
 - Victory Auditor (FASE 2 Closed-Loop STAND IA): 4d8c7534-6abd-4e0a-9a54-076dbf70b380 (victory_auditor_sentinel_15, VICTORY CONFIRMED)
+- Orchestrator (Modernización Gen 3 & Resiliencia): 8032eb16-445b-4b60-9d2c-03db10d5b529 (orchestrator_16, M1 completed, succeeded)
+- Orchestrator Successor: orchestrator_17 (completed M2, M3, M4)
+- Victory Auditor (Modernización Gen 3 & Resiliencia): 15479362-8856-47fd-8842-f53a371c3b40 (victory_auditor_sentinel_16, VICTORY CONFIRMED)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -55,17 +58,18 @@ FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robus
 - Multi-turn conversational memory (20 turns) with chain-of-thought draft editing
 - Eradicate N+1 queries in seller shift report via aiShiftReportService
 - UI cleanup for inventory stock and zero orphan empty containers
+- FASE 3 Modernización Gen 3: aiKeyPoolService < 120, geminiPoolService <= 334, aiClosedLoopService < 120, aiStreamService < 150, aiToolsService < 140, useAiChatStream < 160, ChatToolCards < 140, catalogCacheService < 90, useAiChatAudio < 60
 
 ## User Context
-- **Last user request**: FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robustez Enterprise de STAND {IA}.
+- **Last user request**: Modernización a Gemini 3.8 Flash, pool rotativo multi-key con cooldown 429, captura de audio Opus 24kbps + decibelímetro, catálogo offline en localStorage y motor de upselling de combos.
 - **Pending clarifications**: none
-- **Delivered results**: Fase 1 certificada en producción (`1d41cec`). Fase 2 con ingeniería 100% completada, arnés verde y VICTORY CONFIRMED emitido por el Auditor Independiente. Listo para despliegue por Gary (CTO) y verificación visual en navegador real.
+- **Delivered results**: Requerimientos R1 a R8 completados al 100%. Auditoría forense independiente culminada con VICTORY CONFIRMED. Listo para despliegue por Gary (CTO) con npm run deploy.
 
 ## Project Status
 - **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: 3098e265-0f6c-4aa8-8742-949cf2bf333c (Fred, orchestrator_15, completed)
-- **Active Auditor**: 4d8c7534-6abd-4e0a-9a54-076dbf70b380 (victory_auditor_sentinel_15, VICTORY CONFIRMED)
+- **Active Orchestrator**: orchestrator_17 (completed)
+- **Active Auditor**: victory_auditor_sentinel_16 (VICTORY CONFIRMED)
 - **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
@@ -76,7 +80,6 @@ FASE 2: Function Calling Closed-Loop, Memoria Conversacional Multi-Turno y Robus
 ## Artifact Index
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/DISPATCH.md — Orchestrator Fred dispatch instructions
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/handoff.md — Orchestrator Fred handoff report
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_15/GATE_STATUS.md — Quality Gate M4 verdicts
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_sentinel_15/handoff.md — Master Independent Victory Audit Report (VICTORY CONFIRMED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_16/handoff.md — Soft Handoff from orchestrator_16
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_17/handoff.md — Master Handoff from orchestrator_17
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_sentinel_16/handoff.md — Independent Victory Audit Report (VICTORY CONFIRMED)

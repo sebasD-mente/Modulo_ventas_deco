@@ -17,7 +17,8 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - SUPER_ADMIN_EMAILS=${SUPER_ADMIN_EMAILS}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
       - GCS_BUCKET_NAME=${GCS_BUCKET_NAME:-deko-eventsales-media}
       - GCS_CREDENTIALS_BASE64=${GCS_CREDENTIALS_BASE64}
       - GCS_PROJECT_ID=${GCS_PROJECT_ID:-tienda-deco-vintage-web}

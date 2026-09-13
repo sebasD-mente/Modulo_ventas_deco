@@ -1,14 +1,24 @@
 import React from 'react';
 import { BarChart3, Wallet, Users, Printer, Package } from 'lucide-react';
 
-export default function ChatToolCards({ message, msg, onAddPosterToDraft, onAddPoster }) {
+export default function ChatToolCards({ message, msg, draftSale, pendingDraft, onAddPosterToDraft, onAddPoster }) {
   const m = message || msg;
-  if (!m) return null;
+  if (!m && !draftSale && !pendingDraft) return null;
   const addFn = onAddPosterToDraft || onAddPoster;
-  const { eventKpis: k, cashDrawerStatus: c, sellerShiftReport: s, productionQueueStatus: q, inventoryStock: inv, suggestedPosters: sps } = m;
+  const { eventKpis: k, cashDrawerStatus: c, sellerShiftReport: s, productionQueueStatus: q, inventoryStock: inv, suggestedPosters: sps } = m || {};
+  const draft = m?.draftSale || m?.draft_sale || m?.draft || draftSale || pendingDraft || (m?.items ? m : null);
+  const medQty = (draft?.items || []).reduce((acc, it) => {
+    const sz = (it.sizeId || it.size || it.selectedSizeId || '').toUpperCase();
+    return (sz === 'MEDIANO' || (!sz && (it.description || '').toUpperCase().includes('MEDIANO'))) ? acc + (Number(it.quantity) || 1) : acc;
+  }, 0);
 
   return (
     <>
+      {medQty >= 2 && (
+        <div data-testid="combo-badge" className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold shadow-sm">
+          <span>✨ Combo Medianos ({medQty >= 3 ? '3x Q180' : '2x Q120'})</span>
+        </div>
+      )}
       {k && (
         <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
@@ -41,11 +51,7 @@ export default function ChatToolCards({ message, msg, onAddPosterToDraft, onAddP
             <div className="bg-[#181818] p-2 rounded-xl"><span className="text-[9px] text-neutral-400 block">Ventas Tarjeta</span><strong className="text-xs sm:text-sm text-white font-black">Q {Number(c.totalCardInSales || 0).toFixed(2)}</strong></div>
             <div className="bg-[#181818] p-2 rounded-xl"><span className="text-[9px] text-neutral-400 block">Transferencias</span><strong className="text-xs sm:text-sm text-white font-black">Q {Number(c.totalTransferInSales || 0).toFixed(2)}</strong></div>
           </div>
-          {c.lastClosing && (
-            <div className="text-[10px] text-neutral-400 bg-neutral-900/80 p-2 rounded-xl border border-neutral-800">
-              Último arqueo por <strong>{c.lastClosing.closedBy}</strong>: reportado Q{Number(c.lastClosing.reportedCash || 0).toFixed(2)} (Dif: Q{Number(c.lastClosing.difference || 0).toFixed(2)})
-            </div>
-          )}
+          {c.lastClosing && (<div className="text-[10px] text-neutral-400 bg-neutral-900/80 p-2 rounded-xl border border-neutral-800">Último arqueo por <strong>{c.lastClosing.closedBy}</strong>: reportado Q{Number(c.lastClosing.reportedCash || 0).toFixed(2)} (Dif: Q{Number(c.lastClosing.difference || 0).toFixed(2)})</div>)}
         </div>
       )}
       {s && (
@@ -62,10 +68,7 @@ export default function ChatToolCards({ message, msg, onAddPosterToDraft, onAddP
           ) : (
             <div className="space-y-1.5">
               {(s.ranking || []).slice(0, 4).map((r) => (
-                <div key={r.sellerId} className="flex items-center justify-between p-2 rounded-xl bg-[#181818] text-xs">
-                  <span className="text-white truncate">{r.position === 1 ? '🥇' : r.position === 2 ? '🥈' : r.position === 3 ? '🥉' : '🎖️'} #{r.position} {r.sellerName}</span>
-                  <span className="text-emerald-400 font-bold ml-2">Q {Number(r.totalAmount || 0).toFixed(2)}</span>
-                </div>
+                <div key={r.sellerId} className="flex items-center justify-between p-2 rounded-xl bg-[#181818] text-xs"><span className="text-white truncate">{r.position === 1 ? '🥇' : r.position === 2 ? '🥈' : r.position === 3 ? '🥉' : '🎖️'} #{r.position} {r.sellerName}</span><span className="text-emerald-400 font-bold ml-2">Q {Number(r.totalAmount || 0).toFixed(2)}</span></div>
               ))}
             </div>
           )}
@@ -119,11 +122,7 @@ export default function ChatToolCards({ message, msg, onAddPosterToDraft, onAddP
                   <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
                   <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">Desde Q{sp.precioMinimo}</span>
                 </div>
-                {addFn && (
-                  <button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">
-                    + Vender
-                  </button>
-                )}
+                {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
               </div>
             ))}
           </div>

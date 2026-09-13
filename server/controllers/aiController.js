@@ -40,7 +40,7 @@ export async function handleVoiceSale(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir audio en GCS:', gcsErr.message);
     }
 
-    // 2. Extraer venta con Gemini 2.5 Flash + telemetría LLM
+    // 2. Extraer venta con Gemini 3.8 Flash + telemetría LLM
     const t0Voice = Date.now();
     const draft = await processVoiceSaleAudio({
       audioBuffer: file.buffer,
@@ -52,7 +52,7 @@ export async function handleVoiceSale(req, res) {
       tenantId,
       userId: req.userId || null,
       action: 'AI_VOICE_SALE',
-      model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
       tokensIn: null,
       tokensOut: null,
       latencyMs: Date.now() - t0Voice,
@@ -108,7 +108,7 @@ export async function handleBatchPhoto(req, res) {
       console.warn('⚠️ [GCS Warning] No se pudo persistir foto en GCS:', gcsErr.message);
     }
 
-    // 2. Analizar códigos QR / barras con Gemini 2.5 Flash Vision + telemetría LLM
+    // 2. Analizar códigos QR / barras con Gemini 3.8 Flash Vision + telemetría LLM
     const t0Batch = Date.now();
     const analysis = await processPostersBatchPhoto({
       imageBuffer: file.buffer,
@@ -120,7 +120,7 @@ export async function handleBatchPhoto(req, res) {
       tenantId,
       userId: req.userId || null,
       action: 'AI_BATCH_QR_SCAN',
-      model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
       tokensIn: null,
       tokensOut: null,
       latencyMs: Date.now() - t0Batch,
@@ -169,7 +169,7 @@ export async function handleChatQuery(req, res) {
     const isStream = req.body.stream === true || req.headers.accept?.includes('text/event-stream');
 
     if (!isStream) {
-      // Consultar motor IA con Gemini 2.5 Flash y Function Calling nativo (modo tradicional JSON)
+      // Consultar motor IA con Gemini 3.8 Flash y Function Calling nativo (modo tradicional JSON)
       const t0Chat = Date.now();
       const result = await chatWithSalesAssistant({
         message: message.trim(),
@@ -183,7 +183,7 @@ export async function handleChatQuery(req, res) {
         tenantId,
         userId: req.userId || null,
         action: 'AI_CHAT',
-        model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
+        model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
         tokensIn:  null,
         tokensOut: result.reply ? Math.ceil(result.reply.length / 4) : null, // ~4 chars/token
         latencyMs: Date.now() - t0Chat,
@@ -194,7 +194,7 @@ export async function handleChatQuery(req, res) {
       let draft = result.draftSale || null;
       let suggestedPosters = result.suggestedPosters || [];
 
-      // Manejar llamadas a herramientas (functionCalls) retornadas por el motor de IA Gemini 2.5 Flash
+      // Manejar llamadas a herramientas (functionCalls) retornadas por el motor de IA Gemini 3.8 Flash
       const toolCalls = result.toolCalls || result.functionCalls || [];
       for (const toolCall of toolCalls) {
         const { name, args } = toolCall;
@@ -224,7 +224,7 @@ export async function handleChatQuery(req, res) {
       });
     }
 
-    // Modo Streaming con Server-Sent Events (SSE) y Gemini 2.5 Flash
+    // Modo Streaming con Server-Sent Events (SSE) y Gemini 3.8 Flash
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
@@ -274,7 +274,7 @@ export async function handleChatQuery(req, res) {
         tenantId,
         userId: req.userId || null,
         action: 'AI_CHAT_STREAM',
-        model: ENV.GEMINI_MODEL || 'gemini-1.5-flash',
+        model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
         tokensIn:  null,
         tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
         latencyMs: Date.now() - t0Stream,

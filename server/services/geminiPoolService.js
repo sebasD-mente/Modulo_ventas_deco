@@ -1,30 +1,25 @@
 /**
- * Gemini Pool Service — Phase 3 / Milestone M4
- *
- * Multi-Model Contingency Pool and Fallback Engine for STAND {IA}.
- * Handles rate limits (HTTP 429 / RESOURCE_EXHAUSTED), model saturation (503 / UNAVAILABLE),
- * and transient network errors with Exponential Backoff + Full Jitter, smoothly degrading across
- * models: gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-1.5-flash.
+ * Gemini Pool Service — Phase 3 / Milestone M1
+ * Multi-Model Contingency Pool & Multi-Key Fallback Engine for STAND {IA}.
+ * Handles rate limits (429 / RESOURCE_EXHAUSTED), model saturation (503 / UNAVAILABLE),
+ * and transient network errors across Gen 3 priority pool with multi-key rotation.
  */
 
 import { getGeminiClient } from '../config/gemini.js';
+import { getNextClient, markKeyCooldown, getAvailableKeys } from './ai/aiKeyPoolService.js';
 
 export const MODEL_PRIORITY_POOL = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-1.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
 ];
 
-/**
- * Detects whether the error corresponds to a rate limit or quota exhaustion (HTTP 429 / RESOURCE_EXHAUSTED).
- * @param {any} err
- * @returns {boolean}
- */
 export function isRateLimitOrQuotaError(err) {
   if (!err) return false;
   const status = err.status || err.statusCode || err.code;
   if (status === 429 || status === '429' || status === 'RESOURCE_EXHAUSTED') return true;
-
   const msg = String(err.message || '').toLowerCase();
   return (
     msg.includes('429') ||
@@ -36,24 +31,15 @@ export function isRateLimitOrQuotaError(err) {
   );
 }
 
-/**
- * Detects whether the model or service is temporarily overloaded or unavailable (HTTP 503 / UNAVAILABLE / 500 / 504).
- * @param {any} err
- * @returns {boolean}
- */
 export function isServiceOverloadedError(err) {
   if (!err) return false;
   const status = err.status || err.statusCode || err.code;
   if (
-    status === 503 ||
-    status === '503' ||
-    status === 500 ||
-    status === '500' ||
-    status === 504 ||
-    status === '504' ||
+    status === 503 || status === '503' ||
+    status === 500 || status === '500' ||
+    status === 504 || status === '504' ||
     status === 'UNAVAILABLE'
   ) return true;
-
   const msg = String(err.message || '').toLowerCase();
   return (
     msg.includes('503') ||
@@ -66,11 +52,6 @@ export function isServiceOverloadedError(err) {
   );
 }
 
-/**
- * Detects transient network or connection drop errors.
- * @param {any} err
- * @returns {boolean}
- */
 export function isTransientNetworkError(err) {
   if (!err) return false;
   const code = String(err.code || '');
@@ -89,11 +70,6 @@ export function isTransientNetworkError(err) {
   );
 }
 
-/**
- * Determines if the error warrants a retry with exponential backoff on the same model.
- * @param {any} err
- * @returns {boolean}
- */
 export function isRetryableOnSameModel(err) {
   return isServiceOverloadedError(err) || isTransientNetworkError(err);
 }
@@ -123,11 +99,6 @@ export function isClientInvalidModelError(err) {
   return false;
 }
 
-/**
- * Determines if the error warrants falling back to the next model in the priority pool.
- * @param {any} err
- * @returns {boolean}
- */
 export function shouldFallbackToNextModel(err) {
   return (
     isRateLimitOrQuotaError(err) ||
@@ -138,13 +109,6 @@ export function shouldFallbackToNextModel(err) {
   );
 }
 
-/**
- * Sleeps for a randomized duration following Exponential Backoff with Full Jitter.
- * @param {number} attempt
- * @param {number} [baseDelayMs=300]
- * @param {number} [maxDelayMs=1500]
- * @returns {Promise<number>} Returns actual slept milliseconds
- */
 export async function sleepWithJitter(attempt, baseDelayMs = 300, maxDelayMs = 1500) {
   const exponentialDelay = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
   const jitteredDelay = Math.floor(Math.random() * (exponentialDelay + 1));
@@ -152,21 +116,6 @@ export async function sleepWithJitter(attempt, baseDelayMs = 300, maxDelayMs = 1
   return jitteredDelay;
 }
 
-/**
- * Executes an AI task with automatic fallback across the model priority pool.
- * Handles transient retries on the same model and degrades to secondary models if quota
- * is exhausted (429) or service is unavailable (503).
- *
- * @template T
- * @param {object} opts
- * @param {({ model, client }: { model: string, client: any }) => Promise<T>} opts.taskFn
- * @param {string[]} [opts.models=MODEL_PRIORITY_POOL]
- * @param {string} [opts.actionName='AI_INTERACTION']
- * @param {string|null} [opts.tenantId=null]
- * @param {object} [opts.context={}]
- * @param {any} [opts.client=null]
- * @returns {Promise<{ result: T, usedModel: string, fallbackOccurred: boolean, initialModel: string }>}
- */
 export async function executeWithModelFallback({
   taskFn,
   models = MODEL_PRIORITY_POOL,
@@ -175,140 +124,177 @@ export async function executeWithModelFallback({
   context = {},
   client = null,
 }) {
-  const geminiClient = client || getGeminiClient();
-  if (!geminiClient && !context?.mockMode && !context?.skipClientCheck) {
-    throw new Error('GEMINI_CLIENT_UNAVAILABLE');
-  }
-
   let lastError = null;
+  const passedClient = client;
 
   for (let modelIdx = 0; modelIdx < models.length; modelIdx++) {
     const currentModel = models[modelIdx];
     const isLastModel = modelIdx === models.length - 1;
 
-    // Up to 1 transient retry per model (attempt 0 and attempt 1)
-    for (let attempt = 0; attempt <= 1; attempt++) {
-      try {
-        const result = await taskFn({ model: currentModel, client: geminiClient });
+    const availableKeys = passedClient ? [null] : getAvailableKeys();
+    const maxKeyAttempts = passedClient ? 1 : Math.max(1, availableKeys.length);
 
-        if (modelIdx > 0) {
-          console.warn(`[Gemini Pool] 🔄 Éxito con modelo de contingencia "${currentModel}" (Fallback desde "${models[0]}")`);
+    for (let keyAttempt = 0; keyAttempt < maxKeyAttempts; keyAttempt++) {
+      let activeClient = passedClient;
+      let activeApiKey = null;
+
+      if (!activeClient) {
+        const nextPool = getNextClient(currentModel);
+        if (nextPool) {
+          activeClient = nextPool.client;
+          activeApiKey = nextPool.apiKey;
+        } else {
+          activeClient = getGeminiClient(currentModel);
         }
+      }
 
-        return {
-          result,
-          usedModel: currentModel,
-          fallbackOccurred: modelIdx > 0,
-          initialModel: models[0],
-        };
-      } catch (err) {
-        lastError = err;
-        console.warn(`[Gemini Pool] ⚠️ Intento ${attempt + 1} falló en modelo "${currentModel}": ${err?.message || err}`);
+      if (!activeClient && !context?.mockMode && !context?.skipClientCheck) {
+        lastError = lastError || new Error('GEMINI_CLIENT_UNAVAILABLE');
+        console.warn(`[Gemini Pool] ⚠️ Sin clientes disponibles para "${currentModel}". Continuando cascada...`);
+        break;
+      }
 
-        // Non-recoverable client errors (401 Unauthorized, 403 Forbidden)
-        if (err?.status === 401 || err?.status === 403) {
-          if (!isRateLimitOrQuotaError(err)) {
+      for (let attempt = 0; attempt <= 1; attempt++) {
+        try {
+          const result = await taskFn({ model: currentModel, client: activeClient });
+
+          if (modelIdx > 0) {
+            console.warn(`[Gemini Pool] 🔄 Éxito con modelo de contingencia "${currentModel}" (Fallback desde "${models[0]}")`);
+          }
+
+          return {
+            result,
+            usedModel: currentModel,
+            fallbackOccurred: modelIdx > 0,
+            initialModel: models[0],
+          };
+        } catch (err) {
+          lastError = err;
+          console.warn(`[Gemini Pool] ⚠️ Intento ${attempt + 1} falló en "${currentModel}": ${err?.message || err}`);
+
+          if ((err?.status === 401 || err?.status === 403) && !isRateLimitOrQuotaError(err)) {
             throw err;
           }
-        }
-        if (err?.status === 400 && !isModelNotFoundError(err) && !isClientInvalidModelError(err)) {
-          if (!isRateLimitOrQuotaError(err)) {
+          if (err?.status === 400 && !isModelNotFoundError(err) && !isClientInvalidModelError(err) && !isRateLimitOrQuotaError(err)) {
             throw err;
           }
-        }
 
-        // Quota / Rate limit (429) o Modelo no soportado (404/400): conmutar inmediatamente
-        if (isRateLimitOrQuotaError(err) || isModelNotFoundError(err) || isClientInvalidModelError(err)) {
-          if (!isLastModel) {
-            console.warn(`[Gemini Pool] ⚡ Error en "${currentModel}" (${isModelNotFoundError(err) || isClientInvalidModelError(err) ? 'Modelo no soportado' : 'Cuota agotada'}). Conmutando inmediatamente a "${models[modelIdx + 1]}"...`);
+          if (isRateLimitOrQuotaError(err)) {
+            if (activeApiKey) {
+              markKeyCooldown(activeApiKey, 60000, currentModel);
+            }
+            if (keyAttempt < maxKeyAttempts - 1) {
+              console.warn(`[Gemini Pool] 🔄 Reintentando "${currentModel}" con siguiente clave del pool...`);
+              break;
+            }
             break;
-          } else {
+          }
+
+          if (isModelNotFoundError(err) || isClientInvalidModelError(err)) {
+            break;
+          }
+
+          if (attempt < 1 && isRetryableOnSameModel(err)) {
+            await sleepWithJitter(attempt);
+            continue;
+          }
+
+          if (shouldFallbackToNextModel(err)) {
+            break;
+          }
+
+          if (isLastModel && attempt === 1) {
             break;
           }
         }
+      }
 
-        // Transient overload / network error: retry once on the same model with jitter
-        if (attempt < 1 && isRetryableOnSameModel(err)) {
-          await sleepWithJitter(attempt);
-          continue;
-        }
-
-        // If retry exhausted or should fallback, break to next model
-        if (shouldFallbackToNextModel(err) && !isLastModel) {
-          console.warn(`[Gemini Pool] ⚡ Conmutando de "${currentModel}" hacia "${models[modelIdx + 1]}"...`);
-          break;
-        }
-
-        if (isLastModel && attempt === 1) {
-          break;
-        }
+      if (lastError && !isRateLimitOrQuotaError(lastError) && shouldFallbackToNextModel(lastError)) {
+        break;
       }
     }
   }
 
   console.error('[Gemini Pool] 🚨 Todos los modelos del pool de contingencia se agotaron:', lastError?.message || lastError);
-  throw lastError;
+  throw lastError || new Error('GEMINI_CLIENT_UNAVAILABLE');
 }
 
-/**
- * Resilient async generator for SSE streaming with two-phase fallback:
- * Phase 1 (Pre-Token): If stream initialization fails (429/503), transparently switches to the next model before emitting tokens.
- * Phase 2 (Mid-Stream): If an interruption occurs after tokens started emitting, gracefully closes without fatal error.
- *
- * @param {object} opts
- * @param {({ model }: { model: string }) => { contents: any[], config: any }} opts.buildContentsAndConfig
- * @param {string[]} [opts.models=MODEL_PRIORITY_POOL]
- * @param {((model: string) => void)} [opts.onModelSelected]
- * @param {any} [opts.client=null]
- * @returns {AsyncGenerator<any, void, unknown>}
- */
 export async function* streamWithModelFallback({
   buildContentsAndConfig,
   models = MODEL_PRIORITY_POOL,
   onModelSelected = () => {},
   client = null,
 }) {
-  const geminiClient = client || getGeminiClient();
-  if (!geminiClient) {
-    yield { type: 'token', text: '[Modo Offline] El asistente de IA no está conectado actualmente.' };
-    return;
-  }
-
   let stream = null;
   let activeModel = models[0];
   let lastError = null;
 
-  // FASE 1: Conmutación en Inicialización del Stream (Pre-Token)
+  if (!client && getAvailableKeys().length === 0) {
+    yield { type: 'token', text: '[Modo Offline] El asistente de IA no está conectado actualmente.' };
+    return;
+  }
+
   for (let i = 0; i < models.length; i++) {
     activeModel = models[i];
-    try {
-      const { contents, config } = buildContentsAndConfig({ model: activeModel });
-      stream = await geminiClient.models.generateContentStream({
-        model: activeModel,
-        contents,
-        config,
-      });
+    const availableKeys = client ? [null] : getAvailableKeys();
+    const maxKeys = client ? 1 : Math.max(1, availableKeys.length);
 
-      if (i > 0) {
-        console.warn(`[Gemini Stream Pool] 🔄 Stream iniciado exitosamente con modelo de contingencia: "${activeModel}"`);
-      }
-      if (typeof onModelSelected === 'function') {
-        onModelSelected(activeModel);
-      }
-      break;
-    } catch (initErr) {
-      lastError = initErr;
-      console.warn(`[Gemini Stream Pool] ⚠️ Fallo al inicializar stream con "${activeModel}": ${initErr?.message || initErr}`);
+    for (let k = 0; k < maxKeys; k++) {
+      let activeClient = client;
+      let activeApiKey = null;
 
-      if (i < models.length - 1) {
-        console.warn(`[Gemini Stream Pool] ⚡ Conmutando stream a "${models[i + 1]}"...`);
-        continue;
+      if (!activeClient) {
+        const nextPool = getNextClient(activeModel);
+        if (nextPool) {
+          activeClient = nextPool.client;
+          activeApiKey = nextPool.apiKey;
+        } else {
+          activeClient = getGeminiClient(activeModel);
+        }
       }
-      break;
+
+      if (!activeClient) {
+        lastError = lastError || new Error('GEMINI_CLIENT_UNAVAILABLE');
+        console.warn(`[Gemini Stream Pool] ⚠️ Sin clientes disponibles para "${activeModel}". Conmutando al siguiente modelo...`);
+        break;
+      }
+
+      try {
+        const { contents, config } = buildContentsAndConfig({ model: activeModel });
+        stream = await activeClient.models.generateContentStream({
+          model: activeModel,
+          contents,
+          config,
+        });
+
+        if (i > 0) {
+          console.warn(`[Gemini Stream Pool] 🔄 Stream iniciado con modelo de contingencia: "${activeModel}"`);
+        }
+        if (typeof onModelSelected === 'function') {
+          onModelSelected(activeModel);
+        }
+        break;
+      } catch (initErr) {
+        lastError = initErr;
+        console.warn(`[Gemini Stream Pool] ⚠️ Fallo al inicializar stream con "${activeModel}": ${initErr?.message || initErr}`);
+
+        if (isRateLimitOrQuotaError(initErr)) {
+          if (activeApiKey) markKeyCooldown(activeApiKey, 60000, activeModel);
+          if (k < maxKeys - 1) {
+            console.warn(`[Gemini Stream Pool] 🔄 Reintentando "${activeModel}" con siguiente clave...`);
+            continue;
+          }
+        }
+        break;
+      }
+    }
+
+    if (stream) break;
+    if (i < models.length - 1) {
+      console.warn(`[Gemini Stream Pool] ⚡ Conmutando stream a "${models[i + 1]}"...`);
     }
   }
 
-  // Si fallaron todos los modelos en inicialización:
   if (!stream) {
     console.error('[Gemini Stream Pool] 🚨 Fallaron todos los modelos del pool para streaming:', lastError?.message || lastError);
     yield {
@@ -318,7 +304,6 @@ export async function* streamWithModelFallback({
     return;
   }
 
-  // FASE 2: Consumo de Tokens y Protección Mid-Stream
   try {
     for await (const chunk of stream) {
       yield chunk;

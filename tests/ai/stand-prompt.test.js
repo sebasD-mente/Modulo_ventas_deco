@@ -155,6 +155,17 @@ describe('🧠 Suite de Pruebas: STAND {IA} Commercial Prompt Engineering (M4)',
       assert.ok(prompt.includes('Q 15,450.00'));
       assert.ok(prompt.includes('142'));
     });
+
+    it('1.7 Promociones Oficiales de Combos y Directivas de Upselling Proactivo (Medianos Q120 / Q180)', () => {
+      const prompt = buildSalesSystemPrompt({});
+
+      assert.ok(prompt.includes('Combo 2 Medianos por Q120'), 'Debe incluir Combo 2 Medianos por Q120');
+      assert.ok(prompt.includes('ahorro de Q10'), 'Debe indicar ahorro de Q10 en combo de 2');
+      assert.ok(prompt.includes('Combo 3 Medianos por Q180'), 'Debe incluir Combo 3 Medianos por Q180');
+      assert.ok(prompt.includes('ahorro de Q15'), 'Debe indicar ahorro de Q15 en combo de 3');
+      assert.ok(prompt.includes('Al solicitar 1 Mediano, sugiere proactivamente llevar 2 por Q120'), 'Debe incluir upselling proactivo para 1 mediano');
+      assert.ok(prompt.includes('Al ordenar 2 Medianos, sugiere llevar el 3ro por solo Q60 más'), 'Debe incluir upselling proactivo para 2 medianos');
+    });
   });
 
   describe('2. Inyección Estricta en config.systemInstruction en SDK @google/genai', () => {

@@ -14,7 +14,7 @@ export default function ChatHeader() {
             Asistente IA
           </h2>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
-            STAND &#123;IA&#125; • Gemini 3.6 Flash
+            STAND &#123;IA&#125; • Gemini 3.8 Flash
           </span>
         </div>
       </div>

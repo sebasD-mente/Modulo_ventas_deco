@@ -65,9 +65,9 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
       assert.ok(content.includes('pendingDraft: pendingDraft || null'), 'pendingDraft no es pasado a chatWithSalesAssistant');
     });
 
-    it('2.2 Referencias a Gemini deben especificar Gemini 2.5 Flash', () => {
-      assert.ok(!content.includes('Gemini 3.8 Flash'), 'Aún existen referencias a Gemini 3.8 Flash en aiController');
-      assert.ok(content.includes('Gemini 2.5 Flash'), 'Debe documentar Gemini 2.5 Flash');
+    it('2.2 Referencias a Gemini deben especificar Gemini 3.8 Flash y CERO 2.5', () => {
+      assert.ok(content.includes('Gemini 3.8 Flash'), 'Debe documentar Gemini 3.8 Flash');
+      assert.ok(!content.includes('Gemini 2.5 Flash'), 'No debe contener Gemini 2.5 Flash en aiController');
     });
   });
 
@@ -77,7 +77,8 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
   describe('3. M-04 & M-01: aiMultimodalService.js - Size Normalization & Draft Grounding', async () => {
     const { normalizeCatalogSizeId } = await import('../server/services/aiMultimodalService.js');
     const servicePath = path.join(ROOT, 'server/services/aiMultimodalService.js');
-    const content = fs.readFileSync(servicePath, 'utf-8');
+    const promptPath = path.join(ROOT, 'server/services/ai/aiPromptService.js');
+    const content = fs.existsSync(promptPath) ? fs.readFileSync(promptPath, 'utf-8') : fs.readFileSync(servicePath, 'utf-8');
 
     it('3.1 Mapeo estricto de medidas en pulgadas a GRANDE (Q125)', () => {
       const inputs = [
@@ -140,28 +141,28 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
     });
 
     it('3.8 chatWithSalesAssistant debe inyectar el borrador activo en el prompt de sistema', () => {
-      assert.ok(content.includes('BORRADOR DE VENTA ACTUAL EN PANTALLA'), 'Falta draftContext en el prompt de Jarvis');
-      assert.ok(content.includes('INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR'), 'Faltan instrucciones para edición de borrador');
+      assert.ok(content.includes('BORRADOR ACTIVO EN PANTALLA') || content.includes('BORRADOR DE VENTA ACTUAL EN PANTALLA'), 'Falta draftContext en el prompt de ventas');
+      assert.ok(content.includes('DIRECTIVAS PARA EDICIÓN DEL BORRADOR') || content.includes('INSTRUCCIONES PARA MODIFICACIÓN DEL BORRADOR'), 'Faltan instrucciones para edición de borrador');
     });
   });
 
   // --------------------------------------------------------------------------
   // 4. A-02: .env.example y README.md
   // --------------------------------------------------------------------------
-  describe('4. A-02: Unificación a gemini-2.5-flash en Configuración y Documentación', () => {
+  describe('4. A-02: Unificación a gemini-3.8-flash en Configuración y Documentación', () => {
     const envPath = path.join(ROOT, '.env.example');
     const readmePath = path.join(ROOT, 'README.md');
     const envContent = fs.readFileSync(envPath, 'utf-8');
     const readmeContent = fs.readFileSync(readmePath, 'utf-8');
 
-    it('.env.example debe declarar GEMINI_MODEL=gemini-2.5-flash y CERO 3.8', () => {
-      assert.ok(envContent.includes('GEMINI_MODEL=gemini-2.5-flash'), '.env.example debe tener gemini-2.5-flash');
-      assert.ok(!envContent.includes('gemini-3.8-flash'), '.env.example no debe contener gemini-3.8-flash');
+    it('.env.example debe declarar GEMINI_MODEL=gemini-3.8-flash y CERO 2.5', () => {
+      assert.ok(envContent.includes('GEMINI_MODEL=gemini-3.8-flash'), '.env.example debe tener gemini-3.8-flash');
+      assert.ok(!envContent.includes('gemini-2.5-flash'), '.env.example no debe contener gemini-2.5-flash');
     });
 
-    it('README.md debe documentar gemini-2.5-flash y CERO 3.8', () => {
-      assert.ok(readmeContent.includes('gemini-2.5-flash'), 'README.md debe listar gemini-2.5-flash');
-      assert.ok(!readmeContent.includes('gemini-3.8-flash'), 'README.md no debe contener gemini-3.8-flash');
+    it('README.md debe documentar gemini-3.8-flash y CERO 2.5', () => {
+      assert.ok(readmeContent.includes('gemini-3.8-flash'), 'README.md debe listar gemini-3.8-flash');
+      assert.ok(!readmeContent.includes('gemini-2.5-flash'), 'README.md no debe contener gemini-2.5-flash');
     });
   });
 

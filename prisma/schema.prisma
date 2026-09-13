@@ -253,7 +253,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // ── LLM Observability (Gemini API telemetry) ──────────────────────────────
-  llmModel       String?  @map("llm_model")      // e.g. "gemini-2.5-flash"
+  llmModel       String?  @map("llm_model")      // e.g. "gemini-3.8-flash"
   llmTokensIn    Int?     @map("llm_tokens_in")   // prompt token count
   llmTokensOut   Int?     @map("llm_tokens_out")  // completion token count
   llmLatencyMs   Int?     @map("llm_latency_ms")  // wall-clock ms for the API call

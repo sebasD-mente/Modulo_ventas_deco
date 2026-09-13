@@ -9,7 +9,7 @@ import { salesAssistantTools, constructDraftPayload, executeGetCashDrawerStatus,
 import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService.js';
 import { getGeminiClient } from '../../config/gemini.js';
 
-const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-2.5-flash', ...MODEL_PRIORITY_POOL]));
+const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 
 async function resolveEventContextData({ tenantId, eventId, date = null, contextData = {} }) {
   let event = null, kpis = null;
@@ -33,10 +33,11 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
 }
 
 export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = null }) {
-  const gemini = geminiClient || getGeminiClient();
+  const explicitClient = geminiClient || null;
+  const isAvailable = Boolean(explicitClient || getGeminiClient());
   const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date });
   const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
-  if (!gemini) {
+  if (!isAvailable) {
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
     return { reply: isSale ? `[Modo Offline] Intención de venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} ventas.`, draftSale: null, suggestedPosters: [], toolCalls: [] };
   }
@@ -44,7 +45,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
     const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({ model, contents: formattedContents, config: { systemInstruction: systemPrompt, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
-      models: getActivePool(), actionName: 'AI_CHAT', tenantId, context: { eventId }, client: gemini,
+      models: getActivePool(), actionName: 'AI_CHAT', tenantId, context: { eventId }, client: explicitClient,
     });
     let draftSale = null, suggestedPosters = [], eventKpis = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
     const functionCalls = response.functionCalls || [];
@@ -81,17 +82,18 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
 export async function* streamChatWithSalesAssistant(messageOrOptions, historyParam = [], pendingDraftParam = null, contextDataParam = {}, geminiClientParam = null) {
   const o = (messageOrOptions && typeof messageOrOptions === 'object' && !Array.isArray(messageOrOptions) && messageOrOptions.message !== undefined) ? messageOrOptions : { message: messageOrOptions, history: historyParam, pendingDraft: pendingDraftParam, contextData: contextDataParam, geminiClient: geminiClientParam };
   const { message, history = [], pendingDraft = null, contextData = {}, tenantId = o.contextData?.tenantId, eventId = o.contextData?.eventId, date = o.contextData?.date || null } = o;
-  const gemini = o.geminiClient || geminiClientParam || getGeminiClient();
+  const explicitClient = o.geminiClient || geminiClientParam || null;
+  const isAvailable = Boolean(explicitClient || getGeminiClient());
 
   const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
   const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
-  if (!gemini) {
+  if (!isAvailable) {
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
     yield { type: 'token', text: isSale ? `[Modo Offline] Venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} transacciones.` };
     return;
   }
   const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
-  const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: gemini });
+  const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: explicitClient });
   const executedCalls = new Set();
   const executedTools = [];
   let trailingTextTokens = 0, hasEmittedTokens = false;
@@ -123,7 +125,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   }
 
   if (executedTools.length > 0) {
-    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: gemini, trailingTextTokens });
+    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient, trailingTextTokens });
   } else if (!hasEmittedTokens) {
     yield { type: 'token', text: '¡Con gusto te asesoro! Dime qué póster, personaje o artista buscas y te muestro las mejores opciones de nuestro catálogo.' };
   }

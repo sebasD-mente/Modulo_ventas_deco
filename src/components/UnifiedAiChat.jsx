@@ -48,8 +48,9 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         inputText={chatStream.inputText} setInputText={chatStream.setInputText}
         onSendText={chatStream.handleSendText} isLoading={chatStream.isLoading}
         isRecording={voiceRecorder.isRecording} recordingSeconds={voiceRecorder.recordingSeconds}
-        vadActive={voiceRecorder.vadActive} onStartRecording={voiceRecorder.startRecording}
-        onStopRecording={voiceRecorder.stopRecording} onImageUpload={chatStream.handleImageUpload}
+        vadActive={voiceRecorder.vadActive} audioLevel={voiceRecorder.audioLevel}
+        onStartRecording={voiceRecorder.startRecording} onStopRecording={voiceRecorder.stopRecording}
+        onImageUpload={chatStream.handleImageUpload}
       />
       <ChatSwapModal
         isOpen={chatStream.swappingIndex !== null} onClose={() => chatStream.setSwappingIndex(null)}

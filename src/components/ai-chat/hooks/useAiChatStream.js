@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_EVENT_SIZES, buildOfflineFallbackReply } from '../chatConstants';
+import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
 const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm } = {}) {
@@ -37,11 +38,8 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     setPendingDraft((p) => p ? { ...p, items: [...p.items, item], total: recalculateTotal([...p.items, item]) } : { items: [item], total: uPrice, paymentMethod: 'EFECTIVO', inputChannel: 'IA_CHAT_TEXTO', notes: 'Venta iniciada desde catálogo sugerido' });
   };
 
-  const fetchInitialSwapPosters = async () => { try { setIsSearchingSwap(true); const res = await authFetch('/api/catalog/web-posters?limit=8'), json = await res.json(); if (json.success) setSwapResults(json.data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx) => { setSwappingIndex(idx); setSwapQuery(''); setSwapResults([]); fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
-  const handleSwapSearchChange = (text) => {
-    setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current);
-    swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=8`), json = await res.json(); if (json.success) setSwapResults(json.data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150);
-  };
+  const fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=8', { signal: sig })).json())?.data || [], '', 8); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx) => { setSwappingIndex(idx); setSwapQuery(''); setSwapResults([]); fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
+  const handleSwapSearchChange = (text) => { setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=8`, { signal: sig })).json())?.data || [], text, 8); setSwapResults(data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150); };
   const selectSwapPoster = (newPoster) => {
     if (swappingIndex === null || !pendingDraft) return;
     setPendingDraft((prev) => {

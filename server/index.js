@@ -110,7 +110,7 @@ app.get('/health/ai', async (req, res) => {
       return res.status(200).json({ ...diag, error: 'GEMINI_CLIENT_NOT_INITIALIZED' });
     }
 
-    const testModels = [ENV.GEMINI_MODEL, 'gemini-1.5-flash', 'gemini-2.0-flash'].filter(Boolean);
+    const testModels = [ENV.GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-3.7-flash'].filter(Boolean);
     const uniqueModels = Array.from(new Set(testModels));
 
     for (const m of uniqueModels) {
