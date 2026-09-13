@@ -69,11 +69,24 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
   return { event: null, toolRecord: null };
 }
 
-export async function* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client, trailingTextTokens = 0 }) {
+export async function* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client, trailingTextTokens = 0, rawModelParts = [] }) {
   if (executedTools.length === 0 || trailingTextTokens > 0) return;
 
-  const modelParts = executedTools.map(t => ({ functionCall: { name: t.name, args: t.args || {}, ...(t.id ? { id: t.id } : {}) } }));
-  const toolParts = executedTools.map(t => ({ functionResponse: { name: t.name, response: (typeof t.result === 'object' && t.result !== null) ? t.result : { result: t.result }, ...(t.id ? { id: t.id } : {}) } }));
+  const modelParts = (rawModelParts && rawModelParts.length > 0)
+    ? rawModelParts
+    : executedTools.map(t => ({ functionCall: { name: t.name, args: t.args || {}, ...(t.id ? { id: t.id } : {}) } }));
+
+  const toolParts = executedTools.map((t, idx) => {
+    const matchingModelPart = modelParts[idx]?.functionCall;
+    const callId = t.id || matchingModelPart?.id || null;
+    return {
+      functionResponse: {
+        name: t.name,
+        response: (typeof t.result === 'object' && t.result !== null) ? t.result : { result: t.result },
+        ...(callId ? { id: callId } : {})
+      }
+    };
+  });
   const closedLoopContents = [...formattedContents, { role: 'model', parts: modelParts }, { role: 'user', parts: toolParts }];
 
   let followUpTokensCount = 0;

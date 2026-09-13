@@ -90,9 +90,14 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: explicitClient || undefined });
   const executedCalls = new Set();
   const executedTools = [];
+  const rawModelParts = [];
   let trailingTextTokens = 0, hasEmittedTokens = false;
 
   for await (const chunk of stream) {
+    const candidateParts = chunk.candidates?.[0]?.content?.parts || [];
+    for (const p of candidateParts) {
+      if (p.functionCall) rawModelParts.push(p);
+    }
     if (chunk.type === 'token' && chunk.text) {
       yield chunk;
       hasEmittedTokens = true;
@@ -119,7 +124,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   }
 
   if (executedTools.length > 0) {
-    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient || undefined, trailingTextTokens });
+    yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient || undefined, trailingTextTokens, rawModelParts });
   } else if (!hasEmittedTokens) {
     yield { type: 'token', text: 'Indica el personaje o franquicia que busca el cliente y te muestro las opciones de inmediato.' };
   }
