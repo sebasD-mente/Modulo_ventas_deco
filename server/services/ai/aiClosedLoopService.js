@@ -74,7 +74,7 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
 
   const modelParts = executedTools.map(t => ({ functionCall: { name: t.name, args: t.args || {}, ...(t.id ? { id: t.id } : {}) } }));
   const toolParts = executedTools.map(t => ({ functionResponse: { name: t.name, response: (typeof t.result === 'object' && t.result !== null) ? t.result : { result: t.result }, ...(t.id ? { id: t.id } : {}) } }));
-  const closedLoopContents = [...formattedContents, { role: 'model', parts: modelParts }, { role: 'tool', parts: toolParts }];
+  const closedLoopContents = [...formattedContents, { role: 'model', parts: modelParts }, { role: 'user', parts: toolParts }];
 
   let followUpTokensCount = 0;
   let hadPoolError = false;

@@ -397,11 +397,11 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
   });
 
   // =========================================================================
-  // 3. CONTRATO @google/genai: PAYLOAD DEL SEGUNDO TURNO ({ role: 'tool', parts: [{ functionResponse }] })
+  // 3. CONTRATO @google/genai: PAYLOAD DEL SEGUNDO TURNO ({ role: 'user', parts: [{ functionResponse }] })
   // =========================================================================
   describe('3. Verificación de Contrato Oficial @google/genai para Closed-Loop Payload', () => {
 
-    it('3.1 streamClosedLoopFollowUp construye exactamente el payload { role: "model", parts: [functionCall] } seguido de { role: "tool", parts: [functionResponse] }', async () => {
+    it('3.1 streamClosedLoopFollowUp construye exactamente el payload { role: "model", parts: [functionCall] } seguido de { role: "user", parts: [functionResponse] }', async () => {
       let interceptedContents = null;
 
       const dummyClient = {
@@ -437,7 +437,7 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
       for await (const c of generator) chunks.push(c);
 
       assert.ok(interceptedContents, 'Debe haber invocado el modelo con contents');
-      assert.strictEqual(interceptedContents.length, 3, 'contents debe tener 3 elementos: [user, model, tool]');
+      assert.strictEqual(interceptedContents.length, 3, 'contents debe tener 3 elementos: [user, model, user]');
 
       // Turno 0: Usuario original
       assert.strictEqual(interceptedContents[0].role, 'user');
@@ -454,7 +454,7 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
       });
 
       // Turno 2: Turno de herramienta con functionResponse según especificación @google/genai
-      assert.strictEqual(interceptedContents[2].role, 'tool', 'El role DEBE ser estrictamente "tool"');
+      assert.strictEqual(interceptedContents[2].role, 'user', 'El role DEBE ser estrictamente "user" según especificación @google/genai');
       assert.ok(Array.isArray(interceptedContents[2].parts));
       assert.strictEqual(interceptedContents[2].parts.length, 1);
       assert.ok(interceptedContents[2].parts[0].functionResponse, 'parts[0] DEBE contener el objeto functionResponse');
@@ -513,7 +513,7 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
       assert.strictEqual(modelTurn.parts[0].functionCall.name, 'checkInventoryStock');
       assert.strictEqual(modelTurn.parts[1].functionCall.name, 'getEventKPIs');
 
-      assert.strictEqual(toolTurn.role, 'tool');
+      assert.strictEqual(toolTurn.role, 'user', 'El role para functionResponse en Gemini DEBE ser "user"');
       assert.strictEqual(toolTurn.parts.length, 2, 'Debe agrupar las 2 respuestas en parts');
       assert.strictEqual(toolTurn.parts[0].functionResponse.name, 'checkInventoryStock');
       assert.strictEqual(toolTurn.parts[1].functionResponse.name, 'getEventKPIs');
