@@ -354,7 +354,9 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
       'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster',
       'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños',
-      'hola', 'buenas', 'buenos'
+      'hola', 'buenas', 'buenos', 'muestrame', 'mustrame', 'muéstrame',
+      'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo',
+      'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'
     ]);
     const meaningfulTokens = rawTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
     const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : rawTokens;
@@ -374,6 +376,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
         const normFullText = normalize(fullText);
         const alphaFullText = alphaOnly(fullText);
+        const fullTokensSet = new Set(normFullText.split(/\s+/));
 
         let score = 0;
 
@@ -384,12 +387,13 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 50;
         if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 60;
 
-        // Bonificación si coinciden todas las palabras clave (multi-token)
-        const allTokensMatch = tokens.every((t) => normFullText.includes(t));
+        // Bonificación si coinciden todas las palabras clave (multi-token exacto)
+        const isTokenMatch = (t) => fullTokensSet.has(t) || normFullText.startsWith(t);
+        const allTokensMatch = tokens.every(isTokenMatch);
         if (allTokensMatch) score += 30;
 
-        // Puntuación por cada token individual presente
-        const matchedTokensCount = tokens.filter((t) => normFullText.includes(t)).length;
+        // Puntuación por cada token individual presente como palabra completa
+        const matchedTokensCount = tokens.filter(isTokenMatch).length;
         score += matchedTokensCount * 10;
 
         return { p, score };

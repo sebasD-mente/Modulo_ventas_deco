@@ -38,11 +38,7 @@ export function saveCatalogSnapshot(posters) {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          for (const item of parsed) {
-            if (item?.id) existingMap.set(item.id, item);
-          }
-        }
+        if (Array.isArray(parsed)) parsed.forEach((it) => it?.id && existingMap.set(it.id, it));
       } catch (_) {}
     }
 
@@ -61,11 +57,9 @@ export function saveCatalogSnapshot(posters) {
       existingMap.set(sanitized.id, sanitized);
     }
 
-    let merged = Array.from(existingMap.values());
-    if (merged.length > MAX_LOCAL_CATALOG_ITEMS) {
-      merged = merged.slice(-MAX_LOCAL_CATALOG_ITEMS);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    const merged = Array.from(existingMap.values());
+    const finalItems = merged.length > MAX_LOCAL_CATALOG_ITEMS ? merged.slice(-MAX_LOCAL_CATALOG_ITEMS) : merged;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems));
   } catch (_) {}
 }
 

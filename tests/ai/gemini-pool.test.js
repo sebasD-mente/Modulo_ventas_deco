@@ -300,7 +300,7 @@ describe('🛡️ Suite de Pruebas: Multi-Model Contingency Pool & Resiliencia a
       }
 
       assert.strictEqual(chunks.length, 1);
-      assert.ok(chunks[0].text.includes('volumen alto de consultas'));
+      assert.ok(chunks[0].text.includes('Conexión con IA intermitente'));
     });
   });
 
