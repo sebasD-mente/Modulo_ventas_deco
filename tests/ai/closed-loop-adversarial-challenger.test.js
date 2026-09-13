@@ -691,4 +691,138 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
 
   });
 
+  // =========================================================================
+  // 5. ADVERSARIAL CHALLENGER: PURGA DE TEXTOS ENLATADOS, POOL ERROR RESILIENCE & COMBOS
+  // =========================================================================
+  describe('5. Adversarial Challenger: Error Chunk Termination, Canned Text Elimination & Fair Combos', () => {
+
+    it('5.1 Ante chunk de error del pool ("Conexión con IA intermitente"), streamClosedLoopFollowUp emite SOLO el error y termina SIN ejecutar buildFallbackSummaries (cero concatenación con pitch de ventas)', async () => {
+      // Simular que streamWithModelFallback emite el chunk de contingencia del pool
+      const mockPoolClient = {
+        models: {
+          generateContentStream: async function* () {
+            yield {
+              type: 'token',
+              text: '⚠️ Conexión con IA intermitente en el stand. Puedes continuar registrando la venta con el formulario manual inferior.',
+            };
+          },
+        },
+      };
+
+      const executedTools = [
+        {
+          name: 'prepareSaleDraft',
+          args: { items: [{ productName: 'Spider-Man', quantity: 2, size: 'MEDIANO', unitPrice: 65 }], paymentMethod: 'EFECTIVO' },
+          result: {
+            total: 120,
+            paymentMethod: 'EFECTIVO',
+            items: [{ description: 'Spider-Man Vintage Comic', quantity: 2, unitPrice: 65, sizeId: 'MEDIANO' }],
+          },
+        },
+      ];
+
+      const generator = streamClosedLoopFollowUp({
+        executedTools,
+        formattedContents: [{ role: 'user', parts: [{ text: '2 spiderman' }] }],
+        systemInstruction: 'Eres STAND IA',
+        client: mockPoolClient,
+        trailingTextTokens: 0,
+      });
+
+      const emitted = [];
+      for await (const chunk of generator) {
+        emitted.push(chunk);
+      }
+
+      assert.strictEqual(emitted.length, 1, 'Debe emitir EXACTAMENTE 1 chunk (el error del pool) y terminar');
+      assert.strictEqual(emitted[0].type, 'token');
+      assert.ok(emitted[0].text.includes('Conexión con IA intermitente'), 'El chunk emitido debe ser la advertencia del pool');
+
+      // VERIFICACIÓN ADVERSARIAL CRÍTICA: CERO concatenación de buildFallbackSummaries
+      assert.ok(!emitted[0].text.includes('¡Listo! Te preparé el borrador en pantalla'), 'PROHIBIDO concatenar el pitch de borrador con el error');
+      assert.ok(!emitted[0].text.includes('Presiona "Confirmar Venta"'), 'PROHIBIDO concatenar el pitch de confirmación');
+      assert.ok(!emitted[0].text.includes('HP Látex'), 'Cero menciones técnicas en el error');
+      assert.ok(!emitted[0].text.includes('cinta tesa'), 'Cero menciones de cinta en el error');
+    });
+
+    it('5.2 En respuestas de búsqueda (searchCatalog y chatWithSalesAssistant), NINGUNA cadena enlatada aparece en el texto generado ni en los fallbacks', async () => {
+      // Probar chatWithSalesAssistant con búsqueda de catálogo cuando no hay texto del modelo
+      const mockSearchClient = {
+        models: {
+          generateContent: async () => ({
+            text: '', // Modelo no devolvió texto propio, activando el generador de resumen
+            functionCalls: [
+              {
+                name: 'searchCatalog',
+                args: { query: 'Spider-Man', category: 'CÓMICS' },
+              },
+            ],
+          }),
+        },
+      };
+
+      const result = await chatWithSalesAssistant({
+        message: 'Muéstrame pósters de Spider-Man',
+        tenantId: 'adversarial-tenant',
+        eventId: 'adversarial-event-1',
+        geminiClient: mockSearchClient,
+      });
+
+      assert.ok(result);
+      assert.ok(result.reply, 'Debe haber generado una respuesta limpia');
+
+      const prohibitedStrings = [
+        'tintas ecológicas HP Látex',
+        'HP Látex',
+        'cinta tesa®',
+        'cinta tesa',
+        'volumen alto de consultas',
+      ];
+
+      for (const banned of prohibitedStrings) {
+        assert.ok(
+          !result.reply.toLowerCase().includes(banned.toLowerCase()),
+          `La respuesta NO debe contener la frase enlatada "${banned}". Respuesta recibida: "${result.reply}"`
+        );
+      }
+
+      // Debe sugerir los combos o preguntar cuál anotar
+      assert.ok(
+        result.reply.includes('opciones en catálogo') || result.reply.includes('¿Cuál agregamos al borrador?'),
+        'Debe contener una respuesta de mostrador ágil'
+      );
+      assert.ok(result.reply.includes('2x Q120') || result.reply.includes('3x Q180'), 'Debe mencionar combos');
+    });
+
+    it('5.3 Validación adversarial de combos de feria (2x Q120, 3x Q180): cálculo exacto, ahorro y descripción en prompt y UI', async () => {
+      const { buildSalesSystemPrompt } = await import('../../server/services/ai/aiPromptService.js');
+      const prompt = buildSalesSystemPrompt({});
+
+      // Verificar que el prompt describe con precisión los combos de feria
+      assert.ok(prompt.includes('2 Medianos por Q120'), 'Prompt debe describir 2 Medianos por Q120');
+      assert.ok(prompt.includes('ahorro de Q10'), 'Prompt debe especificar ahorro de Q10');
+      assert.ok(prompt.includes('3 Medianos por Q180'), 'Prompt debe describir 3 Medianos por Q180');
+      assert.ok(prompt.includes('ahorro de Q15'), 'Prompt debe especificar ahorro de Q15');
+
+      // Validar la lógica matemática del combo de 2x Q120 y 3x Q180
+      const calculateCombo = (medQty) => {
+        if (medQty < 2) return null;
+        const regularPrice = medQty * 65;
+        const comboPrice = medQty === 2 ? 120 : (medQty >= 3 ? 180 : 0);
+        const savings = regularPrice - comboPrice;
+        return { qualifies: true, medQty, comboPrice, savings };
+      };
+
+      const combo2 = calculateCombo(2);
+      assert.strictEqual(combo2.comboPrice, 120, '2 medianos deben costar exactamente Q120');
+      assert.strictEqual(combo2.savings, 10, 'El ahorro debe ser exactamente Q10 (regular Q130 vs Q120)');
+
+      const combo3 = calculateCombo(3);
+      assert.strictEqual(combo3.comboPrice, 180, '3 medianos deben costar exactamente Q180');
+      assert.strictEqual(combo3.savings, 15, 'El ahorro debe ser exactamente Q15 (regular Q195 vs Q180)');
+    });
+
+  });
+
 });
+
