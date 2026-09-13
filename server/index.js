@@ -90,80 +90,17 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Diagnóstico de IA en vivo para verificación de modelos y credenciales sin adivinanzas
-app.get('/health/ai', async (req, res) => {
-  try {
-    const { getGeminiClient } = await import('./config/gemini.js');
-    const gemini = getGeminiClient();
-    const apiKey = ENV.GEMINI_API_KEY || '';
-    const diag = {
-      status: 'ok',
-      configured: Boolean(apiKey),
-      keyLength: apiKey.length,
-      keyPrefix: apiKey ? `${apiKey.substring(0, 6)}...` : 'none',
-      envModel: ENV.GEMINI_MODEL,
-      models: {},
-      time: new Date().toISOString(),
-    };
-
-    if (!gemini) {
-      return res.status(200).json({ ...diag, error: 'GEMINI_CLIENT_NOT_INITIALIZED' });
-    }
-
-    const testModels = [ENV.GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-3.7-flash'].filter(Boolean);
-    const uniqueModels = Array.from(new Set(testModels));
-
-    for (const m of uniqueModels) {
-      try {
-        const t0 = Date.now();
-        const r = await gemini.models.generateContent({
-          model: m,
-          contents: 'ping',
-        });
-        diag.models[m] = {
-          ok: true,
-          latencyMs: Date.now() - t0,
-          sample: r.text?.trim()?.substring(0, 40) || 'OK',
-        };
-      } catch (err) {
-        diag.models[m] = {
-          ok: false,
-          status: err.status || err.statusCode || err.code || 'ERR',
-          message: err.message?.substring(0, 200),
-        };
-      }
-    }
-
-    // Verificación en vivo del stream real de STAND {IA}
-    try {
-      const { streamChatWithSalesAssistant } = await import('./services/aiMultimodalService.js');
-      const streamGen = streamChatWithSalesAssistant({
-        message: 'Hola STAND IA, ¿cómo estás?',
-        contextData: { evento: 'Feria Vintage Guate', ubicacion: 'Stand Central' },
-      });
-      let tokens = '';
-      for await (const chunk of streamGen) {
-        if (chunk.type === 'token' && chunk.text) {
-          tokens += chunk.text;
-          if (tokens.length >= 100) break;
-        }
-      }
-      diag.standIaLiveStream = {
-        ok: !tokens.includes('volumen alto de consultas'),
-        isFallback: tokens.includes('volumen alto de consultas'),
-        sample: tokens.substring(0, 100),
-      };
-    } catch (streamErr) {
-      diag.standIaLiveStream = {
-        ok: false,
-        error: streamErr.message,
-      };
-    }
-
-    res.status(200).json(diag);
-  } catch (err) {
-    res.status(500).json({ status: 'error', error: err.message });
-  }
+// Diagnóstico estático de configuración de IA sin consumo de tokens ni exposición de credenciales
+app.get('/health/ai', (req, res) => {
+  const apiKey = ENV.GEMINI_API_KEY || '';
+  const isConfigured = Boolean(apiKey);
+  res.status(200).json({
+    status: isConfigured ? 'ok' : 'unconfigured',
+    configured: isConfigured,
+    model: ENV.GEMINI_MODEL || 'gemini-2.5-flash',
+    contingencyPoolConfigured: true,
+    time: new Date().toISOString(),
+  });
 });
 
 // Rutas de API

@@ -3,13 +3,24 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('deko_auth_token'));
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_auth_user') : null;
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [token, setToken] = useState(() => (typeof localStorage !== 'undefined' ? localStorage.getItem('deko_auth_token') : null));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('deko_auth_token');
+    try {
+      localStorage.removeItem('deko_auth_token');
+      localStorage.removeItem('deko_auth_user');
+      localStorage.removeItem('deko_active_event');
+    } catch (_) {}
     setToken(null);
     setUser(null);
   }, []);
@@ -39,7 +50,7 @@ export function AuthProvider({ children }) {
   );
 
   const checkSession = useCallback(async () => {
-    const currentToken = localStorage.getItem('deko_auth_token') || token;
+    const currentToken = (typeof localStorage !== 'undefined' ? localStorage.getItem('deko_auth_token') : null) || token;
     if (!currentToken) {
       setUser(null);
       setIsLoading(false);
@@ -56,14 +67,22 @@ export function AuthProvider({ children }) {
 
       const data = await res.json();
       if (data.success && data.user) {
+        try {
+          localStorage.setItem('deko_auth_user', JSON.stringify(data.user));
+        } catch (_) {}
         setUser(data.user);
-      } else {
-        localStorage.removeItem('deko_auth_token');
+      } else if (res.status === 401 || res.status === 403) {
+        try {
+          localStorage.removeItem('deko_auth_token');
+          localStorage.removeItem('deko_auth_user');
+          localStorage.removeItem('deko_active_event');
+        } catch (_) {}
         setToken(null);
         setUser(null);
       }
     } catch (err) {
       console.warn('[Auth Warning] Error verificando sesión:', err.message);
+      // En modo offline, conservar el usuario existente si hay token válido
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +108,10 @@ export function AuthProvider({ children }) {
         throw new Error(data.error || 'Fallo en autenticación con Google');
       }
 
-      localStorage.setItem('deko_auth_token', data.token);
+      try {
+        localStorage.setItem('deko_auth_token', data.token);
+        localStorage.setItem('deko_auth_user', JSON.stringify(data.user));
+      } catch (_) {}
       setToken(data.token);
       setUser(data.user);
       return data.user;

@@ -133,6 +133,25 @@ describe('Catalog Cache Service & Audio Satellite Suite (M2)', () => {
       const catalog = getLocalCatalog();
       assert.deepEqual(catalog, SEED_POSTERS);
     });
+
+    it('3.4. saveCatalogSnapshot acumula pósters en llamadas sucesivas sin sobreescritura destructiva', () => {
+      saveCatalogSnapshot([{ id: 'p-1', titulo: 'Póster 1' }, { id: 'p-2', titulo: 'Póster 2' }]);
+      saveCatalogSnapshot([{ id: 'p-3', titulo: 'Póster 3' }]);
+      const catalog = getLocalCatalog();
+      assert.equal(catalog.length, 3);
+      assert.ok(catalog.some((p) => p.id === 'p-1'));
+      assert.ok(catalog.some((p) => p.id === 'p-2'));
+      assert.ok(catalog.some((p) => p.id === 'p-3'));
+    });
+
+    it('3.5. saveCatalogSnapshot respeta el tope FIFO de 300 obras', () => {
+      const largeBatch = Array.from({ length: 350 }, (_, i) => ({ id: `bulk-${i}`, titulo: `Bulk ${i}` }));
+      saveCatalogSnapshot(largeBatch);
+      const catalog = getLocalCatalog();
+      assert.equal(catalog.length, 300);
+      assert.equal(catalog[0].id, 'bulk-50');
+      assert.equal(catalog[299].id, 'bulk-349');
+    });
   });
 
   describe('4. Resiliencia de Red y Fallback con Timeout de 2 Segundos', () => {

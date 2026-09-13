@@ -44,6 +44,13 @@ export async function updateUserRole(req, res) {
     const { id } = req.params;
     const { role, roles } = req.body;
 
+    const existing = await prisma.user.findFirst({
+      where: { id, tenantId: req.tenantId },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado en esta organización.' });
+    }
+
     const validRoles = ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'];
     let targetRoles = [];
 
@@ -89,6 +96,22 @@ export async function assignUserToEvent(req, res) {
     const { id } = req.params;
     const { eventId } = req.body;
 
+    const existing = await prisma.user.findFirst({
+      where: { id, tenantId: req.tenantId },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado en esta organización.' });
+    }
+
+    if (eventId) {
+      const event = await prisma.event.findFirst({
+        where: { id: eventId, tenantId: req.tenantId },
+      });
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Evento no encontrado en esta organización.' });
+      }
+    }
+
     const updated = await prisma.user.update({
       where: { id },
       data: { assignedEventId: eventId || null },
@@ -108,9 +131,11 @@ export async function assignUserToEvent(req, res) {
 export async function toggleUserStatus(req, res) {
   try {
     const { id } = req.params;
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findFirst({
+      where: { id, tenantId: req.tenantId },
+    });
     if (!user) {
-      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado en esta organización.' });
     }
 
     // Proteger que un Super Admin del entorno no pueda ser desactivado por error
@@ -176,7 +201,7 @@ export async function createUser(req, res) {
 
     const existing = await prisma.user.findFirst({
       where: {
-        tenantId: req.tenantId || 'tenant-deco-vintage',
+        tenantId: req.tenantId,
         email: normalizedEmail,
       },
     });
@@ -190,7 +215,7 @@ export async function createUser(req, res) {
 
     const newUser = await prisma.user.create({
       data: {
-        tenantId: req.tenantId || 'tenant-deco-vintage',
+        tenantId: req.tenantId,
         email: normalizedEmail,
         fullName: fullName.trim(),
         role: primaryRole,
@@ -229,9 +254,11 @@ export async function deleteUser(req, res) {
       });
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id } });
+    const targetUser = await prisma.user.findFirst({
+      where: { id, tenantId: req.tenantId },
+    });
     if (!targetUser) {
-      return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado en esta organización.' });
     }
 
     const isSuperAdminEmail = ENV.SUPER_ADMIN_EMAILS.includes((targetUser.email || '').toLowerCase().trim());

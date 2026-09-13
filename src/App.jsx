@@ -29,7 +29,14 @@ function ViewLoadingFallback() {
 function SalesTerminalMain() {
   const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
   const [activeTab, setActiveTab] = useState('venta');
-  const [activeEvent, setActiveEvent] = useState(null);
+  const [activeEvent, setActiveEvent] = useState(() => {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_active_event') : null;
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [liveMetrics, setLiveMetrics] = useState(null);
   const [manualDraft, setManualDraft] = useState(null);
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
@@ -56,6 +63,9 @@ function SalesTerminalMain() {
       const eventData = await eventRes.json();
       if (eventData.success && eventData.data) {
         setActiveEvent(eventData.data);
+        try {
+          localStorage.setItem('deko_active_event', JSON.stringify(eventData.data));
+        } catch (_) {}
 
         // 2. Métricas en vivo del evento activo
         const metricsRes = await authFetch(`/api/sales/events/${eventData.data.id}/metrics`);
@@ -91,7 +101,7 @@ function SalesTerminalMain() {
     }
   }, [user, loadInitialData]);
 
-  if (isAuthLoading) {
+  if (isAuthLoading && !user) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-4">
         <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
@@ -102,7 +112,7 @@ function SalesTerminalMain() {
     );
   }
 
-  // Si no hay usuario autenticado, renderizar pantalla de Login Oficial de Google
+  // Si no hay usuario autenticado (ni en caché local), renderizar pantalla de Login Oficial de Google
   if (!user) {
     return <LoginView />;
   }

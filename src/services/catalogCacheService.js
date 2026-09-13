@@ -9,6 +9,7 @@ export const CANONICAL_SIZES = [
 export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
 const STORAGE_KEY = 'deko_local_catalog_snapshot_v1';
 const TIMEOUT_MS = 2000;
+const MAX_LOCAL_CATALOG_ITEMS = 300;
 
 export const SEED_POSTERS = [
   { id: 'off-1', titulo: 'Chainsaw Man', subtitulo: 'Denji Pochita', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
@@ -32,13 +33,39 @@ export function getLocalCatalog() {
 export function saveCatalogSnapshot(posters) {
   if (!Array.isArray(posters) || !posters.length || typeof localStorage === 'undefined') return;
   try {
-    const sanitized = posters.map((p) => ({
-      id: p.id, titulo: p.titulo || p.name || 'Póster', subtitulo: p.subtitulo || '',
-      categoria: p.categoria || p.category || 'ARTE', imageUrl: p.imageUrl || p.thumbUrl || '/brand/logo-origami.webp',
-      thumbUrl: p.thumbUrl || p.imageUrl || '/brand/logo-origami.webp', precioMinimo: p.precioMinimo || 25,
-      sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : CANONICAL_SIZES,
-    }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+    const existingMap = new Map();
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (item?.id) existingMap.set(item.id, item);
+          }
+        }
+      } catch (_) {}
+    }
+
+    for (const p of posters) {
+      if (!p?.id) continue;
+      const sanitized = {
+        id: p.id,
+        titulo: p.titulo || p.name || 'Póster',
+        subtitulo: p.subtitulo || '',
+        categoria: p.categoria || p.category || 'ARTE',
+        imageUrl: p.imageUrl || p.thumbUrl || '/brand/logo-origami.webp',
+        thumbUrl: p.thumbUrl || p.imageUrl || '/brand/logo-origami.webp',
+        precioMinimo: Number(p.precioMinimo) || 25,
+        sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : CANONICAL_SIZES,
+      };
+      existingMap.set(sanitized.id, sanitized);
+    }
+
+    let merged = Array.from(existingMap.values());
+    if (merged.length > MAX_LOCAL_CATALOG_ITEMS) {
+      merged = merged.slice(-MAX_LOCAL_CATALOG_ITEMS);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch (_) {}
 }
 

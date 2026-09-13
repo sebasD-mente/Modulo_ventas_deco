@@ -125,6 +125,7 @@ router.post(
 router.patch(
   '/sales/:id',
   requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireEventAccess,
   validate(updateSaleSchema),
   updateSale
 );
