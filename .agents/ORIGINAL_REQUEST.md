@@ -1530,3 +1530,85 @@ Integrity mode: development
 - [ ] `npm run harness:check` ejecuta y pasa al 100% (test:security 9/9, audit:secrets, audit:monoliths, build).
 - [ ] Pruebas en vivo ejecutadas y validadas con Chrome DevTools MCP.
 - [ ] Capturas de pantalla de evidencia visual de alta resolución tomadas y documentadas.
+
+## 2026-09-13T23:23:00Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Ted (Lead Architect & Orquestador), Atlas (Especialista en Embeddings y RAG), Echo (Especialista en Neuro-UX y Prompt Engineering), Sentinel (Especialista en QA Adversarial y DevTools)
+
+Misión de Calibración Cognitiva de Alto Nivel, RAG Vectorial 100% Funcional y Repetición Exhaustiva de Pruebas en STAND {IA} (`Modulo_Ventas`). Premisa inquebrantable de la Dirección: STAND debe ser un agente de IA profesional, sumamente inteligente y formal, como tener a un asistente "nerd" experto en cultura pop y en todo el catálogo oficial de Deco Vintage (descripciones de pósters, tags, dimensiones, variantes y combos), aprovechando la tecnología RAG vectorial al 100% con respuestas naturales, fluidas y sin errores técnicos ni tarjetas espurias.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Reparación de Causa Raíz en Motor RAG y Bucle Cerrado Cognitivo
+- **Corrección de Modelo de Embeddings (`server/services/embeddingService.js`):**
+  * Migrar el modelo predeterminado de `text-embedding-004` (inexistente en v1beta / 404) a `gemini-embedding-001` (soporte nativo verificado de 3072 dimensiones).
+  * Garantizar que la búsqueda vectorial se ejecute de verdad contra la API de Google sin conmutar forzadamente al paracaídas léxico.
+  * Mantener el cálculo de similitud coseno con umbral estricto `MIN_SIMILARITY_THRESHOLD = 0.45` para filtrar implacablemente obras fuera de contexto.
+- **Reparación del Bucle Cerrado de Gemini 3.8 Flash (`aiClosedLoopService.js` / `aiStreamService.js`):**
+  * Preservar los `candidates[0].content.parts` originales del stream (incluyendo `thoughtSignature`) para que la llamada de retorno de herramientas a Gemini 3.8 Flash no sea rechazada con HTTP 400.
+  * Formatear correctamente la respuesta de funciones con el rol `user` y la estructura `functionResponse` requerida por `@google/genai`.
+  * Erradicar de raíz la emisión del banner de fallo `"⚠️ Conexión con IA intermitente..."` cuando el modelo está operando normalmente.
+
+### R2. Purga de Tarjetas Falsas y Precisión Semántica Estricta
+- Auditar y calibrar el catálogo y las herramientas para que en consultas temáticas (Fórmula 1, Dragon Ball, Cristiano Ronaldo) el asistente presente **ÚNICAMENTE** obras pertenecientes a dichas entidades.
+- Prohibir terminantemente que se filtren obras irrelevantes (ej. baloncesto/Kobe Bryant en búsquedas de automovilismo o fútbol).
+- Si una obra no alcanza una afinidad semántica/vectorial mínima del 45%, debe ser descartada sin piedad.
+
+### R3. Calibración Cognitiva y Personalidad (Asistente Nerd, Formal y Experto)
+- El asistente debe operar como un consultor "nerd" de altísimo nivel: sumamente inteligente, formal, elocuente y con dominio enciclopédico de todo el catálogo oficial de Deco Vintage Web (títulos, descripciones de obras, artistas, franquicias, tags y medidas).
+- El asistente debe generar **SIEMPRE** una respuesta conversacional natural, inteligente y fluida en tiempo real por Gemini 3.8 Flash.
+- La respuesta no puede limitarse a colgar tarjetas: debe aportar valor contextual de forma ágil, recomendar tamaños o combos de feria (2xQ120, 3xQ180) y facilitar el cierre inmediato del pedido.
+- Tono: Formal, respetuoso, dinámico y empático (trato de "tú", 1-3 líneas que demuestren inteligencia y conocimiento enciclopédico).
+
+### R4. Repetición Exhaustiva de Pruebas en Vivo con Chrome DevTools MCP
+- Repetir la totalidad de las pruebas en vivo en el navegador real analizando no solo si se monta una venta, sino **CADA PALABRA DE LA RESPUESTA Y CADA TARJETA PRESENTADA**:
+  * **Prueba 1 (Typo Dragon Ball):** Mensaje `"mustrame que tenemos disponible de dragon ball"`.
+    - *Análisis textual:* Verificar que la respuesta de Gemini sea 100% natural y fluida, cero menciones a látex/tesa, y CERO advertencias de fallo técnico ("conexión intermitente").
+    - *Análisis de tarjetas:* Verificar que **TODAS** las tarjetas pertenezcan a Dragon Ball / Goku. Cero tarjetas de anime no relacionado o cómics.
+  * **Prueba 2 (Entidades Coloquiales Segmentadas):**
+    - Consultar individualmente o de forma clara:
+      1. *"el saiyajin de pelo amarillo"* -> Debe mostrar a Goku / Super Saiyajin.
+      2. *"el bicho"* -> Debe mostrar a Cristiano Ronaldo (CR7). Cero tarjetas de otros deportes.
+      3. *"obras de F1"* -> Debe mostrar Ferrari, Checo Pérez, Red Bull, Leclerc, Hamilton. CERO tarjetas de baloncesto (Kobe Bryant).
+    - *Criterio de éxito:* Cero contaminación cruzada entre categorías.
+  * **Prueba 3 (Venta Rápida por Dictado & Combo):**
+    - Mensaje `"2 medianos de Goku en efectivo"`.
+    - *Análisis textual:* Respuesta confirmando el borrador y felicitando al vendedor.
+    - *Análisis del borrador:* 2 pósters Medianos (30x45 cm), precio base Q130.00, descuento combo -Q10.00, total neto Q120.00 en efectivo.
+- Capturar nuevas capturas de pantalla de alta resolución demostrando que el agente ahora responde con texto natural y fluido (sin banners de error) y con tarjetas 100% precisas.
+
+### R5. Reporte Exhaustivo y Hoja de Ruta Arquitectónica
+- Entregar un informe técnico detallando:
+  1. Causa raíz exacta de los fallos anteriores y cómo fueron subsanados.
+  2. Análisis cualitativo exhaustivo de las respuestas y tarjetas generadas en cada prueba.
+  3. Hoja de ruta para garantizar que STAND {IA} sea un sistema de clase mundial, robusto y escalable para la Comic Con Guatemala 2026.
+
+## Acceptance Criteria
+
+### Causa Raíz y RAG Real
+- [ ] `server/services/embeddingService.js` configurado con `gemini-embedding-001` (3072 dimensiones) ejecutando búsquedas vectoriales reales contra Gemini API.
+- [ ] Bucle cerrado en `aiClosedLoopService.js` y `aiStreamService.js` preserva `thoughtSignature` y genera texto de respuesta conversacional real por Gemini 3.8 Flash.
+- [ ] Cero banners de `"⚠️ Conexión con IA intermitente..."` durante la operación normal del asistente.
+
+### Precisión de Catálogo
+- [ ] Búsqueda de F1 devuelve exclusivamente obras de automovilismo (Ferrari, Red Bull, Leclerc, Sainz); cero tarjetas de baloncesto (Kobe Bryant).
+- [ ] Búsqueda de "el bicho" devuelve exclusivamente a Cristiano Ronaldo.
+- [ ] Búsqueda de "saiyajin de pelo amarillo" devuelve exclusivamente a Goku / Dragon Ball.
+
+### Calidad de Respuesta del Asistente
+- [ ] El asistente acompaña las tarjetas con una respuesta conversacional natural, enérgica y vendedora de 1 a 3 líneas.
+- [ ] Sugerencia activa de combos de feria (2xQ120, 3xQ180).
+- [ ] Cero respuestas prefabricadas de cintas tesa o tintas látex.
+
+### Validación en Navegador Real y Reporte
+- [ ] Pruebas 1, 2 y 3 repetidas en vivo y validadas visualmente con Chrome DevTools MCP.
+- [ ] Capturas de pantalla actualizadas que muestran la conversación orgánica real y las tarjetas filtradas.
+- [ ] `npm run harness:check` 100% verde (9/9 Zero-Trust, 0 secretos, build exitoso).
+- [ ] Reporte y hoja de ruta arquitectónica entregados a la Dirección.

@@ -21,39 +21,42 @@ export const ALBUM_COVER_SIZE = {
   badge: 'Formato vinilo cuadrado para música',
 };
 
+const SIZE_CATALOG_MAP = {
+  MINI: STANDARD_EVENT_SIZES[0],
+  PEQUENO: STANDARD_EVENT_SIZES[1],
+  PORTADA_ALBUM: ALBUM_COVER_SIZE,
+  MEDIANO: STANDARD_EVENT_SIZES[2],
+  GRANDE: STANDARD_EVENT_SIZES[3],
+  GIGANTE: STANDARD_EVENT_SIZES[4],
+};
+
 /**
- * Construye y normaliza la lista de tamaños disponibles para un póster
+ * Construye y normaliza la lista de tamaños legítimos para un póster sin contaminación cruzada.
  */
 function resolvePosterSizes(poster) {
-  const isMusic = (poster.categoria || poster.category || '').toUpperCase() === 'MUSICA';
-  const apiSizes = Array.isArray(poster.sizes) ? poster.sizes : [];
-
-  const sizeMap = new Map();
-
-  // Si es música o incluye portada de álbum, agregar la portada de álbum primero
-  if (isMusic || apiSizes.some(s => (s.sizeId || s.id) === 'PORTADA_ALBUM')) {
-    sizeMap.set('PORTADA_ALBUM', ALBUM_COVER_SIZE);
-  }
-
-  // Agregar los tamaños estándar del stand
-  for (const std of STANDARD_EVENT_SIZES) {
-    sizeMap.set(std.sizeId, { ...std });
-  }
-
-  // Sobrescribir con precios y badges de la API web si existen
-  for (const api of apiSizes) {
-    const sId = api.sizeId || api.id || 'MEDIANO';
-    const existing = sizeMap.get(sId);
-    sizeMap.set(sId, {
-      sizeId: sId,
-      nombre: api.nombre || api.name || existing?.nombre || 'Estándar',
-      dimensiones: api.dimensiones || api.dimensions || existing?.dimensiones || '30 x 45 cm',
-      precio: Number(api.precio || api.price || existing?.precio || 65),
-      badge: api.badge || existing?.badge || null,
+  if (Array.isArray(poster.sizes) && poster.sizes.length > 0) {
+    const valid = poster.sizes.filter(s => s && s.isActive !== false).map(s => {
+      const sId = s.id || s.sizeId;
+      const ref = SIZE_CATALOG_MAP[sId];
+      return {
+        sizeId: sId,
+        nombre: s.nombre || s.name || ref?.nombre || sId,
+        dimensiones: s.dimensiones || s.dimensions || ref?.dimensiones || '',
+        precio: Number(s.precio || s.price || ref?.precio || 25),
+        badge: s.badge || ref?.badge || null,
+      };
     });
+    if (valid.length > 0) return valid;
   }
 
-  return Array.from(sizeMap.values());
+  if (Array.isArray(poster.availableSizes) && poster.availableSizes.length > 0) {
+    const resolved = poster.availableSizes
+      .map(sId => SIZE_CATALOG_MAP[sId])
+      .filter(Boolean);
+    if (resolved.length > 0) return resolved;
+  }
+
+  return [...STANDARD_EVENT_SIZES];
 }
 
 /**
@@ -73,33 +76,17 @@ export async function syncCatalogFromWeb(tenantId) {
   }
 
   if (!targetTenantId) {
-    const anyTenant = await prisma.tenant.findFirst({
-      select: { id: true },
-    });
+    const anyTenant = await prisma.tenant.findFirst({ select: { id: true } });
     targetTenantId = anyTenant?.id;
   }
-
   if (!targetTenantId) {
-    console.warn('[CatalogSync] ⚠️ No se encontró ningún tenant en la base de datos para sincronizar productos.');
-    return {
-      success: false,
-      count: 0,
-      error: 'Tenant no configurado en la base de datos.',
-    };
+    return { success: false, count: 0, error: 'Tenant no configurado en la base de datos.' };
   }
 
-  // Filtramos URLs candidatas válidas (evitando decovintageguate.com inactivo)
   const configuredUrl = ENV.WEB_CATALOG_URL || process.env.WEB_CATALOG_URL;
-  const candidateUrls = [
-    configuredUrl,
-    'https://decovintage.online',
-  ].filter((url, index, self) => 
-    url && 
-    typeof url === 'string' && 
-    !url.includes('decovintageguate.com') && 
-    self.indexOf(url) === index
+  const candidateUrls = [configuredUrl, 'https://decovintage.online'].filter((url, index, self) => 
+    url && typeof url === 'string' && !url.includes('decovintageguate.com') && self.indexOf(url) === index
   );
-
   let allPosters = [];
   let successfulUrl = null;
 
@@ -188,7 +175,9 @@ export async function syncCatalogFromWeb(tenantId) {
     const rawSubtitle = (poster.subtitulo || poster.subtitle || '').trim();
     const name = rawSubtitle ? `${rawTitle} - ${rawSubtitle}` : rawTitle;
     const category = (poster.categoria || poster.category || 'GENERAL').toUpperCase();
-    const imageUrl = poster.imageUrl || poster.image || poster.thumbUrl || null;
+    const rawImg = poster.imageUrl || poster.image || poster.thumbUrl || null;
+    const imageUrl = typeof rawImg === 'string' && rawImg.trim().length > 5 ? rawImg.trim() : null;
+    const isActiveProduct = Boolean(imageUrl);
     const sizes = resolvePosterSizes(poster);
     const minPrice = sizes.reduce((min, s) => Math.min(min, s.precio), Number(poster.precioMinimo || 25));
 
@@ -223,7 +212,7 @@ export async function syncCatalogFromWeb(tenantId) {
           imageUrl,
           sizes,
           tags: combinedTags,
-          isActive: true,
+          isActive: isActiveProduct,
         },
         update: {
           name,
@@ -232,7 +221,7 @@ export async function syncCatalogFromWeb(tenantId) {
           imageUrl,
           sizes,
           tags: combinedTags,
-          isActive: true,
+          isActive: isActiveProduct,
         },
       });
       syncedSkus.add(sku);
@@ -246,7 +235,7 @@ export async function syncCatalogFromWeb(tenantId) {
     }
   }
 
-  // Soft-delete de productos que ya no existen en la tienda web
+  // Soft-delete de productos que ya no existen en la tienda web o sin imagen
   const removedSkus = [...existingSkusBefore].filter((sku) => !syncedSkus.has(sku));
   if (removedSkus.length > 0) {
     await prisma.product.updateMany({
@@ -255,6 +244,10 @@ export async function syncCatalogFromWeb(tenantId) {
     }).catch((e) => console.warn('[CatalogSync] No se pudo desactivar productos removidos:', e.message));
     console.log(`[CatalogSync] 🗑️  ${removedSkus.length} productos ya no disponibles en la tienda → marcados como inactivos.`);
   }
+  await prisma.product.updateMany({
+    where: { tenantId: targetTenantId, OR: [{ imageUrl: null }, { imageUrl: '' }] },
+    data: { isActive: false },
+  }).catch(() => {});
 
   // Invalidar caché en memoria para refrescar búsquedas instantáneas
   invalidateCatalogCache();

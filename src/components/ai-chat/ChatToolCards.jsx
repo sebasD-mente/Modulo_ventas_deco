@@ -7,18 +7,8 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
   const addFn = onAddPosterToDraft || onAddPoster;
   const { eventKpis: k, cashDrawerStatus: c, sellerShiftReport: s, productionQueueStatus: q, inventoryStock: inv, suggestedPosters: sps } = m || {};
   const draft = m?.draftSale || m?.draft_sale || m?.draft || draftSale || pendingDraft || (m?.items ? m : null);
-  const medQty = (draft?.items || []).reduce((acc, it) => {
-    const sz = (it.sizeId || it.size || it.selectedSizeId || '').toUpperCase();
-    return (sz === 'MEDIANO' || (!sz && (it.description || '').toUpperCase().includes('MEDIANO'))) ? acc + (Number(it.quantity) || 1) : acc;
-  }, 0);
-
   return (
     <>
-      {medQty >= 2 && (
-        <div data-testid="combo-badge" className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold shadow-sm">
-          <span>✨ Combo Medianos ({medQty >= 3 ? '3x Q180' : '2x Q120'})</span>
-        </div>
-      )}
       {k && (
         <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
@@ -110,24 +100,32 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
           )}
         </div>
       )}
-      {sps && sps.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-neutral-700/70 space-y-2">
-          <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider block">🎨 Obras encontradas en catálogo ({sps.length}):</span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {sps.map((sp) => (
-              <div key={sp.id} className="flex items-center gap-2.5 p-2 rounded-xl bg-black border border-neutral-700 hover:border-neutral-500 transition-all shadow-sm">
-                <img src={sp.thumbUrl || sp.imageUrl} alt={sp.titulo} className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900 shadow" />
-                <div className="flex-1 min-w-0">
-                  <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
-                  <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
-                  <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">Desde Q{sp.precioMinimo}</span>
-                </div>
-                {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
-              </div>
-            ))}
+      {(() => {
+        const validPosters = (sps || []).filter((sp) => Boolean(sp?.thumbUrl || sp?.imageUrl));
+        if (validPosters.length === 0) return null;
+        return (
+          <div className="mt-3 pt-3 border-t border-neutral-700/70 space-y-2">
+            <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider block">🎨 Obras encontradas en catálogo ({validPosters.length}):</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {validPosters.map((sp) => {
+                const singleSize = Array.isArray(sp.sizes) && sp.sizes.length === 1 ? sp.sizes[0] : null;
+                const priceLabel = singleSize ? `${singleSize.nombre}: Q${singleSize.precio}` : `Desde Q${sp.precioMinimo}`;
+                return (
+                  <div key={sp.id} className="flex items-center gap-2.5 p-2 rounded-xl bg-black border border-neutral-700 hover:border-neutral-500 transition-all shadow-sm">
+                    <img src={sp.thumbUrl || sp.imageUrl} alt={sp.titulo} className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900 shadow" />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
+                      <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
+                      <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">{priceLabel}</span>
+                    </div>
+                    {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }

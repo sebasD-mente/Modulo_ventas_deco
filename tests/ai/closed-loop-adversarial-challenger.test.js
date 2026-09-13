@@ -544,6 +544,135 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
       assert.deepStrictEqual(toolPart.functionResponse.response, { result: 'OK_SUCCESS' });
     });
 
+    it('3.4 Preserva intactos los rawModelParts incluyendo thought y thoughtSignature de Gemini 3.8 Flash', async () => {
+      let interceptedContents = null;
+
+      const dummyClient = {
+        models: {
+          generateContentStream: async function* ({ contents }) {
+            interceptedContents = contents;
+            yield { text: '¡Excelente selección de Dragon Ball!' };
+          },
+        },
+      };
+
+      const rawModelParts = [
+        {
+          thought: true,
+          text: 'El vendedor solicita obras de Dragon Ball...',
+          thoughtSignature: 'base64_opaque_thought_signature_xyz123',
+        },
+        {
+          functionCall: {
+            name: 'searchCatalog',
+            args: { query: 'dragon ball' },
+            id: 'call_db_search_999',
+          },
+        },
+      ];
+
+      const executedTools = [
+        {
+          name: 'searchCatalog',
+          args: { query: 'dragon ball' },
+          result: { matchesCount: 6, posters: [{ id: 'p1', titulo: 'Goku' }] },
+          id: 'call_db_search_999',
+        },
+      ];
+
+      const generator = streamClosedLoopFollowUp({
+        executedTools,
+        formattedContents: [{ role: 'user', parts: [{ text: 'mustrame dragon ball' }] }],
+        systemInstruction: 'Eres STAND IA',
+        client: dummyClient,
+        trailingTextTokens: 0,
+        rawModelParts,
+      });
+
+      const chunks = [];
+      for await (const c of generator) chunks.push(c);
+
+      assert.ok(interceptedContents);
+      const modelTurn = interceptedContents[1];
+      assert.strictEqual(modelTurn.role, 'model');
+      assert.strictEqual(modelTurn.parts.length, 2, 'Debe preservar las 2 partes (thought y functionCall)');
+      assert.strictEqual(modelTurn.parts[0].thought, true);
+      assert.strictEqual(modelTurn.parts[0].thoughtSignature, 'base64_opaque_thought_signature_xyz123');
+      assert.strictEqual(modelTurn.parts[1].functionCall.name, 'searchCatalog');
+      assert.strictEqual(modelTurn.parts[1].functionCall.id, 'call_db_search_999');
+
+      const toolTurn = interceptedContents[2];
+      assert.strictEqual(toolTurn.role, 'user');
+      assert.strictEqual(toolTurn.parts.length, 1);
+      assert.strictEqual(toolTurn.parts[0].functionResponse.name, 'searchCatalog');
+      assert.strictEqual(toolTurn.parts[0].functionResponse.id, 'call_db_search_999', 'El callId debe resolverse dinámicamente');
+      assert.strictEqual(typeof toolTurn.parts[0].functionResponse.response, 'object');
+    });
+
+    it('3.5 En respuesta exitosa del follow-up stream, emite tokens conversacionales y CERO banners de error', async () => {
+      const dummyClient = {
+        models: {
+          generateContentStream: async function* () {
+            yield { type: 'token', text: '¡Con gusto! ' };
+            yield { type: 'token', text: 'Aquí tienes las obras oficiales en mostrador. ¿Anotamos el combo de 2 por Q120?' };
+          },
+        },
+      };
+
+      const executedTools = [
+        {
+          name: 'searchCatalog',
+          args: { query: 'dragon ball' },
+          result: { matchesCount: 3, posters: [{ id: 'p1' }] },
+          id: 'call_1',
+        },
+      ];
+
+      const generator = streamClosedLoopFollowUp({
+        executedTools,
+        formattedContents: [{ role: 'user', parts: [{ text: 'dragon ball' }] }],
+        systemInstruction: 'Eres STAND IA',
+        client: dummyClient,
+        trailingTextTokens: 0,
+      });
+
+      const emitted = [];
+      for await (const c of generator) emitted.push(c);
+
+      assert.ok(emitted.length >= 2, 'Debe emitir los tokens exitosos');
+      const fullText = emitted.map(e => e.text || '').join('');
+      assert.ok(fullText.includes('obras oficiales'));
+      assert.strictEqual(fullText.includes('Conexión con IA intermitente'), false, 'CERO banners de conexión intermitente en operación normal');
+      assert.strictEqual(fullText.includes('volumen alto'), false, 'CERO advertencias espurias de volumen');
+    });
+
+    it('3.6 Si el resultado de la tool es un Array, lo envuelve en { result: [...] } para proteger Protobuf Struct', async () => {
+      let interceptedContents = null;
+      const dummyClient = {
+        models: {
+          generateContentStream: async function* ({ contents }) {
+            interceptedContents = contents;
+            yield { text: 'Ok.' };
+          },
+        },
+      };
+
+      const rawArrayResult = [{ id: 'p1', name: 'Goku' }, { id: 'p2', name: 'Vegeta' }];
+      const generator = streamClosedLoopFollowUp({
+        executedTools: [{ name: 'searchCatalog', args: {}, result: rawArrayResult }],
+        formattedContents: [{ role: 'user', parts: [{ text: 'dragon ball' }] }],
+        systemInstruction: '',
+        client: dummyClient,
+        trailingTextTokens: 0,
+      });
+
+      for await (const _ of generator) {}
+
+      const toolPart = interceptedContents[2].parts[0];
+      assert.strictEqual(Array.isArray(toolPart.functionResponse.response), false, 'response NUNCA debe ser un array plano');
+      assert.deepStrictEqual(toolPart.functionResponse.response, { result: rawArrayResult });
+    });
+
   });
 
   // =========================================================================
@@ -786,40 +915,29 @@ describe('🛡️ ADVERSARIAL CHALLENGER: Closed-Loop Tool Execution & Dual Stre
         );
       }
 
-      // Debe sugerir los combos o preguntar cuál anotar
+      // Debe sugerir de forma limpia sin textos enlatados ni combos forzados
       assert.ok(
-        result.reply.includes('opciones en catálogo') || result.reply.includes('¿Cuál agregamos al borrador?'),
+        result.reply.includes('opciones en catálogo') || result.reply.includes('¿Cuál te gustaría agregar al borrador?'),
         'Debe contener una respuesta de mostrador ágil'
       );
-      assert.ok(result.reply.includes('2x Q120') || result.reply.includes('3x Q180'), 'Debe mencionar combos');
+      assert.ok(!result.reply.includes('2x Q120'), 'No debe forzar combos en la búsqueda');
+      assert.ok(!result.reply.includes('3x Q180'), 'No debe forzar combos en la búsqueda');
     });
 
-    it('5.3 Validación adversarial de combos de feria (2x Q120, 3x Q180): cálculo exacto, ahorro y descripción en prompt y UI', async () => {
+    it('5.3 Validación adversarial de política de precios 100% fijos (2 Medianos Q130, 3 Medianos Q195)', async () => {
       const { buildSalesSystemPrompt } = await import('../../server/services/ai/aiPromptService.js');
       const prompt = buildSalesSystemPrompt({});
 
-      // Verificar que el prompt describe con precisión los combos de feria
-      assert.ok(prompt.includes('2 Medianos por Q120'), 'Prompt debe describir 2 Medianos por Q120');
-      assert.ok(prompt.includes('ahorro de Q10'), 'Prompt debe especificar ahorro de Q10');
-      assert.ok(prompt.includes('3 Medianos por Q180'), 'Prompt debe describir 3 Medianos por Q180');
-      assert.ok(prompt.includes('ahorro de Q15'), 'Prompt debe especificar ahorro de Q15');
+      // Verificar que el prompt exige precios fijos y prohíbe combos
+      assert.ok(prompt.includes('PRECIOS 100% FIJOS'), 'Prompt debe exigir precios fijos');
+      assert.ok(prompt.includes('PROHIBIDO 2x Q120, 3x Q180'), 'Prompt debe prohibir 2x Q120 y 3x Q180');
+      assert.ok(prompt.includes('Q130 (2 × Q65)'), 'Prompt debe especificar Q130 por 2 medianos');
+      assert.ok(prompt.includes('Q195 (3 × Q65)'), 'Prompt debe especificar Q195 por 3 medianos');
 
-      // Validar la lógica matemática del combo de 2x Q120 y 3x Q180
-      const calculateCombo = (medQty) => {
-        if (medQty < 2) return null;
-        const regularPrice = medQty * 65;
-        const comboPrice = medQty === 2 ? 120 : (medQty >= 3 ? 180 : 0);
-        const savings = regularPrice - comboPrice;
-        return { qualifies: true, medQty, comboPrice, savings };
-      };
-
-      const combo2 = calculateCombo(2);
-      assert.strictEqual(combo2.comboPrice, 120, '2 medianos deben costar exactamente Q120');
-      assert.strictEqual(combo2.savings, 10, 'El ahorro debe ser exactamente Q10 (regular Q130 vs Q120)');
-
-      const combo3 = calculateCombo(3);
-      assert.strictEqual(combo3.comboPrice, 180, '3 medianos deben costar exactamente Q180');
-      assert.strictEqual(combo3.savings, 15, 'El ahorro debe ser exactamente Q15 (regular Q195 vs Q180)');
+      // Validar cálculo exacto sin sacrificios de margen
+      const calculateFixedTotal = (medQty) => medQty * 65;
+      assert.strictEqual(calculateFixedTotal(2), 130, '2 medianos deben costar exactamente Q130');
+      assert.strictEqual(calculateFixedTotal(3), 195, '3 medianos deben costar exactamente Q195');
     });
 
   });

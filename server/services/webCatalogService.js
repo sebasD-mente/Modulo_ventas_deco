@@ -55,12 +55,9 @@ export function formatProductForPos(p) {
       badge: s.badge || null,
     }));
   } else {
-    // Variantes de tamaño por defecto para pósters de eventos
-    const base = Number(p.basePrice || 25);
     parsedSizes = [
       { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
       { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-      { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
       { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
       { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
       { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
@@ -327,7 +324,8 @@ export function deduplicatePosters(posters) {
  */
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
   const cleanQuery = String(query ?? '').trim().toLowerCase();
-  const allProducts = await getCachedProducts(tenantId);
+  const rawProducts = await getCachedProducts(tenantId);
+  const allProducts = rawProducts.filter(p => p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim().length > 0);
 
   let filtered = allProducts;
 

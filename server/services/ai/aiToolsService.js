@@ -4,8 +4,8 @@ import { searchWebPosters, searchHybridPosters } from '../webCatalogService.js';
 import { extractPaymentMethod, resolveEntityAlias, normalizeArtworkQuery } from '../semanticParserService.js';
 import { normalizeCatalogSizeId, matchPosterEverywhere } from './aiMediaService.js';
 
-export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, discount: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
-export const searchCatalogDeclaration = { name: 'searchCatalog', description: 'Busca obras y pósters en el catálogo oficial de Deco Vintage por palabras clave, personaje, franquicia o artista. Acompaña siempre la búsqueda con recomendaciones proactivas.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, category: { type: Type.STRING } }, required: ['query'] } };
+export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, discount: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
+export const searchCatalogDeclaration = { name: 'searchCatalog', description: 'Busca obras y pósters en el catálogo oficial de Deco Vintage por palabras clave, personaje, franquicia o artista. Acompaña siempre la búsqueda con mensaje_conversacional fluido.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, category: { type: Type.STRING }, mensaje_conversacional: { type: Type.STRING, description: 'Explicación conversacional, natural y empática de lo encontrado.' } }, required: ['query'] } };
 export const getEventKPIsDeclaration = { name: 'getEventKPIs', description: 'Obtiene las métricas y KPIs en tiempo real del evento activo en PostgreSQL: total vendido, transacciones, etc.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, date: { type: Type.STRING } } } };
 export const getCashDrawerStatusDeclaration = { name: 'getCashDrawerStatus', description: 'Consulta el estado del efectivo en gaveta del stand, total en tarjetas, transferencias y último arqueo de caja registrado.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING } } } };
 export const getSellerShiftReportDeclaration = { name: 'getSellerShiftReport', description: 'Consulta el ranking y métricas de ventas por vendedor en el evento activo (ventas totales, monto total, ticket promedio).', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, sellerId: { type: Type.STRING } } } };
@@ -13,7 +13,7 @@ export const getProductionQueueStatusDeclaration = { name: 'getProductionQueueSt
 export const checkInventoryStockDeclaration = { name: 'checkInventoryStock', description: 'Verifica las existencias y disponibilidad física de una obra en el stand o catálogo.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, sizeId: { type: Type.STRING } }, required: ['query'] } };
 export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
 
-const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 }, { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55, badge: '🎵 Vinilo / 30x30' }, { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 }];
+const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 }];
 const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s === 'PEQUENO' ? 35.0 : s === 'GRANDE' ? 125.0 : s === 'GIGANTE' ? 180.0 : 65.0;
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 async function resolveActiveEvent(tenantId, eventId) {
@@ -35,12 +35,26 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     const matched = await matchPosterEverywhere(tenantId, queryName, requestedSize);
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
     const normSize = normalizeCatalogSizeId(requestedSize);
-    const isAlbum = (matched?.sizeId === 'PORTADA_ALBUM' || normSize === 'PORTADA_ALBUM');
-    const unitPrice = matched ? (isAlbum ? 55.0 : (matched.unitPrice || Number(it.unitPrice) || 65.0)) : (isAlbum ? 55.0 : (Number(it.unitPrice) || sizePrice(normSize)));
+    const unitPrice = matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize));
     const subtotal = Number((qty * unitPrice).toFixed(2));
     grandTotal += subtotal;
     if (matched) {
-      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched.posterId || null, description: matched.description, baseTitle: matched.baseTitle || rawName, category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'), thumbUrl: matched.thumbUrl || null, imageUrl: matched.imageUrl || null, quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [] });
+      enrichedItems.push({
+        productId: isUuid(matched?.productId) ? matched.productId : null,
+        webPosterId: matched.posterId || null,
+        description: matched.description,
+        baseTitle: matched.baseTitle || rawName,
+        category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
+        thumbUrl: matched.thumbUrl || null,
+        imageUrl: matched.imageUrl || null,
+        quantity: qty,
+        unitPrice,
+        subtotal,
+        sizeId: matched.sizeId || normSize,
+        availableSizes: matched.availableSizes || [],
+        sizeAvailable: matched.sizeAvailable !== false,
+        unavailableReason: matched.unavailableReason || null,
+      });
     } else {
       enrichedItems.push({ productId: null, description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`, baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName, quantity: qty, unitPrice, subtotal, sizeId: normSize });
     }
@@ -124,13 +138,31 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
     }
     const primaryMatch = posterMatches[0];
     const allSizes = Array.isArray(primaryMatch.sizes) && primaryMatch.sizes.length > 0 ? [...primaryMatch.sizes] : [...DEFAULT_SIZES];
-    if ((primaryMatch.categoria || '').toUpperCase() === 'MUSICA' && !allSizes.some((s) => s.sizeId === 'PORTADA_ALBUM')) {
-      allSizes.unshift({ sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: 'Formato vinilo cuadrado para música' });
-    }
-    const matchedSizeInfo = requestedSizeNorm ? (allSizes.find((s) => s.sizeId === requestedSizeNorm) || { sizeId: requestedSizeNorm, nombre: requestedSizeNorm, precio: sizePrice(requestedSizeNorm), dimensiones: requestedSizeNorm === 'PORTADA_ALBUM' ? '30 x 30 cm' : 'Estándar' }) : null;
-    const targetSizeId = matchedSizeInfo?.sizeId || 'MEDIANO', isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
-    const stockAvailability = { availableInCatalog: true, standPhysicalStock: isDirectStock ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER', estimatedWaitMinutes: isDirectStock ? 0 : 12, tallerCapability: 'Impresión bajo demanda en taller (~12 min)', deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)' };
-    return { found: true, query: cleanQuery, artwork: { id: primaryMatch.id, sku: primaryMatch.sku, title: primaryMatch.titulo, subtitle: primaryMatch.subtitulo || '', category: primaryMatch.categoria, imageUrl: primaryMatch.imageUrl, thumbUrl: primaryMatch.thumbUrl, basePrice: primaryMatch.precioMinimo }, requestedSize: matchedSizeInfo, allAvailableSizes: allSizes, stockAvailability, eventStockHistory: null, suggestedPosters: matches, summary: `🎨 Disponibilidad — "${primaryMatch.titulo}": ${stockAvailability.deliveryMode}.` };
+    const foundSize = requestedSizeNorm ? allSizes.find((s) => s.sizeId === requestedSizeNorm) : null;
+    const isSizeSupported = requestedSizeNorm ? Boolean(foundSize) : true;
+    const matchedSizeInfo = foundSize || (requestedSizeNorm ? null : allSizes[0]);
+    const targetSizeId = matchedSizeInfo?.sizeId || allSizes[0]?.sizeId || 'MEDIANO';
+    const isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
+    const stockAvailability = {
+      availableInCatalog: true,
+      sizeSupported: isSizeSupported,
+      unsupportedSizeMessage: !isSizeSupported ? `El diseño "${primaryMatch.titulo}" no se fabrica en ${requestedSizeNorm}. Formatos oficiales: ${allSizes.map(s => `${s.nombre} (${s.dimensiones || ''})`).join(', ')}.` : null,
+      standPhysicalStock: isDirectStock ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER',
+      estimatedWaitMinutes: isDirectStock ? 0 : 12,
+      tallerCapability: 'Impresión bajo demanda en taller (~12 min)',
+      deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)',
+    };
+    return {
+      found: true,
+      query: cleanQuery,
+      artwork: { id: primaryMatch.id, sku: primaryMatch.sku, title: primaryMatch.titulo, subtitle: primaryMatch.subtitulo || '', category: primaryMatch.categoria, imageUrl: primaryMatch.imageUrl, thumbUrl: primaryMatch.thumbUrl, basePrice: primaryMatch.precioMinimo },
+      requestedSize: matchedSizeInfo,
+      allAvailableSizes: allSizes,
+      stockAvailability,
+      eventStockHistory: null,
+      suggestedPosters: matches,
+      summary: !isSizeSupported ? stockAvailability.unsupportedSizeMessage : `🎨 Disponibilidad — "${primaryMatch.titulo}": ${stockAvailability.deliveryMode}.`,
+    };
   } catch (err) {
     return { found: false, query: query.trim(), message: `Error consultando stock: ${err.message}`, availableInCatalog: false, suggestedPosters: [] };
   }

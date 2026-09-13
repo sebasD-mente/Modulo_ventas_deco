@@ -38,8 +38,10 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - Victory Auditor (Auditoría Forense 360 & Blueprint STAND IA): 74d11d9a-455c-4c21-a28d-37e837e7f261 (victory_auditor_18, VICTORY CONFIRMED)
 - Orchestrator (Cirugía Arquitectónica & Blindaje P0): orchestrator_19 (completed)
 - Victory Auditor (Cirugía Arquitectónica & Blindaje P0): closed
-- Orchestrator (RAG Vectorial & Copiloto STAND IA): 6ddcf51f-f397-4dd4-ad16-5a76fa7c9097 (orchestrator_20, running)
-- Victory Auditor (RAG Vectorial & Copiloto STAND IA): to be spawned on victory claim
+- Orchestrator (RAG Vectorial & Copiloto STAND IA): 6ddcf51f-f397-4dd4-ad16-5a76fa7c9097 (orchestrator_20, completed)
+- Victory Auditor (RAG Vectorial & Copiloto STAND IA): 3db69a7d-e74e-42f6-904e-1c5ce91f58fd (VICTORY CONFIRMED, victory_auditor_20)
+- Orchestrator (Calibración Cognitiva & RAG Real STAND IA): 49bacfc9-111d-49c6-a56b-a5b485ca6767 (orchestrator_21, active)
+- Victory Auditor (Calibración Cognitiva & RAG Real STAND IA): to be spawned on victory claim
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -76,22 +78,29 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - Purga completa de textos enlatados ("tintas látex", "cintas tesa", "volumen alto de consultas").
 - Calibración de personalidad de mostrador: copiloto táctico de vendedor, rápido, enérgico, combos de feria (2xQ120, 3xQ180).
 - Verificación en vivo obligatoria con Chrome DevTools MCP y capturas de alta resolución.
+- Modelo de embeddings gemini-embedding-001 (3072 dims), MIN_SIMILARITY_THRESHOLD = 0.45.
+- Preservar candidates[0].content.parts originales (thoughtSignature) y formatear functionResponse con rol user en @google/genai.
+- Erradicar banner "⚠️ Conexión con IA intermitente...".
+- Cero contaminación cruzada en catálogo (F1 solo automovilismo, el bicho solo CR7, saiyajin solo Goku/Dragon Ball).
+- Asistente nerd, formal, inteligente, respuestas en 1-3 líneas con Gemini 3.8 Flash, sugerencia de combos de feria (2xQ120, 3xQ180).
+- Repetición exhaustiva de pruebas 1, 2 y 3 en vivo en Chrome DevTools MCP con evidencia visual de alta resolución.
+- Reporte técnico y hoja de ruta arquitectónica para Comic Con 2026.
 
 ## User Context
-- **Last user request**: Motor RAG vectorial híbrido con @google/genai, purga de enlatados, calibración de personalidad de mostrador y certificación en vivo vía Chrome DevTools MCP para Comic Con Guatemala 2026.
+- **Last user request**: Calibración Cognitiva de Alto Nivel, RAG Vectorial 100% Funcional (gemini-embedding-001), bucle cerrado preservando thoughtSignature, purga de tarjetas falsas, personalidad nerd/formal/experta, pruebas en vivo con Chrome DevTools MCP y hoja de ruta para Comic Con 2026.
 - **Pending clarifications**: none
-- **Delivered results**: Misión RAG Vectorial Híbrido & Copiloto Mostrador STAND {IA} 100% completada y certificada con veredicto VICTORY CONFIRMED por el auditor independiente.
+- **Delivered results**: none yet for this mission
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: in progress (Hito M1: Reparación de Motor RAG gemini-embedding-001 y Bucle Cerrado Cognitivo)
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_20 (6ddcf51f-f397-4dd4-ad16-5a76fa7c9097, completed)
-- **Active Auditor**: victory_auditor_20 (3db69a7d-e74e-42f6-904e-1c5ce91f58fd, completed)
-- **Monitoring Crons**: none (cleaned up)
+- **Active Orchestrator**: orchestrator_21 (49bacfc9-111d-49c6-a56b-a5b485ca6767, active)
+- **Active Auditor**: pending victory claim
+- **Monitoring Crons**: Cron 1 (task-30, */8 * * * *), Cron 2 (task-32, */10 * * * *)
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index

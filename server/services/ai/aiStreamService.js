@@ -63,7 +63,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     let cleanReply = response.text || '';
     if (!cleanReply?.trim()) {
       if (draftSale) cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
-      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla. ¿Cuál agregamos al borrador? Recuerda ofrecer los combos de 2x Q120 o 3x Q180.`;
+      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla. ¿Cuál te gustaría agregar al borrador?`;
       else cleanReply = 'Indica el personaje, película o artista y busco de inmediato las obras disponibles en el stand.';
     }
     return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
@@ -96,7 +96,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   for await (const chunk of stream) {
     const candidateParts = chunk.candidates?.[0]?.content?.parts || [];
     for (const p of candidateParts) {
-      if (p.functionCall) rawModelParts.push(p);
+      rawModelParts.push(p);
     }
     if (chunk.type === 'token' && chunk.text) {
       yield chunk;

@@ -3,7 +3,7 @@ import { getNextClient } from './ai/aiKeyPoolService.js';
 import { ENV } from '../config/env.js';
 import { searchWebPosters, deduplicatePosters, getCachedProducts } from './webCatalogService.js';
 
-export const EMBEDDING_MODEL = ENV.GEMINI_EMBEDDING_MODEL || 'text-embedding-004';
+export const EMBEDDING_MODEL = ENV.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
 export const MIN_SIMILARITY_THRESHOLD = 0.45;
 export const VECTOR_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -25,7 +25,12 @@ export const computeCosineSimilarity = cosineSimilarity;
 
 export function posterToEmbeddingText(p) {
   const tags = Array.isArray(p?.tags) ? p.tags.join(' ') : '';
-  return `${p?.titulo || ''} ${p?.subtitulo || ''} ${p?.categoria || ''} ${tags}`.replace(/\s+/g, ' ').trim();
+  let cat = p?.categoria || '';
+  if (cat === 'BASKETBALL_Y_FORMULA_1') {
+    const isBasket = /(lakers|nba|basket|jordan|kobe|lebron|bulls|mamba)/i.test(`${p?.titulo || ''} ${p?.subtitulo || ''} ${tags}`);
+    cat = isBasket ? 'BASKETBALL' : 'FORMULA 1';
+  }
+  return `${p?.titulo || ''} ${p?.subtitulo || ''} ${cat} ${tags}`.replace(/\s+/g, ' ').trim();
 }
 
 export function clearVectorCache(tenantId = null) {
@@ -36,14 +41,15 @@ export function clearVectorCache(tenantId = null) {
 export const invalidateVectorCache = clearVectorCache;
 export const getVectorCacheStats = () => ({ size: vectorCache.size });
 
-export async function embedTexts(texts, client = null) {
+export async function embedTexts(texts, client = null, taskType = null) {
   if (!texts?.length) return [];
   const contents = texts.map((t) => String(t || '').trim()).filter(Boolean);
   if (!contents.length) return [];
   const activeClient = client || getNextClient(EMBEDDING_MODEL)?.client || getGeminiClient(EMBEDDING_MODEL);
   if (!activeClient) throw new Error('GEMINI_CLIENT_UNAVAILABLE');
 
-  const response = await activeClient.models.embedContent({ model: EMBEDDING_MODEL, contents });
+  const config = taskType ? { taskType } : {};
+  const response = await activeClient.models.embedContent({ model: EMBEDDING_MODEL, contents, config });
   const raw = response?.embeddings || (response?.embedding ? [response.embedding] : []);
   return raw.map((e) => (e?.values ? Array.from(e.values) : null)).filter(Boolean);
 }
@@ -53,7 +59,7 @@ export async function getPosterEmbedding(poster, { client = null, tenantId = nul
   const cached = vectorCache.get(key);
   if (cached && Date.now() - cached.timestamp < VECTOR_CACHE_TTL_MS) return cached.vector;
 
-  const [vector] = await embedTexts([posterToEmbeddingText(poster)], client);
+  const [vector] = await embedTexts([posterToEmbeddingText(poster)], client, 'RETRIEVAL_DOCUMENT');
   if (vector) vectorCache.set(key, { id: poster.id, poster, vector, timestamp: Date.now() });
   return vector || null;
 }
@@ -80,7 +86,7 @@ export async function warmCatalogVectors(tenantId = null, forceRefresh = false, 
       const BATCH = 50;
       for (let i = 0; i < toFetch.length; i += BATCH) {
         const batch = toFetch.slice(i, i + BATCH);
-        const vectors = await embedTexts(batch.map(posterToEmbeddingText), client);
+        const vectors = await embedTexts(batch.map(posterToEmbeddingText), client, 'RETRIEVAL_DOCUMENT');
         for (let j = 0; j < vectors.length; j++) {
           if (vectors[j]) {
             const entry = { id: batch[j].id, poster: batch[j], vector: vectors[j], timestamp: Date.now() };
@@ -112,7 +118,7 @@ export async function searchHybridPosters({ tenantId = null, query = '', categor
     return finalRes;
   }
   try {
-    const queryVectors = await embedTexts([cleanQuery], client);
+    const queryVectors = await embedTexts([cleanQuery], client, 'RETRIEVAL_QUERY');
     if (!queryVectors?.length) throw new Error('EMBEDDINGS_UNAVAILABLE');
     const cachedItems = await warmCatalogVectors(tenantId, false, client);
     if (!cachedItems?.length) throw new Error('CATALOG_VECTORS_UNAVAILABLE');

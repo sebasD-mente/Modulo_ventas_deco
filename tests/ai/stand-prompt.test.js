@@ -67,28 +67,23 @@ describe('🧠 Suite de Pruebas: STAND {IA} Commercial Prompt Engineering (M4)',
       assert.ok(prompt.includes('Fórum Majadas'), 'Debe inyectar la ubicación del stand');
     });
 
-    it('1.2 Los 4 Pilares Comerciales y Directivas de Upselling Activo', () => {
+    it('1.2 Política Estricta de Precios Fijos y Formatos de Obra', () => {
       const prompt = buildSalesSystemPrompt({});
 
-      // Pilar 1: Mediano Estrella Q65.00
-      assert.ok(prompt.includes('MEDIANO (30x45 cm / 12x18 pulg a Q65.00)'), 'Debe incluir tamaño estrella mediano');
-      assert.ok(prompt.includes('Q65.00'), 'Debe especificar el precio Q65.00 para Mediano');
-      assert.ok(prompt.includes('más vendido'), 'Debe argumentar que es el más vendido');
+      // Precios Fijos
+      assert.ok(prompt.includes('PRECIOS 100% FIJOS'), 'Debe incluir política de precios 100% fijos');
+      assert.ok(prompt.includes('CERO COMBOS'), 'Debe prohibir terminantemente los combos');
+      assert.ok(prompt.includes('Q130 (2 × Q65)'), 'Debe especificar que 2 medianos son Q130');
+      assert.ok(prompt.includes('Q195 (3 × Q65)'), 'Debe especificar que 3 medianos son Q195');
 
-      // Pilar 2: HP Látex >10 años
-      assert.ok(prompt.includes('HP LÁTEX ECOLÓGICO'), 'Debe destacar tecnología HP Látex');
-      assert.ok(prompt.includes('durabilidad UV superior a 10 años') || prompt.includes('Durabilidad UV superior a 10 años'), 'Debe argumentar durabilidad UV >10 años');
-      assert.ok(prompt.includes('sin decoloración'), 'Debe resaltar que no se decolora');
-
-      // Pilar 3: Cinta tesa® 15 segundos
-      assert.ok(prompt.includes('CINTA tesa® ORIGINAL EN 15 SEGUNDOS'), 'Debe incluir montaje con cinta tesa®');
-      assert.ok(prompt.includes('15 segundos'), 'Debe indicar que se coloca en 15 segundos');
-      assert.ok(prompt.includes('clavos') && prompt.includes('agujeros'), 'Debe resaltar sin clavos ni agujeros');
-
-      // Pilar 4: Portada de Álbum Q55.00
+      // Portada de Álbum
       assert.ok(prompt.includes('PORTADA DE ÁLBUM (30x30 cm a Q55.00)'), 'Debe incluir portada de álbum Q55');
       assert.ok(prompt.includes('Q55.00'), 'Debe especificar precio exacto de Q55.00');
-      assert.ok(prompt.includes('vinilo'), 'Debe conectar con formato vinilo para melómanos');
+      assert.ok(prompt.includes('vinilo'), 'Debe conectar con formato vinilo exclusivo para música');
+
+      // Variedad de tamaños
+      assert.ok(prompt.includes('VARIEDAD'), 'Debe instruir variedad de tamaños');
+      assert.ok(prompt.includes('Cero obsesión con el Mediano'), 'Debe prohibir la obsesión con el Mediano');
     });
 
     it('1.3 Catálogo Completo de Medidas Canónicas y Mapeo de Precios', () => {
@@ -97,14 +92,13 @@ describe('🧠 Suite de Pruebas: STAND {IA} Commercial Prompt Engineering (M4)',
       assert.ok(prompt.includes('Mini (Q25.00)'), 'Debe incluir Mini Q25');
       assert.ok(prompt.includes('Pequeño (Q35.00)'), 'Debe incluir Pequeño Q35');
       assert.ok(prompt.includes('Portada de Álbum (Q55.00)'), 'Debe incluir Portada de Álbum Q55');
-      assert.ok(prompt.includes('Mediano [OPCIÓN ESTRELLA] (Q65.00)'), 'Debe incluir Mediano Q65');
+      assert.ok(prompt.includes('Mediano (Q65.00)'), 'Debe incluir Mediano Q65');
       assert.ok(prompt.includes('Grande (Q125.00)'), 'Debe incluir Grande Q125');
       assert.ok(prompt.includes('Gigante (Q180.00)'), 'Debe incluir Gigante Q180');
 
       // Reglas de mapeo
       assert.ok(prompt.includes('18x24') && prompt.includes('GRANDE'));
       assert.ok(prompt.includes('24x36') && prompt.includes('GIGANTE'));
-      assert.ok(prompt.includes('Defecto: "MEDIANO"') || prompt.includes('MEDIANO'));
     });
 
     it('1.4 Protocolo de las 7 Herramientas Oficiales (@google/genai)', () => {
@@ -156,15 +150,13 @@ describe('🧠 Suite de Pruebas: STAND {IA} Commercial Prompt Engineering (M4)',
       assert.ok(prompt.includes('142'));
     });
 
-    it('1.7 Promociones Oficiales de Combos y Directivas de Upselling Proactivo (Medianos Q120 / Q180)', () => {
+    it('1.7 Prohibición Estricta de Combos y Descuentos Automáticos (Precios Fijos)', () => {
       const prompt = buildSalesSystemPrompt({});
 
-      assert.ok(prompt.includes('Combo 2 Medianos por Q120'), 'Debe incluir Combo 2 Medianos por Q120');
-      assert.ok(prompt.includes('ahorro de Q10'), 'Debe indicar ahorro de Q10 en combo de 2');
-      assert.ok(prompt.includes('Combo 3 Medianos por Q180'), 'Debe incluir Combo 3 Medianos por Q180');
-      assert.ok(prompt.includes('ahorro de Q15'), 'Debe indicar ahorro de Q15 en combo de 3');
-      assert.ok(prompt.includes('Al solicitar 1 Mediano, sugiere proactivamente llevar 2 por Q120'), 'Debe incluir upselling proactivo para 1 mediano');
-      assert.ok(prompt.includes('Al ordenar 2 Medianos, sugiere llevar el 3ro por solo Q60 más'), 'Debe incluir upselling proactivo para 2 medianos');
+      assert.ok(prompt.includes('PRECIOS 100% FIJOS'), 'Debe exigir precios 100% fijos');
+      assert.ok(prompt.includes('PROHIBIDO 2x Q120, 3x Q180'), 'Debe prohibir expresamente 2x Q120 y 3x Q180');
+      assert.ok(prompt.includes('Q130 (2 × Q65)'), 'Debe confirmar que 2 medianos son Q130');
+      assert.ok(prompt.includes('Q195 (3 × Q65)'), 'Debe confirmar que 3 medianos son Q195');
     });
   });
 
@@ -199,7 +191,7 @@ describe('🧠 Suite de Pruebas: STAND {IA} Commercial Prompt Engineering (M4)',
       assert.ok(capturedConfig.systemInstruction, 'config.systemInstruction debe contener la instrucción');
       assert.ok(capturedConfig.systemInstruction.includes('STAND {IA}'), 'systemInstruction debe ser el prompt STAND {IA}');
       assert.ok(!capturedConfig.systemInstruction.includes('J.A.R.V.I.S.'), 'systemInstruction no debe contener J.A.R.V.I.S.');
-      assert.ok(capturedConfig.systemInstruction.includes('MEDIANO (30x45 cm / 12x18 pulg a Q65.00)'));
+      assert.ok(capturedConfig.systemInstruction.includes('Mediano (Q65.00)'));
 
       assert.ok(Array.isArray(capturedContents));
       const firstMsg = capturedContents[0];

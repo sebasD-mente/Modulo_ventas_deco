@@ -1,25 +1,28 @@
-export const CANONICAL_SIZES = [
+export const STANDARD_POSTER_SIZES = [
   { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
   { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-  { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
   { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
   { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
   { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
 ];
+export const ALBUM_POSTER_SIZES = [
+  { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
+];
+export const CANONICAL_SIZES = [...STANDARD_POSTER_SIZES];
 export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
 const STORAGE_KEY = 'deko_local_catalog_snapshot_v1';
 const TIMEOUT_MS = 2000;
 const MAX_LOCAL_CATALOG_ITEMS = 300;
 
 export const SEED_POSTERS = [
-  { id: 'off-1', titulo: 'Chainsaw Man', subtitulo: 'Denji Pochita', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-2', titulo: 'Spider-Man', subtitulo: 'Miles Morales', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-3', titulo: 'Batman', subtitulo: 'The Dark Knight', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-4', titulo: 'Van Gogh', subtitulo: 'Noche Estrellada', categoria: 'ARTE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-5', titulo: 'Bad Bunny', subtitulo: 'Un Verano Sin Ti', categoria: 'MUSICA', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-6', titulo: 'Taylor Swift', subtitulo: 'Midnights', categoria: 'MUSICA', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-7', titulo: 'Star Wars', subtitulo: 'Darth Vader', categoria: 'CINE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-8', titulo: 'Dragon Ball Z', subtitulo: 'Goku Super Saiyan', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
+  { id: 'off-1', titulo: 'Chainsaw Man', subtitulo: 'Denji Pochita', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-2', titulo: 'Spider-Man', subtitulo: 'Miles Morales', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-3', titulo: 'Batman', subtitulo: 'The Dark Knight', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-4', titulo: 'Van Gogh', subtitulo: 'Noche Estrellada', categoria: 'ARTE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-5', titulo: 'Bad Bunny', subtitulo: 'Un Verano Sin Ti', categoria: 'MUSICA', precioMinimo: 55, imageUrl: '/brand/logo-origami.webp', sizes: ALBUM_POSTER_SIZES },
+  { id: 'off-6', titulo: 'Taylor Swift', subtitulo: 'Midnights', categoria: 'MUSICA', precioMinimo: 55, imageUrl: '/brand/logo-origami.webp', sizes: ALBUM_POSTER_SIZES },
+  { id: 'off-7', titulo: 'Star Wars', subtitulo: 'Darth Vader', categoria: 'CINE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-8', titulo: 'Dragon Ball Z', subtitulo: 'Goku Super Saiyan', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
 ];
 
 export function getLocalCatalog() {

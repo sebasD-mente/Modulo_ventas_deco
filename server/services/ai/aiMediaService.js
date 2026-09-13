@@ -37,20 +37,44 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 12 });
   if (webMatches.length > 0) {
     const matched = webMatches[0];
-    let selectedSize = matched.sizes.find((s) => s.sizeId === 'MEDIANO') || matched.sizes[0];
+    let selectedSize = matched.sizes[0];
+    let sizeAvailable = true;
+    let unavailableReason = null;
+
     if (requestedSize) {
       const norm = normalizeCatalogSizeId(requestedSize);
       const cleanSize = String(requestedSize).toUpperCase().trim();
-      const found = matched.sizes.find(s => s.sizeId === norm || s.sizeId === cleanSize || s.nombre.toUpperCase() === cleanSize || s.nombre.toUpperCase().includes(cleanSize) || (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize)));
-      if (found) selectedSize = found;
-      else if (norm === 'PORTADA_ALBUM') selectedSize = { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: 'Formato vinilo' };
-      else { const fb = matched.sizes.find(s => s.sizeId === norm); if (fb) selectedSize = fb; }
+      const found = matched.sizes.find(s => 
+        s.sizeId === norm || 
+        s.sizeId === cleanSize || 
+        s.nombre.toUpperCase() === cleanSize || 
+        s.nombre.toUpperCase().includes(cleanSize) || 
+        (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize))
+      );
+      if (found) {
+        selectedSize = found;
+      } else {
+        sizeAvailable = false;
+        unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
+      }
     }
+
     const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
     return {
-      type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id, description: `${displayTitle} (${selectedSize.nombre})`,
-      baseTitle: displayTitle, category: matched.categoria, thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl,
-      unitPrice: Number(selectedSize.precio), sizeId: selectedSize.sizeId, sizeName: selectedSize.nombre, availableSizes: matched.sizes,
+      type: 'WEB_POSTER',
+      productId: isUuid(matched.id) ? matched.id : null,
+      posterId: matched.id,
+      description: `${displayTitle} (${selectedSize.nombre})`,
+      baseTitle: displayTitle,
+      category: matched.categoria,
+      thumbUrl: matched.thumbUrl,
+      imageUrl: matched.imageUrl,
+      unitPrice: Number(selectedSize.precio),
+      sizeId: selectedSize.sizeId,
+      sizeName: selectedSize.nombre,
+      availableSizes: matched.sizes,
+      sizeAvailable,
+      unavailableReason,
     };
   }
   try {
@@ -61,6 +85,7 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
         type: 'LOCAL_PRODUCT', productId: isUuid(match.id) ? match.id : null, description: match.name, baseTitle: match.name, category: match.category,
         thumbUrl: match.imageUrl || null, imageUrl: match.imageUrl || null, unitPrice: Number(match.basePrice),
         sizeId: 'ESTANDAR', sizeName: 'Estándar', availableSizes: [{ sizeId: 'ESTANDAR', nombre: 'Estándar', precio: Number(match.basePrice) }],
+        sizeAvailable: true, unavailableReason: null,
       };
     }
   } catch (err) { console.warn('[matchPosterEverywhere] ⚠️ Error:', err.message); }

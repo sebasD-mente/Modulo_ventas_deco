@@ -72,17 +72,20 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
 export async function* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client, trailingTextTokens = 0, rawModelParts = [] }) {
   if (executedTools.length === 0 || trailingTextTokens > 0) return;
 
-  const modelParts = (rawModelParts && rawModelParts.length > 0)
-    ? rawModelParts
-    : executedTools.map(t => ({ functionCall: { name: t.name, args: t.args || {}, ...(t.id ? { id: t.id } : {}) } }));
+  const modelParts = (rawModelParts && rawModelParts.length > 0) ? [...rawModelParts] : [];
+  for (const t of executedTools) {
+    const exists = modelParts.some(p => p.functionCall && (p.functionCall.name === t.name || (t.id && p.functionCall.id === t.id)));
+    if (!exists) modelParts.push({ functionCall: { name: t.name, args: t.args || {}, ...(t.id ? { id: t.id } : {}) } });
+  }
 
-  const toolParts = executedTools.map((t, idx) => {
-    const matchingModelPart = modelParts[idx]?.functionCall;
-    const callId = t.id || matchingModelPart?.id || null;
+  const toolParts = executedTools.map(t => {
+    const matching = modelParts.find(p => p.functionCall && (p.functionCall.name === t.name || (t.id && p.functionCall.id === t.id)))?.functionCall;
+    const callId = t.id || matching?.id || null;
+    const isPlainObj = typeof t.result === 'object' && t.result !== null && !Array.isArray(t.result);
     return {
       functionResponse: {
         name: t.name,
-        response: (typeof t.result === 'object' && t.result !== null) ? t.result : { result: t.result },
+        response: isPlainObj ? t.result : { result: t.result },
         ...(callId ? { id: callId } : {})
       }
     };

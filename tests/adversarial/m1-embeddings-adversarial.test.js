@@ -159,6 +159,35 @@ describe('⚔️ ADVERSARIAL EMPIRICAL STRESS-TEST: MOTOR RAG VECTORIAL HÍBRIDO
         assert.ok(sim >= -1.0 && sim <= 1.0, `Similitud fuera de límites [-1, 1]: ${sim}`);
       }
     });
+
+    it('2.4 Vectores de 3072 dimensiones (gemini-embedding-001): Idénticos, opuestos, ortogonales y acotados', () => {
+      const dim = 3072;
+      const raw = Array.from({ length: dim }, () => Math.random() - 0.5);
+      const norm = Math.sqrt(raw.reduce((acc, x) => acc + x * x, 0));
+      const vA = raw.map((x) => x / norm);
+      const vOpp = vA.map((x) => -x);
+
+      const simId = cosineSimilarity(vA, vA);
+      assert.ok(Math.abs(simId - 1.0) < 1e-7, `3072 dims idéntico debe ser 1.0, obtenido: ${simId}`);
+
+      const simOpp = cosineSimilarity(vA, vOpp);
+      assert.ok(Math.abs(simOpp - (-1.0)) < 1e-7, `3072 dims opuesto debe ser -1.0, obtenido: ${simOpp}`);
+
+      const vOrth1 = new Array(dim).fill(0);
+      const vOrth2 = new Array(dim).fill(0);
+      for (let i = 0; i < dim / 2; i++) vOrth1[i] = 1 / Math.sqrt(dim / 2);
+      for (let i = dim / 2; i < dim; i++) vOrth2[i] = 1 / Math.sqrt(dim / 2);
+      const simOrth = cosineSimilarity(vOrth1, vOrth2);
+      assert.ok(Math.abs(simOrth - 0.0) < 1e-7, `3072 dims ortogonales debe ser 0.0, obtenido: ${simOrth}`);
+
+      // Acotamiento en 50 pares aleatorios de 3072 dims
+      for (let i = 0; i < 50; i++) {
+        const rA = Array.from({ length: dim }, () => (Math.random() - 0.5) * 500);
+        const rB = Array.from({ length: dim }, () => (Math.random() - 0.5) * 500);
+        const sim = cosineSimilarity(rA, rB);
+        assert.ok(sim >= -1.0 && sim <= 1.0, `3072 dims similitud fuera de [-1, 1]: ${sim}`);
+      }
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -361,6 +390,29 @@ describe('⚔️ ADVERSARIAL EMPIRICAL STRESS-TEST: MOTOR RAG VECTORIAL HÍBRIDO
 
       console.log(`      ⚡ Escaneo completo de catálogo (300 pósters en RAM): ${elapsedMs.toFixed(3)}ms`);
       assert.ok(elapsedMs < 5.0, `Escaneo de catálogo tomó ${elapsedMs.toFixed(2)}ms (debe ser < 5.0ms)`);
+    });
+
+    it('5.4 1,000 evaluaciones de similitud coseno en 3072 dimensiones (gemini-embedding-001) toman < 60ms', () => {
+      const dim = 3072;
+      const queryVec = Array.from({ length: dim }, () => Math.random() - 0.5);
+      const catalogVectors = Array.from({ length: 1000 }, () =>
+        Array.from({ length: dim }, () => Math.random() - 0.5)
+      );
+
+      for (let i = 0; i < 50; i++) {
+        cosineSimilarity(queryVec, catalogVectors[i]);
+      }
+
+      const t0 = performance.now();
+      let matchesCount = 0;
+      for (let i = 0; i < 1000; i++) {
+        const sim = cosineSimilarity(queryVec, catalogVectors[i]);
+        if (sim >= MIN_SIMILARITY_THRESHOLD) matchesCount++;
+      }
+      const elapsedMs = performance.now() - t0;
+
+      console.log(`      ⚡ Latencia 1,000 evaluaciones (3072 dims): ${elapsedMs.toFixed(3)}ms (Promedio: ${(elapsedMs / 1000).toFixed(4)}ms / eval)`);
+      assert.ok(elapsedMs < 60.0, `1,000 evaluaciones en 3072 dims tomaron ${elapsedMs.toFixed(2)}ms (debe ser < 60.0ms)`);
     });
   });
 

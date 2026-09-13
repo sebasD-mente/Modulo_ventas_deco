@@ -141,6 +141,10 @@ const server = app.listen(ENV.PORT, () => {
   // y cada 6 horas de forma periódica para mantener el catálogo actualizado.
   const runCatalogSync = async (reason = 'startup') => {
     try {
+      await prisma.product.updateMany({
+        where: { OR: [{ imageUrl: null }, { imageUrl: '' }], isActive: true },
+        data: { isActive: false },
+      }).catch(() => {});
       const localCount = await prisma.product.count({ where: { isActive: true } });
       console.log(`[CatalogSync] 🔄 Iniciando sync (${reason}). Productos locales: ${localCount}`);
       const result = await syncCatalogFromWeb();

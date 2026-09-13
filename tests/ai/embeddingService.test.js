@@ -1,6 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  EMBEDDING_MODEL,
   computeCosineSimilarity,
   MIN_SIMILARITY_THRESHOLD,
   getPosterEmbedding,
@@ -76,6 +77,10 @@ describe('📐 Suite RAG Vectorial Híbrido: EmbeddingService (STAND {IA})', () 
   // SUITE 2: Strict Cut-Off Threshold (MIN_SIMILARITY_THRESHOLD = 0.45)
   // ───────────────────────────────────────────────────────────────────────────
   describe('2. Umbral Estricto de Afinidad (MIN_SIMILARITY_THRESHOLD = 0.45)', () => {
+    it('2.0 La constante exportada EMBEDDING_MODEL es por defecto gemini-embedding-001', () => {
+      assert.strictEqual(EMBEDDING_MODEL, 'gemini-embedding-001');
+    });
+
     it('2.1 La constante exportada MIN_SIMILARITY_THRESHOLD es exactamente 0.45', () => {
       assert.strictEqual(MIN_SIMILARITY_THRESHOLD, 0.45);
     });
@@ -177,8 +182,8 @@ describe('📐 Suite RAG Vectorial Híbrido: EmbeddingService (STAND {IA})', () 
       assert.strictEqual(statsAfter.size, 0);
     });
 
-    it('3.3 Latencia matemática sub-15ms en escaneo de 300 vectores cacheados', () => {
-      const dim = 768;
+    it('3.3 Latencia matemática sub-15ms en escaneo de 300 vectores cacheados de 3072 dimensiones', () => {
+      const dim = 3072;
       const queryVec = Array.from({ length: dim }, () => Math.random());
       
       const cachedVectors = Array.from({ length: 300 }, (_, i) => ({
@@ -195,6 +200,15 @@ describe('📐 Suite RAG Vectorial Híbrido: EmbeddingService (STAND {IA})', () 
 
       assert.ok(elapsed < 15.0, `Latencia excedió 15ms: tomó ${elapsed.toFixed(2)}ms`);
       assert.ok(Array.isArray(scored));
+    });
+
+    it('3.4 Cálculo de similitud coseno con vectores normalizados de 3072 dimensiones', () => {
+      const dim = 3072;
+      const raw = Array.from({ length: dim }, () => Math.random() - 0.5);
+      const norm = Math.sqrt(raw.reduce((acc, x) => acc + x * x, 0));
+      const vA = raw.map((x) => x / norm);
+      const sim = computeCosineSimilarity(vA, vA);
+      assert.ok(Math.abs(sim - 1.0) < 1e-6, `Esperado 1.0, obtenido: ${sim}`);
     });
   });
 
