@@ -11,7 +11,7 @@ import path from 'path';
 const DOKPLOY_WEBHOOK_URL = 'http://145.223.120.56:3000/api/deploy/ifJKTSseeCgAumCezDEZx';
 const HEALTH_URL = 'https://ventas.decovintage.online/health';
 const POLLING_INTERVAL_MS = 4000;
-const MAX_WAIT_MS = 180000; // 3 minutos
+const MAX_WAIT_MS = 300000; // 5 minutos (holgura para compilación limpia de imagen Docker en VPS)
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

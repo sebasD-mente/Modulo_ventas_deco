@@ -1443,3 +1443,90 @@ Integrity mode: development
 - [ ] `npm run audit:secrets`: Reporta 0 secretos y 0 violaciones de aislamiento en el 100% de los archivos auditados.
 - [ ] `npm test`: Las suites de dominio (`tests/sales`, `tests/semantic`, `tests/production`) ejecutan con 100% de tests aprobados.
 - [ ] `npm run build`: El comando de empaquetado de Vite compila exitosamente con 0 errores.
+
+## 2026-09-13T21:15:16Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Ted (Lead Architect & Orquestador), Atlas (Especialista en Embeddings y RAG), Echo (Especialista en Neuro-UX y Prompt Engineering), Sentinel (Especialista en QA Adversarial y DevTools)
+
+STAND {IA} (`Modulo_Ventas`) es el sistema POS inteligente y copiloto de ventas de alta velocidad para Deco Vintage Guate en convenciones masivas (Comic Con Guatemala 2026). La misión es implementar el motor RAG vectorial híbrido con `@google/genai`, erradicar los textos enlatados ("tintas látex", "cintas tesa", "volumen alto"), calibrar la personalidad del asistente como copiloto táctico del vendedor del stand y certificar con pruebas adversariales en vivo vía Chrome DevTools MCP.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Motor RAG Vectorial Híbrido en Memoria RAM (`server/services/embeddingService.js`)
+- Crear un servicio modular y limpio (< 150 líneas) utilizando el SDK moderno `@google/genai` con el modelo `text-embedding-004` (o `gemini-embedding-001`).
+- Implementar caché de vectores en memoria RAM para los pósters del catálogo activo con TTL de refresco y cálculo matemático de similitud coseno con latencia sub-15ms.
+- Establecer un umbral estricto de afinidad matemática (`MIN_SIMILARITY_THRESHOLD = 0.45`):
+  * Al buscar obras específicas (ej. *"Dragon Ball"*), devolver exclusivamente las obras que superen el 45% de afinidad matemática.
+  * Prohibido rellenar con obras no relacionadas (cero Batman, cero BTS cuando se busca Dragon Ball).
+- Implementar paracaídas híbrido resiliente: si la API de embeddings parpadea por problemas de red en la feria, conmutar transparentemente a la búsqueda léxica local preservando el filtro estricto.
+- Integrar el servicio en `webCatalogService.js` y en la tool `searchCatalog` de `server/services/ai/aiToolsService.js` / `server/services/ai/aiClosedLoopService.js`.
+
+### R2. Erradicación de Textos Enlatados y Reparación del Bucle Cerrado
+- Purgar completamente de `server/services/ai/aiStreamService.js`, `server/services/ai/aiClosedLoopService.js` y `server/services/geminiPoolService.js` todas las frases prefabricadas y plantillas comerciales ("Nuestro tamaño estrella es el Mediano (30x45 cm a Q65.00) con tintas ecológicas HP Látex y cinta tesa®...", "En este momento la red de IA está recibiendo un volumen alto de consultas...").
+- Reparar `streamClosedLoopFollowUp`: jamás concatenar mensajes de error técnico o advertencias de fallback con discursos de ventas comerciales en la misma burbuja de respuesta.
+- Garantizar generación 100% orgánica en tiempo real por el modelo Gemini en función de la consulta exacta del vendedor.
+
+### R3. Calibración de Personalidad de Mostrador (`server/services/ai/aiPromptService.js`)
+- Calibrar la directiva del sistema (`buildSalesSystemPrompt`):
+  * El usuario es el VENDEDOR DEL STAND (colega interno, no cliente final). No necesita explicaciones básicas de materiales ni discursos largos.
+  * Rol: Copiloto táctico de mostrador, rápido, enérgico, inteligente y comercial.
+  * Estilo: Enfocado en cerrar ventas, agilizar el dictado y sugerir combos oficiales de feria (2 Medianos por Q120, 3 por Q180).
+  * Respuestas ágiles: Confirmación inmediata de borradores, presentación directa de opciones encontradas en stock.
+
+### R4. Aislamiento Estricto y Preservación Arquitectónica
+- Cumplimiento estricto del protocolo Zero-Trust: no modificar proyectos externos, no conectar a bases de datos ajenas, no incluir referencias a la IP prohibida `145.223.120.56`.
+- Mantener los límites de tamaño modular: `embeddingService.js` debe mantenerse por debajo de 150 líneas.
+- Respetar los contratos existentes del frontend y la estructura de datos consumida por los componentes de React (`FastManualSaleForm`, etc.).
+
+## Verification Resources & Protocol
+
+### Verificación Automatizada (Tests y Arnés)
+- Ejecutar `npm run harness:check` que comprende:
+  * `npm run test:security`: 9/9 pruebas pasando de aislamiento estricto y Zero-Trust.
+  * `npm run audit:secrets`: Cero fugas de claves o IPs ajenas.
+  * `npm run audit:monoliths`: Respeto de límites modulares.
+  * `npm run build`: Build de Vite en verde.
+- Suite de pruebas unitarias para `embeddingService.js` verificando similitud coseno, umbral de corte del 45%, caché en memoria y degradación elegante a búsqueda léxica.
+
+### Verificación en Vivo con Navegador Real (Chrome DevTools MCP)
+- **Prueba 1 (Consulta con Typo & Cero Enlatados):**
+  * Consulta: `"mustrame que tenemos disponible de dragon ball"`
+  * Criterio: Respuesta 100% natural, cero menciones a tintas ecológicas HP Látex o cintas tesa, y exclusivamente tarjetas de Dragon Ball (cero Batman, cero BTS).
+- **Prueba 2 (Lenguaje Coloquial y Cultural):**
+  * Consultas: `"el saiyajin de pelo amarillo"`, `"el bicho"`, `"obras de F1"`.
+  * Criterio: El motor RAG vectorial identifica con precisión a Goku, Cristiano Ronaldo y Checo Pérez / Ferrari / Red Bull.
+- **Prueba 3 (Venta Rápida por Dictado):**
+  * Consulta: `"2 medianos de Goku en efectivo"`
+  * Criterio: Borrador de venta montado al instante con combo de feria aplicado (Q120.00) o precio regular correcto.
+- **Evidencia Visual:** Captura de pantalla de alta resolución demostrando la respuesta en vivo.
+
+## Acceptance Criteria
+
+### Hito M1: Motor RAG Vectorial
+- [ ] Archivo `server/services/embeddingService.js` implementado con < 150 líneas de código limpio.
+- [ ] Similitud coseno matemática calcula distancias contra vectores cacheados en memoria RAM en < 15ms.
+- [ ] `MIN_SIMILARITY_THRESHOLD = 0.45` filtra tajantemente obras no afines sin devolver falsos positivos irrelevantes.
+- [ ] Paracaídas híbrido conmuta a búsqueda léxica si no hay embeddings disponibles o si falla la red.
+- [ ] Integrado correctamente en `webCatalogService.js` y en la tool `searchCatalog`.
+
+### Hito M2: Purga de Textos Enlatados
+- [ ] Frases de "tintas ecológicas HP Látex" y "cinta tesa®" completamente eliminadas de los fallbacks de `aiStreamService.js` y `aiClosedLoopService.js`.
+- [ ] Frase de "volumen alto de consultas" purgada de `geminiPoolService.js` y `aiClosedLoopService.js`.
+- [ ] Respuestas generadas orgánicamente por Gemini sin mezclar errores de retry con discursos comerciales.
+
+### Hito M3: Personalidad de Copiloto de Mostrador
+- [ ] `aiPromptService.js` ajustado para tratar al vendedor como compañero de equipo táctico en mostrador.
+- [ ] Promoción de combos de feria (2 Medianos por Q120, 3 por Q180) y cierre ágil de ventas.
+- [ ] Tono enérgico, breve y resolutivo adaptado al ruido y velocidad de una convención.
+
+### Hito M4: Certificación y Arnés
+- [ ] `npm run harness:check` ejecuta y pasa al 100% (test:security 9/9, audit:secrets, audit:monoliths, build).
+- [ ] Pruebas en vivo ejecutadas y validadas con Chrome DevTools MCP.
+- [ ] Capturas de pantalla de evidencia visual de alta resolución tomadas y documentadas.

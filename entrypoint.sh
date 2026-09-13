@@ -50,7 +50,11 @@ fi
 echo "🔄 [Entrypoint] Synchronizing database schema with Prisma..."
 if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
   echo "📦 [Entrypoint] Migrations directory detected. Executing 'prisma migrate deploy'..."
-  npx prisma migrate deploy
+  npx prisma migrate deploy || {
+    echo "⚠️ [Entrypoint] Migration deploy encountered conflict. Resolving baseline..."
+    npx prisma migrate resolve --applied 20260913000000_init_stand_ia || true
+    npx prisma migrate deploy || npx prisma db push --skip-generate
+  }
 else
   echo "📦 [Entrypoint] No migrations directory detected. Executing safe 'prisma db push --skip-generate'..."
   npx prisma db push --skip-generate
