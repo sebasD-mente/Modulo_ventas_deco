@@ -32,7 +32,7 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
 
 export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = null }) {
   const explicitClient = geminiClient || null;
-  const isAvailable = Boolean(explicitClient || getGeminiClient());
+  const isAvailable = geminiClient === null ? false : Boolean(explicitClient || getGeminiClient());
   const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date });
   const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
   if (!isAvailable) {
@@ -76,7 +76,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   const o = (messageOrOptions && typeof messageOrOptions === 'object' && !Array.isArray(messageOrOptions) && messageOrOptions.message !== undefined) ? messageOrOptions : { message: messageOrOptions, history: historyParam, pendingDraft: pendingDraftParam, contextData: contextDataParam, geminiClient: geminiClientParam };
   const { message, history = [], pendingDraft = null, contextData = {}, tenantId = o.contextData?.tenantId, eventId = o.contextData?.eventId, date = o.contextData?.date || null } = o;
   const explicitClient = o.geminiClient || geminiClientParam || null;
-  const isAvailable = Boolean(explicitClient || getGeminiClient());
+  const isAvailable = (o.geminiClient === null || geminiClientParam === null) ? false : Boolean(explicitClient || getGeminiClient());
 
   const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
   const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });

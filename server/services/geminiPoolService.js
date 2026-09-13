@@ -229,7 +229,7 @@ export async function* streamWithModelFallback({
   let activeModel = models[0];
   let lastError = null;
 
-  if (!client && getAvailableKeys().length === 0) {
+  if (client === null || (!client && getAvailableKeys().length === 0)) {
     yield { type: 'token', text: '[Modo Offline] El asistente de IA no está conectado actualmente.' };
     return;
   }

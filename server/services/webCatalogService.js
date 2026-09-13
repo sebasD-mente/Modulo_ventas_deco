@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { invalidateVectorCache, searchHybridPosters, searchPostersByEmbedding } from './embeddingService.js';
+import { resolveEntityAlias } from './semantic/entityAliases.js';
 
 /**
  * Servicio Desacoplado de Catálogo de Pósters
@@ -358,8 +359,14 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo',
       'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'
     ]);
-    const meaningfulTokens = rawTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
-    const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : rawTokens;
+    const aliasRes = resolveEntityAlias(cleanQuery);
+    const aliasTokens = (aliasRes.matched && aliasRes.searchQuery)
+      ? normalize(aliasRes.searchQuery).split(/\s+/).filter((t) => !STOP_WORDS.has(t) && t.length > 1)
+      : [];
+
+    const allTokens = Array.from(new Set([...rawTokens, ...aliasTokens]));
+    const meaningfulTokens = allTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
+    const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : (allTokens.length > 0 ? allTokens : rawTokens);
 
     const scored = filtered
       .map((p) => {

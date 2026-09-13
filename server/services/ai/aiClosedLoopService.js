@@ -86,10 +86,11 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
     });
     for await (const chunk of followUpStream) {
       const text = chunk.text || '';
-      const isBreak = text.includes('Respuesta finalizada') || text.includes('Conexión con IA intermitente') || text.includes('volumen alto');
-      if (isBreak) hadPoolError = true;
-      if (chunk.type === 'token' && text) { yield chunk; if (!isBreak) followUpTokensCount++; }
-      else if (text) { yield { type: 'token', text }; if (!isBreak) followUpTokensCount++; }
+      const isBreak = text.includes('Respuesta finalizada');
+      const isPoolCrash = text.includes('Conexión con IA intermitente') || text.includes('volumen alto');
+      if (isPoolCrash) hadPoolError = true;
+      if (chunk.type === 'token' && text) { yield chunk; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
+      else if (text) { yield { type: 'token', text }; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
     }
   } catch (err) {
     console.warn('[aiClosedLoopService] ⚠️ Error en closed-loop follow-up:', err.message);

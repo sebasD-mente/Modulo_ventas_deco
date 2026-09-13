@@ -83,14 +83,14 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - **Delivered results**: previous missions completed (VICTORY CONFIRMED); new mission launched to orchestrator_20.
 
 ## Project Status
-- **Phase**: in progress
+- **Phase**: auditing
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_20 (6ddcf51f-f397-4dd4-ad16-5a76fa7c9097, running)
-- **Active Auditor**: to be spawned on victory claim
+- **Active Orchestrator**: orchestrator_20 (6ddcf51f-f397-4dd4-ad16-5a76fa7c9097, completed, awaiting audit)
+- **Active Auditor**: victory_auditor_20 (3db69a7d-e74e-42f6-904e-1c5ce91f58fd, running)
 - **Monitoring Crons**: Cron 1 (task-32, 8m progress), Cron 2 (task-34, 10m liveness)
 
 ## Victory Audit Status
-- **Triggered**: no
+- **Triggered**: yes
 - **Verdict**: pending
 - **Retry count**: 0
 
