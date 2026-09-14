@@ -1,6 +1,20 @@
 import { prisma } from '../../config/prisma.js';
 
 /**
+ * Retorna el rango civil exacto de inicio y fin de un día en la zona horaria oficial America/Guatemala (UTC-6).
+ * Si no se provee dateStr (formato YYYY-MM-DD), calcula automáticamente el día civil actual en Guatemala.
+ */
+export function getGuatemalaDayRange(dateStr = null) {
+  const targetDate = dateStr
+    ? String(dateStr).trim().split('T')[0]
+    : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+
+  const startOfDay = new Date(`${targetDate}T00:00:00.000-06:00`);
+  const endOfDay = new Date(`${targetDate}T23:59:59.999-06:00`);
+  return { targetDate, startOfDay, endOfDay };
+}
+
+/**
  * Obtiene métricas y KPIs en tiempo real de un evento utilizando agregaciones nativas de PostgreSQL en O(1)
  */
 export async function getEventKPIs(params, fallbackTenantId = null) {
@@ -29,8 +43,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
   }
 
   if (date) {
-    const startOfDay = new Date(`${date}T00:00:00.000Z`);
-    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
     saleWhere.createdAt = {
       gte: startOfDay,
       lte: endOfDay,
@@ -158,20 +171,17 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null }) {
     orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
   });
 
-  // 2. Filtro de fecha para las ventas
+  // 2. Filtro de fecha para las ventas del Monitor
+  // En tiempo real muestra ÚNICAMENTE la jornada del día actual (o la fecha consultada) en Guatemala (UTC-6)
+  const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
   const salesWhere = {
     tenantId,
     status: 'COMPLETADA',
-  };
-
-  if (date) {
-    const startOfDay = new Date(`${date}T00:00:00.000Z`);
-    const endOfDay = new Date(`${date}T23:59:59.999Z`);
-    salesWhere.createdAt = {
+    createdAt: {
       gte: startOfDay,
       lte: endOfDay,
-    };
-  }
+    },
+  };
 
   const allSales = await prisma.sale.findMany({
     where: salesWhere,
@@ -220,7 +230,11 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null }) {
     const lastSale = evSales[0]
       ? {
           amount: Number(evSales[0].totalAmount),
-          time: new Date(evSales[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time: new Date(evSales[0].createdAt).toLocaleTimeString('es-GT', {
+            timeZone: 'America/Guatemala',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
         }
       : null;
 
@@ -262,7 +276,7 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null }) {
   }
 
   return {
-    date: date || new Date().toISOString().split('T')[0],
+    date: targetDate,
     lastUpdated: new Date().toISOString(),
     eventDetails: eventDetails.filter((e) => e.status === 'ACTIVO' || e.transactions > 0),
     resumenGeneral: {
@@ -295,8 +309,7 @@ export async function getEventSalesList({
   }
 
   if (date) {
-    const startOfDay = new Date(`${date}T00:00:00.000Z`);
-    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
     where.createdAt = { gte: startOfDay, lte: endOfDay };
   }
 

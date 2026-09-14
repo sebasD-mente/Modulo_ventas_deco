@@ -12,6 +12,25 @@ import {
 } from 'lucide-react';
 import EditSaleModal from './EditSaleModal.jsx';
 
+function formatSaleTime(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const fmtDay = (dt) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(dt);
+  const isToday = fmtDay(d) === fmtDay(new Date());
+  const timeStr = d.toLocaleTimeString('es-GT', {
+    timeZone: 'America/Guatemala',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  if (isToday) return timeStr;
+  const dayStr = d.toLocaleDateString('es-GT', {
+    timeZone: 'America/Guatemala',
+    day: 'numeric',
+    month: 'short',
+  });
+  return `${dayStr}, ${timeStr}`;
+}
+
 export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated }) {
   const { authFetch } = useAuth();
   const [sales, setSales] = useState([]);
@@ -65,6 +84,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
             Transferencia
           </span>
         );
+      case 'EFECTIVO':
       default:
         return (
           <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1">
@@ -123,10 +143,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
                   </span>
                   <span className="text-slate-500 flex items-center gap-1 text-[11px]">
                     <Clock className="w-3 h-3 text-slate-500" />
-                    {new Date(sale.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatSaleTime(sale.createdAt)}
                   </span>
                   {getPaymentBadge(sale.payments?.[0]?.method)}
                   {sale.notes && (

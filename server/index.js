@@ -1,4 +1,5 @@
 import express from 'express';
+process.env.TZ = process.env.TZ || 'America/Guatemala';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
