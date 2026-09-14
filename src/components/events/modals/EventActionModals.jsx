@@ -59,20 +59,31 @@ export default function EventActionModals({
               <span className="text-neutral-400 flex items-center gap-1"><MapPin className="w-3 h-3" /> {eventToDelete.location}</span>
             </div>
             {deleteErrorMsg ? (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{deleteErrorMsg}</span>
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{deleteErrorMsg}</span>
+                </div>
+                <p className="text-[11px] text-amber-300/90 leading-relaxed bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
+                  Si este evento y sus ventas fueron creados únicamente para pruebas y deseas iniciar desde cero con el evento real, puedes forzar la purga completa.
+                </p>
               </div>
             ) : (
               <p className="text-xs text-neutral-400 leading-relaxed">
                 Esta acción es permanente y eliminará el evento. Úsala únicamente si el evento fue <strong>creado por error</strong> o <strong>cancelado</strong>.
               </p>
             )}
-            <div className="pt-3 border-t border-neutral-800 flex items-center justify-end gap-2">
+            <div className="pt-3 border-t border-neutral-800 flex items-center justify-end gap-2 flex-wrap">
               <button type="button" onClick={onCloseDelete} className="px-4 py-2 rounded-xl border border-neutral-800 text-neutral-400 text-xs font-bold hover:text-white hover:border-neutral-700 cursor-pointer">
                 Cancelar
               </button>
-              <button type="button" onClick={onConfirmDelete} disabled={deleting} className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-red-500/20 disabled:opacity-50 cursor-pointer transition-transform active:scale-95">
+              {deleteErrorMsg && (
+                <button type="button" onClick={() => onConfirmDelete(true)} disabled={deleting} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-black font-black text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer transition-transform active:scale-95">
+                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  <span>Purgar evento y pruebas</span>
+                </button>
+              )}
+              <button type="button" onClick={() => onConfirmDelete(false)} disabled={deleting} className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-red-500/20 disabled:opacity-50 cursor-pointer transition-transform active:scale-95">
                 {deleting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Eliminando...</span></> : <><Trash2 className="w-3.5 h-3.5" /><span>Eliminar definitivamente</span></>}
               </button>
             </div>

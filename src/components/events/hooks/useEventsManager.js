@@ -83,11 +83,12 @@ export function useEventsManager({ onEventActivated } = {}) {
 
   const openDeleteModal = (ev) => { setDeleteErrorMsg(null); setEventToDelete(ev); };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (force = false) => {
     if (!eventToDelete) return;
     setIsSubmittingDelete(true); setDeleteErrorMsg(null);
     try {
-      const res = await authFetch(`/api/events/${eventToDelete.id}`, { method: 'DELETE' });
+      const url = force ? `/api/events/${eventToDelete.id}?force=true` : `/api/events/${eventToDelete.id}`;
+      const res = await authFetch(url, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error al eliminar el evento.');
       setEventToDelete(null); await loadEvents();

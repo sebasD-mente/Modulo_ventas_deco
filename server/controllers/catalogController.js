@@ -243,19 +243,24 @@ export async function unarchiveEvent(req, res) {
 export async function deleteEvent(req, res) {
   try {
     const { id } = req.params;
+    const { force } = req.query;
     const tenantId = req.tenantId;
 
     const event = await prisma.event.findFirst({
       where: { id, tenantId },
-      include: {
-        _count: {
-          select: { sales: true, cashClosings: true },
-        },
-      },
+      include: { _count: { select: { sales: true, cashClosings: true } } },
     });
 
     if (!event) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
+    }
+
+    if (force === 'true' && req.role === 'SUPER_ADMIN') {
+      await prisma.user.updateMany({ where: { assignedEventId: id }, data: { assignedEventId: null } });
+      await prisma.cashClosing.deleteMany({ where: { eventId: id } });
+      await prisma.sale.deleteMany({ where: { eventId: id } });
+      await prisma.event.delete({ where: { id } });
+      return res.json({ success: true, message: `El evento "${event.name}" y sus registros de prueba fueron purgados con éxito.` });
     }
 
     if (event._count.sales > 0 || event._count.cashClosings > 0) {
@@ -272,14 +277,8 @@ export async function deleteEvent(req, res) {
       });
     }
 
-    await prisma.event.delete({
-      where: { id },
-    });
-
-    return res.json({
-      success: true,
-      message: `El evento "${event.name}" fue eliminado correctamente.`,
-    });
+    await prisma.event.delete({ where: { id } });
+    return res.json({ success: true, message: `El evento "${event.name}" fue eliminado correctamente.` });
   } catch (err) {
     console.error('❌ Error eliminando evento:', err);
     return res.status(500).json({ success: false, error: 'Error al eliminar el evento.' });
