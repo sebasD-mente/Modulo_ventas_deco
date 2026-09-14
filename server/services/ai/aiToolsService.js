@@ -27,22 +27,54 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
   let grandTotal = 0;
   const textToScan = [userMessage, args?.notes].filter(Boolean).join(' ');
   const finalPayment = extractPaymentMethod(textToScan) || args?.paymentMethod || 'EFECTIVO';
+
+  const extractSizeFromText = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    const str = text.toLowerCase();
+    if (/\b(extra\s*grande|gigante|xl|60x90|24x36)\b/i.test(str)) return 'GIGANTE';
+    if (/\b(grande|large|18x24|45x60)\b/i.test(str)) return 'GRANDE';
+    if (/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/i.test(str)) return 'PORTADA_ALBUM';
+    if (/\b(peque[ñn]o|chico|small|8\.?5?x1[01]|21x27)\b/i.test(str)) return 'PEQUENO';
+    if (/\b(mini|miniatura|xs|5x7|14x21)\b/i.test(str)) return 'MINI';
+    if (/\b(mediano|medio|medium|12x18|30x45)\b/i.test(str)) return 'MEDIANO';
+    return null;
+  };
+
+  const globalMsgSize = rawItems.length === 1 ? extractSizeFromText(userMessage) : null;
+
   for (const it of rawItems) {
-    const rawName = it.productName || it.title || it.description || 'Póster';
-    const requestedSize = it.size || 'MEDIANO';
+    let rawName = String(it.productName || it.title || it.description || 'Póster').trim();
+    const nameExtractedSize = extractSizeFromText(rawName);
+    if (nameExtractedSize) {
+      rawName = rawName
+        .replace(/\b(extra\s*grande|gigante|xl|60x90|24x36)\b/gi, '')
+        .replace(/\b(grande|large|18x24|45x60)\b/gi, '')
+        .replace(/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/gi, '')
+        .replace(/\b(peque[ñn]o|chico|small|8\.?5?x1[01]|21x27)\b/gi, '')
+        .replace(/\b(mini|miniatura|xs|5x7|14x21)\b/gi, '')
+        .replace(/\b(mediano|medio|medium|12x18|30x45)\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    }
+
+    const explicitSize = it.size ? normalizeCatalogSizeId(it.size) : null;
+    const requestedSize = explicitSize || nameExtractedSize || globalMsgSize || 'MEDIANO';
+
     let matched = await matchPosterEverywhere(tenantId, rawName, requestedSize);
     let aliasRes = { matched: false };
     if (!matched) {
       aliasRes = resolveEntityAlias(rawName);
       if (aliasRes.matched && aliasRes.searchQuery) {
-        matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, it.size || aliasRes.defaultSizeId || requestedSize);
+        matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, requestedSize || aliasRes.defaultSizeId);
       }
     }
+
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
-    const normSize = normalizeCatalogSizeId(matched?.sizeId || requestedSize);
+    const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
     const unitPrice = matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize));
     const subtotal = Number((qty * unitPrice).toFixed(2));
     grandTotal += subtotal;
+
     if (matched) {
       enrichedItems.push({
         productId: isUuid(matched?.productId) ? matched.productId : null,
@@ -61,7 +93,15 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
         unavailableReason: matched.unavailableReason || null,
       });
     } else {
-      enrichedItems.push({ productId: null, description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`, baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName, quantity: qty, unitPrice, subtotal, sizeId: normSize });
+      enrichedItems.push({
+        productId: null,
+        description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`,
+        baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName,
+        quantity: qty,
+        unitPrice,
+        subtotal,
+        sizeId: normSize,
+      });
     }
   }
   return { items: enrichedItems, total: Number(grandTotal.toFixed(2)), discount: Number(args?.discount || 0), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };

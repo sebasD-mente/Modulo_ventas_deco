@@ -30,7 +30,10 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   const removeDraftItem = (idx) => pendingDraft?.items?.[idx] && setPendingDraft((p) => {
     const items = p.items.filter((_, i) => i !== idx); return items.length ? { ...p, items, total: recalculateTotal(items) } : null;
   });
-  const updateDraftPaymentMethod = (method) => setPendingDraft((p) => (p ? { ...p, paymentMethod: method } : null)), discardDraft = () => setPendingDraft(null);
+  const updateDraftPaymentMethod = (method) => setPendingDraft((p) => (p ? { ...p, paymentMethod: method } : null)), discardDraft = () => {
+    setPendingDraft(null);
+    setMessages((p) => [...p, { id: genId(), sender: 'ai', text: '🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?', timestamp: getNow() }]);
+  };
 
   const addPosterToDraft = (poster) => {
     const sizes = poster.sizes?.length ? poster.sizes : DEFAULT_EVENT_SIZES, def = sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo, uPrice = Number(def.precio);

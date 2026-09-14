@@ -11,7 +11,7 @@ function scanDir(dir) {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!['node_modules', 'dist', '.git', 'coverage', '.agents', 'tests', 'scripts'].includes(entry.name)) {
+      if (!['node_modules', 'dist', '.git', 'coverage', '.agents', 'tests', 'scripts', 'scratch'].includes(entry.name)) {
         scanDir(fullPath);
       }
     } else if (/\.(js|jsx|json)$/i.test(entry.name)) {

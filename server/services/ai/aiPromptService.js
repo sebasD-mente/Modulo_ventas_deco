@@ -72,7 +72,8 @@ export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendin
   total: pendingDraft.total,
   paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
   notes: pendingDraft.notes || ''
-}, null, 2)}\n\nDIRECTIVAS PARA EDICIÓN DEL BORRADOR:\n- Si el usuario pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", etc.):\n  * Preserva todos los ítems actuales a menos que pidan removerlos.\n  * Modifica cantidades, tamaños o método de pago según lo pedido.\n  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : '';
+}, null, 2)}\n\nDIRECTIVAS PARA EDICIÓN DEL BORRADOR:\n- Si el usuario pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", etc.):\n  * Preserva todos los ítems actuales a menos que pidan removerlos.\n  * Modifica cantidades, tamaños o método de pago según lo pedido.\n  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    : `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nESTADO: NO HAY BORRADOR ACTIVO EN PANTALLA (VENTA LIMPIA O RECIÉN DESCARTADA/CONFIRMADA).\nDIRECTIVA DE INDEPENDENCIA ESTRICTA:\n- Cualquier solicitud de venta del vendedor ("1 scarface", "dame Batman", etc.) DEBE SER UN BORRADOR NUEVO Y LIMPIO.\n- NUNCA revivas, agregues ni mezcles obras mencionadas en mensajes anteriores del historial conversacional.\n- El borrador a preparar debe incluir ÚNICAMENTE las obras y cantidades pedidas explícitamente en el último mensaje.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
   return `Eres STAND {IA}, el Copiloto Táctico de Mostrador y Asistente Estrella de Ventas para el VENDEDOR del stand de Deco Vintage Guate en "${eventName}" (${eventLocation}).
 

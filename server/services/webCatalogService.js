@@ -366,12 +366,19 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     const meaningfulTokens = allTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
     const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : (allTokens.length > 0 ? allTokens : rawTokens);
 
+    const getCondensed = (str) =>
+      normalize(str)
+        .split(/\s+/)
+        .filter((t) => !STOP_WORDS.has(t) && t.length > 0)
+        .join(' ');
+
+    const queryCondensed = getCondensed(cleanQuery);
+
     const scored = filtered
       .map((p) => {
+        const titleText = [p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' ');
         const fullText = [
-          p.titulo,
-          p.subtitulo,
-          p.nombreCompleto,
+          titleText,
           p.sku,
           p.categoria,
           Array.isArray(p.tags) ? p.tags.join(' ') : '',
@@ -379,27 +386,46 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
           .filter(Boolean)
           .join(' ');
 
+        const normTitleText = normalize(titleText);
         const normFullText = normalize(fullText);
         const alphaFullText = alphaOnly(fullText);
+        const titleTokensSet = new Set(normTitleText.split(/\s+/));
         const fullTokensSet = new Set(normFullText.split(/\s+/));
 
         let score = 0;
 
-        // Bonificaciones de coincidencia directa o normalizada
-        if (normFullText.startsWith(normQuery)) score += 100;
+        // 1. Coincidencia directa o normalizada en texto crudo
+        if (normTitleText === normQuery) score += 350;
+        if (normFullText.startsWith(normQuery)) score += 120;
         if (p.titulo.toLowerCase().startsWith(cleanQuery)) score += 100;
-        if (normFullText.includes(normQuery)) score += 60;
-        if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 50;
-        if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 60;
+        if (normFullText.includes(normQuery)) score += 80;
+        if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 60;
+        if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 80;
 
-        // Bonificación si coinciden todas las palabras clave (multi-token exacto)
+        // 2. Coincidencia de frase condensada sin stop-words (ej: "scarface trono" -> "Scarface - El Trono del Poder")
+        if (queryCondensed.length >= 3) {
+          const productTitleCondensed = getCondensed(titleText);
+          const productFullCondensed = getCondensed(fullText);
+
+          if (productTitleCondensed === queryCondensed) score += 300;
+          else if (productTitleCondensed.startsWith(queryCondensed)) score += 250;
+          else if (productTitleCondensed.includes(queryCondensed)) score += 200;
+          else if (productFullCondensed.includes(queryCondensed)) score += 150;
+        }
+
+        // 3. Puntuación por tokens clave
         const isTokenMatch = (t) => fullTokensSet.has(t) || normFullText.startsWith(t);
-        const allTokensMatch = tokens.every(isTokenMatch);
-        if (allTokensMatch) score += 30;
+        const allTokensMatch = tokens.length > 0 && tokens.every(isTokenMatch);
+        if (allTokensMatch) score += 150;
 
-        // Puntuación por cada token individual presente como palabra completa
-        const matchedTokensCount = tokens.filter(isTokenMatch).length;
-        score += matchedTokensCount * 10;
+        // Puntuación diferenciada: token en título vale más que en tags
+        for (const token of tokens) {
+          if (titleTokensSet.has(token)) {
+            score += 35;
+          } else if (isTokenMatch(token)) {
+            score += 15;
+          }
+        }
 
         return { p, score };
       })

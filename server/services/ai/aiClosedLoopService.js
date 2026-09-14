@@ -6,7 +6,7 @@ import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, execu
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 
-function buildFallbackSummaries(executedTools) {
+export function buildFallbackSummaries(executedTools) {
   const summaries = [];
   for (const t of executedTools) {
     if (t.name === 'prepareSaleDraft' && t.result) {

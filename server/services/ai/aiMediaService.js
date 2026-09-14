@@ -54,8 +54,26 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       if (found) {
         selectedSize = found;
       } else {
-        sizeAvailable = false;
-        unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
+        const standardSizeMap = {
+          MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
+          PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+          PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 },
+          MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
+          GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
+          GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+        };
+        const standardMatch = standardSizeMap[norm];
+        if (standardMatch) {
+          selectedSize = standardMatch;
+          sizeAvailable = true;
+          unavailableReason = null;
+          if (!matched.sizes.some(s => s.sizeId === norm)) {
+            matched.sizes.push(standardMatch);
+          }
+        } else {
+          sizeAvailable = false;
+          unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
+        }
       }
     }
 
