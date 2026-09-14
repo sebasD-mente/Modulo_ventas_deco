@@ -51,6 +51,11 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
           <button type="button" onClick={() => onArchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer" title="Archivar evento cuando concluya">
             <Archive className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Archivar</span>
           </button>
+          {onDelete && (
+            <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer transition-colors" title="Eliminar evento (creado por error o cancelado)">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     );

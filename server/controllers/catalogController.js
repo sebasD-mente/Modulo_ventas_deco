@@ -267,17 +267,11 @@ export async function deleteEvent(req, res) {
     if (event._count.sales > 0 || event._count.cashClosings > 0) {
       return res.status(400).json({
         success: false,
-        error: `No se puede eliminar "${event.name}" porque tiene registros contables (${event._count.sales} ventas y ${event._count.cashClosings} arqueos). Puedes archivarlo para preservar el historial.`,
+        error: `No se puede eliminar "${event.name}" porque tiene registros contables (${event._count.sales} ventas y ${event._count.cashClosings} arqueos). Puedes archivarlo para preservar el historial o purgarlo si eres administrador.`,
       });
     }
 
-    if (event.status === 'ACTIVO') {
-      return res.status(400).json({
-        success: false,
-        error: `No se puede eliminar un evento que está actualmente EN CURSO. Activa otro evento o archívalo primero.`,
-      });
-    }
-
+    await prisma.user.updateMany({ where: { assignedEventId: id }, data: { assignedEventId: null } });
     await prisma.event.delete({ where: { id } });
     return res.json({ success: true, message: `El evento "${event.name}" fue eliminado correctamente.` });
   } catch (err) {

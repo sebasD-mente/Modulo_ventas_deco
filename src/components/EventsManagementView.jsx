@@ -30,7 +30,7 @@ export default function EventsManagementView({ onEventActivated }) {
             {m.activeEvents.length === 0 ? (
               <div className="p-6 rounded-2xl bg-black border border-neutral-800 text-center text-xs text-neutral-500">No hay ningún evento activo en curso en este momento. Activa uno de los eventos confirmados abajo.</div>
             ) : m.activeEvents.map((ev) => (
-              <EventCard key={ev.id} event={ev} statusType="ACTIVO" onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} />
+              <EventCard key={ev.id} event={ev} statusType="ACTIVO" onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} onDelete={() => m.openDeleteModal(ev)} />
             ))}
           </div>
           <div className="space-y-3 pt-2">
