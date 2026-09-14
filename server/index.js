@@ -9,6 +9,7 @@ import { ENV } from './config/env.js';
 import apiRoutes from './routes/apiRoutes.js';
 import { prisma } from './config/prisma.js';
 import { syncCatalogFromWeb } from './services/catalogSyncService.js';
+import { deltaSyncRecentPosters } from './services/catalog/liveCatalogSyncService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,9 +162,22 @@ const server = app.listen(ENV.PORT, () => {
   // Siempre sincronizar al arrancar — captura cualquier producto nuevo en la tienda web
   runCatalogSync('startup');
 
-  // Sync automático cada 6 horas para mantener el catálogo actualizado en ferias largas
+  // Sync automático cada 6 horas para auditoría y reconciliación profunda
   const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 horas
   setInterval(() => runCatalogSync('scheduled-6h'), CATALOG_SYNC_INTERVAL_MS).unref();
+
+  // ⚡ Delta-sync periódico rápido (cada 60s) para capturar al instante nuevos pósters de la web
+  const FAST_DELTA_INTERVAL_MS = 60 * 1000; // 60 segundos
+  setInterval(async () => {
+    try {
+      const res = await deltaSyncRecentPosters();
+      if (res && (res.newCount > 0 || res.updated > 0)) {
+        console.log(`[DeltaSync] ⚡ Novedades detectadas en tienda web: ${res.newCount} nuevos, ${res.updated} actualizados.`);
+      }
+    } catch {
+      // Silencioso para no saturar logs en caso de micro-cortes
+    }
+  }, FAST_DELTA_INTERVAL_MS).unref();
   // ── Fin Sincronización ──────────────────────────────────────────────────────
 
 

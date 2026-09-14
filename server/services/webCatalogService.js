@@ -408,6 +408,21 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     scored.sort((a, b) => b.score - a.score);
     const sortedProducts = scored.map((item) => item.p);
     const deduplicated = deduplicatePosters(sortedProducts);
+
+    // ⚡ PARACAÍDAS REACTIVO: Si la búsqueda local no arrojó resultados (ej. póster recién publicado en la web),
+    // consulta en caliente a la tienda web, lo indexa atómicamente y lo retorna en la misma llamada.
+    if (deduplicated.length === 0 && cleanQuery.length >= 3) {
+      try {
+        const { searchLiveWebParachute } = await import('./catalog/liveCatalogSyncService.js');
+        const liveResults = await searchLiveWebParachute(cleanQuery, tenantId);
+        if (Array.isArray(liveResults) && liveResults.length > 0) {
+          return deduplicatePosters(liveResults).slice(0, limit);
+        }
+      } catch {
+        // Fallback no bloqueante
+      }
+    }
+
     return deduplicated.slice(0, limit);
   }
 

@@ -33,7 +33,7 @@ const SIZE_CATALOG_MAP = {
 /**
  * Construye y normaliza la lista de tamaños legítimos para un póster sin contaminación cruzada.
  */
-function resolvePosterSizes(poster) {
+export function resolvePosterSizes(poster) {
   if (Array.isArray(poster.sizes) && poster.sizes.length > 0) {
     const valid = poster.sizes.filter(s => s && s.isActive !== false).map(s => {
       const sId = s.id || s.sizeId;

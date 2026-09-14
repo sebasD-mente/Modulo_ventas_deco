@@ -51,13 +51,16 @@ import {
   handleVideoRecognition,
 } from '../controllers/aiController.js';
 
+import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
+
 const router = express.Router();
 
 // ==========================================
-// 1. RUTAS PÚBLICAS DE AUTENTICACIÓN
+// 1. RUTAS PÚBLICAS (AUTENTICACIÓN Y WEBHOOKS)
 // ==========================================
 router.get('/auth/config', getAuthConfig);
 router.post('/auth/google', handleGoogleLogin);
+router.post('/catalog/webhook', handleCatalogWebhook);
 
 // ==========================================
 // 2. MIDDLEWARE GLOBAL DE AUTENTICACIÓN
