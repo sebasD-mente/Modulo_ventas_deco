@@ -57,28 +57,43 @@ export default function SaleCartList({
         <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
           {cartItems.map((item) => (
             <div key={item.id} className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs">
-              {item.thumbUrl && (
-                <img src={item.thumbUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
+              {item.thumbUrl || item.imageUrl ? (
+                <img src={item.thumbUrl || item.imageUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
+              ) : (
+                <div className="w-9 h-12 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                </div>
               )}
 
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-white block truncate">{item.description}</span>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  {(item.availableSizes || DEFAULT_SIZES).map((sz) => {
-                    const isSel = item.selectedSizeId ? item.selectedSizeId === sz.sizeId : item.unitPrice === sz.precio;
-                    return (
-                      <button
-                        key={sz.sizeId}
-                        type="button"
-                        onClick={() => onChangeSize && onChangeSize(item.id, sz)}
-                        className={`text-[9px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
-                          isSel ? 'bg-white text-black' : 'bg-[#181818] text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        {sz.nombre || sz.sizeId} (Q{sz.precio})
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    const sizes = Array.isArray(item.availableSizes) && item.availableSizes.length > 0 ? item.availableSizes : DEFAULT_SIZES;
+                    if (sizes.length <= 1) {
+                      const sz = sizes[0];
+                      return (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          {sz?.nombre || sz?.sizeId || 'Portada de Álbum'} (Q{sz?.precio || item.unitPrice})
+                        </span>
+                      );
+                    }
+                    return sizes.map((sz) => {
+                      const isSel = item.selectedSizeId ? item.selectedSizeId === sz.sizeId : item.unitPrice === sz.precio;
+                      return (
+                        <button
+                          key={sz.sizeId}
+                          type="button"
+                          onClick={() => onChangeSize && onChangeSize(item.id, sz)}
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                            isSel ? 'bg-white text-black' : 'bg-[#181818] text-neutral-400 hover:text-white'
+                          }`}
+                        >
+                          {sz.nombre || sz.sizeId} (Q{sz.precio})
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

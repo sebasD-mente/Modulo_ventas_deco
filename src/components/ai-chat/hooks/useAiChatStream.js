@@ -16,8 +16,8 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   const cancelRaf = () => { if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; } };
   const getAtts = (p) => Array.isArray(p.attachments) && p.attachments.length ? p.attachments : p.audioUrl ? [{ fileUrl: p.audioUrl, fileType: 'AUDIO_VOZ', transcription: p.transcription || null }] : p.imageUrl ? [{ fileUrl: p.imageUrl, fileType: p.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }] : [];
   const updateDraftItemSize = (idx, newSizeId) => pendingDraft?.items?.[idx] && setPendingDraft((prev) => {
-    const items = [...prev.items], it = items[idx], raw = it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES;
-    const sizes = raw.some((s) => s.sizeId === 'PORTADA_ALBUM') ? raw : [...raw, DEFAULT_EVENT_SIZES.find((s) => s.sizeId === 'PORTADA_ALBUM') || { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 }];
+    const items = [...prev.items], it = items[idx];
+    const sizes = Array.isArray(it.availableSizes) && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_EVENT_SIZES;
     const target = sizes.find((s) => s.sizeId === newSizeId) || sizes[0];
     items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})`, availableSizes: sizes };
     return { ...prev, items, total: recalculateTotal(items) };

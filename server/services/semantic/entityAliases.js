@@ -66,11 +66,25 @@ export const STAND_ENTITY_ALIASES = [
     aliases: ['queen', 'freddie mercury', 'bohemian rhapsody', 'el de queen']
   },
   {
+    canonicalTitle: 'Nirvana - MTV Unplugged in New York',
+    searchQuery: 'Nirvana MTV Unplugged in New York',
+    category: 'MUSICA',
+    defaultSizeId: 'PORTADA_ALBUM',
+    aliases: ['unplugged', 'umplugged', 'nirvana unplugged', 'nirvana umplugged', 'mtv unplugged', 'unplugged nirvana', 'el acustico de nirvana', 'acustico nirvana']
+  },
+  {
     canonicalTitle: 'Nirvana - Nevermind',
     searchQuery: 'Nirvana Nevermind',
     category: 'MUSICA',
     defaultSizeId: 'PORTADA_ALBUM',
-    aliases: ['nirvana', 'kurt cobain', 'nevermind', 'el bebe en la piscina', 'bebe nadando']
+    aliases: ['nevermind', 'nirvana nevermind', 'el bebe en la piscina', 'bebe nadando', 'bebe en la piscina']
+  },
+  {
+    canonicalTitle: 'Nirvana - In Utero',
+    searchQuery: 'Nirvana In Utero',
+    category: 'MUSICA',
+    defaultSizeId: 'PORTADA_ALBUM',
+    aliases: ['in utero', 'nirvana in utero', 'el angel de nirvana']
   },
   {
     canonicalTitle: 'Michael Jackson - King of Pop',

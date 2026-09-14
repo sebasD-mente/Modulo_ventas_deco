@@ -29,12 +29,17 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
   const finalPayment = extractPaymentMethod(textToScan) || args?.paymentMethod || 'EFECTIVO';
   for (const it of rawItems) {
     const rawName = it.productName || it.title || it.description || 'Póster';
-    const aliasRes = resolveEntityAlias(rawName);
-    const queryName = aliasRes.matched ? aliasRes.searchQuery : rawName;
-    const requestedSize = it.size || (aliasRes.matched && aliasRes.defaultSizeId) || 'MEDIANO';
-    const matched = await matchPosterEverywhere(tenantId, queryName, requestedSize);
+    const requestedSize = it.size || 'MEDIANO';
+    let matched = await matchPosterEverywhere(tenantId, rawName, requestedSize);
+    let aliasRes = { matched: false };
+    if (!matched) {
+      aliasRes = resolveEntityAlias(rawName);
+      if (aliasRes.matched && aliasRes.searchQuery) {
+        matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, it.size || aliasRes.defaultSizeId || requestedSize);
+      }
+    }
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
-    const normSize = normalizeCatalogSizeId(requestedSize);
+    const normSize = normalizeCatalogSizeId(matched?.sizeId || requestedSize);
     const unitPrice = matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize));
     const subtotal = Number((qty * unitPrice).toFixed(2));
     grandTotal += subtotal;

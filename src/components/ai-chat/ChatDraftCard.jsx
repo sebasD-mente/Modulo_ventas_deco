@@ -16,7 +16,7 @@ export default function ChatDraftCard({
   const discard = onDiscard || discardDraft;
   const confirm = onConfirmSale || confirmPendingSale;
   const openSwap = onOpenSwapModal || openSwapModal;
-  const getSizes = (it) => { const raw = it.availableSizes?.length ? it.availableSizes : DEFAULT_EVENT_SIZES; return raw.some((s) => s.sizeId === 'PORTADA_ALBUM') ? raw : [...raw, DEFAULT_EVENT_SIZES.find((s) => s.sizeId === 'PORTADA_ALBUM') || { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 }]; };
+  const getSizes = (it) => (Array.isArray(it.availableSizes) && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_EVENT_SIZES);
 
   const handleModify = () => {
     if (transferDraftToManualForm) { transferDraftToManualForm(); return; }
@@ -46,47 +46,63 @@ export default function ChatDraftCard({
       </div>
 
       <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
-        {(pendingDraft.items || []).map((it, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-black border border-neutral-800 text-xs">
-            <img src={it.thumbUrl || it.imageUrl} alt="" className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-white block truncate">{it.baseTitle || it.description}</span>
-              <span className="text-[9px] text-neutral-400 uppercase font-semibold block">{it.category || 'ARTE'}</span>
-              <div className="flex items-center gap-1.5 mt-1">
-                <label className="text-[10px] text-neutral-400 font-medium">Tamaño:</label>
-                <select
-                  value={it.sizeId || 'MEDIANO'}
-                  onChange={(e) => updateSize?.(idx, e.target.value)}
-                  className="bg-[#222222] border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-white font-bold focus:outline-none focus:border-white cursor-pointer"
-                >
-                  {getSizes(it).map((s) => (
-                    <option key={s.sizeId} value={s.sizeId}>{s.nombre} (Q{s.precio})</option>
-                  ))}
-                </select>
-              </div>
-              {openSwap && (
-                <button type="button" onClick={() => openSwap(idx)} className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 underline transition-colors cursor-pointer mt-1">
-                  <RefreshCw className="w-2.5 h-2.5" /> Cambiar diseño
-                </button>
+        {(pendingDraft.items || []).map((it, idx) => {
+          const itemSizes = getSizes(it);
+          const currentSize = itemSizes.find((s) => s.sizeId === it.sizeId) || itemSizes[0];
+          return (
+            <div key={idx} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-black border border-neutral-800 text-xs">
+              {it.thumbUrl || it.imageUrl ? (
+                <img src={it.thumbUrl || it.imageUrl} alt="" className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
+              ) : (
+                <div className="w-10 h-14 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
+                  <ShoppingBag className="w-4 h-4 text-neutral-600" />
+                </div>
               )}
-            </div>
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              <div className="flex items-center gap-1 bg-[#222] border border-neutral-700 rounded-lg p-0.5">
-                <button type="button" onClick={() => updateQty?.(idx, -1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
-                  <Minus className="w-2.5 h-2.5" />
-                </button>
-                <span className="font-bold text-xs text-white px-1">{it.quantity}</span>
-                <button type="button" onClick={() => updateQty?.(idx, 1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
-                  <Plus className="w-2.5 h-2.5" />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-white block truncate">{it.baseTitle || it.description}</span>
+                <span className="text-[9px] text-neutral-400 uppercase font-semibold block">{it.category || 'ARTE'}</span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <label className="text-[10px] text-neutral-400 font-medium">Tamaño:</label>
+                  {itemSizes.length <= 1 ? (
+                    <span className="bg-[#222222] border border-neutral-700/80 rounded px-2 py-0.5 text-[10px] text-emerald-400 font-bold">
+                      {currentSize?.nombre || 'Portada de Álbum'} (Q{currentSize?.precio || it.unitPrice})
+                    </span>
+                  ) : (
+                    <select
+                      value={it.sizeId || currentSize?.sizeId}
+                      onChange={(e) => updateSize?.(idx, e.target.value)}
+                      className="bg-[#222222] border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-white font-bold focus:outline-none focus:border-white cursor-pointer"
+                    >
+                      {itemSizes.map((s) => (
+                        <option key={s.sizeId} value={s.sizeId}>{s.nombre} (Q{s.precio})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {openSwap && (
+                  <button type="button" onClick={() => openSwap(idx)} className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 underline transition-colors cursor-pointer mt-1">
+                    <RefreshCw className="w-2.5 h-2.5" /> Cambiar diseño
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div className="flex items-center gap-1 bg-[#222] border border-neutral-700 rounded-lg p-0.5">
+                  <button type="button" onClick={() => updateQty?.(idx, -1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
+                    <Minus className="w-2.5 h-2.5" />
+                  </button>
+                  <span className="font-bold text-xs text-white px-1">{it.quantity}</span>
+                  <button type="button" onClick={() => updateQty?.(idx, 1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+                <span className="font-black text-xs text-emerald-400">Q{(it.quantity * it.unitPrice).toFixed(2)}</span>
+                <button type="button" onClick={() => removeItem?.(idx)} className="text-neutral-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer" title="Eliminar este póster">
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-              <span className="font-black text-xs text-emerald-400">Q{(it.quantity * it.unitPrice).toFixed(2)}</span>
-              <button type="button" onClick={() => removeItem?.(idx)} className="text-neutral-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer" title="Eliminar este póster">
-                <Trash2 className="w-3 h-3" />
-              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="pt-2 border-t border-neutral-800 space-y-2">
