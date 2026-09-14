@@ -12,6 +12,12 @@ import {
 } from 'lucide-react';
 import EditSaleModal from './EditSaleModal.jsx';
 
+function isSaleFromToday(dateStr) {
+  if (!dateStr) return false;
+  const fmtDay = (dt) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date(dt));
+  return fmtDay(dateStr) === fmtDay(new Date());
+}
+
 function formatSaleTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -42,13 +48,14 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
     if (!eventId) return;
     setIsLoading(true);
     try {
-      const res = await authFetch(`/api/sales/events/${eventId}`);
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+      const res = await authFetch(`/api/sales/events/${eventId}?date=${todayStr}`);
       const json = await res.json();
       if (json.success) {
         setSales(json.data || []);
       }
     } catch (err) {
-      console.error('Error al cargar ventas recientes:', err);
+      console.error('Error al cargar ventas de hoy:', err);
     } finally {
       setIsLoading(false);
     }
@@ -100,9 +107,9 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
       {/* Encabezado */}
       <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
         <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-white" />
+          <Receipt className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white uppercase tracking-wider">
-            Ventas Recientes del Evento ({sales.length})
+            Ventas de Hoy ({sales.length})
           </h3>
         </div>
         <span className="text-[11px] text-neutral-400">
@@ -126,7 +133,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
         </div>
       ) : sales.length === 0 ? (
         <div className="py-8 text-center text-neutral-500 text-xs">
-          Aún no se han registrado ventas en este evento. Realiza una venta arriba para verla aquí.
+          Aún no se han registrado ventas hoy en este evento. Realiza una venta arriba para verla aquí.
         </div>
       ) : (
         <div className="space-y-2.5 max-h-[500px] overflow-y-auto no-scrollbar pr-0.5">
@@ -177,15 +184,24 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setEditingSale(sale)}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-500/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                  title="Editar venta en caso de error"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  <span>Editar</span>
-                </button>
+                {isSaleFromToday(sale.createdAt) ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingSale(sale)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-500/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    title="Editar venta de la jornada actual"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Editar</span>
+                  </button>
+                ) : (
+                  <span
+                    className="px-2.5 py-1 rounded-lg bg-neutral-900 text-neutral-500 border border-neutral-800 text-[11px] font-semibold select-none"
+                    title="Las ventas de días anteriores están archivadas y son inmutables"
+                  >
+                    Cerrada
+                  </span>
+                )}
               </div>
             </div>
           ))}

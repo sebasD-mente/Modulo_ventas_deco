@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma.js';
 import { generateSaleNumber } from './saleNumberGenerator.js';
+import { getGuatemalaDayRange } from './saleKpiService.js';
 
 /**
  * Registra una venta completa con integridad transaccional ACID
@@ -126,6 +127,29 @@ export async function updateSaleTransaction({
 
     if (!existing) {
       throw new Error('Venta no encontrada o no pertenece a esta organización.');
+    }
+
+    // 1.1 Inmutabilidad Contable: Validar que la venta corresponda a la jornada actual en Guatemala
+    const { startOfDay, endOfDay } = getGuatemalaDayRange();
+    const saleDate = new Date(existing.createdAt);
+    if (saleDate < startOfDay || saleDate > endOfDay) {
+      throw new Error('No es posible modificar una venta de un día anterior. Las ventas de jornadas pasadas son inmutables para garantizar el arqueo contable.');
+    }
+
+    // 1.2 Verificar si ya existe un arqueo o cierre de caja para este evento en la jornada actual
+    const existingClosing = await tx.cashClosing.findFirst({
+      where: {
+        tenantId,
+        eventId: existing.eventId,
+        closingDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    if (existingClosing) {
+      throw new Error('No es posible modificar ventas de una jornada que ya cuenta con arqueo o cierre de caja registrado.');
     }
 
     let totalAmount = Number(existing.totalAmount);

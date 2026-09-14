@@ -29,6 +29,7 @@ import {
   getMonitorMetrics,
   postCashClosing,
   getCashClosingsList,
+  purgeEventSales,
 } from '../controllers/saleController.js';
 import {
   getActiveEvent,
@@ -148,6 +149,11 @@ router.get(
   '/sales/monitor',
   requireRole(['SUPER_ADMIN', 'VENDEDOR']),
   getMonitorMetrics
+);
+router.post(
+  '/sales/purge-test-sales',
+  requireRole(['SUPER_ADMIN']),
+  purgeEventSales
 );
 
 // ==========================================

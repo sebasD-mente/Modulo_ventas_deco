@@ -11,3 +11,5 @@ export { generateSaleNumber } from './sales/saleNumberGenerator.js';
 export { createSaleTransaction, updateSaleTransaction } from './sales/saleTransactionService.js';
 export { getEventKPIs, getMonitorDashboardMetrics, getEventSalesList } from './sales/saleKpiService.js';
 export { createCashClosingTransaction } from './sales/cashClosingService.js';
+export { runMidnightClosingAudit } from './sales/midnightClosingService.js';
+export { purgeEventSalesTransaction } from './sales/salePurgeService.js';

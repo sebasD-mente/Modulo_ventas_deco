@@ -5,6 +5,7 @@ import {
   getMonitorDashboardMetrics,
   createCashClosingTransaction,
   getEventSalesList as getEventSalesServiceList,
+  purgeEventSalesTransaction,
 } from '../services/saleService.js';
 import { prisma } from '../config/prisma.js';
 
@@ -189,5 +190,27 @@ export async function getCashClosingsList(req, res) {
   } catch (err) {
     console.error('❌ Error obteniendo cierres de caja:', err);
     return res.status(500).json({ success: false, error: 'Error al obtener historial de cierres.' });
+  }
+}
+
+export async function purgeEventSales(req, res) {
+  try {
+    const { eventId } = req.body;
+    const tenantId = req.tenantId;
+    const userId = req.user?.id;
+
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'eventId es requerido.' });
+    }
+
+    const result = await purgeEventSalesTransaction({ tenantId, eventId, userId });
+    return res.json({
+      success: true,
+      message: `Ventas del evento "${result.eventName}" purgadas exitosamente. Secuencia reiniciada a 0.`,
+      data: result,
+    });
+  } catch (err) {
+    console.error('❌ Error purgando ventas del evento:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Error al purgar ventas.' });
   }
 }

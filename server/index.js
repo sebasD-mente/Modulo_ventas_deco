@@ -11,6 +11,7 @@ import apiRoutes from './routes/apiRoutes.js';
 import { prisma } from './config/prisma.js';
 import { syncCatalogFromWeb } from './services/catalogSyncService.js';
 import { deltaSyncRecentPosters } from './services/catalog/liveCatalogSyncService.js';
+import { runMidnightClosingAudit } from './services/sales/midnightClosingService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,6 +181,23 @@ const server = app.listen(ENV.PORT, () => {
     }
   }, FAST_DELTA_INTERVAL_MS).unref();
   // ── Fin Sincronización ──────────────────────────────────────────────────────
+
+  // 🔒 Auditoría de Cierre Automático de Medianoche (jornadas previas sin arqueo oficial)
+  runMidnightClosingAudit()
+    .then((res) => {
+      if (res && res.closingsCreated > 0) {
+        console.log(`[MidnightClosing] 🔒 Cierres automáticos ejecutados al iniciar: ${res.closingsCreated}`);
+      }
+    })
+    .catch((err) => console.warn('[MidnightClosing] ⚠️ Error en auditoría inicial:', err.message));
+
+  // Verificación periódica cada 15 minutos para conciliar días pasados en cuanto cruza la medianoche
+  const MIDNIGHT_AUDIT_INTERVAL_MS = 15 * 60 * 1000;
+  setInterval(() => {
+    runMidnightClosingAudit().catch((err) =>
+      console.warn('[MidnightClosing] ⚠️ Error en auditoría programada:', err.message)
+    );
+  }, MIDNIGHT_AUDIT_INTERVAL_MS).unref();
 
 
   // 🛡️ REGLA ZERO-TRUST: Verificación y reconciliación no destructiva de Super Administradores
