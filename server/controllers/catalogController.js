@@ -255,7 +255,8 @@ export async function deleteEvent(req, res) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
     }
 
-    if (force === 'true' && req.role === 'SUPER_ADMIN') {
+    const isSuperAdmin = req.user?.roles?.includes('SUPER_ADMIN') || req.user?.role === 'SUPER_ADMIN';
+    if (force === 'true' && isSuperAdmin) {
       await prisma.user.updateMany({ where: { assignedEventId: id }, data: { assignedEventId: null } });
       await prisma.cashClosing.deleteMany({ where: { eventId: id } });
       await prisma.sale.deleteMany({ where: { eventId: id } });
