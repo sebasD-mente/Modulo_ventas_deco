@@ -7,9 +7,9 @@ export default function PaymentSummaryBar({
   disabled = false, onConfirmSale,
 }) {
   const methods = [
-    { id: 'EFECTIVO', label: '💵 Efectivo', icon: Banknote },
-    { id: 'TARJETA', label: '💳 Tarjeta', icon: CreditCard },
-    { id: 'TRANSFERENCIA', label: '📲 Transfer', icon: Smartphone },
+    { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote },
+    { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard },
+    { id: 'TRANSFERENCIA', label: 'Transfer', icon: Smartphone },
   ];
 
   return (
@@ -24,13 +24,13 @@ export default function PaymentSummaryBar({
               key={id}
               type="button"
               onClick={() => setPaymentMethod && setPaymentMethod(id)}
-              className={`flex items-center justify-center gap-2 p-3 rounded-2xl border font-bold text-xs transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
                 paymentMethod === id
-                  ? 'bg-amber-400 text-black border-amber-400 shadow-md font-black'
-                  : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-600'
+                  ? 'bg-amber-400 text-black border-amber-400 shadow-sm font-bold'
+                  : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
               <span>{label}</span>
             </button>
           ))}

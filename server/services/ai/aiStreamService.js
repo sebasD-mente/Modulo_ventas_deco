@@ -26,14 +26,15 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
       desgloseMetodosPago: kpis ? { efectivo: `Q ${kpis.paymentBreakdown.EFECTIVO.amount.toFixed(2)}`, tarjeta: `Q ${kpis.paymentBreakdown.TARJETA.amount.toFixed(2)}`, transferencia: `Q ${kpis.paymentBreakdown.TRANSFERENCIA.amount.toFixed(2)}` } : (contextData?.desgloseMetodosPago || {}),
       topProductos: kpis ? kpis.topProducts : (contextData?.topProductos || []),
       ultimasVentas: kpis ? kpis.recentSales?.map(s => ({ numero: s.saleNumber, total: `Q ${s.totalAmount}`, vendedor: s.seller?.fullName, hora: s.createdAt, items: s.items?.map(i => `${i.quantity}x ${i.description}`).join(', '), pagos: s.payments?.map(p => `${p.method}: Q${p.amount}`).join(', ') })) || [] : (contextData?.ultimasVentas || []),
+      vendedorNombre: contextData?.sellerName || contextData?.vendedorNombre || 'Vendedor',
     },
   };
 }
 
-export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, geminiClient = undefined } = {}) {
+export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, contextData = {}, geminiClient = undefined } = {}) {
   const explicitClient = (geminiClient !== undefined && geminiClient !== null) ? geminiClient : null;
   const isAvailable = geminiClient === null ? false : Boolean(explicitClient || getGeminiClient());
-  const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date });
+  const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date, contextData });
   const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
   if (!isAvailable) {
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);

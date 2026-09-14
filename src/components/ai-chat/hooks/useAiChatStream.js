@@ -6,7 +6,30 @@ import { searchPostersWithFallback } from '../../../services/catalogCacheService
 const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm } = {}) {
-  const { authFetch } = useAuth(), [messages, setMessages] = useState([{ id: genId(), sender: 'ai', text: '¡Hola! Soy STAND IA y estoy listo para registrar ventas y dar reportes, ¿con qué comenzamos?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+  const { authFetch, user } = useAuth();
+  const getGreeting = (u) => {
+    const firstName = u?.fullName?.trim().split(' ')[0] || u?.name || '';
+    if (firstName) {
+      return `¡Hola ${firstName}! Estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?`;
+    }
+    return '¡Hola! Soy STAND IA y estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?';
+  };
+  const [messages, setMessages] = useState(() => [
+    { id: genId(), sender: 'ai', text: getGreeting(user), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+  ]);
+
+  useEffect(() => {
+    if (user?.fullName) {
+      const greeting = getGreeting(user);
+      setMessages((prev) => {
+        if (prev.length === 1 && prev[0].sender === 'ai' && prev[0].text.startsWith('¡Hola')) {
+          return [{ ...prev[0], text: greeting }];
+        }
+        return prev;
+      });
+    }
+  }, [user?.fullName]);
+
   const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState('');
   const [pendingDraft, setPendingDraft] = useState(null), [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false);
   const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null);
@@ -101,7 +124,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
       let res;
       try {
         const history = messages.slice(-20).map((m) => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: `${m.text || ''}${m.sender === 'ai' && m.suggestedPosters?.length ? `\n\n[Contexto de obras:\n${m.suggestedPosters.map((p, i) => `Opción #${i + 1}: ${p.titulo || p.name || 'Póster'}${p.subtitulo ? ` - ${p.subtitulo}` : ''} [ID: ${p.id}] (Precio: Q${p.precioMinimo || 65})`).join('\n')}]` : ''}`.trim() }], text: m.text || '' }));
-        res = await authFetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ message: query, eventId, pendingDraft: pendingDraft || null, stream: true, history }), signal: controller.signal });
+        res = await authFetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ message: query, eventId, pendingDraft: pendingDraft || null, stream: true, history, sellerName: user?.fullName || 'Vendedor' }), signal: controller.signal });
       } catch (fetchErr) {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           const off = buildOfflineFallbackReply(query); updateAiMsg((m) => ({ ...m, isStreaming: false, text: off.text }));

@@ -4,7 +4,7 @@ import useEditSaleForm from './sales/edit/hooks/useEditSaleForm';
 import EditSaleItemsTable from './sales/edit/EditSaleItemsTable';
 // Immutability: setItems((prevItems) => { updated[idx] = { ...current, }; return prevItems.filter(
 
-const METHODS = [{ id: 'EFECTIVO', label: '💵 Efectivo', icon: Banknote }, { id: 'TARJETA', label: '💳 Tarjeta', icon: CreditCard }, { id: 'TRANSFERENCIA', label: '📲 Transfer', icon: Smartphone }];
+const METHODS = [{ id: 'EFECTIVO', label: 'Efectivo', icon: Banknote }, { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard }, { id: 'TRANSFERENCIA', label: 'Transfer', icon: Smartphone }];
 
 export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated }) {
   if (!sale) return null;
@@ -32,9 +32,9 @@ export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated })
             <div className="grid grid-cols-3 gap-2">
               {METHODS.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => setPaymentMethod(id)}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-2xl border font-bold text-xs cursor-pointer ${
-                    paymentMethod === id ? 'bg-white text-black border-white shadow-md font-black' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-600'
-                  }`}><Icon className="w-4 h-4" /><span>{label}</span></button>
+                  className={`flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                    paymentMethod === id ? 'bg-amber-400 text-black border-amber-400 shadow-sm font-bold' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                  }`}><Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} /><span>{label}</span></button>
               ))}
             </div>
           </div>

@@ -71,34 +71,32 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
             />
           </div>
 
-          {/* Perfil de Usuario y Logout */}
-          <div className="flex items-center gap-2">
+          {/* Perfil de Usuario y Logout Discreto */}
+          <div className="flex items-center gap-1">
             {user && (
-              <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-300/80 rounded-full py-1 px-2 sm:px-3">
+              <div
+                className="flex items-center gap-1.5 py-1 px-2 rounded-full hover:bg-neutral-100 transition-colors"
+                title={`${user.fullName} (${roleBadgeText})`}
+              >
                 {user.avatarUrl ? (
                   <img
                     src={user.avatarUrl}
                     alt={user.fullName}
-                    className="w-5 h-5 rounded-full object-cover shrink-0"
+                    className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-neutral-200"
                   />
                 ) : (
                   <div className="w-5 h-5 rounded-full bg-black text-white text-[10px] font-bold flex items-center justify-center">
                     {user.fullName?.[0] || 'U'}
                   </div>
                 )}
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-[11px] font-bold leading-tight truncate max-w-[100px]">
-                    {user.fullName}
-                  </span>
-                  <span className="text-[9px] font-black text-emerald-700 tracking-wider">
-                    {roleBadgeText}
-                  </span>
-                </div>
+                <span className="hidden sm:inline text-xs font-semibold text-neutral-700 truncate max-w-[110px]">
+                  {user.fullName?.trim().split(' ')[0] || user.fullName}
+                </span>
                 <button
                   type="button"
                   onClick={logout}
                   title="Cerrar Sesión"
-                  className="p-1 hover:bg-neutral-200 rounded-full transition-all text-neutral-600 hover:text-black cursor-pointer"
+                  className="p-1 text-neutral-400 hover:text-black rounded-full transition-colors cursor-pointer ml-0.5"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>

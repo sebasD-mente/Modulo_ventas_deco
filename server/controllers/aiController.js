@@ -171,6 +171,7 @@ export async function handleChatQuery(req, res) {
     if (!isStream) {
       // Consultar motor IA con Gemini 3.8 Flash y Function Calling nativo (modo tradicional JSON)
       const t0Chat = Date.now();
+      const sellerName = req.body.sellerName || req.user?.fullName || 'Vendedor';
       const result = await chatWithSalesAssistant({
         message: message.trim(),
         history: history || [],
@@ -178,6 +179,7 @@ export async function handleChatQuery(req, res) {
         eventId,
         date: date || null,
         pendingDraft: pendingDraft || null,
+        contextData: { sellerName },
       });
       recordLlmInteraction({
         tenantId,
@@ -239,6 +241,7 @@ export async function handleChatQuery(req, res) {
     const t0Stream = Date.now();
 
     try {
+      const sellerName = req.body.sellerName || req.user?.fullName || 'Vendedor';
       const streamGenerator = streamChatWithSalesAssistant({
         message: message.trim(),
         history: history || [],
@@ -246,6 +249,7 @@ export async function handleChatQuery(req, res) {
         eventId,
         date: date || null,
         pendingDraft: pendingDraft || null,
+        contextData: { sellerName },
       });
 
       for await (const chunk of streamGenerator) {
