@@ -185,8 +185,8 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
     const allSizes = Array.isArray(primaryMatch.sizes) && primaryMatch.sizes.length > 0 ? [...primaryMatch.sizes] : [...DEFAULT_SIZES];
     const foundSize = requestedSizeNorm ? allSizes.find((s) => s.sizeId === requestedSizeNorm) : null;
     const isSizeSupported = requestedSizeNorm ? Boolean(foundSize) : true;
-    const matchedSizeInfo = foundSize || (requestedSizeNorm ? null : allSizes[0]);
-    const targetSizeId = matchedSizeInfo?.sizeId || allSizes[0]?.sizeId || 'MEDIANO';
+    const matchedSizeInfo = foundSize || null;
+    const targetSizeId = foundSize?.sizeId || 'MEDIANO';
     const isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
     const stockAvailability = {
       availableInCatalog: true,

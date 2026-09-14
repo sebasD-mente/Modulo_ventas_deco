@@ -94,8 +94,8 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
               <div className="flex-1 min-w-0 text-xs">
                 <span className="font-bold text-white block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.title} - ${inv.artwork.subtitle}` : inv.artwork.title}</span>
                 <span className="text-[10px] text-neutral-400 block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.category} • ${inv.artwork.subtitle}` : inv.artwork.category}</span>
-                <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">{inv.requestedSize ? `${inv.requestedSize.nombre}: Q${inv.requestedSize.precio}` : `Desde Q${inv.artwork.basePrice}`}</span>
               </div>
+              {addFn && (<button type="button" onClick={() => addFn({ id: inv.artwork.id, titulo: inv.artwork.rawTitle || inv.artwork.title, subtitulo: inv.artwork.subtitle, categoria: inv.artwork.category, thumbUrl: inv.artwork.thumbUrl, imageUrl: inv.artwork.imageUrl, sizes: inv.allAvailableSizes || [] })} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
             </div>
           )}
         </div>
@@ -107,21 +107,16 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
           <div className="mt-3 pt-3 border-t border-neutral-700/70 space-y-2">
             <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider block">🎨 Obras encontradas en catálogo ({validPosters.length}):</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {validPosters.map((sp) => {
-                const singleSize = Array.isArray(sp.sizes) && sp.sizes.length === 1 ? sp.sizes[0] : null;
-                const priceLabel = singleSize ? `${singleSize.nombre}: Q${singleSize.precio}` : `Desde Q${sp.precioMinimo}`;
-                return (
-                  <div key={sp.id} className="flex items-center gap-2.5 p-2 rounded-xl bg-black border border-neutral-700 hover:border-neutral-500 transition-all shadow-sm">
-                    <img src={sp.thumbUrl || sp.imageUrl} alt={sp.titulo} className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900 shadow" />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
-                      <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
-                      <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">{priceLabel}</span>
-                    </div>
-                    {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
+              {validPosters.map((sp) => (
+                <div key={sp.id} className="flex items-center gap-2.5 p-2 rounded-xl bg-black border border-neutral-700 hover:border-neutral-500 transition-all shadow-sm">
+                  <img src={sp.thumbUrl || sp.imageUrl} alt={sp.titulo} className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900 shadow" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
+                    <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
                   </div>
-                );
-              })}
+                  {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
+                </div>
+              ))}
             </div>
           </div>
         );
