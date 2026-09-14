@@ -64,7 +64,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     let cleanReply = response.text || '';
     if (!cleanReply?.trim()) {
       if (draftSale) cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
-      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla. ¿Cuál te gustaría agregar al borrador?`;
+      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla (Mediano Q65 más vendido). ¿Cuál te gustaría agregar al borrador?`;
       else cleanReply = 'Indica el personaje, película o artista y busco de inmediato las obras disponibles en el stand.';
     }
     return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };

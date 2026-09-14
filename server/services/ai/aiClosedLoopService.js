@@ -14,7 +14,7 @@ export function buildFallbackSummaries(executedTools) {
       summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
     } else if (t.name === 'searchCatalog') {
       const count = t.result?.matchesCount || (Array.isArray(t.result) ? t.result.length : 0);
-      summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla. ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
+      summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla (Mediano Q65 más vendido). ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
     } else if (t.name === 'checkInventoryStock' && t.result?.summary) {
       summaries.push(t.result.summary);
     } else if (t.name === 'getCashDrawerStatus' && t.result?.summaryText) {

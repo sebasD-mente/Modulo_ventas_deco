@@ -145,6 +145,27 @@ export const STAND_ENTITY_ALIASES = [
 
   // ── SUPERHÉROES & CÓMICS ──────────────────────────────────────────────────
   {
+    canonicalTitle: 'Spider-Man - Traje Avanzado en Óleo y Acuarela',
+    searchQuery: 'Spider-Man Traje Avanzado Óleo y Acuarela',
+    category: 'SUPERHEROES',
+    aliases: [
+      'spiderman acuarela azul', 'spider man acuarela azul', 'spider-man acuarela azul',
+      'spider acuarela azul', 'spiderman azul', 'spider-man azul', 'spiderman oleo y acuarela',
+      'spider man oleo y acuarela', 'spider oleo y acuarela', 'spiderman oleo', 'spider man oleo',
+      'spider oleo', 'traje avanzado oleo y acuarela', 'traje avanzado en oleo y acuarela',
+      'spiderman acuarela y oleo'
+    ]
+  },
+  {
+    canonicalTitle: 'Spider-Man - Traje Avanzado en Acuarela',
+    searchQuery: 'Spider-Man Traje Avanzado Acuarela',
+    category: 'SUPERHEROES',
+    aliases: [
+      'spiderman acuarela', 'spider-man acuarela', 'spider man acuarela', 'spider acuarela',
+      'traje avanzado acuarela', 'spiderman blanco acuarela', 'spiderman traje avanzado'
+    ]
+  },
+  {
     canonicalTitle: 'Spider-Man Vintage Comic',
     searchQuery: 'Spider-Man',
     category: 'SUPERHEROES',

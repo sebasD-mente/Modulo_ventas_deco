@@ -51,6 +51,12 @@ export async function normalizeAndUpsertPoster(poster, tenantId) {
   const minPrice = sizes.reduce((min, s) => Math.min(min, s.precio), Number(poster.precioMinimo || 25));
 
   const extraTags = Array.isArray(poster.tags) ? poster.tags : [];
+  const rawDesc = (poster.descripcion || poster.description || '').toLowerCase();
+  const descTokens = rawDesc
+    .replace(/[^a-záéíóúüñ0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !['para', 'este', 'esta', 'como', 'con', 'por', 'los', 'las', 'una'].includes(w));
+
   const combinedTags = Array.from(
     new Set([
       rawTitle.toLowerCase(),
@@ -59,13 +65,39 @@ export async function normalizeAndUpsertPoster(poster, tenantId) {
       ...rawTitle.toLowerCase().split(/\s+/),
       ...(rawSubtitle ? rawSubtitle.toLowerCase().split(/\s+/) : []),
       ...extraTags.map((t) => String(t).replace(/^#/, '').toLowerCase().trim()),
+      ...descTokens,
     ])
   ).filter((t) => t.length > 1);
 
-  const product = await prisma.product.upsert({
-    where: { tenantId_sku: { tenantId: targetTenantId, sku } },
-    create: {
-      tenantId: targetTenantId,
+  try {
+    const product = await prisma.product.upsert({
+      where: { tenantId_sku: { tenantId: targetTenantId, sku } },
+      create: {
+        tenantId: targetTenantId,
+        sku,
+        name,
+        category,
+        basePrice: minPrice,
+        imageUrl,
+        sizes,
+        tags: combinedTags,
+        isActive: isActiveProduct,
+      },
+      update: {
+        name,
+        category,
+        basePrice: minPrice,
+        imageUrl,
+        sizes,
+        tags: combinedTags,
+        isActive: isActiveProduct,
+      },
+    });
+
+    return product;
+  } catch (dbErr) {
+    return {
+      id: posterId,
       sku,
       name,
       category,
@@ -74,19 +106,8 @@ export async function normalizeAndUpsertPoster(poster, tenantId) {
       sizes,
       tags: combinedTags,
       isActive: isActiveProduct,
-    },
-    update: {
-      name,
-      category,
-      basePrice: minPrice,
-      imageUrl,
-      sizes,
-      tags: combinedTags,
-      isActive: isActiveProduct,
-    },
-  });
-
-  return product;
+    };
+  }
 }
 
 export async function deltaSyncRecentPosters(tenantId = null) {
@@ -99,11 +120,11 @@ export async function deltaSyncRecentPosters(tenantId = null) {
 
   for (const rawBase of candidateUrls) {
     const baseUrl = rawBase.replace(/\/+$/, '');
-    const url = `${baseUrl}/api/catalog/posters?take=30`;
+    const url = `${baseUrl}/api/catalog/posters?take=100`;
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
       clearTimeout(timeoutId);
 
@@ -172,7 +193,12 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
       .trim();
 
   const normQuery = normalizeStr(cleanQuery);
-  const queryTokens = normQuery.split(/\s+/).filter((t) => t.length > 1);
+  const STOP_WORDS = new Set([
+    'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'con', 'por', 'para',
+    'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'dame', 'quiero'
+  ]);
+  const rawTokens = normQuery.split(/\s+/).filter((t) => t.length > 2 && !STOP_WORDS.has(t));
+  const queryTokens = Array.from(new Set(rawTokens));
 
   const candidateUrls = getCatalogCandidateUrls();
   const allWebItems = new Map();
@@ -180,12 +206,13 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
   for (const rawBase of candidateUrls) {
     const baseUrl = rawBase.replace(/\/+$/, '');
     
-    // Consulta 1: Búsqueda activa por search param en la web
-    // Consulta 2: Lote reciente take=30
+    // Consulta 1: Frase directa limpia
+    // Consulta 2: Búsqueda individual por cada token clave (ej: 'spider', 'acuarela', 'oleo')
+    // Consulta 3: Lote amplio take=100
     const urlsToTry = [
-      `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(cleanQuery)}&take=30`,
-      `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(normQuery)}&take=30`,
-      `${baseUrl}/api/catalog/posters?take=30`,
+      `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(cleanQuery)}&take=50`,
+      ...queryTokens.slice(0, 3).map(tok => `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(tok)}&take=50`),
+      `${baseUrl}/api/catalog/posters?take=100`,
     ];
 
     for (const targetUrl of urlsToTry) {
@@ -207,7 +234,7 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
             }
           }
         }
-      } catch (err) {
+      } catch {
         // Fallback silencioso por URL
       }
     }
@@ -218,22 +245,42 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
   if (allWebItems.size === 0) return [];
 
   const targetTenantId = await resolveDefaultTenantId(tenantId);
-  const importedProducts = [];
+  const matchedCandidates = [];
 
   for (const p of allWebItems.values()) {
     const title = normalizeStr(p.titulo || p.title || '');
     const sub = normalizeStr(p.subtitulo || p.subtitle || '');
     const full = `${title} ${sub}`;
     const tags = Array.isArray(p.tags) ? p.tags.map((t) => normalizeStr(String(t))) : [];
+    const desc = normalizeStr(p.descripcion || p.description || '');
+    const fullTextWithDesc = `${full} ${tags.join(' ')} ${desc}`;
 
-    const matchesQuery =
-      full.includes(normQuery) ||
-      (queryTokens.length > 0 && queryTokens.every((token) => full.includes(token) || tags.some((tag) => tag.includes(token))));
+    let score = 0;
+    if (full.includes(normQuery)) score += 200;
+    if (fullTextWithDesc.includes(normQuery)) score += 100;
 
-    if (matchesQuery) {
-      const prod = await normalizeAndUpsertPoster(p, targetTenantId);
-      if (prod) importedProducts.push(formatProductForPos(prod));
+    let matchedTokens = 0;
+    for (const tok of queryTokens) {
+      if (full.includes(tok)) {
+        score += 50;
+        matchedTokens++;
+      } else if (fullTextWithDesc.includes(tok)) {
+        score += 25;
+        matchedTokens++;
+      }
     }
+
+    if (score > 0 || (queryTokens.length > 0 && matchedTokens >= Math.min(queryTokens.length, 1))) {
+      matchedCandidates.push({ poster: p, score });
+    }
+  }
+
+  matchedCandidates.sort((a, b) => b.score - a.score);
+  const importedProducts = [];
+
+  for (const { poster } of matchedCandidates.slice(0, 25)) {
+    const prod = await normalizeAndUpsertPoster(poster, targetTenantId);
+    if (prod) importedProducts.push(formatProductForPos(prod));
   }
 
   if (importedProducts.length > 0) {

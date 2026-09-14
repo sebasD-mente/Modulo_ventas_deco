@@ -69,7 +69,7 @@ export async function syncCatalogFromWeb(tenantId) {
 
   if (!targetTenantId) {
     const defaultTenant = await prisma.tenant.findFirst({
-      where: { slug: 'deco-vintage' },
+      where: { slug: { in: ['deco-vintage-guate', 'deco-vintage'] } },
       select: { id: true },
     });
     targetTenantId = defaultTenant?.id;
@@ -181,8 +181,10 @@ export async function syncCatalogFromWeb(tenantId) {
     const sizes = resolvePosterSizes(poster);
     const minPrice = sizes.reduce((min, s) => Math.min(min, s.precio), Number(poster.precioMinimo || 25));
 
-    // Generar tags enriquecidos con título, subtítulo, categoría y tokens
+    // Generar tags enriquecidos con título, subtítulo, categoría, descripción y tokens
     const extraTags = Array.isArray(poster.tags) ? poster.tags : [];
+    const rawDesc = (poster.descripcion || poster.description || '').toLowerCase();
+    const descTokens = rawDesc.replace(/[^a-záéíóúüñ0-9\s]/gi, ' ').split(/\s+/).filter(w => w.length >= 3);
     const combinedTags = Array.from(
       new Set([
         rawTitle.toLowerCase(),
@@ -191,6 +193,7 @@ export async function syncCatalogFromWeb(tenantId) {
         ...rawTitle.toLowerCase().split(/\s+/),
         ...(rawSubtitle ? rawSubtitle.toLowerCase().split(/\s+/) : []),
         ...extraTags.map(t => String(t).replace(/^#/, '').toLowerCase().trim()),
+        ...descTokens,
       ])
     ).filter(t => t.length > 1);
 

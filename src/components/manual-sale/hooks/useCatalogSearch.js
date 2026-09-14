@@ -38,10 +38,10 @@ export function useCatalogSearch() {
       try {
         const queryText = searchQuery.trim();
         const results = await searchPostersWithFallback(async (signal) => {
-          const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(queryText)}&limit=8`, { signal });
+          const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(queryText)}&limit=30`, { signal });
           const json = await res.json();
           return json.success ? (json.data || []) : [];
-        }, queryText, 8);
+        }, queryText, 30);
         if (!isSelectingRef.current) {
           setSearchResults(results);
           setShowDropdown(true);

@@ -71,7 +71,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
 
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
     const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
-    const unitPrice = matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize));
+    const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : (matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize)));
     const subtotal = Number((qty * unitPrice).toFixed(2));
     grandTotal += subtotal;
 
