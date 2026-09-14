@@ -197,16 +197,17 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
       tallerCapability: 'Impresión bajo demanda en taller (~12 min)',
       deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)',
     };
+    const fullArtworkTitle = primaryMatch.subtitulo ? `${primaryMatch.titulo} - ${primaryMatch.subtitulo}` : primaryMatch.titulo;
     return {
       found: true,
       query: cleanQuery,
-      artwork: { id: primaryMatch.id, sku: primaryMatch.sku, title: primaryMatch.titulo, subtitle: primaryMatch.subtitulo || '', category: primaryMatch.categoria, imageUrl: primaryMatch.imageUrl, thumbUrl: primaryMatch.thumbUrl, basePrice: primaryMatch.precioMinimo },
+      artwork: { id: primaryMatch.id, sku: primaryMatch.sku, title: fullArtworkTitle, rawTitle: primaryMatch.titulo, subtitle: primaryMatch.subtitulo || '', category: primaryMatch.categoria, imageUrl: primaryMatch.imageUrl, thumbUrl: primaryMatch.thumbUrl, basePrice: primaryMatch.precioMinimo },
       requestedSize: matchedSizeInfo,
       allAvailableSizes: allSizes,
       stockAvailability,
       eventStockHistory: null,
       suggestedPosters: matches,
-      summary: !isSizeSupported ? stockAvailability.unsupportedSizeMessage : `🎨 Disponibilidad — "${primaryMatch.titulo}": ${stockAvailability.deliveryMode}.`,
+      summary: !isSizeSupported ? stockAvailability.unsupportedSizeMessage : `🎨 Disponibilidad — "${fullArtworkTitle}": ${stockAvailability.deliveryMode}.`,
     };
   } catch (err) {
     return { found: false, query: query.trim(), message: `Error consultando stock: ${err.message}`, availableInCatalog: false, suggestedPosters: [] };

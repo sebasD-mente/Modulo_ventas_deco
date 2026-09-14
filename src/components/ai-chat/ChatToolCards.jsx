@@ -92,8 +92,8 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
             <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#181818]">
               <img src={inv.artwork.thumbUrl || inv.artwork.imageUrl} alt={inv.artwork.title} className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
               <div className="flex-1 min-w-0 text-xs">
-                <span className="font-bold text-white block truncate">{inv.artwork.title}</span>
-                <span className="text-[10px] text-neutral-400 block">{inv.artwork.category}</span>
+                <span className="font-bold text-white block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.title} - ${inv.artwork.subtitle}` : inv.artwork.title}</span>
+                <span className="text-[10px] text-neutral-400 block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.category} • ${inv.artwork.subtitle}` : inv.artwork.category}</span>
                 <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">{inv.requestedSize ? `${inv.requestedSize.nombre}: Q${inv.requestedSize.precio}` : `Desde Q${inv.artwork.basePrice}`}</span>
               </div>
             </div>

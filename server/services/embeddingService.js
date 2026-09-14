@@ -108,7 +108,7 @@ export async function warmCatalogVectors(tenantId = null, forceRefresh = false, 
   return warmPromise;
 }
 
-export async function searchHybridPosters({ tenantId = null, query = '', category = null, limit = 12, minThreshold = MIN_SIMILARITY_THRESHOLD, client = null } = {}) {
+export async function searchHybridPosters({ tenantId = null, query = '', category = null, limit = 12, minThreshold = 0.55, client = null } = {}) {
   const cleanQuery = String(query || '').trim();
   if (!cleanQuery) {
     const res = await searchWebPosters({ tenantId, query: '', category, limit });
@@ -117,30 +117,87 @@ export async function searchHybridPosters({ tenantId = null, query = '', categor
     finalRes.source = 'lexical';
     return finalRes;
   }
+
+  // 1. Obtener candidatos léxicos estructurados del catálogo
+  const lexicalMatches = await searchWebPosters({ tenantId, query: cleanQuery, category, limit: 30 });
+  const lexicalList = Array.isArray(lexicalMatches) ? deduplicatePosters(lexicalMatches) : [];
+
+  // Tokens sustanciales de la consulta para verificación de entidad
+  const normQueryTokens = cleanQuery
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !['para', 'con', 'del', 'los', 'las', 'una', 'uno', 'unos', 'unas', 'por', 'que'].includes(t));
+
   try {
     const queryVectors = await embedTexts([cleanQuery], client, 'RETRIEVAL_QUERY');
     if (!queryVectors?.length) throw new Error('EMBEDDINGS_UNAVAILABLE');
     const cachedItems = await warmCatalogVectors(tenantId, false, client);
     if (!cachedItems?.length) throw new Error('CATALOG_VECTORS_UNAVAILABLE');
 
-    const queryVec = queryVectors[0], scored = [];
+    const queryVec = queryVectors[0];
+    const vectorScores = new Map();
+
     for (const item of cachedItems) {
       if (category && String(category).trim().toUpperCase() !== (item.poster.categoria || '').toUpperCase()) continue;
       const sim = cosineSimilarity(queryVec, item.vector);
-      if (sim >= minThreshold) scored.push({ poster: item.poster, similarity: sim });
+      if (sim >= minThreshold) {
+        vectorScores.set(item.poster.id || item.poster.sku || item.poster.titulo, { poster: item.poster, similarity: sim });
+      }
     }
-    scored.sort((a, b) => b.similarity - a.similarity);
-    const res = scored.length > 0 ? deduplicatePosters(scored.map((s) => s.poster)).slice(0, limit) : [];
+
+    // Fusión híbrida de puntuaciones
+    const combinedScores = new Map();
+
+    // Incorporar resultados léxicos con ponderación prioritaria
+    lexicalList.forEach((poster, rank) => {
+      const key = poster.id || poster.sku || poster.titulo;
+      const lexicalWeight = Math.max(0.2, 1.0 - (rank * 0.05));
+      const vecEntry = vectorScores.get(key);
+      const vecSim = vecEntry ? vecEntry.similarity : 0.0;
+      const hybridScore = (lexicalWeight * 0.65) + (vecSim * 0.35);
+      combinedScores.set(key, { poster, hybridScore, isLexicalMatch: true, vecSim });
+    });
+
+    // Incorporar candidatos vectoriales complementarios
+    for (const [key, vecEntry] of vectorScores.entries()) {
+      if (!combinedScores.has(key)) {
+        if (vecEntry.similarity >= 0.60) {
+          const posterText = `${vecEntry.poster.titulo || ''} ${vecEntry.poster.subtitulo || ''} ${Array.isArray(vecEntry.poster.tags) ? vecEntry.poster.tags.join(' ') : ''}`.toLowerCase();
+          const matchesEntity = normQueryTokens.length === 0 || normQueryTokens.some((tok) => posterText.includes(tok));
+          if (matchesEntity) {
+            combinedScores.set(key, { poster: vecEntry.poster, hybridScore: vecEntry.similarity * 0.5, isLexicalMatch: false, vecSim: vecEntry.similarity });
+          }
+        }
+      }
+    }
+
+    const merged = Array.from(combinedScores.values());
+    merged.sort((a, b) => b.hybridScore - a.hybridScore);
+
+    // Si los primeros resultados corresponden a una entidad específica (ej: Messi)
+    // y los siguientes son de entidades no relacionadas (ej: Cristiano Ronaldo o Real Madrid),
+    // no diluir el resultado con elementos ajenos
+    let filteredList = merged.map((m) => m.poster);
+    if (lexicalList.length > 0 && lexicalList.length <= 4) {
+      const topEntityTitles = lexicalList.map((p) => p.titulo.toLowerCase().trim());
+      const allSameTitle = topEntityTitles.every((t) => t === topEntityTitles[0]);
+      if (allSameTitle) {
+        filteredList = filteredList.filter((p) => p.titulo.toLowerCase().trim() === topEntityTitles[0]);
+      }
+    }
+
+    const res = deduplicatePosters(filteredList).slice(0, limit);
     res.results = res;
-    res.source = 'vector';
+    res.source = 'hybrid';
     return res;
   } catch (err) {
     console.warn(`[RAG Hybrid Parachute] 🪂 Conmutando a búsqueda léxica local: ${err.message}`);
-    const res = await searchWebPosters({ tenantId, query: cleanQuery, category, limit });
-    const finalRes = Array.isArray(res) ? [...res] : [];
-    finalRes.results = finalRes;
-    finalRes.source = 'lexical_parachute';
-    return finalRes;
+    const res = deduplicatePosters(lexicalList).slice(0, limit);
+    res.results = res;
+    res.source = 'lexical_parachute';
+    return res;
   }
 }
 export const searchPostersByEmbedding = searchHybridPosters;

@@ -362,7 +362,16 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       ? normalize(aliasRes.searchQuery).split(/\s+/).filter((t) => !STOP_WORDS.has(t) && t.length > 1)
       : [];
 
-    const allTokens = Array.from(new Set([...rawTokens, ...aliasTokens]));
+    // Expansión semántica ligera de verbos frecuentes a sustantivos de catálogo
+    const expandedTokens = [];
+    for (const t of rawTokens) {
+      if (/^(besando|besa|besan)$/.test(t)) expandedTokens.push('beso');
+      else if (/^(mordiendo|muerde)$/.test(t)) expandedTokens.push('mordida', 'uña');
+      else if (/^(celebrando|festejando|festeja|celebra)$/.test(t)) expandedTokens.push('festejo', 'celebracion');
+      else if (/^(levantando|alza|alzando)$/.test(t)) expandedTokens.push('copa', 'trofeo');
+    }
+
+    const allTokens = Array.from(new Set([...rawTokens, ...aliasTokens, ...expandedTokens]));
     const meaningfulTokens = allTokens.filter((t) => !STOP_WORDS.has(t) && t.length > 1);
     const tokens = meaningfulTokens.length > 0 ? meaningfulTokens : (allTokens.length > 0 ? allTokens : rawTokens);
 
@@ -373,6 +382,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         .join(' ');
 
     const queryCondensed = getCondensed(cleanQuery);
+    const aliasCondensed = (aliasRes.matched && aliasRes.searchQuery) ? getCondensed(aliasRes.searchQuery) : '';
 
     const scored = filtered
       .map((p) => {
@@ -411,6 +421,14 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
           else if (productTitleCondensed.startsWith(queryCondensed)) score += 250;
           else if (productTitleCondensed.includes(queryCondensed)) score += 200;
           else if (productFullCondensed.includes(queryCondensed)) score += 150;
+        }
+
+        // 2b. Coincidencia con consulta canónica de alias (ej: "messi besando la copa" -> "Messi El Beso Eterno")
+        if (aliasCondensed.length >= 3) {
+          const productTitleCondensed = getCondensed(titleText);
+          if (productTitleCondensed === aliasCondensed) score += 320;
+          else if (productTitleCondensed.startsWith(aliasCondensed)) score += 260;
+          else if (productTitleCondensed.includes(aliasCondensed)) score += 210;
         }
 
         // 3. Puntuación por tokens clave

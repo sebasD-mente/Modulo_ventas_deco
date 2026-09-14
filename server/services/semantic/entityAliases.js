@@ -350,13 +350,46 @@ export const STAND_ENTITY_ALIASES = [
     canonicalTitle: 'Gustav Klimt - El Beso',
     searchQuery: 'El Beso Gustav Klimt',
     category: 'ARTE',
-    aliases: ['el beso', 'el beso de klimt', 'klimt', 'gustav klimt']
+    aliases: ['el beso de klimt', 'el beso klimt', 'gustav klimt el beso', 'klimt el beso', 'gustav klimt', 'klimt', 'el beso']
   },
   {
     canonicalTitle: 'Edvard Munch - El Grito',
     searchQuery: 'El Grito Edvard Munch',
     category: 'ARTE',
     aliases: ['el grito', 'el grito de munch', 'munch']
+  },
+
+  // ── FÚTBOL & DEPORTES (Catar 2022 y Leyendas) ──────────────────────────────
+  {
+    canonicalTitle: 'Messi - El Beso Eterno',
+    searchQuery: 'Messi El Beso Eterno',
+    category: 'FUTBOL',
+    aliases: [
+      'el beso eterno', 'beso eterno', 'messi el beso eterno', 'messi beso eterno',
+      'messi besando la copa', 'besando la copa messi', 'messi besando copa',
+      'messi beso copa', 'beso copa messi', 'el beso eterno messi',
+      'messi con la copa besandola', 'el beso de messi copa', 'messi vuelta olimpica copa',
+      'messi besando copa mundo', 'messi besando trofeo'
+    ]
+  },
+  {
+    canonicalTitle: 'Messi - El Beso de la Gloria',
+    searchQuery: 'Messi El Beso de la Gloria',
+    category: 'FUTBOL',
+    aliases: [
+      'el beso de la gloria', 'beso de la gloria', 'messi el beso de la gloria',
+      'messi beso de la gloria', 'messi beso gloria', 'messi beso podio',
+      'messi balon de oro y copa', 'el beso de la gloria messi',
+      'messi besando la copa podio', 'messi balon de oro copa', 'beso de la gloria podio'
+    ]
+  },
+  {
+    canonicalTitle: 'Lionel Messi',
+    searchQuery: 'Messi',
+    category: 'FUTBOL',
+    aliases: [
+      'messi', 'lionel messi', 'la pulga', 'd10s messi', 'lio messi', 'leo messi'
+    ]
   },
 
   // ── GAMING ────────────────────────────────────────────────────────────────
@@ -376,8 +409,9 @@ export const STAND_ENTITY_ALIASES = [
 
 /**
  * Resuelve una consulta de cliente o vendedor contrastándola con el diccionario cultural.
- * Aplica coincidencia exacta prioritaria y límites de palabra para evitar colisiones
- * (ej. "rengoku" no debe colisionar con el substring "goku").
+ * Aplica coincidencia exacta prioritaria y límites de palabra ordenados por longitud descendente
+ * para que frases compuestas específicas ("el beso eterno") siempre se cotejen antes que
+ * fragmentos cortos ("el beso").
  * @param {string} query - Término o apodo buscado por el usuario.
  * @returns {{ matched: boolean, canonicalTitle?: string, searchQuery?: string, category?: string, defaultSizeId?: string, query: string }}
  */
@@ -385,40 +419,49 @@ export function resolveEntityAlias(query) {
   if (!query || typeof query !== 'string') return { matched: false, query: '' };
   const clean = normalizeSemanticText(query);
 
-  // 1. Coincidencia exacta con cualquier alias
+  // Aplanar todos los alias
+  const allEntries = [];
   for (const entity of STAND_ENTITY_ALIASES) {
     for (const alias of entity.aliases) {
-      const cleanAlias = normalizeSemanticText(alias);
-      if (clean === cleanAlias) {
-        return {
-          matched: true,
-          canonicalTitle: entity.canonicalTitle,
-          searchQuery: entity.searchQuery,
-          category: entity.category,
-          defaultSizeId: entity.defaultSizeId || null,
-          query,
-        };
-      }
+      allEntries.push({
+        entity,
+        alias,
+        cleanAlias: normalizeSemanticText(alias)
+      });
     }
   }
 
-  // 2. Coincidencia con límites de palabra (\b) para frases compuestas
-  for (const entity of STAND_ENTITY_ALIASES) {
-    for (const alias of entity.aliases) {
-      const cleanAlias = normalizeSemanticText(alias);
-      if (cleanAlias.length >= 3) {
-        const escaped = cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const wordBoundaryRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
-        if (wordBoundaryRegex.test(clean)) {
-          return {
-            matched: true,
-            canonicalTitle: entity.canonicalTitle,
-            searchQuery: entity.searchQuery,
-            category: entity.category,
-            defaultSizeId: entity.defaultSizeId || null,
-            query,
-          };
-        }
+  // 1. Coincidencia exacta con cualquier alias
+  for (const item of allEntries) {
+    if (clean === item.cleanAlias) {
+      return {
+        matched: true,
+        canonicalTitle: item.entity.canonicalTitle,
+        searchQuery: item.entity.searchQuery,
+        category: item.entity.category,
+        defaultSizeId: item.entity.defaultSizeId || null,
+        query,
+      };
+    }
+  }
+
+  // 2. Coincidencia con límites de palabra (\b), ordenando por longitud DESCENDENTE
+  // (frases largas y específicas primero para evitar que alias cortos capturen consultas complejas)
+  const sortedByLength = [...allEntries].sort((a, b) => b.cleanAlias.length - a.cleanAlias.length);
+
+  for (const item of sortedByLength) {
+    if (item.cleanAlias.length >= 3) {
+      const escaped = item.cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const wordBoundaryRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
+      if (wordBoundaryRegex.test(clean)) {
+        return {
+          matched: true,
+          canonicalTitle: item.entity.canonicalTitle,
+          searchQuery: item.entity.searchQuery,
+          category: item.entity.category,
+          defaultSizeId: item.entity.defaultSizeId || null,
+          query,
+        };
       }
     }
   }
