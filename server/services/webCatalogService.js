@@ -18,7 +18,7 @@ import { resolveEntityAlias } from './semantic/entityAliases.js';
 // Caché en memoria segmentada por tenant para búsquedas sub-milisegundo en el POS
 // Estructura: Map<tenantId, { products: Array, timestamp: number }>
 const productCache = new Map();
-const CACHE_TTL_MS = 60 * 1000; // 60 segundos de TTL
+const CACHE_TTL_MS = 30 * 1000; // 30 segundos de TTL para reactividad en caliente
 const DEFAULT_TENANT_KEY = '__GLOBAL__';
 
 /**
@@ -435,14 +435,21 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     const sortedProducts = scored.map((item) => item.p);
     const deduplicated = deduplicatePosters(sortedProducts);
 
-    // ⚡ PARACAÍDAS REACTIVO: Si la búsqueda local no arrojó resultados (ej. póster recién publicado en la web),
-    // consulta en caliente a la tienda web, lo indexa atómicamente y lo retorna en la misma llamada.
-    if (deduplicated.length === 0 && cleanQuery.length >= 3) {
+    // ⚡ PARACAÍDAS REACTIVO INTELIGENTE:
+    // Se dispara si no hay coincidencias locales O si los resultados locales no cubren
+    // todos los tokens clave buscados (ej. "michael jackson pelicula" y solo existía "blood on dance floor").
+    const hasMissingTokens = meaningfulTokens.length >= 2 && !deduplicated.some((p) => {
+      const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' '));
+      return meaningfulTokens.every((tok) => pNorm.includes(tok));
+    });
+
+    if ((deduplicated.length === 0 || hasMissingTokens) && cleanQuery.length >= 3) {
       try {
         const { searchLiveWebParachute } = await import('./catalog/liveCatalogSyncService.js');
         const liveResults = await searchLiveWebParachute(cleanQuery, tenantId);
         if (Array.isArray(liveResults) && liveResults.length > 0) {
-          return deduplicatePosters(liveResults).slice(0, limit);
+          const combined = deduplicatePosters([...liveResults, ...deduplicated]);
+          return combined.slice(0, limit);
         }
       } catch {
         // Fallback no bloqueante

@@ -18,8 +18,18 @@ const THROTTLE_MS = 10000; // 10 segundos de protección contra ráfagas
 
 export async function resolveDefaultTenantId(tenantId) {
   if (tenantId) return tenantId;
-  const def = await prisma.tenant.findFirst({ where: { slug: 'deco-vintage' }, select: { id: true } });
+  const def = await prisma.tenant.findFirst({
+    where: { slug: { in: ['deco-vintage-guate', 'deco-vintage'] } },
+    select: { id: true },
+  });
   return def?.id || (await prisma.tenant.findFirst({ select: { id: true } }))?.id || null;
+}
+
+export function getCatalogCandidateUrls() {
+  const configuredUrl = ENV.WEB_CATALOG_URL || process.env.WEB_CATALOG_URL;
+  return [configuredUrl, 'https://decovintage.online'].filter((url, index, self) => 
+    url && typeof url === 'string' && !url.includes('decovintageguate.com') && self.indexOf(url) === index
+  );
 }
 
 export async function normalizeAndUpsertPoster(poster, tenantId) {
@@ -83,20 +93,39 @@ export async function deltaSyncRecentPosters(tenantId = null) {
   const targetTenantId = await resolveDefaultTenantId(tenantId);
   if (!targetTenantId) return { success: false, updated: 0, newCount: 0 };
 
-  const baseUrl = (ENV.WEB_CATALOG_URL || 'https://decovintage.online').replace(/\/+$/, '');
-  const url = `${baseUrl}/api/catalog/posters?take=15`;
+  const candidateUrls = getCatalogCandidateUrls();
+  let batch = [];
+  let successfulBase = null;
+
+  for (const rawBase of candidateUrls) {
+    const baseUrl = rawBase.replace(/\/+$/, '');
+    const url = `${baseUrl}/api/catalog/posters?take=30`;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json.posters || [];
+        if (Array.isArray(items) && items.length > 0) {
+          batch = items;
+          successfulBase = baseUrl;
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn(`[DeltaSync Warning] Fallo consultando ${baseUrl}:`, err.message);
+    }
+  }
+
+  if (batch.length === 0) {
+    return { success: true, updated: 0, newCount: 0 };
+  }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return { success: false, updated: 0, newCount: 0 };
-    const json = await res.json();
-    const batch = json.data || json.posters || [];
-    if (!Array.isArray(batch) || batch.length === 0) return { success: true, updated: 0, newCount: 0 };
-
     const skus = batch.map((p) => `WEB-${p.id || p._id || p.legacyId}`).filter((s) => s !== 'WEB-undefined');
     const existing = await prisma.product.findMany({
       where: { tenantId: targetTenantId, sku: { in: skus } },
@@ -121,8 +150,9 @@ export async function deltaSyncRecentPosters(tenantId = null) {
     }
 
     return { success: true, updated: updatedCount, newCount };
-  } catch {
-    return { success: false, updated: 0, newCount: 0 };
+  } catch (err) {
+    console.error('[DeltaSync Error]:', err.message);
+    return { success: false, updated: 0, newCount: 0, error: err.message };
   }
 }
 
@@ -133,39 +163,83 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
   if (Date.now() - lastRan < THROTTLE_MS) return [];
   recentQueryThrottle.set(cacheKey, Date.now());
 
-  const baseUrl = (ENV.WEB_CATALOG_URL || 'https://decovintage.online').replace(/\/+$/, '');
-  const url = `${baseUrl}/api/catalog/posters?take=15`;
+  const normalizeStr = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[-_]/g, ' ')
+      .trim();
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
-    clearTimeout(timeoutId);
+  const normQuery = normalizeStr(cleanQuery);
+  const queryTokens = normQuery.split(/\s+/).filter((t) => t.length > 1);
 
-    if (!res.ok) return [];
-    const json = await res.json();
-    const batch = json.data || json.posters || [];
-    if (!Array.isArray(batch) || batch.length === 0) return [];
+  const candidateUrls = getCatalogCandidateUrls();
+  const allWebItems = new Map();
 
-    const targetTenantId = await resolveDefaultTenantId(tenantId);
-    const importedProducts = [];
+  for (const rawBase of candidateUrls) {
+    const baseUrl = rawBase.replace(/\/+$/, '');
+    
+    // Consulta 1: Búsqueda activa por search param en la web
+    // Consulta 2: Lote reciente take=30
+    const urlsToTry = [
+      `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(cleanQuery)}&take=30`,
+      `${baseUrl}/api/catalog/posters?search=${encodeURIComponent(normQuery)}&take=30`,
+      `${baseUrl}/api/catalog/posters?take=30`,
+    ];
 
-    for (const p of batch) {
-      const title = (p.titulo || p.title || '').toLowerCase();
-      const sub = (p.subtitulo || p.subtitle || '').toLowerCase();
-      if (title.includes(cleanQuery) || sub.includes(cleanQuery) || (Array.isArray(p.tags) && p.tags.some((t) => String(t).toLowerCase().includes(cleanQuery)))) {
-        const prod = await normalizeAndUpsertPoster(p, targetTenantId);
-        if (prod) importedProducts.push(formatProductForPos(prod));
+    for (const targetUrl of urlsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(targetUrl, { headers: { Accept: 'application/json' }, signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const json = await res.json();
+          const items = json.data || json.posters || [];
+          if (Array.isArray(items)) {
+            for (const item of items) {
+              const itemId = item.id || item._id || item.legacyId;
+              if (itemId && !allWebItems.has(itemId)) {
+                allWebItems.set(itemId, item);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Fallback silencioso por URL
       }
     }
 
-    if (importedProducts.length > 0) {
-      invalidateCatalogCache(targetTenantId);
-      try { invalidateVectorCache(targetTenantId); } catch {}
-    }
-
-    return importedProducts;
-  } catch {
-    return [];
+    if (allWebItems.size > 0) break;
   }
+
+  if (allWebItems.size === 0) return [];
+
+  const targetTenantId = await resolveDefaultTenantId(tenantId);
+  const importedProducts = [];
+
+  for (const p of allWebItems.values()) {
+    const title = normalizeStr(p.titulo || p.title || '');
+    const sub = normalizeStr(p.subtitulo || p.subtitle || '');
+    const full = `${title} ${sub}`;
+    const tags = Array.isArray(p.tags) ? p.tags.map((t) => normalizeStr(String(t))) : [];
+
+    const matchesQuery =
+      full.includes(normQuery) ||
+      (queryTokens.length > 0 && queryTokens.every((token) => full.includes(token) || tags.some((tag) => tag.includes(token))));
+
+    if (matchesQuery) {
+      const prod = await normalizeAndUpsertPoster(p, targetTenantId);
+      if (prod) importedProducts.push(formatProductForPos(prod));
+    }
+  }
+
+  if (importedProducts.length > 0) {
+    invalidateCatalogCache(targetTenantId);
+    try { invalidateVectorCache(targetTenantId); } catch {}
+  }
+
+  return importedProducts;
 }
