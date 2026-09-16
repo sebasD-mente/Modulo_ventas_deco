@@ -8,34 +8,32 @@ export async function updateSaleTransaction({
   saleId, tenantId, userId, items, payments, discount, notes,
 }) {
   return await prisma.$transaction(async (tx) => {
-    // 1. Verificar existencia de la venta
+    // 1. Cargar venta para actualización transaccional
     const existing = await tx.sale.findFirst({
       where: { id: saleId, tenantId },
       include: { items: true, payments: true },
     });
 
     if (!existing) {
-      throw new Error('Venta no encontrada o no pertenece a esta organización.');
+      const error = new Error('Venta no encontrada o no pertenece a esta organización.');
+      error.statusCode = 404;
+      throw error;
     }
 
-    // 1.1 Inmutabilidad Contable: Validar jornada actual en Guatemala
-    const { startOfDay, endOfDay } = getGuatemalaDayRange();
-    const saleDate = new Date(existing.createdAt);
-    if (saleDate < startOfDay || saleDate > endOfDay) {
-      throw new Error('No es posible modificar una venta de un día anterior. Las ventas de jornadas pasadas son inmutables para garantizar el arqueo contable.');
-    }
+    // 1.1 Inmutabilidad Contable: Validar jornada cerrada o anterior
+    const { targetDate: saleDateStr, startOfDay, endOfDay } = getGuatemalaDayRange(existing.createdAt);
+    const isPastDay = saleDateStr < getGuatemalaDayRange().targetDate;
+    const closingFinder = tx.cashClosing?.findFirst ? tx.cashClosing : null;
+    const existingClosing = closingFinder
+      ? await closingFinder.findFirst({
+          where: { tenantId, eventId: existing.eventId, closingDate: { gte: startOfDay, lte: endOfDay } },
+        })
+      : null;
 
-    // 1.2 Verificar si ya existe un arqueo o cierre de caja para este evento en la jornada actual
-    const existingClosing = await tx.cashClosing?.findFirst({
-      where: {
-        tenantId,
-        eventId: existing.eventId,
-        closingDate: { gte: startOfDay, lte: endOfDay },
-      },
-    });
-
-    if (existingClosing) {
-      throw new Error('No es posible modificar ventas de una jornada que ya cuenta con arqueo o cierre de caja registrado.');
+    if (isPastDay || existingClosing) {
+      const error = new Error('No se puede modificar una venta de una jornada cerrada o anterior.');
+      error.statusCode = 403;
+      throw error;
     }
 
     let totalAmount = Number(existing.totalAmount);
@@ -134,7 +132,11 @@ export async function updateSaleTransaction({
         ...(notes !== undefined ? { notes } : {}),
       },
       include: {
-        items: true,
+        items: {
+          include: {
+            product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } },
+          },
+        },
         payments: true,
         seller: { select: { fullName: true, email: true } },
       },
@@ -143,17 +145,11 @@ export async function updateSaleTransaction({
     // 5. Registro de auditoría inmutable
     await tx.auditLog.create({
       data: {
-        tenantId,
-        userId: userId || existing.sellerId,
-        action: 'VENTA_MODIFICADA',
-        entity: 'sale',
-        entityId: saleId,
+        tenantId, userId: userId || existing.sellerId, action: 'VENTA_MODIFICADA',
+        entity: 'sale', entityId: saleId,
         details: {
-          saleNumber: existing.saleNumber,
-          previousTotal: Number(existing.totalAmount),
-          newTotal: Number(totalAmount),
-          previousNotes: existing.notes,
-          newNotes: notes,
+          saleNumber: existing.saleNumber, previousTotal: Number(existing.totalAmount),
+          newTotal: Number(totalAmount), previousNotes: existing.notes, newNotes: notes,
           paymentMethod: updated.payments?.[0]?.method,
         },
       },

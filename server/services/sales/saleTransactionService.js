@@ -33,6 +33,16 @@ export async function createSaleTransaction({
     }
   }
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const isUuid = (val) => typeof val === 'string' && UUID_REGEX.test(val.trim());
+  const candidateSkus = [...new Set((items || [])
+    .filter((i) => !isUuid(i.productId) && (i.posterId || i.productId))
+    .map((i) => String(i.posterId || i.productId).trim()))];
+  const matched = candidateSkus.length > 0
+    ? await prisma.product.findMany({ where: { tenantId, sku: { in: candidateSkus } }, select: { id: true, sku: true } })
+    : [];
+  const skuMap = new Map(matched.map((p) => [p.sku, p.id]));
+
   try {
     return await prisma.$transaction(async (tx) => {
       // In-transaction secondary check
@@ -53,8 +63,9 @@ export async function createSaleTransaction({
       const itemsData = items.map((item) => {
         const subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
         itemsTotal += subtotal;
+        const pId = isUuid(item.productId) ? item.productId : (skuMap.get(String(item.posterId || item.productId || '').trim()) || null);
         return {
-          productId: item.productId || null,
+          productId: pId,
           description: item.description.trim(),
           quantity: item.quantity,
           unitPrice: item.unitPrice,
@@ -106,28 +117,18 @@ export async function createSaleTransaction({
           } : undefined,
         },
         include: {
-          items: true,
+          items: { include: { product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } } } },
           payments: true,
-          seller: {
-            select: { id: true, fullName: true, email: true },
-          },
+          seller: { select: { id: true, fullName: true, email: true } },
         },
       });
 
       // 5. Registrar log de auditoría
       await tx.auditLog.create({
         data: {
-          tenantId,
-          userId: sellerId,
-          action: 'VENTA_REGISTRADA',
-          entity: 'sale',
-          entityId: sale.id,
-          details: {
-            saleNumber,
-            totalAmount,
-            itemCount: items.length,
-            inputChannel,
-          },
+          tenantId, userId: sellerId, action: 'VENTA_REGISTRADA',
+          entity: 'sale', entityId: sale.id,
+          details: { saleNumber, totalAmount, itemCount: items.length, inputChannel },
         },
       });
 

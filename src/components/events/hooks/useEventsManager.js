@@ -6,7 +6,7 @@ const INITIAL_EVENT_DATA = { name: '', location: '', startDate: '', endDate: '',
 export function useEventsManager({ onEventActivated } = {}) {
   const { authFetch } = useAuth();
   const [events, setEvents] = useState([]), [isLoading, setIsLoading] = useState(true), [errorMsg, setErrorMsg] = useState(null);
-  const [selectedEventForSales, setSelectedEventForSales] = useState(null), [eventSalesList, setEventSalesList] = useState([]), [isLoadingSales, setIsLoadingSales] = useState(false);
+  const [selectedEventForSales, setSelectedEventForSales] = useState(null), [eventSalesList, setEventSalesList] = useState([]), [eventClosingsList, setEventClosingsList] = useState([]), [isLoadingSales, setIsLoadingSales] = useState(false);
   const [activatingEvent, setActivatingEvent] = useState(null), [sellerGoogleEmail, setSellerGoogleEmail] = useState(''), [sellerName, setSellerName] = useState(''), [isSubmittingActivation, setIsSubmittingActivation] = useState(false);
   const [eventToArchive, setEventToArchive] = useState(null), [isSubmittingArchive, setIsSubmittingArchive] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null), [isSubmittingDelete, setIsSubmittingDelete] = useState(false), [deleteErrorMsg, setDeleteErrorMsg] = useState(null);
@@ -28,9 +28,13 @@ export function useEventsManager({ onEventActivated } = {}) {
   const viewEventSales = async (event) => {
     setSelectedEventForSales(event); setIsLoadingSales(true);
     try {
-      const res = await authFetch(`/api/sales/events/${event.id}`);
-      const json = await res.json();
-      if (json.success) setEventSalesList(json.data || []);
+      const [salesRes, closingsRes] = await Promise.all([
+        authFetch(`/api/sales/events/${event.id}`),
+        authFetch(`/api/closings/events/${event.id}`),
+      ]);
+      const [salesJson, closingsJson] = await Promise.all([salesRes.json(), closingsRes.json()]);
+      if (salesJson.success) setEventSalesList(salesJson.data || []);
+      if (closingsJson.success) setEventClosingsList(closingsJson.data || []);
     } catch (e) { console.error(e); }
     finally { setIsLoadingSales(false); }
   };
@@ -135,7 +139,7 @@ export function useEventsManager({ onEventActivated } = {}) {
     events, isLoading, errorMsg, loadEvents, activeEvents, confirmedEvents, archivedEvents,
     archivedSearchQuery, setArchivedSearchQuery, archivedDateFilter, setArchivedDateFilter,
     showArchivedSection, setShowArchivedSection, filteredArchivedEvents,
-    selectedEventForSales, setSelectedEventForSales, eventSalesList, isLoadingSales, viewEventSales,
+    selectedEventForSales, setSelectedEventForSales, eventSalesList, eventClosingsList, isLoadingSales, viewEventSales,
     activatingEvent, setActivatingEvent, openActivationModal, sellerGoogleEmail, setSellerGoogleEmail,
     sellerName, setSellerName, isSubmittingActivation, handleConfirmActivation,
     eventToArchive, setEventToArchive, isSubmittingArchive, handleConfirmArchive, handleUnarchiveEvent,

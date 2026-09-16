@@ -161,7 +161,11 @@ export async function getEventSalesList({
     prisma.sale.findMany({
       where,
       include: {
-        items: true,
+        items: {
+          include: {
+            product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } },
+          },
+        },
         payments: true,
         seller: { select: { fullName: true, email: true } },
       },

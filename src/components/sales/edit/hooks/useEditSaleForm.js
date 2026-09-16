@@ -6,12 +6,9 @@ export default function useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated 
   const [paymentMethod, setPaymentMethod] = useState(sale?.payments?.[0]?.method || 'EFECTIVO');
   const [items, setItems] = useState(
     (sale?.items || []).map((it) => ({
-      id: it.id,
-      productId: it.productId || null,
-      description: it.description,
-      quantity: Number(it.quantity) || 1,
-      unitPrice: Number(it.unitPrice) || 0,
-      subtotal: Number(it.subtotal) || 0,
+      id: it.id, productId: it.productId || null, description: it.description,
+      quantity: Number(it.quantity) || 1, unitPrice: Number(it.unitPrice) || 0, subtotal: Number(it.subtotal) || 0,
+      product: it.product || null, imageUrl: it.imageUrl || it.product?.imageUrl || null, thumbUrl: it.thumbUrl || null,
     }))
   );
   const [discount, setDiscount] = useState(Number(sale?.discount || 0));

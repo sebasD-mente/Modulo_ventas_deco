@@ -51,7 +51,8 @@ export async function updateSale(req, res) {
     return res.json({ success: true, message: 'Venta actualizada exitosamente.', data: updatedSale });
   } catch (err) {
     console.error('❌ Error actualizando venta:', err);
-    return res.status(400).json({ success: false, error: err.message || 'Error al actualizar la venta.' });
+    const status = err.statusCode || (err.message?.includes('no encontrada') ? 404 : 400);
+    return res.status(status).json({ success: false, error: err.message || 'Error al actualizar la venta.' });
   }
 }
 

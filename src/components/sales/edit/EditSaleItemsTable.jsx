@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, Image as ImageIcon } from 'lucide-react';
 
 export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveItem }) {
   return (
@@ -8,17 +8,28 @@ export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveIt
         2. Pósters en la venta ({items.length})
       </label>
       <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
-        {items.map((it, idx) => (
-          <div
-            key={it.id || idx}
-            className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs"
-          >
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-white block truncate">{it.description}</span>
-              <span className="text-[10px] text-neutral-400 font-mono">
-                Precio unitario: Q {Number(it.unitPrice).toFixed(2)}
-              </span>
-            </div>
+        {items.map((it, idx) => {
+          const img = it.product?.imageUrl || it.imageUrl || it.thumbUrl;
+          return (
+            <div
+              key={it.id || idx}
+              className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {img ? (
+                  <img src={img} alt={it.description} className="w-10 h-10 rounded-lg object-cover bg-neutral-900 border border-neutral-800 shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 shrink-0 flex items-center justify-center text-neutral-600">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className="font-semibold text-white block truncate">{it.description}</span>
+                  <span className="text-[10px] text-neutral-400 font-mono">
+                    Precio unitario: Q {Number(it.unitPrice).toFixed(2)}
+                  </span>
+                </div>
+              </div>
 
             {/* Stepper de cantidad */}
             <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-800 shrink-0">
@@ -56,7 +67,8 @@ export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveIt
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
-        ))}
+        );
+      })}
       </div>
     </div>
   );

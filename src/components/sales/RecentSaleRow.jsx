@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Edit, CreditCard, Smartphone, Banknote } from 'lucide-react';
+import { Clock, Edit, CreditCard, Smartphone, Banknote, Image as ImageIcon } from 'lucide-react';
 
 function isSaleFromToday(dateStr) {
   if (!dateStr) return false;
@@ -19,12 +19,8 @@ function formatSaleTime(dateStr) {
 }
 
 function getPaymentBadge(method) {
-  if (method === 'TARJETA') {
-    return <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-bold text-[10px] flex items-center gap-1"><CreditCard className="w-3 h-3" /> Tarjeta</span>;
-  }
-  if (method === 'TRANSFERENCIA') {
-    return <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1"><Smartphone className="w-3 h-3" /> Transferencia</span>;
-  }
+  if (method === 'TARJETA') return <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-bold text-[10px] flex items-center gap-1"><CreditCard className="w-3 h-3" /> Tarjeta</span>;
+  if (method === 'TRANSFERENCIA') return <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1"><Smartphone className="w-3 h-3" /> Transferencia</span>;
   return <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1"><Banknote className="w-3 h-3" /> Efectivo</span>;
 }
 
@@ -45,13 +41,25 @@ export default function RecentSaleRow({ sale, onEdit }) {
             </span>
           )}
         </div>
-        <div className="text-[11px] text-slate-300 space-y-0.5">
-          {(sale.items || []).map((it, idx) => (
-            <div key={idx} className="flex items-center justify-between text-slate-300">
-              <span className="truncate pr-2">• {it.quantity}x {it.description}</span>
-              <span className="font-mono text-slate-400 shrink-0">Q {Number(it.subtotal).toFixed(2)}</span>
-            </div>
-          ))}
+        <div className="text-[11px] text-slate-300 space-y-1 pt-0.5">
+          {(sale.items || []).map((it, idx) => {
+            const img = it.product?.imageUrl || it.imageUrl || it.thumbUrl;
+            return (
+              <div key={idx} className="flex items-center justify-between gap-2 text-slate-300">
+                <div className="flex items-center gap-2 min-w-0">
+                  {img ? (
+                    <img src={img} alt={it.description} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-neutral-900 border border-neutral-800 shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-neutral-900 border border-neutral-800 shrink-0 flex items-center justify-center text-neutral-600">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                  )}
+                  <span className="truncate">{it.quantity}x {it.description}</span>
+                </div>
+                <span className="font-mono text-slate-400 shrink-0">Q {Number(it.subtotal).toFixed(2)}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0">

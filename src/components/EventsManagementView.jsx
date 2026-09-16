@@ -58,7 +58,7 @@ export default function EventsManagementView({ onEventActivated }) {
       )}
       <CreateEventModal isOpen={m.isCreatingEvent} onClose={() => m.setIsCreatingEvent(false)} newEventData={m.newEventData} setNewEventData={m.setNewEventData} onSubmit={m.handleCreateEvent} />
       <ActivateEventModal event={m.activatingEvent} onClose={() => m.setActivatingEvent(null)} sellerGoogleEmail={m.sellerGoogleEmail} setSellerGoogleEmail={m.setSellerGoogleEmail} sellerName={m.sellerName} setSellerName={m.setSellerName} onConfirm={m.handleConfirmActivation} isSubmitting={m.isSubmittingActivation} />
-      <EventSalesModal event={m.selectedEventForSales} salesList={m.eventSalesList} isLoading={m.isLoadingSales} onClose={() => m.setSelectedEventForSales(null)} />
+      <EventSalesModal event={m.selectedEventForSales} salesList={m.eventSalesList} closingsList={m.eventClosingsList} isLoading={m.isLoadingSales} onClose={() => m.setSelectedEventForSales(null)} />
       <EventActionModals eventToArchive={m.eventToArchive} onCloseArchive={() => m.setEventToArchive(null)} onConfirmArchive={m.handleConfirmArchive} isSubmittingArchive={m.isSubmittingArchive} eventToDelete={m.eventToDelete} onCloseDelete={() => { m.setEventToDelete(null); m.setDeleteErrorMsg(null); }} onConfirmDelete={m.handleConfirmDelete} isSubmittingDelete={m.isSubmittingDelete} deleteErrorMsg={m.deleteErrorMsg} />
     </div>
   );
