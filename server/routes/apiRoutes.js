@@ -33,13 +33,15 @@ import {
 } from '../controllers/saleController.js';
 import {
   getActiveEvent,
-  getProducts,
   getEventsList,
   activateEvent,
   createEvent,
   archiveEvent,
   unarchiveEvent,
   deleteEvent,
+} from '../controllers/eventController.js';
+import {
+  getProducts,
   searchWebPostersCatalog,
   triggerCatalogSync,
 } from '../controllers/catalogController.js';

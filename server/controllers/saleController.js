@@ -1,9 +1,10 @@
 import {
   createSaleTransaction, updateSaleTransaction, getEventKPIs,
-  getMonitorDashboardMetrics, createCashClosingTransaction,
+  getMonitorDashboardMetrics,
   getEventSalesList as getEventSalesServiceList, purgeEventSalesTransaction,
 } from '../services/saleService.js';
-import { prisma } from '../config/prisma.js';
+
+export { postCashClosing, getCashClosingsList } from './cashClosingController.js';
 
 export async function createSale(req, res) {
   try {
@@ -18,38 +19,21 @@ export async function createSale(req, res) {
     }
 
     const sale = await createSaleTransaction({
-      tenantId,
-      sellerId,
-      eventId,
-      items,
-      payments,
-      discount,
-      notes,
-      inputChannel,
-      attachments: attachments || [],
-      idempotencyKey,
+      tenantId, sellerId, eventId, items, payments, discount, notes, inputChannel,
+      attachments: attachments || [], idempotencyKey,
     });
 
     if (sale.idempotentReplay) {
       return res.status(200).json({
-        success: true,
-        idempotentReplay: true,
-        message: 'Venta previamente registrada (Idempotent Replay).',
-        data: sale,
+        success: true, idempotentReplay: true,
+        message: 'Venta previamente registrada (Idempotent Replay).', data: sale,
       });
     }
 
-    return res.status(201).json({
-      success: true,
-      message: 'Venta registrada exitosamente.',
-      data: sale,
-    });
+    return res.status(201).json({ success: true, message: 'Venta registrada exitosamente.', data: sale });
   } catch (err) {
     console.error('❌ Error creando venta:', err);
-    return res.status(400).json({
-      success: false,
-      error: err.message || 'Error registrando la venta.',
-    });
+    return res.status(400).json({ success: false, error: err.message || 'Error registrando la venta.' });
   }
 }
 
@@ -61,26 +45,13 @@ export async function updateSale(req, res) {
     const tenantId = req.tenantId;
 
     const updatedSale = await updateSaleTransaction({
-      saleId: id,
-      tenantId,
-      userId,
-      items,
-      payments,
-      discount,
-      notes,
+      saleId: id, tenantId, userId, items, payments, discount, notes,
     });
 
-    return res.json({
-      success: true,
-      message: 'Venta actualizada exitosamente.',
-      data: updatedSale,
-    });
+    return res.json({ success: true, message: 'Venta actualizada exitosamente.', data: updatedSale });
   } catch (err) {
     console.error('❌ Error actualizando venta:', err);
-    return res.status(400).json({
-      success: false,
-      error: err.message || 'Error al actualizar la venta.',
-    });
+    return res.status(400).json({ success: false, error: err.message || 'Error al actualizar la venta.' });
   }
 }
 
@@ -90,25 +61,15 @@ export async function getEventSalesList(req, res) {
     const { date, page, limit } = req.query;
     const tenantId = req.tenantId;
 
-    const result = await getEventSalesServiceList({
-      tenantId,
-      eventId,
-      date,
-      page,
-      limit,
-    });
+    const result = await getEventSalesServiceList({ tenantId, eventId, date, page, limit });
 
     return res.json({
       success: true,
       data: result.sales,
       count: result.sales.length,
       pagination: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-        hasNext: result.hasNext,
-        hasPrev: result.hasPrev,
+        total: result.total, page: result.page, limit: result.limit,
+        totalPages: result.totalPages, hasNext: result.hasNext, hasPrev: result.hasPrev,
       },
     });
   } catch (err) {
@@ -136,68 +97,11 @@ export async function getMonitorMetrics(req, res) {
     const tenantId = req.tenantId;
     const { date } = req.query;
 
-    const data = await getMonitorDashboardMetrics({
-      tenantId,
-      date: date || null,
-    });
-
-    return res.json({
-      success: true,
-      data,
-    });
+    const data = await getMonitorDashboardMetrics({ tenantId, date: date || null });
+    return res.json({ success: true, data });
   } catch (err) {
     console.error('❌ Error obteniendo métricas del monitor:', err);
     return res.status(500).json({ success: false, error: 'Error obteniendo datos del monitor.' });
-  }
-}
-
-export async function postCashClosing(req, res) {
-  try {
-    const { eventId, closingType, totalCashReported, observations, date } = req.body;
-    const closedById = req.user?.id;
-    const tenantId = req.tenantId;
-
-    const closing = await createCashClosingTransaction({
-      tenantId,
-      eventId,
-      closedById,
-      closingType,
-      totalCashReported: Number(totalCashReported),
-      observations,
-      date: date || null,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Cierre de caja registrado exitosamente.',
-      data: closing,
-    });
-  } catch (err) {
-    console.error('❌ Error registrando cierre de caja:', err);
-    return res.status(400).json({
-      success: false,
-      error: err.message || 'Error al procesar el cierre de caja.',
-    });
-  }
-}
-
-export async function getCashClosingsList(req, res) {
-  try {
-    const { eventId } = req.params;
-    const tenantId = req.tenantId;
-
-    const closings = await prisma.cashClosing.findMany({
-      where: { tenantId, eventId },
-      include: {
-        closedBy: { select: { fullName: true } },
-      },
-      orderBy: { closingDate: 'desc' },
-    });
-
-    return res.json({ success: true, data: closings });
-  } catch (err) {
-    console.error('❌ Error obteniendo cierres de caja:', err);
-    return res.status(500).json({ success: false, error: 'Error al obtener historial de cierres.' });
   }
 }
 

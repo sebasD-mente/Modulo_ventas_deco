@@ -1956,3 +1956,104 @@ Reference specification: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Vent
 - [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos, 0 violaciones de límites).
 - [ ] `npm run build` exitoso sin errores.
 - [ ] 100% de tests unitarios y adversariales aprobados.
+## 2026-09-16T02:15:00Z
+
+# Teamwork Project Prompt — Fase 4: Modularización Quirúrgica, Unificación de Servicios y Protocolo del Nuevo Arnés
+
+Implementación atómica de la **Fase 4 del Roadmap Quirúrgico Cero Deuda** en el repositorio `Modulo_Ventas`, ejecutando la unificación de servicios redundantes de sincronización de catálogo, el despiece de los monolitos críticos del backend y frontend conforme a los techos del nuevo arnés inteligente (`DOMAIN_CEILINGS` en `scripts/audit-monoliths.js`), garantizando la preservación inquebrantable de contratos HTTP y el aislamiento sagrado entre proyectos.
+
+Working directory: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+Integrity mode: development
+Reference specification: Master Prompt de Ingeniería de Gary (Sesión `@:4dfbdf49-6b03-4c91-98da-4d3ddbbfbcb2`) y `scripts/audit-monoliths.js`.
+
+---
+
+## Directivas Permanentes e Intocables (Regla del Nuevo Arnés)
+- **Archivos Protegidos Autorizados (🟢 INTOCABLES):** Queda terminantemente prohibido tocar, dividir o alterar los 8 archivos protegidos en verde por tener cohesión natural:
+  1. `server/services/semantic/entityAliases.js` (545/600 líneas)
+  2. `server/services/geminiPoolService.js` (316/350 líneas)
+  3. `server/index.js` (260/300 líneas)
+  4. `server/routes/apiRoutes.js` (235/300 líneas)
+  5. `server/controllers/authController.js` (266/300 líneas)
+  6. `server/services/semantic/paymentExtractor.js` (229/280 líneas)
+  7. `server/services/ai/aiToolsService.js` (216/250 líneas)
+  8. `src/App.jsx` (212/250 líneas)
+- La intervención debe ser **100% quirúrgica sobre los archivos en rojo con deuda técnica real**.
+
+---
+
+## Requirements
+
+### R1. Unificación de Servicios de Sincronización de Catálogo (EJE A)
+- Consolidar la duplicidad entre `server/services/catalog/liveCatalogSyncService.js` (293 líneas) y `server/services/catalogSyncService.js` (268 líneas):
+  1. Extraer la normalización y constantes de tamaños a `server/services/catalog/catalogSizeResolver.js` (< 80 líneas) conteniendo `STANDARD_EVENT_SIZES`, `ALBUM_COVER_SIZE` y `resolvePosterSizes`.
+  2. Centralizar en `server/services/catalog/liveCatalogSyncService.js` (< 200 líneas) la sincronización continua (delta-sync + webhooks + reconciliación periódica + paracaídas web).
+  3. Reducir `server/services/catalogSyncService.js` a una **fachada de retrocompatibilidad (< 25 líneas)** que reexporte los símbolos públicos sin romper llamadas existentes.
+
+### R2. Despiece del Monolito Crítico de Catálogo Web (EJE B.1)
+- Despiezar `server/services/webCatalogService.js` (551 líneas | límite: 200):
+  1. Extraer almacenamiento en memoria, TTL, invalidación y `getCachedProducts` a `server/services/catalog/catalogCacheStore.js` (< 110 líneas).
+  2. Extraer tratamiento léxico, slugs, deduplicación y formateo POS (`extractImageSlug`, `normalizePosterTitle`, `deduplicatePosters`, `formatProductForPos`) a `server/services/catalog/catalogStringNormalizer.js` (< 130 líneas).
+  3. Mantener `server/services/webCatalogService.js` en **< 180 líneas**, enfocado exclusivamente en `searchWebPosters`, scoring y fachadas públicas (`searchPosters`, `getCatalogPosters`, `getWebPosterById`).
+
+### R3. Despiece de Controladores con Violación de Dominio y Monolitos (EJE B.2 & B.3)
+- **Catálogo vs Eventos:**
+  1. Crear `server/controllers/eventController.js` (< 190 líneas) con el ciclo de vida de eventos (`getActiveEvent`, `getEventsList`, `createEvent`, `activateEvent`, `archiveEvent`, `unarchiveEvent`, `deleteEvent`).
+  2. Reducir `server/controllers/catalogController.js` a **< 90 líneas** con funciones exclusivas de catálogo (`getProducts`, `searchWebPostersCatalog`, `triggerCatalogSync`).
+  3. Actualizar rutas en `server/routes/apiRoutes.js` para delegar `/api/events/*` en `eventController.js` sin alterar contratos de URL.
+- **Controlador IA:**
+  1. Extraer streaming SSE (`handleChatQuery`) a `server/controllers/ai/aiChatController.js` (< 170 líneas).
+  2. Extraer endpoints multipart (`handleVoiceSale`, `handleBatchPhoto`, `handleArtworkRecognition`, `handleVideoRecognition`) a `server/controllers/ai/aiMediaController.js` (< 180 líneas).
+  3. Reducir `server/controllers/aiController.js` a **< 30 líneas** como fachada reexportadora hacia `apiRoutes.js`.
+
+### R4. Modularización de Controladores y Servicios de Ventas y Usuarios (EJE B.4 & B.5)
+- **Ventas y Arqueos:**
+  1. En `server/controllers/saleController.js`, delegar arqueos huérfanos (`postCashClosing`, `getCashClosingsList`) al controlador dedicado de caja, dejando `saleController.js` en **< 160 líneas**.
+  2. En `server/services/sales/saleKpiService.js` (341 líneas), extraer métricas feriales de pantalla gigante (`getMonitorDashboardMetrics`) a `server/services/sales/monitorKpiService.js` (< 130 líneas), dejando `saleKpiService.js` en **< 190 líneas**.
+  3. En `server/services/sales/saleTransactionService.js` (332 líneas), extraer `updateSaleTransaction` a `server/services/sales/saleUpdateService.js` (< 170 líneas), manteniendo `saleTransactionService.js` en **< 170 líneas** con reexportación.
+- **Usuarios y Asignaciones:**
+  1. En `server/controllers/userController.js` (284 líneas), extraer validaciones de roles y asignaciones feriales (`assignUserToEvent`) a `server/services/userEventAssignmentService.js` (< 80 líneas), reduciendo `userController.js` a **< 170 líneas**.
+
+### R5. Modularización de Frontend y Limpieza de Timers (EJE B.6)
+- En `src/components/RecentSalesList.jsx` (222 líneas | límite: 200):
+  1. Extraer componente de fila a `src/components/sales/RecentSaleRow.jsx` (< 90 líneas) con formateo de estados, badges y botón de edición.
+  2. Almacenar el temporizador de toast/notificación (`setTimeout 3500ms`) en `useRef` y limpiar con `clearTimeout` en el cleanup de `useEffect`.
+  3. Reducir `RecentSalesList.jsx` a **< 130 líneas**.
+
+---
+
+## Verification Resources
+- Auditoría de Monolitos: `node scripts/audit-monoliths.js` (Debe reportar 0 archivos en infracción en la sección de deuda real).
+- Suite de Seguridad Zero-Trust: `npm run test:security` (9/9 pass).
+- Auditoría de Secretos: `npm run audit:secrets` (0 secretos).
+- Suite de Componentes Modulares: `node --test tests/manual-sale/manual-sale-m3.test.js` (17/17 pass).
+- Compilación de Producción: `npm run build` (código de salida 0).
+- Suite Integral de Regresión:
+  - `node --test tests/catalog/catalog-cache-service.test.js`
+  - `node --test tests/ai/embeddingService.test.js`
+  - `node --test tests/ai/closed-loop-adversarial-challenger.test.js`
+  - `node --test tests/ai/m3-cards-line-ceilings.test.js`
+  - `node --test tests/ai/m4-frontend-modular-adversarial.test.js`
+- Verificación en Vivo: Chrome DevTools MCP interactuando con el flujo de catálogo, eventos y ventas recientes.
+
+---
+
+## Acceptance Criteria
+
+### Unificación y Despiece Backend (R1, R2, R3, R4)
+- [ ] `node scripts/audit-monoliths.js` reporta 0 archivos en infracción en la Deuda Monolítica Real.
+- [ ] Los 8 archivos protegidos permanecen intactos sin fragmentación artificial.
+- [ ] Todos los archivos nuevos y modificados se encuentran estrictamente por debajo de sus techos respectivos (<200 líneas lógica estándar).
+- [ ] `server/services/catalogSyncService.js` opera como fachada de < 25 líneas sin romper llamadas existentes.
+- [ ] `server/controllers/aiController.js` opera como fachada de < 30 líneas delegando en `aiChatController` y `aiMediaController`.
+- [ ] Contratos de API HTTP (rutas, query params, payloads y responses) 100% preservados.
+
+### Modularización Frontend (R5)
+- [ ] `RecentSalesList.jsx` tiene < 130 líneas y cuenta con cleanup estricto de temporizadores en desmontaje.
+- [ ] `RecentSaleRow.jsx` creado y funcionando fluidamente.
+- [ ] `tests/manual-sale/manual-sale-m3.test.js` pasa 17/17 verde.
+
+### Integridad General
+- [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos, monolitos limpios, build en 0).
+- [ ] Cero dependencias cruzadas o llamadas a bases de datos de otros proyectos.
+- [ ] Evidencia visual en vivo mediante Chrome DevTools MCP demostrando operación fluida en catálogo, eventos y ventas recientes.
