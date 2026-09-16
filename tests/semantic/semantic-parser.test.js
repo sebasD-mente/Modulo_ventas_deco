@@ -94,7 +94,8 @@ describe('🧠 Suite de Parser Semántico, Métodos de Pago y Diccionario Cultur
 
   describe('3. Normalización de Consultas de Catálogo (normalizeArtworkQuery)', () => {
     it('Traduce alias culturales a consultas canónicas de búsqueda', () => {
-      assert.strictEqual(normalizeArtworkQuery('el conejo malo'), 'Un Verano Sin Ti Bad Bunny');
+      assert.strictEqual(normalizeArtworkQuery('el conejo malo'), 'Bad Bunny');
+      assert.strictEqual(normalizeArtworkQuery('un verano sin ti'), 'Un Verano Sin Ti Bad Bunny');
       assert.strictEqual(normalizeArtworkQuery('el pibe motosierra'), 'Chainsaw Man Denji Pochita');
       assert.strictEqual(normalizeArtworkQuery('el de checo'), 'Formula 1 Red Bull Checo Perez Verstappen');
     });

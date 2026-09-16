@@ -52,55 +52,68 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     const queryCondensed = getCondensed(cleanQuery);
     const aliasCondensed = (aliasRes.matched && aliasRes.searchQuery) ? getCondensed(aliasRes.searchQuery) : '';
 
-    const scored = filtered
-      .map((p) => {
-        const titleText = [p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' ');
-        const fullText = [titleText, p.sku, p.categoria, Array.isArray(p.tags) ? p.tags.join(' ') : ''].filter(Boolean).join(' ');
-        const normTitleText = normalize(titleText), normFullText = normalize(fullText);
-        const alphaFullText = alphaOnly(fullText);
-        const titleTokensSet = new Set(normTitleText.split(/\s+/)), fullTokensSet = new Set(normFullText.split(/\s+/));
+    const scoredAll = filtered.map((p) => {
+      const titleText = [p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' ');
+      const fullText = [titleText, p.sku, p.categoria, Array.isArray(p.tags) ? p.tags.join(' ') : ''].filter(Boolean).join(' ');
+      const normTitleText = normalize(titleText), normFullText = normalize(fullText);
+      const alphaFullText = alphaOnly(fullText);
+      const titleTokensSet = new Set(normTitleText.split(/\s+/)), fullTokensSet = new Set(normFullText.split(/\s+/));
+      const productTitleCondensed = getCondensed(titleText);
 
-        let score = 0;
-        if (normTitleText === normQuery) score += 350;
-        if (normFullText.startsWith(normQuery)) score += 120;
-        if (p.titulo?.toLowerCase().startsWith(cleanQuery)) score += 100;
-        if (normFullText.includes(normQuery)) score += 80;
-        if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 60;
-        if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 80;
+      let score = 0;
+      if (normTitleText === normQuery) score += 350;
+      if (normFullText.startsWith(normQuery)) score += 120;
+      if (p.titulo?.toLowerCase().startsWith(cleanQuery)) score += 100;
+      if (normFullText.includes(normQuery)) score += 80;
+      if (alphaQuery.length >= 3 && alphaFullText.includes(alphaQuery)) score += 60;
+      if (p.sku && p.sku.toLowerCase().includes(cleanQuery)) score += 80;
 
-        if (queryCondensed.length >= 3) {
-          const productTitleCondensed = getCondensed(titleText), productFullCondensed = getCondensed(fullText);
-          if (productTitleCondensed === queryCondensed) score += 300;
-          else if (productTitleCondensed.startsWith(queryCondensed)) score += 250;
-          else if (productTitleCondensed.includes(queryCondensed)) score += 200;
-          else if (productFullCondensed.includes(queryCondensed)) score += 150;
+      if (queryCondensed.length >= 3) {
+        const productFullCondensed = getCondensed(fullText);
+        if (productTitleCondensed === queryCondensed) score += 300;
+        else if (productTitleCondensed.startsWith(queryCondensed)) score += 250;
+        else if (productTitleCondensed.includes(queryCondensed)) score += 200;
+        else if (productFullCondensed.includes(queryCondensed)) score += 150;
+      }
+
+      if (aliasCondensed.length >= 3) {
+        if (productTitleCondensed === aliasCondensed) score += 320;
+        else if (productTitleCondensed.startsWith(aliasCondensed)) score += 260;
+        else if (productTitleCondensed.includes(aliasCondensed)) score += 210;
+      }
+
+      const isTokenMatch = (t) => fullTokensSet.has(t) || normFullText.startsWith(t);
+      if (tokens.length > 0 && tokens.every(isTokenMatch)) score += 150;
+
+      for (const token of tokens) {
+        if (titleTokensSet.has(token)) score += 35;
+        else if (isTokenMatch(token)) score += 15;
+      }
+
+      if (meaningfulTokens.length >= 2) {
+        const matchedMeaningful = meaningfulTokens.filter((t) => titleTokensSet.has(t) || isTokenMatch(t));
+        const hasAliasMatch = Boolean(aliasCondensed.length >= 3 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
+        const hasFullPhrase = normFullText.includes(normQuery) || (queryCondensed.length >= 3 && normFullText.includes(queryCondensed));
+        const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.6;
+        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio) {
+          score = 0;
         }
+      }
 
-        if (aliasCondensed.length >= 3) {
-          const productTitleCondensed = getCondensed(titleText);
-          if (productTitleCondensed === aliasCondensed) score += 320;
-          else if (productTitleCondensed.startsWith(aliasCondensed)) score += 260;
-          else if (productTitleCondensed.includes(aliasCondensed)) score += 210;
-        }
+      return { p, score };
+    });
 
-        const isTokenMatch = (t) => fullTokensSet.has(t) || normFullText.startsWith(t);
-        if (tokens.length > 0 && tokens.every(isTokenMatch)) score += 150;
-
-        for (const token of tokens) {
-          if (titleTokensSet.has(token)) score += 35;
-          else if (isTokenMatch(token)) score += 15;
-        }
-
-        return { p, score };
-      })
-      .filter((item) => item.score > 0);
+    const maxScore = scoredAll.reduce((max, item) => (item.score > max ? item.score : max), 0);
+    const minThreshold = maxScore >= 150 ? Math.max(50, maxScore * 0.25) : 50;
+    const scored = scoredAll.filter((item) => item.score >= minThreshold && item.score > 0);
 
     scored.sort((a, b) => b.score - a.score);
     const deduplicated = deduplicatePosters(scored.map((item) => item.p));
 
-    const hasMissingTokens = meaningfulTokens.length >= 2 && !deduplicated.some((p) => {
+    const targetMeaningful = (aliasRes.matched && aliasTokens.length > 0) ? aliasTokens : meaningfulTokens;
+    const hasMissingTokens = targetMeaningful.length >= 2 && !deduplicated.some((p) => {
       const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' '));
-      return meaningfulTokens.every((tok) => pNorm.includes(tok));
+      return targetMeaningful.every((tok) => pNorm.includes(tok));
     });
 
     if ((deduplicated.length === 0 || hasMissingTokens) && cleanQuery.length >= 3) {

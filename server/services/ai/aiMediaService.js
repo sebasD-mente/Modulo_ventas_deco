@@ -25,12 +25,12 @@ export function normalizeCatalogSizeId(requestedSize) {
   if (!requestedSize) return 'MEDIANO';
   const raw = String(requestedSize).toLowerCase().trim();
   const compact = raw.replace(/\s+/g, '').replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '').replace(/por|\*|x/gi, 'x');
-  if (/18x24|24x18|45x60|60x45/.test(compact) || /grande|large|l\b/i.test(raw)) return 'GRANDE';
-  if (/24x36|36x24|60x90|90x60/.test(compact) || /gigante|extra\s*grande|xl\b/i.test(raw)) return 'GIGANTE';
-  if (/12x18|18x12|30x45|45x30/.test(compact) || /mediano|medio|medium|m\b/i.test(raw)) return 'MEDIANO';
-  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact) || /peque[ñn]o|chico|small|s\b/i.test(raw)) return 'PEQUENO';
-  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact) || /mini|miniatura|xs\b/i.test(raw)) return 'MINI';
-  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact) || /portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco/i.test(raw)) return 'PORTADA_ALBUM';
+  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact) || /\b(portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco)\b/i.test(raw)) return 'PORTADA_ALBUM';
+  if (/18x24|24x18|45x60|60x45/.test(compact) || /\b(grande|large|l)\b/i.test(raw)) return 'GRANDE';
+  if (/24x36|36x24|60x90|90x60/.test(compact) || /\b(gigante|extra\s*grande|xl)\b/i.test(raw)) return 'GIGANTE';
+  if (/12x18|18x12|30x45|45x30/.test(compact) || /\b(mediano|medio|medium|m)\b/i.test(raw)) return 'MEDIANO';
+  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact) || /\b(peque[ñn]o|chico|small|s)\b/i.test(raw)) return 'PEQUENO';
+  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact) || /\b(mini|miniatura|xs)\b/i.test(raw)) return 'MINI';
   return raw.toUpperCase();
 }
 

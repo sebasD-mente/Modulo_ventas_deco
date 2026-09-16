@@ -27,13 +27,22 @@ export const STAND_ENTITY_ALIASES = [
   // ── MÚSICA & ÁLBUMES (Con afinidad a PORTADA_ALBUM) ───────────────────────
   {
     canonicalTitle: 'Bad Bunny - Un Verano Sin Ti',
+    searchQuery: 'Bad Bunny',
+    category: 'MUSICA',
+    defaultSizeId: 'PORTADA_ALBUM',
+    aliases: [
+      'bad bunny', 'bad buni', 'badbunny', 'conejo malo', 'el conejo malo',
+      'benito', 'el conejo', 'el benito'
+    ]
+  },
+  {
+    canonicalTitle: 'Bad Bunny - Un Verano Sin Ti',
     searchQuery: 'Un Verano Sin Ti Bad Bunny',
     category: 'MUSICA',
     defaultSizeId: 'PORTADA_ALBUM',
     aliases: [
-      'un verano sin ti', 'verano sin ti', 'bad bunny', 'conejo malo', 'el conejo malo',
-      'benito', 'el corazon de bad bunny', 'corazon con ojos', 'corazon triste',
-      'bad buni', 'badbunny', 'el conejo', 'el benito'
+      'un verano sin ti', 'verano sin ti', 'el corazon de bad bunny',
+      'corazon con ojos', 'corazon triste'
     ]
   },
   {
@@ -186,7 +195,7 @@ export const STAND_ENTITY_ALIASES = [
     searchQuery: 'Spider-Man',
     category: 'SUPERHEROES',
     aliases: [
-      'spiderman', 'spider-man', 'el hombre arana', 'el hombre araña', 'hombre arana',
+      'spiderman', 'spider-man', 'spider man', 'spider', 'el hombre arana', 'el hombre araña', 'hombre arana',
       'peter parker', 'miles morales', 'spiderverse', 'into the spider verse', 'arana marvel'
     ]
   },
