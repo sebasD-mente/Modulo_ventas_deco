@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-09T14:28:30Z
+# BRIEFING — 2026-09-15T18:12:00Z
 
 ## Mission
-Investigate GCS storage, Docker/Dokploy multi-stage build, and health check/observability for Deko EventSales.
+Survey codebase for R3 (Cirugía 2.3): AbortController in manual search (useCatalogSearch.js, webCatalogService.js) and asynchronous snapshot caching (catalogCacheService.js, catalog-cache-service.test.js).
 
 ## 🔒 My Identity
 - Archetype: explorer
@@ -9,36 +9,42 @@ Investigate GCS storage, Docker/Dokploy multi-stage build, and health check/obse
 - Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/explorer_survey_3
 - Original parent: 40958512-4854-45d9-bf41-45feacb902c8
 - Milestone: survey
+- Current Role: Codebase Investigator (R3: AbortController & Cache Resilience)
+- Current Parent ID: db233a73-dd6b-4945-8057-cdd1e9a20608
+- Parent Orchestrator Directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\orchestrator_24
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement
 - Zero assumptions, live verification where needed
 - Root cause DevOps discipline: no code hacks for infra issues
 - Strict project isolation and zero technical debt
+- Adherence to line count ceilings: useCatalogSearch.js <= 200, catalogCacheService.js <= 200
 
 ## Current Parent
-- Conversation ID: 40958512-4854-45d9-bf41-45feacb902c8
-- Updated: not yet
+- Conversation ID: db233a73-dd6b-4945-8057-cdd1e9a20608
+- Updated: 2026-09-15T18:12:00Z
 
 ## Investigation State
 - **Explored paths**:
-  - `server/services/gcsStorageService.js` (silent fallback to local disk `public/uploads`)
-  - `server/config/gcs.js`, `server/config/env.js`, `.env`, `.env.example`
-  - `Dockerfile`, `docker-compose.yml`, `package.json`, `prisma/schema.prisma`
-  - GCP CLI: `gcloud`, `gsutil`, project `tienda-deco-vintage-web`, service accounts, bucket list
-  - `server/index.js` (/health endpoint, graceful shutdown bug with missing db.js)
+  - `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_3\DISPATCH.md`
+  - `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\ORIGINAL_REQUEST.md` (header `2026-09-15T23:59:14Z`)
+  - `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 2, Cirugía 2.3)
+  - `src/components/manual-sale/hooks/useCatalogSearch.js` (80 lines)
+  - `src/services/catalogCacheService.js` (96 lines)
+  - `server/services/webCatalogService.js` (558 lines)
+  - `tests/catalog/catalog-cache-service.test.js` (22 tests)
+  - `scripts/audit-monoliths.js` (default ceiling 200)
 - **Key findings**:
-  - `gs://deko-eventsales-media` does not exist (404); current config points to web bucket `decovintage-master-media`.
-  - GCP CLI is 578.0.0 with ADC active in `us-central1`. Service account `deco-storage-uploader` exists with objectAdmin.
-  - `gcsStorageService.js` silently catches GCS failures and writes to `public/uploads` (ephemeral disk in Docker).
-  - Dockerfile uses `node:22-alpine` (musl vs glibc mismatch with Prisma `debian-openssl-3.0.x`).
-  - `.dockerignore` is missing; `entrypoint.sh` is missing; no migration/db push runs at container startup.
-  - `Dockerfile` attempts to copy non-existent `/app/public` in runner stage.
-  - `/health` endpoint is a shallow static check without DB validation. `server/index.js` imports non-existent `./config/db.js` during shutdown.
-- **Unexplored areas**: None for survey scope 3.
+  - `useCatalogSearch.js` lacks `activeAbortRef` and abort calls on search change or clear.
+  - `searchPostersWithFallback` is in `src/services/catalogCacheService.js` with hardcoded 5000ms timeout and catches all errors falling back to local snapshot.
+  - Proposed polymorphic signature for `searchPostersWithFallback` to receive `{ signal }` and re-throw on user cancellation.
+  - Proposed `saveCatalogSnapshot` deferred serialization (`setTimeout(..., 0)`) in browser, synchronous in tests to preserve all 22 passing tests.
+  - Line count projections: `useCatalogSearch.js` ~98 lines (<= 200), `catalogCacheService.js` ~118 lines (<= 200).
+- **Unexplored areas**: None. Scope fully covered.
 
 ## Key Decisions Made
-- Fully documented architecture specification for R4 (GCS bucket provisioning, objectViewer public access, credentials in Dokploy) and R6 (multi-stage `node:22-bookworm-slim`, robust `entrypoint.sh`, strict `.dockerignore`, deep `/health` endpoint).
+- Comprehensive 5-component handoff report generated in `handoff.md`.
+- All requirements from dispatch addressed with exact line numbers and proposed code snippets.
 
 ## Artifact Index
 - DISPATCH.md — Task assignment log

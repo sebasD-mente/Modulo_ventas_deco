@@ -1612,3 +1612,347 @@ Integrity mode: development
 - [ ] Capturas de pantalla actualizadas que muestran la conversación orgánica real y las tarjetas filtradas.
 - [ ] `npm run harness:check` 100% verde (9/9 Zero-Trust, 0 secretos, build exitoso).
 - [ ] Reporte y hoja de ruta arquitectónica entregados a la Dirección.
+
+## 2026-09-15T17:17:38Z
+
+# Teamwork Project Prompt
+
+Auditoría forense 360°, diagnóstico exhaustivo de causa raíz y formulación del roadmap quirúrgico cero deuda técnica sobre el repositorio `Modulo_Ventas` y Stand {IA}, con entrega del Informe Maestro Final de Fred estructurado bajo 5 secciones obligatorias, respaldado 100% por inspección de código real y cero suposiciones.
+
+Requested team: Squad Especialista de Subagentes de Fred (4 Sabuesos: Búsqueda Híbrida/RAG, Orquestador Conversacional Stand {IA}, Arquitectura Monolítica/Estado, Resiliencia Operativa/DB)
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Auditoría Forense del Motor de Búsqueda Híbrida, RAG y Contaminación Vectorial (Sabueso 1)
+- Inspección algorítmica exhaustiva en:
+  - `server/services/embeddingService.js`
+  - `server/services/webCatalogService.js`
+  - `server/services/catalog/liveCatalogSyncService.js`
+  - `server/services/semantic/entityAliases.js`
+  - `src/components/manual-sale/hooks/useCatalogSearch.js`
+  - `src/services/catalogCacheService.js`
+  - `server/controllers/catalogController.js`
+- Diagnóstico de causa raíz del "Caso Messi y Búsquedas Contaminadas":
+  - Identificar por qué consultas compuestas como *"muéstrame lo que tenemos de messi"* conservan palabras funcionales/stop words en `normQueryTokens` y cómo la condición `normQueryTokens.some(...)` genera falsos positivos.
+  - Auditar la calibración del umbral de similitud coseno (`minThreshold = 0.55` y `similarity >= 0.60`) y el balance de scoring léxico vs vectorial y deduplicación.
+- Auditoría del Buscador Manual:
+  - Analizar la interacción entre el snapshot local en `localStorage` (`saveCatalogSnapshot`) y la API en vivo `/api/catalog/web-posters`.
+  - Determinar por qué se percibe errático o lento y evaluar el comportamiento ante desconexiones, timeouts y fallbacks.
+
+### R2. Auditoría del Orquestador Conversacional Stand {IA} y Experiencia de Mostrador (Sabueso 2)
+- Inspección detallada en:
+  - `server/services/ai/aiPromptService.js`
+  - `server/services/ai/aiStreamService.js`
+  - `server/services/ai/aiClosedLoopService.js`
+  - `server/services/ai/aiToolsService.js`
+  - `src/components/ai-chat/` (`useAiChatStream.js`, `ChatMessageList.jsx`, `ChatToolCards.jsx`, `ChatDraftCard.jsx`, `ChatInputBar.jsx`)
+- Erradicación de verbosidad e interrupciones:
+  - Analizar `buildSalesSystemPrompt` identificando directivas que induzcan explicaciones innecesarias o textos redundantes que frenan la velocidad del cajero en mostrador ferial.
+  - Auditar el contrato y comportamiento de la herramienta `searchCatalog`: determinar cuándo debe invocarse y cómo presentar resultados sin saturar la pantalla ni hablar de más.
+- Auditoría de renderizado y streaming reactivo:
+  - Evaluar duplicidades entre el texto generado por streaming SSE y las tarjetas interactivas (`ChatToolCards.jsx`).
+  - Revisar el ciclo de vida del borrador interactivo (`prepareSaleDraft`): cómo se sincroniza el estado local de React con los eventos SSE del backend y evitar cierres obsoletos (*stale closures*).
+- Experiencia de venta natural:
+  - Evaluar si el agente actúa como un copiloto táctico ágil (acciones en 1 clic, confirmación visual rápida) o como un chatbot genérico invasivo.
+
+### R3. Auditoría de Arquitectura de Software, Monolitos y Gestión de Estado (Sabueso 3)
+- Ejecución e interpretación real del script `node scripts/audit-monoliths.js` en el repositorio local.
+- Mapa cuantitativo de deuda técnica monolítica:
+  - Inventariar todos los archivos que superan las 200 líneas y los críticos (>1000 líneas).
+  - Identificar acoplamientos excesivos, lógica de negocio incrustada en vistas UI y controladores con responsabilidades múltiples.
+- Auditoría de ciclos de vida y memoria:
+  - Detectar `useEffect` y suscripciones sin limpieza en frontend.
+  - Revisar el ciclo de vida del Event Loop en Node.js (manejo de SSE, conexiones a Prisma/PostgreSQL, llamadas a Gemini SDK).
+
+### R4. Auditoría de Resiliencia Operativa, Concurrencia y Base de Datos (Sabueso 4)
+- Inspección en:
+  - `server/services/catalogSyncService.js`
+  - `server/services/catalog/liveCatalogSyncService.js`
+  - `server/services/ai/aiKeyPoolService.js`
+  - `server/services/ai/aiMediaService.js`
+  - `server/routes/apiRoutes.js`
+  - `server/services/saleService.js`
+  - `prisma/schema.prisma`
+- Sincronización multi-tenant y webhooks:
+  - Garantizar que nuevos productos publicados en la web se reflejen de inmediato en el stand sin reiniciar contenedores ni corromper cachés.
+- Alta disponibilidad en feria física:
+  - Diagnosticar el comportamiento del Módulo de Ventas ante cortes de internet de 30+ segundos.
+  - Evaluar la resiliencia del pool de claves Gemini (`aiKeyPoolService.js`) ante errores 429/503 y detectar llamadas multimodales en `aiMediaService.js` que eludan el pool de fallback.
+  - Identificar contención transaccional en PostgreSQL (`tx.event.update` en `saleService.js`) que serialice ventas concurrentes de múltiples cajeros.
+
+### R5. Entrega del Informe Maestro de Fred (Formato Obligatorio en 5 Secciones)
+- Generar el informe final consolidado estructurado estrictamente en:
+  - **SECCIÓN 1:** Radiografía completa del Módulo de Ventas Stand {IA} (Venta IA, Venta Manual, Catálogo en Vivo, Cola de Taller, Arqueos, Monitoreo, Webhooks).
+  - **SECCIÓN 2:** Matriz de Diagnóstico de Causa Raíz (`ID | Subsistema | Síntoma Visible | Causa Raíz en Código (Archivo:Líneas) | Nivel de Riesgo P0/P1/P2`).
+  - **SECCIÓN 3:** Disección Quirúrgica del Sistema de Búsqueda (análisis punto por punto de contaminación vectorial, stop words y caché local).
+  - **SECCIÓN 4:** Disección Quirúrgica de la Experiencia Stand {IA} (flujo conversacional, verbosidad, latencia percibida, renderizado de herramientas).
+  - **SECCIÓN 5:** Plan Maestro de Cirugía y Roadmap Cero Deuda (intervenciones atómicas priorizadas según el protocolo de cirugía de arquitectura).
+- Cumplimiento inquebrantable de **Cero Suposiciones**: cada hallazgo debe citar archivo real y rango exacto de líneas inspeccionadas.
+
+## Verification Resources
+- Script ejecutable de auditoría: `node scripts/audit-monoliths.js`
+- Comprobaciones del arnés: `npm run harness:check`
+- Código fuente local en `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+
+## Acceptance Criteria
+
+### Verificación de Búsqueda y Algoritmos (Sabueso 1)
+- [ ] Ubicación exacta en código (archivo y líneas) de la condición de matching de tokens de consulta en `webCatalogService.js` / `embeddingService.js` con explicación de por qué pasan stop words.
+- [ ] Mecanismo exacto de sobreescritura/destrucción en `saveCatalogSnapshot` (`catalogCacheService.js`) documentado con flujo de datos.
+- [ ] Evaluación matemática del umbral de similitud coseno (0.55 / 0.60) y por qué admite obras no relacionadas.
+
+### Verificación Conversacional y Ergonomía (Sabueso 2)
+- [ ] Directivas exactas en `aiPromptService.js:buildSalesSystemPrompt` que provocan verbosidad o interrupciones identificadas con números de línea.
+- [ ] Análisis de concurrencia y flujo de datos de `prepareSaleDraft` en `useAiChatStream.js` documentado.
+- [ ] Identificación de áreas táctiles subdimensionadas (<44px) en componentes de chat/mostrador.
+
+### Verificación de Arquitectura y Código (Sabueso 3)
+- [ ] Salida cuantitativa real de `node scripts/audit-monoliths.js` incluida en el reporte con lista de archivos >200 líneas y críticos.
+- [ ] Identificación con archivo y línea de efectos colaterales o suscripciones sin limpieza en hooks y controladores.
+
+### Verificación de Resiliencia y Base de Datos (Sabueso 4)
+- [ ] Identificación de llamadas en `aiMediaService.js` que eludan el pool de fallback y fallan con HTTP 429.
+- [ ] Diagnóstico del candado exclusivo de fila (`tx.event.update`) en `saleService.js` y su impacto en tiempos de respuesta.
+- [ ] Análisis del comportamiento offline ante pérdida de conectividad de 30 segundos.
+
+### Integridad del Entregable
+- [ ] Informe Maestro de Fred contiene las 5 secciones requeridas sin omisiones.
+- [ ] 100% de las afirmaciones respaldadas por inspección real de código fuente con cita de archivo y línea.
+- [ ] Cumplimiento estricto del aislamiento entre proyectos (0 alteraciones a repositorios o bases de datos externas).
+
+## 2026-09-15T19:57:22Z
+
+# Teamwork Project Prompt — Fase 1 (Roadmap Quirúrgico Cero Deuda)
+
+Implementación atómica de la **Fase 1 del Roadmap Quirúrgico Cero Deuda (P0)** en el repositorio `Modulo_Ventas`, incorporando las recomendaciones críticas de Gary para prevenir colisiones de secuencias en PostgreSQL, blindar la experiencia de usuario ante fallos de IA multimodal y asegurar idempotencia real RFC 7231 en mostrador ferial.
+
+Requested team: Squad de Cirugía de Arquitectura (Fred & Implementadores Especialistas)
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+Reference specification: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md (Sección 5: Fase 1)
+
+## Requirements
+
+### R1. Desacoplamiento de Concurrencia en PostgreSQL con Secuencias Nativas (Cirugía 1.1)
+- Modificar `server/services/sales/saleNumberGenerator.js` y `server/services/sales/saleTransactionService.js` para eliminar el incremento serial mediante `tx.event.update` dentro de `prisma.$transaction`.
+- Implementar secuencias nativas de PostgreSQL (`nextval`) sin retención de bloqueos de tupla (`RowExclusiveLock` / `FOR UPDATE`) sobre la tabla `events`.
+- **Directiva de Gary (Prevención de Colisiones):** La secuencia debe crearse/inicializarse dinámicamente asegurando que arranque en `COALESCE("currentSaleSequence", 0) + 1` del evento actual, previniendo duplicados con ventas preexistentes:
+  ```sql
+  DO $$
+  DECLARE
+    current_seq int;
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename = 'sale_seq_' || quote_ident($1)) THEN
+      SELECT COALESCE("currentSaleSequence", 0) + 1 INTO current_seq FROM "Event" WHERE id = $1;
+      EXECUTE 'CREATE SEQUENCE sale_seq_' || quote_ident($1) || ' START WITH ' || current_seq;
+    END IF;
+  END $$;
+  ```
+- **Casting Seguro:** Castear explícitamente el valor `BigInt` retornado por `nextval` a `Number()` en JavaScript para evitar problemas de serialización JSON.
+- Mantener estrictamente el formato canónico del ticket (`{NOMBRE_EVENTO}-{SECUENCIA}`).
+
+### R2. Erradicación de Mocks en `aiMediaService` y Resiliencia en Modales UI (Cirugía 1.2)
+- En `server/services/ai/aiMediaService.js` (`#L138-L141, L165-L168, L196-L199, L235-L238`), erradicar completamente los retornos mock quemados (*"Chainsaw Man Q65"*, etc.) en los bloques `catch`. Propagar excepciones descriptivas estructuradas (`throw new Error('AI_MEDIA_SERVICE_FAILED')`).
+- En `server/services/geminiPoolService.js`, sanear la lista del pool de modelos a identificadores válidos y operativos de Google GenAI (`gemini-2.5-flash`, `gemini-2.5-pro` u homólogos oficiales).
+- En `server/services/embeddingService.js#L48-L55`, canalizar `embedContent` a través de `executeWithModelFallback` para tolerar errores HTTP 429 mediante rotación automática de API Keys.
+- **Directiva de Gary (UX en Mostrador):** En los componentes de frontend que consumen notas de voz, fotos de obras y fotos de lote (ej. modales de dictado y escaneo), capturar limpiamente los errores de IA. Si la inferencia falla, detener el spinner y mostrar un banner visual ámbar/rojo con mensaje claro y botón de acción directa *"Cargar Manual"*, impidiendo bloqueos o spinners infinitos.
+
+### R3. Resiliencia Offline e Idempotencia Real RFC 7231 (Cirugía 1.3)
+- **Directiva de Gary (Esquema Prisma):** Agregar el campo `idempotencyKey String? @unique` al modelo `Sale` en `prisma/schema.prisma` y sincronizarlo con la base de datos de forma segura.
+- **Idempotencia RFC 7231 en Backend:** En `server/services/sales/saleTransactionService.js` y `server/controllers/saleController.js`, si una petición incluye un `idempotencyKey` que ya existe en la base de datos, **no lanzar error 500 ni rechazar la transacción**: retornar de inmediato la venta previa registrada con status HTTP 200 OK y el flag `{ idempotentReplay: true }`.
+- **Generación en Frontend:** En `src/components/manual-sale/hooks/useManualSaleCart.js` y el flujo de ventas, generar un `clientSaleUuid = crypto.randomUUID()` transmitido en la cabecera HTTP `Idempotency-Key`.
+- **Tolerancia Offline 30s:** Manejo defensivo en frontend para reintentar la venta con la misma clave ante parpadeos de red sin duplicar filas en `sales`, `sale_items` o `sale_payments`.
+
+## Verification Resources
+- Suite de arnés oficial: `npm run harness:check`
+- Comprobación de ausencia de mocks: `git grep -n "Chainsaw Man" server/` (debe devolver 0 fuera de tests archivados)
+- Compilación de producción: `npm run build`
+- Pruebas de base de datos y prisma: `npx prisma validate`
+
+## Acceptance Criteria
+
+### Concurrencia PostgreSQL (R1)
+- [ ] `tx.event.update` eliminado del flujo de consecutivo dentro de `prisma.$transaction`.
+- [ ] Secuencia creada dinámicamente con offset correcto (`currentSaleSequence + 1`), impidiendo colisión con ventas previas.
+- [ ] Consecutivo devuelto como `Number` y formato de ticket `{NOMBRE}-{SEQ}` intacto.
+
+### Saneamiento de IA y Frontend UI (R2)
+- [ ] 0 referencias a datos mock ficticios en `server/services/ai/aiMediaService.js`.
+- [ ] Fallos de red o 429 en voz/fotos muestran banner con botón "Cargar Manual" en la interfaz sin congelar la pantalla.
+- [ ] `embeddingService.js` utiliza fallback de claves ante errores 429.
+
+### Idempotencia RFC 7231 (R3)
+- [ ] Campo `idempotencyKey` con índice `@unique` agregado al modelo `Sale` en `prisma/schema.prisma`.
+- [ ] Peticiones repetidas con la misma `Idempotency-Key` devuelven la venta existente con HTTP 200 sin insertar duplicados.
+- [ ] El frontend genera y envía `Idempotency-Key` en cada intento de confirmación de venta.
+
+### Integridad General
+- [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos).
+- [ ] `npm run build` exitoso con código de salida 0.
+- [ ] Cero acoplamiento o alteraciones a bases de datos ajenas (aislamiento sagrado).
+
+## 2026-09-15T23:59:14Z
+
+# Teamwork Project Prompt — Fase 2 (Roadmap Quirúrgico Cero Deuda)
+
+Implementación atómica y blindada de la **Fase 2 del Roadmap Quirúrgico Cero Deuda (P0)** en el repositorio `Modulo_Ventas`, erradicando definitivamente la contaminación vectorial en el motor de búsqueda híbrida/RAG, resolviendo entidades culturales cortas ("F1", "CR7"), sincronizando stop-words universales y dotando de `AbortController` al buscador manual de mostrador.
+
+Working directory: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+Integrity mode: development
+Reference specification: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 2)
+
+## Requirements
+
+### R1. Sincronización Universal de Stop-Words y Resolución de Entidades Cortas (Cirugía 2.1)
+- Crear o centralizar la lista completa y exhaustiva `UNIVERSAL_STOP_WORDS` (50+ términos coloquiales de mostrador: `'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas', 'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio', 'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños', 'hola', 'buenas', 'buenos', 'muestrame', 'mustrame', 'muéstrame', 'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo', 'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'`) para consumo compartido entre `webCatalogService.js` y `embeddingService.js`.
+- En `server/services/embeddingService.js`:
+  - Utilizar `UNIVERSAL_STOP_WORDS` en lugar de la lista reducida de 11 palabras.
+  - Implementar lista blanca de entidades cortas reconocidas:
+    ```javascript
+    const KNOWN_SHORT_ENTITIES = new Set(['f1', 'u2', 'r34', 'go', 'up', 'cr7']);
+    ```
+    para que tokens críticos de 2 caracteres no sean purgados por la regla `t.length > 2`.
+  - Aplicar `resolveEntityAlias(cleanQuery)` o expansión canónica antes de la tokenización para resolver *"f1"* y apodos culturales.
+- En `server/services/semantic/entityAliases.js`:
+  - Incorporar la entidad `Formula 1 - F1` con alias `['f1', 'formula 1', 'formula uno', 'carreras', 'ferrari f1', 'red bull f1', 'verstappen', 'hamilton', 'senna', 'ayrton senna']` (categoría `DEPORTES` o `CARRERAS`).
+  - Incorporar la entidad `Cristiano Ronaldo - CR7` con alias `['el bicho', 'cr7', 'cristiano ronaldo', 'cristiano', 'ronaldo', 'siuu', 'el comandante']` (categoría `FUTBOL`).
+
+### R2. Calibración Vectorial (>= 0.72) y Compuerta de Entidad Raíz (Cirugía 2.2)
+- En `server/services/embeddingService.js`:
+  - Elevar el umbral complementario para candidatos puramente vectoriales de `0.60` a **`0.72`** para eliminar el ruido basal del hipercono de embeddings 768d/3072d.
+  - Sustituir la condición débil `.some` por cobertura estricta de tokens de consulta:
+    ```javascript
+    const matchesEntity = normQueryTokens.length > 0 && normQueryTokens.every((tok) => posterText.includes(tok));
+    ```
+  - Reemplazar la compuerta restrictiva `allSameTitle` por comprobación de entidad canónica compartida: si los primeros resultados léxicos corresponden a una entidad raíz compartida (ej. *"messi"*), no admitir en la mezcla vectorial obras que pertenezcan a entidades distintas, permitiendo a la vez múltiples obras del mismo personaje (*"Messi - El Beso Eterno"*, *"Messi - El Beso de la Gloria"*).
+
+### R3. Blindaje de Red con `AbortController` en Buscador Manual y Snapshot Asíncrono (Cirugía 2.3)
+- En `src/components/manual-sale/hooks/useCatalogSearch.js`:
+  - Implementar `activeAbortRef = useRef(null)`.
+  - En cada cambio de `searchQuery`, abortar inmediatamente cualquier petición HTTP en vuelo (`activeAbortRef.current?.abort()`) antes de disparar el nuevo debounce.
+  - Pasar el `signal` a `searchPostersWithFallback`.
+  - Ignorar excepciones de tipo `AbortError` limpiamente sin congelar la interfaz ni parpadear mensajes de error.
+- En `src/services/catalogCacheService.js`:
+  - Ajustar `TIMEOUT_MS` a `1500ms`.
+  - Optimizar `saveCatalogSnapshot` para diferir la serialización a `localStorage` fuera del hilo crítico de renderizado (mediante `setTimeout(..., 0)` o microtarea), preservando la compatibilidad síncrona en entornos de testing donde `localStorage` se evalúa inmediatamente.
+
+### R4. Techos de Líneas y Calidad de Código
+- `server/services/embeddingService.js` <= 200 líneas.
+- `src/components/manual-sale/hooks/useCatalogSearch.js` <= 200 líneas.
+- `src/services/catalogCacheService.js` <= 200 líneas.
+- `server/services/semantic/entityAliases.js` <= 600 líneas.
+
+## Verification Resources
+- Arnés Zero-Trust: `npm run harness:check`
+- Compilación Vite: `npm run build`
+- Suite de pruebas unitarias y adversariales:
+  - `node --test tests/catalog/catalog-cache-service.test.js`
+  - `node --test tests/ai/embeddingService.test.js`
+  - `node --test tests/adversarial/m1-embeddings-adversarial.test.js`
+- Test de regresión y cobertura de búsqueda con alias cortos y stop words:
+  - Verificar que `"muéstrame lo que tenemos de messi"` retiene únicamente `['messi']`.
+  - Verificar que `"f1"` retiene `"f1"` y no se descarta.
+  - Verificar que búsqueda de `"f1"` no devuelva pósters de baloncesto.
+
+## Acceptance Criteria
+
+### Búsqueda Semántica y Stop-Words (R1)
+- [ ] `normQueryTokens` descarta limpiamente verbos y palabras de mostrador (*"muéstrame"*, *"tenemos"*, *"cuánto cuesta"*).
+- [ ] Consulta `"f1"` retiene el token `"f1"` y resuelve alias a Formula 1.
+- [ ] Entidades F1 y CR7 agregadas en `entityAliases.js` con sus respectivos alias culturales.
+
+### Calibración y Compuerta de Entidad (R2)
+- [ ] Umbral vectorial complementario fijado en `>= 0.72`.
+- [ ] Descarte tajante de candidatos que no cumplan `every` sobre los tokens de entidad.
+- [ ] Búsqueda de *"Messi"* admite múltiples obras de Messi pero bloquea pósters no afines (ej. Cristiano Ronaldo o películas).
+
+### Ergonomía y Buscador Manual (R3)
+- [ ] `activeAbortRef` cancela peticiones HTTP pendientes al escribir en el POS.
+- [ ] `AbortError` no rompe el flujo ni borra la lista de resultados activa.
+- [ ] `TIMEOUT_MS` configurado en `1500ms` en `catalogCacheService.js`.
+
+### Integridad General (R4)
+- [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos, límites de líneas respetados).
+- [ ] `npm run build` exitoso sin errores de bundling.
+- [ ] Todas las suites de pruebas de embeddings y caché pasando 100% verde.
+
+## 2026-09-16T01:32:28Z
+
+# Teamwork Project Prompt — Fase 3 (Roadmap Quirúrgico Cero Deuda)
+
+Implementación atómica y blindada de la **Fase 3 del Roadmap Quirúrgico Cero Deuda (P1)** en el repositorio `Modulo_Ventas`, restituyendo el flujo completo de bucle cerrado SSE (Turno 2) en `aiStreamService.js`, eliminando textos duplicados frente a `ChatDraftCard`, modularizando la tarjeta de borrador con `DraftItemRow.jsx` para cumplir los techos de líneas (<140 líneas), previniendo cierres obsoletos (*stale closures*) con `pendingDraftRef` y garantizando áreas táctiles feriales WCAG 2.1 AAA (>= 44px).
+
+Working directory: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas`
+Integrity mode: development
+Reference specification: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 3)
+
+## Requirements
+
+### R1. Restitución del Bucle Cerrado SSE Turno 2 y Retiro de Texto Duplicado (Cirugía 3.1)
+- En `server/services/ai/aiStreamService.js#L128-L135`:
+  - Eliminar el bloqueo `if (hasDraft) { return; }` que truncaba el streaming impidiendo que Gemini complete el Turno 2 tras ejecutar `prepareSaleDraft`.
+  - Permitir que `streamClosedLoopFollowUp` procese el resultado estructurado de `prepareSaleDraft` como `functionResponse`.
+- En `server/services/ai/aiPromptService.js`:
+  - Ajustar el system prompt para que, tras la preparación de un borrador, Gemini responda con **1 a 2 líneas breves, amables y vendedoras** (*"¡Excelente elección! Te preparé el borrador en pantalla con la promo aplicada. ¿Deseas confirmar la venta?"*).
+  - Prohibir explícitamente en las directivas recitar la lista exhaustiva de ítems, precios unitarios o subtotales que ya están visibles de forma interactiva en `ChatDraftCard`.
+  - Reemplazar la formulación negativa anti-enlatados por directivas afirmativas claras de estilo conversacional ágil para cajero ferial.
+- En `server/services/ai/aiToolsService.js#L8`:
+  - Eliminar el parámetro muerto o no utilizado `mensaje_conversacional` en `searchCatalogDeclaration`.
+
+### R2. Modularización, Cumplimiento de Line Ceilings y Erradicación de Stale Closures (Cirugía 3.2)
+- Crear el subcomponente modular: `src/components/ai-chat/components/DraftItemRow.jsx` (o `src/components/ai-chat/DraftItemRow.jsx` según el patrón de importación):
+  - Extraer el renderizado de filas de ítems del borrador, selector de tamaño/precio, controles de cantidad y botón de sustitución (*swap*).
+- En `src/components/ai-chat/ChatDraftCard.jsx`:
+  - Importar y delegar en `DraftItemRow.jsx`.
+  - Reducir el tamaño total del archivo a **< 140 líneas** (meta: < 125 líneas) para satisfacer `tests/ai/m3-cards-line-ceilings.test.js` y `tests/ai/m4-frontend-modular-adversarial.test.js`.
+- En `src/components/ai-chat/hooks/useAiChatStream.js`:
+  - Implementar `pendingDraftRef = useRef(pendingDraft)` manteniéndolo sincronizado en cada render o actualización de estado.
+  - Asegurar que `handleSendText`, los callbacks de confirmación y el lector SSE consuman siempre `pendingDraftRef.current` para evitar cierres obsoletos (*stale closures*).
+  - Mantener el tamaño de `useAiChatStream.js` estrictamente en **< 160 líneas** (meta: <= 145 líneas).
+
+### R3. Rediseño de Zonas Táctiles de Mostrador Ferial (>= 44px) (Cirugía 3.3)
+- En `src/components/ai-chat/ChatDraftCard.jsx` y `DraftItemRow.jsx`:
+  - Asegurar que los botones de incremento (`+`) y decremento (`-`) de cantidad tengan un área de toque efectiva mínima de `min-w-[44px] min-h-[44px]` (o contenedor de 44px con icono centrado).
+  - Asegurar que los botones de método de pago tengan una altura mínima de `min-h-[44px]` con tipografía táctil legible.
+  - Asegurar que el botón principal *"Confirmar Venta"* tenga una altura mínima de `min-h-[48px]`.
+- En `src/components/ai-chat/ChatToolCards.jsx`:
+  - Verificar que los botones de acción rápida (*"+ Vender"*, etc.) cumplan con el estándar accesible `min-h-[44px]`.
+
+### R4. Techos de Líneas y Calidad de Código
+- `src/components/ai-chat/ChatDraftCard.jsx` < 140 líneas.
+- `src/components/ai-chat/hooks/useAiChatStream.js` < 160 líneas.
+- `src/components/ai-chat/ChatToolCards.jsx` < 140 líneas.
+- `src/components/ai-chat/ChatSwapModal.jsx` < 100 líneas.
+- `server/services/ai/aiStreamService.js` <= 200 líneas.
+- `server/services/ai/aiClosedLoopService.js` <= 200 líneas.
+
+## Verification Resources
+- Suite adversarial de Closed-Loop: `node --test tests/ai/closed-loop-adversarial-challenger.test.js`
+- Suite de techos de líneas de tarjetas: `node --test tests/ai/m3-cards-line-ceilings.test.js`
+- Suite modular adversarial de frontend: `node --test tests/ai/m4-frontend-modular-adversarial.test.js`
+- Arnés Zero-Trust y Monolitos: `npm run harness:check`
+- Compilación Vite: `npm run build`
+
+## Acceptance Criteria
+
+### Closed-Loop SSE y Verbosidad (R1)
+- [ ] Test 1.1 de `tests/ai/closed-loop-adversarial-challenger.test.js` pasa 100% verde (invoca exactamente 2 turnos de `generateContentStream`).
+- [ ] Gemini genera mensaje vendedor conciso (1-2 líneas) tras armar el borrador sin recitar la lista de pósters ya mostrada en pantalla.
+- [ ] Parámetro muerto `mensaje_conversacional` eliminado de `aiToolsService.js`.
+
+### Line Ceilings y Modularidad (R2)
+- [ ] `ChatDraftCard.jsx` tiene estrictamente < 140 líneas.
+- [ ] `DraftItemRow.jsx` creado e integrado limpiamente.
+- [ ] `useAiChatStream.js` consume `pendingDraftRef` erradicando cierres obsoletos.
+- [ ] `tests/ai/m3-cards-line-ceilings.test.js` y `tests/ai/m4-frontend-modular-adversarial.test.js` pasan 100% verde.
+
+### Accesibilidad Táctil Ferial (R3)
+- [ ] Controles de cantidad (`+`, `-`), botones de pago y confirmación cumplen con tamaño mínimo de 44px (o 48px en confirmación).
+- [ ] Tarjetas de herramientas (`ChatToolCards.jsx`) accesibles y optimizadas para pantallas táctiles de mostrador.
+
+### Integridad General (R4)
+- [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos, 0 violaciones de límites).
+- [ ] `npm run build` exitoso sin errores.
+- [ ] 100% de tests unitarios y adversariales aprobados.

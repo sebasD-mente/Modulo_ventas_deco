@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_SIZES, SIZE_CLEANUP_REGEX } from '../manualSaleConstants';
@@ -15,6 +15,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
   const [attachments, setAttachments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const activeSaleUuidRef = useRef(null);
 
   useEffect(() => {
     if (!initialDraft || !initialDraft.items?.length) return;
@@ -70,16 +71,19 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
       availableSizes: poster.sizes || DEFAULT_SIZES,
       selectedSizeId: size.sizeId,
     };
+    activeSaleUuidRef.current = null;
     setCartItems((prev) => [...prev, newItem]);
   };
 
   const updateItemQty = (id, delta) => {
+    activeSaleUuidRef.current = null;
     setCartItems((prev) =>
       prev.map((it) => (it.id === id ? (it.quantity + delta > 0 ? { ...it, quantity: it.quantity + delta, subtotal: Number(((it.quantity + delta) * it.unitPrice).toFixed(2)) } : null) : it)).filter(Boolean)
     );
   };
 
   const changeItemSize = (id, newSize) => {
+    activeSaleUuidRef.current = null;
     setCartItems((prev) =>
       prev.map((it) => {
         if (it.id !== id) return it;
@@ -90,15 +94,24 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
     );
   };
 
-  const removeItem = (id) => setCartItems((prev) => prev.filter((it) => it.id !== id));
+  const removeItem = (id) => { activeSaleUuidRef.current = null; setCartItems((prev) => prev.filter((it) => it.id !== id)); };
   const unlinkAttachments = () => { setAttachments([]); setInputChannel('MANUAL_RAPIDA'); };
-  const clearCart = () => { setCartItems([]); setDiscount(0); setNotes(''); setAttachments([]); setInputChannel('MANUAL_RAPIDA'); setErrorMsg(null); };
+  const clearCart = () => { activeSaleUuidRef.current = null; setCartItems([]); setDiscount(0); setNotes(''); setAttachments([]); setInputChannel('MANUAL_RAPIDA'); setErrorMsg(null); };
+
+  const handleSetDiscount = (val) => {
+    activeSaleUuidRef.current = null;
+    setDiscount(val);
+  };
 
   const confirmSale = async () => {
     if (cartItems.length === 0) { setErrorMsg('Debes agregar al menos un póster a la venta.'); return false; }
     if (!eventId) { setErrorMsg('No hay un evento activo seleccionado.'); return false; }
     setIsSubmitting(true);
     setErrorMsg(null);
+
+    const clientSaleUuid = activeSaleUuidRef.current || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sale-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+    activeSaleUuidRef.current = clientSaleUuid;
+
     const salePayload = {
       eventId,
       items: cartItems.map((i) => ({ productId: isUuid(i.productId) ? i.productId : null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
@@ -107,19 +120,46 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
       notes: notes || null,
       inputChannel: inputChannel || 'MANUAL_RAPIDA',
       attachments: attachments?.length ? attachments : [],
+      idempotencyKey: clientSaleUuid,
     };
 
+    const maxAttempts = 3;
+    const delays = [1500, 3000, 6000];
+    let lastError = null;
+
     try {
-      const res = await authFetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(salePayload) });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Error registrando la venta en la base de datos');
-      try { confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ['#F59E0B', '#10B981', '#3B82F6'] }); } catch (e) {}
-      clearCart();
-      if (onSaleRegistered) onSaleRegistered(json.data);
-      return json.data;
-    } catch (err) {
-      console.error('Error en confirmSale:', err);
-      setErrorMsg(err.message || 'Error registrando la venta');
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          if (attempt > 1) {
+            setErrorMsg(`Reintentando venta tras parpadeo de red (intento ${attempt}/${maxAttempts})...`);
+          }
+          const res = await authFetch('/api/sales', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': clientSaleUuid,
+            },
+            body: JSON.stringify(salePayload),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.error || 'Error registrando la venta en la base de datos');
+          try { confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ['#F59E0B', '#10B981', '#3B82F6'] }); } catch (e) {}
+          activeSaleUuidRef.current = null;
+          clearCart();
+          if (onSaleRegistered) onSaleRegistered(json.data);
+          return json.data;
+        } catch (err) {
+          lastError = err;
+          const isNetworkGlitch = (typeof navigator !== 'undefined' && !navigator.onLine) || err.name === 'TypeError' || err.message?.includes('fetch') || err.message?.includes('Network');
+          if (!isNetworkGlitch || attempt === maxAttempts) {
+            break;
+          }
+          await new Promise((r) => setTimeout(r, delays[attempt - 1]));
+        }
+      }
+
+      console.error('Error en confirmSale:', lastError);
+      setErrorMsg(lastError?.message || 'Error registrando la venta. Pulsa "Confirmar Venta" para reintentar.');
       return null;
     } finally {
       setIsSubmitting(false);
@@ -128,7 +168,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
 
   return {
     cartItems, setCartItems, paymentMethod, setPaymentMethod,
-    discount, setDiscount, notes, setNotes, inputChannel, setInputChannel,
+    discount, setDiscount: handleSetDiscount, notes, setNotes, inputChannel, setInputChannel,
     attachments, setAttachments, isSubmitting, errorMsg, setErrorMsg,
     subtotal, grandTotal, addItemFromPoster, updateItemQty, changeItemSize,
     removeItem, clearCart, unlinkAttachments, confirmSale,

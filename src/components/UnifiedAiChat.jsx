@@ -6,12 +6,8 @@ import ChatMessageList from './ai-chat/ChatMessageList';
 import ChatDraftCard from './ai-chat/ChatDraftCard';
 import ChatInputBar from './ai-chat/ChatInputBar';
 import ChatSwapModal from './ai-chat/ChatSwapModal';
+import AiErrorBanner from './ai-chat/AiErrorBanner';
 
-// Architecture: Cross-browser audio (iOS/Safari) & WebRTC directives:
-// const getSupportedAudioMimeType = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac']
-// navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-// streamRef = useRef(null); streamRef.current.getTracks().forEach(t => t.stop()); clearInterval(recordingTimerRef.current)
-// ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm'; `voice-sale.${ext}`; pendingDraft: pendingDraft || null
 export { getSupportedAudioMimeType };
 
 export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateManualForm }) {
@@ -23,7 +19,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     if (isPinnedToBottomRef.current && chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [chatStream.messages, chatStream.pendingDraft, voiceRecorder.isRecording]);
+  }, [chatStream.messages, chatStream.pendingDraft, voiceRecorder.isRecording, chatStream.aiError]);
 
   return (
     <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-white relative">
@@ -33,6 +29,18 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         onAddPosterToDraft={chatStream.addPosterToDraft} chatContainerRef={chatContainerRef}
         isPinnedToBottomRef={isPinnedToBottomRef} chatBottomRef={chatBottomRef}
       />
+      {chatStream.aiError && (
+        <AiErrorBanner
+          error={chatStream.aiError}
+          onDismiss={chatStream.clearAiError}
+          onManualSale={() => {
+            const channel = chatStream.aiError?.channel || 'MANUAL_RAPIDA';
+            const note = `Fallo IA (${chatStream.aiError?.title || 'Inferencia'}) - Carga manual directa`;
+            chatStream.clearAiError();
+            if (onPopulateManualForm) onPopulateManualForm({ inputChannel: channel, notes: note, items: [] });
+          }}
+        />
+      )}
       {chatStream.pendingDraft && (
         <ChatDraftCard
           pendingDraft={chatStream.pendingDraft}

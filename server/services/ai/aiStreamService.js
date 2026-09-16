@@ -4,7 +4,7 @@ import { getEventKPIs } from '../saleService.js';
 import { executeWithModelFallback, streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
 import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
-import { executeToolCall, streamClosedLoopFollowUp, buildFallbackSummaries } from './aiClosedLoopService.js';
+import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService.js';
 import { getGeminiClient } from '../../config/gemini.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
@@ -125,14 +125,6 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   }
 
   if (executedTools.length > 0) {
-    const hasDraft = executedTools.some(t => t.name === 'prepareSaleDraft');
-    if (hasDraft) {
-      const summaries = buildFallbackSummaries(executedTools);
-      for (const s of summaries) {
-        yield { type: 'token', text: s };
-      }
-      return;
-    }
     yield* streamClosedLoopFollowUp({ executedTools, formattedContents, systemInstruction, client: explicitClient || undefined, trailingTextTokens, rawModelParts });
   } else if (!hasEmittedTokens) {
     yield { type: 'token', text: 'Indica el personaje o franquicia que busca el cliente y te muestro las opciones de inmediato.' };

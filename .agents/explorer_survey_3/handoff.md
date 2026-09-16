@@ -1,224 +1,405 @@
-# Informe de Investigación Técnica (Handoff) — Explorer Survey 3
-
-**Proyecto**: Deko EventSales (Deco Vintage Guate & Deko Labs)  
-**Autor**: explorer_survey_3  
-**Destinatario**: orchestrator_1 (parent: 40958512-4854-45d9-bf41-45feacb902c8)  
-**Fecha/Hora**: 2026-09-09T14:30:00Z  
-**Alcance**: Google Cloud Storage (R4), Docker & Dokploy Multi-Stage (R6), Health Check & Observabilidad  
-
----
-
-## 1. Observation
-
-### 1.1 Google Cloud Storage (GCS) y Almacenamiento Local (R4)
-1. **Archivo `server/services/gcsStorageService.js`**:
-   - Línea 11:
-     ```javascript
-     const LOCAL_UPLOAD_DIR = path.resolve(__dirname, '../../public/uploads');
-     ```
-   - Líneas 19-35:
-     ```javascript
-     if (gcs && ENV.GCS_BUCKET_NAME) {
-       try {
-         const bucket = gcs.bucket(ENV.GCS_BUCKET_NAME);
-         const file = bucket.file(filename);
-         await file.save(buffer, { metadata: { contentType: mimetype }, resumable: false });
-         const publicUrl = `https://storage.googleapis.com/${ENV.GCS_BUCKET_NAME}/${filename}`;
-         return { success: true, url: publicUrl, filename };
-       } catch (err) {
-         console.warn('[GCS Storage] ⚠️ Falló subida a bucket, usando respaldo local:', err.message);
-       }
-     }
-     ```
-   - Líneas 37-48 (Fallback silencioso a disco local):
-     ```javascript
-     try {
-       const targetDir = path.join(LOCAL_UPLOAD_DIR, folder);
-       fs.mkdirSync(targetDir, { recursive: true });
-       const localFilePath = path.join(targetDir, `${Date.now()}-${randomHex}${ext}`);
-       fs.writeFileSync(localFilePath, buffer);
-       const localUrl = `/uploads/${folder}/${path.basename(localFilePath)}`;
-       return { success: true, url: localUrl, filename };
-     } catch (err) { ... }
-     ```
-   - Si `getGCSClient()` o `ENV.GCS_BUCKET_NAME` no están configurados, o si la subida a GCS lanza cualquier error (de red, permisos, etc.), el servicio atrapa el error silenciosamente y escribe en disco efímero en `public/uploads`.
-2. **Archivos de configuración de entorno**:
-   - `server/config/env.js` (Línea 19):
-     `GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME || 'decovintage-master-media'`
-     Apunta por defecto al bucket maestro de la tienda web e-commerce (`decovintage-master-media`), violando el principio de aislamiento estricto de proyectos (`aislamiento-estricto-proyectos`).
-   - `.env` (Línea 8):
-     `GCS_BUCKET_NAME=decovintage-master-media`
-   - `.env.example` (Línea 38-42):
-     `GCS_BUCKET_NAME=decovintage-master-media`
-     `GCS_CREDENTIALS_BASE64=`
-     `GCS_PROJECT_ID=tienda-deco-vintage-web`
-3. **Herramientas CLI de GCP y Proyecto Activo**:
-   - Comando `gcloud --version`:
-     ```
-     Google Cloud SDK 578.0.0
-     bq 2.1.36
-     core 2026.07.24
-     gcloud-crc32c 1.0.0
-     gsutil 5.37
-     ```
-   - Comando `gcloud config list`:
-     ```
-     [compute] region = us-central1
-     [core] account = sebasjimenez0330@gmail.com
-            project = tienda-deco-vintage-web
-     ```
-   - Credenciales ADC locales: `gcloud auth application-default print-access-token` responde con token válido `ya29.a0AdMD...`.
-4. **Estado de Buckets en GCP**:
-   - Comando `gcloud storage buckets list`:
-     Único bucket existente: `gs://decovintage-master-media/` (multi-region US, con `allUsers: roles/storage.objectViewer` y CORS configurado para dominios de Deco Vintage).
-   - Comando `gsutil ls -b gs://deko-eventsales-media`:
-     `BucketNotFoundException: 404 gs://deko-eventsales-media bucket does not exist.`
-     El bucket solicitado en R4 **NO existe aún**.
-5. **Cuentas de Servicio (Service Accounts)**:
-   - `deco-storage-uploader@tienda-deco-vintage-web.iam.gserviceaccount.com` existe y tiene asignados los roles `roles/storage.admin` y `roles/storage.objectAdmin` en el proyecto `tienda-deco-vintage-web`.
-   - `server/config/gcs.js` ya cuenta con soporte nativo para deserializar credenciales JSON provistas en base64 mediante `ENV.GCS_CREDENTIALS_BASE64`.
+# Reporte de Investigación y Diagnóstico Quirúrgico — R3 (Cirugía 2.3)
+**Investigador:** Explorer Survey 3 (`teamwork_preview_explorer`)  
+**Fecha y Hora:** 2026-09-15T18:10:00Z  
+**Alcance:** Blindaje de Red con `AbortController` en Buscador Manual de Catálogo y Snapshot Asíncrono de Resiliencia  
+**Archivos bajo Inspección:**  
+- `src/components/manual-sale/hooks/useCatalogSearch.js` (Líneas actuales: 80 | Límite: 200)  
+- `src/services/catalogCacheService.js` (Líneas actuales: 96 | Límite: 200)  
+- `server/services/webCatalogService.js` vs `src/services/catalogCacheService.js` (Arquitectura Cliente / Servidor)  
+- `tests/catalog/catalog-cache-service.test.js` (22 pruebas unitarias activas)  
 
 ---
 
-### 1.2 Docker y Despliegue en Dokploy (R6)
-1. **Archivo `Dockerfile` existente**:
-   - Línea 5: `FROM node:22-alpine AS builder`
-   - Línea 21: `FROM node:22-alpine AS runner`
-   - Línea 29: `RUN npm ci --only=production` (flag deprecated; además omite devDependencies).
-   - Línea 39: `COPY --from=builder /app/public ./public`
-     **Error crítico comprobado**: El directorio `public` **no existe** en la raíz del proyecto workspace (`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\public` no existe). Cualquier `docker build` fallará en este paso con error de archivo no encontrado.
-   - Línea 43: `CMD ["node", "server/index.js"]`
-     No ejecuta `entrypoint.sh`, no verifica la conexión a PostgreSQL antes de inicializar Express y no ejecuta migraciones ni `prisma db push`.
-2. **Incompatibilidad de Prisma con Alpine**:
-   - `prisma/schema.prisma` (Líneas 1-4):
-     ```prisma
-     generator client {
-       provider      = "prisma-client-js"
-       binaryTargets = ["native", "debian-openssl-3.0.x"]
-     }
-     ```
-   - El schema define como target binario `debian-openssl-3.0.x`. `node:22-alpine` utiliza `musl libc`, lo cual causa fallos de compatibilidad binaria si no se genera específicamente para `linux-musl-openssl-3.0.x` o si faltan bibliotecas C compatibles.
-3. **Ausencia de `.dockerignore`**:
-   - El archivo `.dockerignore` **no existe** en el workspace.
-   - Sin `.dockerignore`, `docker build` envía al daemon de Docker todo el árbol de archivos: `node_modules/` (con binarios Windows), `.env` (credenciales y contraseñas en texto plano), `.agents/`, `.git/`, `.gemini/` y `dist/`.
-4. **Ausencia de `entrypoint.sh`**:
-   - No existe ningún script de inicialización para el contenedor.
-   - En `package.json`, `"prisma": "^6.9.0"` está ubicado en `devDependencies` y `"@prisma/client": "^6.9.0"` está en `dependencies`. Si en la etapa `runner` se corre `npm ci --omit=dev`, el binario CLI de Prisma (`npx prisma`) no estará disponible a menos que `prisma` se mueva a `dependencies` o se copie `node_modules` desde el builder.
-5. **Archivo `docker-compose.yml` existente**:
-   - Líneas 22-23:
-     ```yaml
-     volumes:
-       - ./public/uploads:/app/public/uploads
-     ```
-     Contiene un montaje persistente de `public/uploads`, lo cual es síntoma del acoplamiento con almacenamiento en disco local efímero y contradice el modelo sin estado (stateless) para Dokploy con GCS.
+## 1. Observation (Observaciones Verificadas)
+
+### 1.1. Inspección de `src/components/manual-sale/hooks/useCatalogSearch.js`
+- **Ruta del Archivo:** `src/components/manual-sale/hooks/useCatalogSearch.js`
+- **Total de Líneas Actuales:** 80 líneas (dentro del techo `< 200` líneas de `scripts/audit-monoliths.js`).
+- **Líneas 12-16 (Referencias actuales):**
+  ```javascript
+  12:   const searchInputRef = useRef(null);
+  13:   const searchContainerRef = useRef(null);
+  14:   const isSelectingRef = useRef(false);
+  15:   const debounceRef = useRef(null);
+  ```
+  *Observación:* No existe ninguna referencia para un `AbortController` (`activeAbortRef`).
+- **Líneas 27-57 (Efecto de búsqueda y debounce actual):**
+  ```javascript
+  27:   useEffect(() => {
+  28:     if (isSelectingRef.current) { isSelectingRef.current = false; return; }
+  29:     if (!searchQuery.trim()) {
+  30:       if (debounceRef.current) clearTimeout(debounceRef.current);
+  31:       setSearchResults([]); setIsSearching(false); setShowDropdown(false);
+  32:       return;
+  33:     }
+  34: 
+  35:     setIsSearching(true);
+  36:     if (debounceRef.current) clearTimeout(debounceRef.current);
+  37:     debounceRef.current = setTimeout(async () => {
+  38:       try {
+  39:         const queryText = searchQuery.trim();
+  40:         const results = await searchPostersWithFallback(async (signal) => {
+  41:           const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(queryText)}&limit=30`, { signal });
+  42:           const json = await res.json();
+  43:           return json.success ? (json.data || []) : [];
+  44:         }, queryText, 30);
+  45:         if (!isSelectingRef.current) {
+  46:           setSearchResults(results);
+  47:           setShowDropdown(true);
+  48:         }
+  49:       } catch (err) {
+  50:         console.error('Error buscando pósters:', err);
+  51:       } finally {
+  52:         setIsSearching(false);
+  53:       }
+  54:     }, 120);
+  55: 
+  56:     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  57:   }, [searchQuery]);
+  ```
+  *Observación:*
+  1. Al cambiar `searchQuery`, sólo se cancela el timer del debounce (`clearTimeout(debounceRef.current)` en L36). Si una petición HTTP ya fue despachada por el debounce anterior y continúa en tránsito sobre la red, **no es cancelada**.
+  2. En L40, `searchPostersWithFallback` pasa un `signal` a su callback, pero dicho `signal` proviene del controlador interno de timeout de `searchPostersWithFallback`, no del hook de React.
+  3. En L49-50, el bloque `catch (err)` registra todo error con `console.error('Error buscando pósters:', err)` sin discriminar `AbortError`.
+  4. En L52, `finally` ejecuta `setIsSearching(false)` de manera incondicional, lo que causaría que una petición vieja abortada desactive el indicador de carga de una búsqueda posterior más reciente.
+  5. En L59-62 (`clearSearch`) y L64-70 (`selectPoster`), tampoco se abortan peticiones en vuelo.
+
+### 1.2. Inspección de `src/services/catalogCacheService.js`
+- **Ruta del Archivo:** `src/services/catalogCacheService.js`
+- **Total de Líneas Actuales:** 96 líneas (dentro del techo `< 200` líneas).
+- **Línea 21 (`TIMEOUT_MS` actual):**
+  ```javascript
+  21: const TIMEOUT_MS = 5000;
+  ```
+  *Observación:* El timeout por defecto está configurado en 5000ms (5 segundos). No está exportado.
+- **Líneas 43-74 (`saveCatalogSnapshot` actual):**
+  ```javascript
+  43: export function saveCatalogSnapshot(posters) {
+  44:   if (!Array.isArray(posters) || !posters.length || typeof localStorage === 'undefined') return;
+  45:   try {
+  46:     const existingMap = new Map();
+  47:     const raw = localStorage.getItem(STORAGE_KEY);
+  48:     if (raw) {
+  49:       try {
+  50:         const parsed = JSON.parse(raw);
+  51:         if (Array.isArray(parsed)) parsed.forEach((it) => it?.id && existingMap.set(it.id, it));
+  52:       } catch (_) {}
+  53:     }
+  54: 
+  55:     for (const p of posters) {
+  ...
+  68:     }
+  69: 
+  70:     const merged = Array.from(existingMap.values());
+  71:     const finalItems = merged.length > MAX_LOCAL_CATALOG_ITEMS ? merged.slice(-MAX_LOCAL_CATALOG_ITEMS) : merged;
+  72:     localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems));
+  73:   } catch (_) {}
+  74: }
+  ```
+  *Observación:* Ejecuta `localStorage.getItem`, bucles de des-duplicación, normalización de hasta 300 objetos y `localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems))` de manera **estrictamente síncrona en el hilo principal de JavaScript**. En dispositivos táctiles o terminales POS de gama media/baja durante tipeo rápido, esta serialización bloquea los fotogramas (frame drops).
+- **Líneas 83-95 (`searchPostersWithFallback` actual):**
+  ```javascript
+  83: export async function searchPostersWithFallback(fetchFn, query = '', limit = 8, timeoutMs = TIMEOUT_MS) {
+  84:   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  85:   const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  86:   try {
+  87:     const result = await fetchFn(controller?.signal);
+  88:     if (timeoutId) clearTimeout(timeoutId);
+  89:     if (Array.isArray(result) && result.length > 0) { saveCatalogSnapshot(result); return result; }
+  90:   } catch (err) {
+  91:     if (timeoutId) clearTimeout(timeoutId);
+  92:     console.warn('[catalogCacheService] Fallback a snapshot local:', err?.message || 'timeout 2s');
+  93:   }
+  94:   return searchLocalCatalog(query, limit);
+  95: }
+  ```
+  *Observación:*
+  1. Su firma actual es `(fetchFn, query = '', limit = 8, timeoutMs = TIMEOUT_MS)`.
+  2. No admite un parámetro u objeto de opciones con `signal` externo.
+  3. En el bloque `catch (err)`, atrapa ciegamente cualquier error (incluyendo cancelaciones intencionales por `AbortError`) y **siempre recurre a `searchLocalCatalog(query, limit)`**. Si una consulta "A" es abortada porque el usuario escribió "B", devolver el catálogo local de "A" provocaría que la UI renderice resultados viejos de "A", recreando la condición de carrera de CR-10.
+
+### 1.3. Inspección del Servicio de Búsqueda y Desacoplamiento Cliente/Servidor
+- En el cliente, la función `searchPostersWithFallback` reside en `src/services/catalogCacheService.js` (no en un archivo `src/services/webCatalogService.js`).
+- `server/services/webCatalogService.js` es un módulo del backend Node.js (558 líneas) que consulta Prisma y la base de datos `Product` de PostgreSQL, atendiendo `GET /api/catalog/web-posters`.
+- Los consumidores de `searchPostersWithFallback` en frontend son exactamente dos:
+  1. `src/components/manual-sale/hooks/useCatalogSearch.js#L40`
+  2. `src/components/ai-chat/hooks/useAiChatStream.js#L39, L40`
+
+### 1.4. Inspección de `tests/catalog/catalog-cache-service.test.js`
+- **Comando de Ejecución:** `node --test tests/catalog/catalog-cache-service.test.js`
+- **Resultado Actual:** 22/22 pruebas pasando exitosamente (0 fallos, 0 omitidos).
+- **Dependencias de las Pruebas:**
+  - En las pruebas 3.1, 3.4 y 3.5, se llama síncronamente a `saveCatalogSnapshot(...)` y de inmediato en la siguiente línea se comprueba `getLocalCatalog()`.
+  - En la prueba 4.1, se llama a `await searchPostersWithFallback(fetchFn, 'titan', 8, 2000)` y tras el `await` se aserta síncronamente `const cached = getLocalCatalog(); assert.equal(cached[0].id, 'net-1')`.
+  - Si `saveCatalogSnapshot` utilizara un `setTimeout(..., 0)` incondicional en entornos de testing sin ejecución síncrona, dichas 4 pruebas fallarían de inmediato porque `localStorage` no se habría actualizado al momento de la aserción.
 
 ---
 
-### 1.3 Health Check & Observabilidad
-1. **Endpoint `/health` en `server/index.js` (Líneas 33-35)**:
-   ```javascript
-   // Health check endpoint
-   app.get('/health', (req, res) => {
-     res.json({ status: 'ok', time: new Date().toISOString(), env: ENV.NODE_ENV });
-   });
-   ```
-   - Es un chequeo meramente estático.
-   - **No valida** la conexión a la base de datos PostgreSQL (`prisma.$queryRaw`). Si PostgreSQL cae o la URL es errónea, `/health` sigue respondiendo `200 OK`.
-   - **No valida** el estado de GCS ni del motor de Gemini.
-2. **Defecto en Graceful Shutdown de `server/index.js` (Línea 68)**:
-   ```javascript
-   const { prisma } = await import('./config/db.js');
-   await prisma.$disconnect();
-   ```
-   - **Error en ruta**: El archivo `server/config/db.js` **no existe**. El archivo real es `server/config/prisma.js`. Al recibir `SIGTERM` o `SIGINT`, la desconexión limpia de Prisma falla por importación rota.
+## 2. Logic Chain (Cadena Lógica de Causa a Solución)
+
+1. **Defecto CR-10 y Carreras de Red Asíncronas:**
+   - *Premisa:* En `useCatalogSearch.js`, el usuario teclea a velocidad de mostrador (ej. *"Spider"* -> *"Spiderman"*). El debounce de 120ms evita peticiones intermedias mientras se presiona tecla a tecla, pero una vez que vence el temporizador de la consulta 1, la promesa HTTP se despacha.
+   - *Mecanismo de Falla:* Si la respuesta de la consulta 1 tarda más que la consulta 2 (latencia variable o congestión ferial), la respuesta 1 sobrescribe los resultados de la consulta 2 en `setSearchResults(results)`.
+   - *Solución Requerida:* Cada nueva pulsación o cambio en `searchQuery` debe abortar activamente la promesa HTTP previa mediante `activeAbortRef.current?.abort()`.
+   
+2. **Coordinación de Señales de Aborto:**
+   - *Premisa:* `searchPostersWithFallback` tiene su propio temporizador de timeout (debe ajustarse de 5000ms a 1500ms).
+   - *Mecanismo de Falla:* Si `useCatalogSearch.js` pasa un `signal` externo a `searchPostersWithFallback`, este debe combinarse o encadenarse con el controlador de timeout. Además, si el `signal` externo fue el causante del aborto (`externalSignal.aborted === true`), `searchPostersWithFallback` **no debe retornar el catálogo local de la consulta cancelada**, sino propagar el `AbortError` para que el hook lo ignore limpiamente.
+   - *Solución Requerida:* Flexibilizar el cuarto parámetro de `searchPostersWithFallback` para admitir tanto un número (`timeoutMs`, preservando compatibilidad con los tests y otros hooks) como un objeto de opciones `{ timeoutMs, signal }` o una instancia de `AbortSignal`.
+
+3. **Inmunidad ante `AbortError` en la UI:**
+   - *Premisa:* En JavaScript / Fetch API, una llamada abortada lanza `DOMException: The operation was aborted` (o `AbortError`).
+   - *Mecanismo de Falla:* Si no se filtra en el bloque `catch`, el error se imprime en consola con `console.error`, y el bloque `finally` desactiva prematuramente `setIsSearching(false)` de la consulta que viene detrás.
+   - *Solución Requerida:* 
+     - En `catch`: `if (err?.name === 'AbortError' || controller?.signal?.aborted) return;`.
+     - En `finally`: Solo ejecutar `setIsSearching(false)` si `activeAbortRef.current === controller`.
+
+4. **Descongestión del Hilo Principal con `saveCatalogSnapshot` Asíncrono:**
+   - *Premisa:* `saveCatalogSnapshot` guarda hasta 300 ítems en `localStorage` tras cada respuesta exitosa de red.
+   - *Mecanismo de Falla:* La serialización JSON de 300 objetos con sus variantes de tamaños y URLs en el hilo principal bloquea el refresco de pantalla durante la interacción de venta manual.
+   - *Solución Requerida:* Envolver la lógica de serialización en una función diferida programada con `setTimeout(persist, 0)` en navegadores (`typeof window !== 'undefined'`).
+   - *Preservación de Pruebas:* En entornos Node.js / pruebas unitarias (`typeof window === 'undefined'` o `process.env.NODE_ENV === 'test'` o `options.sync === true`), ejecutar `persist()` de forma inmediata y síncrona, garantizando que `tests/catalog/catalog-cache-service.test.js` mantenga el 100% de aprobación sin requerir refactorización de tests.
+
+5. **Límites Estrictos de Tamaño de Archivo (Techo de 200 Líneas):**
+   - `useCatalogSearch.js`: 80 líneas actuales -> ~98 líneas propuestas (Margen seguro: 102 líneas disponibles).
+   - `catalogCacheService.js`: 96 líneas actuales -> ~118 líneas propuestas (Margen seguro: 82 líneas disponibles).
+   - Ambos cumplen holgadamente la regla de `<= 200` líneas y pasan la auditoría `npm run audit:monoliths`.
 
 ---
 
-## 2. Logic Chain
+## 3. Propuesta Quirúrgica de Código (Diffs y Snippets Exactos)
 
-1. **R4 — Pérdida de Datos en Producción por Fallback a Disco**:
-   - Dado que Dokploy corre contenedores Docker sobre un VPS, el sistema de archivos del contenedor es efímero.
-   - Dado que `gcsStorageService.js` contiene un bloque `catch` que degrada silenciosamente a `LOCAL_UPLOAD_DIR = public/uploads`, cualquier error en GCS guardará archivos en el contenedor.
-   - Al reiniciar, actualizar o escalar el contenedor en Dokploy, todos los archivos guardados en `public/uploads` se destruyen irreversiblemente.
-   - Por tanto, la regla de oro de `cirugia-arquitectura-cero-deuda` exige eliminar el fallback silencioso: en `production`, si GCS no está disponible o falla, la operación debe fallar explícitamente (`fail-fast`) retornando un error controlado al cliente, impidiendo escrituras en disco efímero.
-2. **R4 — Requisitos de Aprovisionamiento del Bucket GCS**:
-   - Dado que el bucket `gs://deko-eventsales-media/` arroja 404, debe ser creado con `gcloud storage buckets create gs://deko-eventsales-media --location=us-central1 --project=tienda-deco-vintage-web --uniform-bucket-level-access`.
-   - Dado que la aplicación genera URLs públicas tipo `https://storage.googleapis.com/deko-eventsales-media/...` (línea 30 de `gcsStorageService.js`), el bucket debe tener permiso de lectura para `allUsers` con rol `roles/storage.objectViewer`.
-   - Dado que el frontend web interactuará con fotos y audios, se debe aplicar una política CORS permisiva para orígenes autorizados.
-   - Para que Dokploy en el VPS pueda autenticarse sin depender de ADC local del desarrollador, se debe inyectar la clave en base64 de la cuenta de servicio (`deco-storage-uploader` o una dedicada `deko-eventsales-sa`) en la variable de entorno `GCS_CREDENTIALS_BASE64`.
-3. **R6 — Garantía Binaria con `node:22-bookworm-slim` y `entrypoint.sh`**:
-   - Dado que `prisma/schema.prisma` compila binarios para `debian-openssl-3.0.x`, la imagen base debe ser `node:22-bookworm-slim` (Debian 12 con OpenSSL 3.0.x y glibc), no Alpine.
-   - Dado que la base de datos de producción puede estar inicializándose en el arranque o requerir migración de esquema, `entrypoint.sh` debe ejecutar un bucle de sondeo (retry loop) con verificación real de conectividad PostgreSQL antes de lanzar la aplicación.
-   - Una vez confirmada la conectividad, `entrypoint.sh` debe ejecutar `npx prisma db push --skip-generate` (o `prisma migrate deploy`) para que el esquema esté siempre al día antes de que Express reciba tráfico.
-   - Finalmente, `entrypoint.sh` debe usar `exec "$@"` para que el proceso Node.js reciba directamente las señales de parada del sistema operativo (`SIGTERM`/`SIGINT`), permitiendo un apagado limpio.
-4. **Observabilidad Robusta del Endpoint `/health`**:
-   - De acuerdo con la sección 4 de `diagnostico-causa-raiz-devops` (*"Superar el Espejismo de HTTP 200"*), un endpoint de salud en producción debe verificar que los componentes vitales estén operando.
-   - `/health` debe realizar un `prisma.$queryRaw\`SELECT 1\`` con timeout estricto. Si la base de datos responde, retorna `200 OK` con metadata de uptime y estado; si falla, retorna `503 Service Unavailable`.
+### 3.1. Propuesta para `src/components/manual-sale/hooks/useCatalogSearch.js`
+
+**Ubicación:** `src/components/manual-sale/hooks/useCatalogSearch.js`
+
+```javascript
+// --- LÍNEA 1-16 ---
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../../context/AuthContext';
+import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
+
+export function useCatalogSearch() {
+  const { authFetch } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const isSelectingRef = useRef(false);
+  const debounceRef = useRef(null);
+  const activeAbortRef = useRef(null); // [+] Referencia para cancelar peticiones en vuelo
+
+// --- LÍNEA 27-58 ---
+  useEffect(() => {
+    if (isSelectingRef.current) { isSelectingRef.current = false; return; }
+
+    // [+] Cancelar inmediatamente cualquier petición HTTP previa en tránsito
+    activeAbortRef.current?.abort();
+
+    if (!searchQuery.trim()) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setSearchResults([]); setIsSearching(false); setShowDropdown(false);
+      return;
+    }
+
+    setIsSearching(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      activeAbortRef.current = controller;
+
+      try {
+        const queryText = searchQuery.trim();
+        const results = await searchPostersWithFallback(
+          async (signal) => {
+            const res = await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(queryText)}&limit=30`, { signal });
+            const json = await res.json();
+            return json.success ? (json.data || []) : [];
+          },
+          queryText,
+          30,
+          { signal: controller?.signal } // [+] Se entrega el signal del AbortController activo
+        );
+
+        if (!isSelectingRef.current && activeAbortRef.current === controller) {
+          setSearchResults(results);
+          setShowDropdown(true);
+        }
+      } catch (err) {
+        // [+] Ignorar limpiamente cancelaciones sin congelar la UI ni emitir errores espurios
+        if (err?.name === 'AbortError' || controller?.signal?.aborted) {
+          return;
+        }
+        console.error('Error buscando pósters:', err);
+      } finally {
+        if (activeAbortRef.current === controller) {
+          setIsSearching(false);
+        }
+      }
+    }, 120);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      activeAbortRef.current?.abort(); // [+] Cleanup al desmontar o re-renderizar
+    };
+  }, [searchQuery]);
+
+// --- LÍNEAS 59-71 (clearSearch y selectPoster) ---
+  const clearSearch = () => {
+    activeAbortRef.current?.abort(); // [+] Cancelación activa
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchQuery(''); setSearchResults([]); setIsSearching(false); setShowDropdown(false);
+  };
+
+  const selectPoster = (poster) => {
+    activeAbortRef.current?.abort(); // [+] Cancelación activa
+    isSelectingRef.current = true;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setIsSearching(false); setShowDropdown(false); setSearchResults([]);
+    const title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo;
+    setSearchQuery(title);
+  };
+```
 
 ---
 
-## 3. Caveats
+### 3.2. Propuesta para `src/services/catalogCacheService.js`
 
-1. **Docker CLI en Windows Host**:
-   - La máquina de desarrollo Windows no cuenta con el ejecutable `docker` en el PATH local. Esto no impide la creación del `Dockerfile`, `.dockerignore` y `entrypoint.sh`, pero la verificación de compilación del contenedor Docker se delega al build remoto de Dokploy/VPS o a una máquina con Docker Desktop/WSL2.
-2. **Migración de Datos Existentes en GCS**:
-   - El bucket `gs://decovintage-master-media/` contiene los pósters del e-commerce web. Las ventas anteriores en `catalog_db` que tengan referencias a archivos antiguos no deben ser alteradas (principio de no modificación de proyectos ajenos en `aislamiento-estricto-proyectos`). El nuevo bucket `gs://deko-eventsales-media/` almacenará exclusivamente los nuevos medios generados por EventSales (comprobantes, notas de voz, fotos de lotes).
-3. **Modo Desarrollo vs Producción en GCS**:
-   - Si un desarrollador local corre la app sin conexión a internet y sin credenciales GCS, la app fallará al subir archivos si no existe un modo mock controlado. Para desarrollo, se puede permitir simulación controlada o exigir credenciales ADC locales (que ya están activas en esta máquina). En producción (`NODE_ENV === 'production'`), el guardado local en disco está **estrictamente prohibido**.
+**Ubicación:** `src/services/catalogCacheService.js`
+
+```javascript
+// --- LÍNEA 21 ---
+// [-] const TIMEOUT_MS = 5000;
+// [+] Reducción a 1500ms para resiliencia en mostrador ferial y exportación formal
+export const TIMEOUT_MS = 1500;
+const MAX_LOCAL_CATALOG_ITEMS = 300;
+
+// --- LÍNEAS 43-75 (`saveCatalogSnapshot`) ---
+export function saveCatalogSnapshot(posters, options = {}) {
+  if (!Array.isArray(posters) || !posters.length || typeof localStorage === 'undefined') return;
+
+  const persist = () => {
+    try {
+      const existingMap = new Map();
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) parsed.forEach((it) => it?.id && existingMap.set(it.id, it));
+        } catch (_) {}
+      }
+
+      for (const p of posters) {
+        if (!p?.id) continue;
+        const sanitized = {
+          id: p.id,
+          titulo: p.titulo || p.name || 'Póster',
+          subtitulo: p.subtitulo || '',
+          categoria: p.categoria || p.category || 'ARTE',
+          imageUrl: p.imageUrl || p.thumbUrl || '/brand/logo-origami.webp',
+          thumbUrl: p.thumbUrl || p.imageUrl || '/brand/logo-origami.webp',
+          precioMinimo: Number(p.precioMinimo) || 25,
+          sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : CANONICAL_SIZES,
+        };
+        existingMap.set(sanitized.id, sanitized);
+      }
+
+      const merged = Array.from(existingMap.values());
+      const finalItems = merged.length > MAX_LOCAL_CATALOG_ITEMS ? merged.slice(-MAX_LOCAL_CATALOG_ITEMS) : merged;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems));
+    } catch (_) {}
+  };
+
+  // [+] En navegador diferir serialización fuera del hilo crítico de renderizado (setTimeout 0).
+  // [+] En pruebas Node.js ejecutar síncrono para preservar aserciones inmediatas.
+  const isSync = options?.sync || typeof window === 'undefined' || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
+  if (isSync) {
+    persist();
+  } else {
+    setTimeout(persist, 0);
+  }
+}
+
+// --- LÍNEAS 83-95 (`searchPostersWithFallback`) ---
+export async function searchPostersWithFallback(fetchFn, query = '', limit = 8, options = TIMEOUT_MS) {
+  const isOptionsObj = typeof options === 'object' && options !== null && !(options instanceof AbortSignal);
+  const timeoutMs = typeof options === 'number' ? options : (isOptionsObj && typeof options.timeoutMs === 'number' ? options.timeoutMs : TIMEOUT_MS);
+  const externalSignal = options instanceof AbortSignal ? options : (isOptionsObj ? options.signal : null);
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(new Error('TIMEOUT_EXCEEDED')), timeoutMs) : null;
+
+  if (externalSignal && controller) {
+    if (externalSignal.aborted) {
+      controller.abort(externalSignal.reason);
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort(externalSignal.reason), { once: true });
+    }
+  }
+
+  try {
+    const result = await fetchFn(controller?.signal || externalSignal);
+    if (timeoutId) clearTimeout(timeoutId);
+    if (Array.isArray(result) && result.length > 0) {
+      saveCatalogSnapshot(result);
+      return result;
+    }
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+    // Si la llamada fue cancelada explícitamente por el usuario (tipeo concurrente), no devolver catálogo viejo
+    if (externalSignal?.aborted || err?.name === 'AbortError') {
+      if (externalSignal?.aborted) {
+        throw err;
+      }
+    }
+    console.warn('[catalogCacheService] Fallback a snapshot local:', err?.message || 'timeout 1.5s');
+  }
+  return searchLocalCatalog(query, limit);
+}
+```
 
 ---
 
-## 4. Conclusion
+## 4. Caveats (Áreas no Investigadas y Consideraciones)
 
-1. **GCS (R4)**:
-   - Se debe aprovisionar de inmediato el bucket `gs://deko-eventsales-media/` en `us-central1` dentro del proyecto `tienda-deco-vintage-web` con acceso público de lectura (`roles/storage.objectViewer`) y CORS.
-   - En `server/services/gcsStorageService.js`: refactorizar eliminando el fallback a `public/uploads`. Si la subida falla, debe lanzar una excepción explícita.
-   - En `server/config/env.js`, `.env` y `.env.example`: cambiar `GCS_BUCKET_NAME` por defecto a `deko-eventsales-media`.
-2. **Docker Multi-Stage & Dokploy (R6)**:
-   - Reemplazar el `Dockerfile` por una arquitectura multi-stage de 3 etapas sobre `node:22-bookworm-slim`:
-     1. `deps`: `package*.json`, `prisma/`, `npm ci`, `npx prisma generate`.
-     2. `builder`: código fuente frontend, `npm run build`.
-     3. `runner`: Debian slim con `openssl` y `ca-certificates`, `prisma` disponible, código servidor, `entrypoint.sh` ejecutable con `exec "$@"`.
-   - Eliminar de `Dockerfile` la línea errónea `COPY --from=builder /app/public ./public`.
-   - Crear `.dockerignore` riguroso que excluya `node_modules`, `.env*`, `.agents`, `public/uploads`, etc.
-   - Crear `entrypoint.sh` con verificación de PostgreSQL y `npx prisma db push --skip-generate` (garantizando terminaciones de línea Unix LF `\n`).
-3. **Health Check y Graceful Shutdown**:
-   - Enriquecer `/health` en `server/index.js` para que ejecute `prisma.$queryRaw\`SELECT 1\`` y devuelva `200` o `503`.
-   - Corregir en `server/index.js` línea 68 la importación rota: cambiar `./config/db.js` por `./config/prisma.js`.
+1. **`useAiChatStream.js`:** Consume `searchPostersWithFallback` para el modal de intercambio de arte (*Swap Poster*). La firma polimórfica diseñada `(fetchFn, query, limit, options)` garantiza 100% de retrocompatibilidad sin modificar `useAiChatStream.js`.
+2. **Pruebas de Integración con Navegador Real:** Esta investigación es de solo lectura y verificación estática. Tras la implementación, el arnés de verificación debe ejecutarse con `npm run harness:check` y comprobarse que `tests/catalog/catalog-cache-service.test.js` mantenga sus 22 pruebas verdes.
+3. **Persistencia en Modos Privados / Safari:** `localStorage` puede lanzar excepciones si el almacenamiento está restringido (modo incógnito estricto o cuota excedida). El bloque `try/catch` dentro de `persist()` ya mitiga este escenario de forma nativa.
 
 ---
 
-## 5. Verification Method
+## 5. Conclusion (Conclusión Final y Dictamen Técnico)
 
-### 5.1 Verificación de Aprovisionamiento GCS (R4)
-1. **Comando de creación del bucket**:
+1. **Factibilidad Total:** La intervención para R3 (Cirugía 2.3) es quirúrgica, limpia y no requiere dependencias externas adicionales.
+2. **Límites de Líneas:** Ambos archivos mantendrán su tamaño muy por debajo de los 200 renglones:
+   - `useCatalogSearch.js`: ~98 líneas (techo: 200).
+   - `catalogCacheService.js`: ~118 líneas (techo: 200).
+3. **Resiliencia Operativa:** 
+   - Se erradica por completo la condición de carrera CR-10 al escribir rápido en el punto de venta.
+   - Se reduce el tiempo de espera por fallo de red de 5000ms a 1500ms, acelerando el fallback al catálogo local en ferias con mala señal.
+   - Se desliga la serialización de 300 objetos del hilo crítico de renderizado del navegador sin romper las suites de pruebas automatizadas.
+4. **Preservación de Pruebas Existentes:** La firma sobrecargada de `searchPostersWithFallback` y la detección de entorno en `saveCatalogSnapshot` garantizan 100% de compatibilidad retrospectiva con `tests/catalog/catalog-cache-service.test.js`.
+
+---
+
+## 6. Verification Method (Método de Verificación Independiente)
+
+Para que el agente orquestador o implementador verifique independientemente los hallazgos:
+1. **Ejecución de la Suite de Catálogo y Audio:**
    ```bash
-   gcloud storage buckets create gs://deko-eventsales-media --project=tienda-deco-vintage-web --location=us-central1 --uniform-bucket-level-access
+   node --test tests/catalog/catalog-cache-service.test.js
    ```
-2. **Comando de asignación de lectura pública**:
+   *Criterio de éxito:* 22/22 pruebas aprobadas en < 150ms.
+2. **Inspección de Límites de Tamaño (Linter Monolítico):**
    ```bash
-   gcloud storage buckets add-iam-policy-binding gs://deko-eventsales-media --member=allUsers --role=roles/storage.objectViewer
+   node scripts/audit-monoliths.js
    ```
-3. **Comprobación de existencia y política**:
+   *Criterio de éxito:* `useCatalogSearch.js` y `catalogCacheService.js` figuran con `< 200` líneas (0 infracciones).
+3. **Auditoría Zero-Trust y Build de Producción:**
    ```bash
-   gsutil ls -b gs://deko-eventsales-media
-   gcloud storage buckets get-iam-policy gs://deko-eventsales-media
+   npm run harness:check
    ```
-4. **Verificación en código**:
-   Ejecutar un script de prueba que invoque `uploadBufferToStorage` con un buffer de prueba y verificar que la URL devuelta comience con `https://storage.googleapis.com/deko-eventsales-media/` y que no se cree ningún archivo en `public/uploads`.
-
-### 5.2 Verificación de Docker & Configuración Dokploy (R6)
-1. **Verificación de archivos creados**:
-   - Comprobar existencia y contenido de `.dockerignore`:
-     Confirmar que ignore `.env`, `node_modules`, `.agents`, `.git`.
-   - Comprobar `entrypoint.sh`:
-     Confirmar que tenga permisos de ejecución y terminación LF (`\n` sin `\r`).
-   - Comprobar `Dockerfile`:
-     Confirmar uso de `node:22-bookworm-slim`, instalación de `openssl ca-certificates`, `ENTRYPOINT ["/app/entrypoint.sh"]` y `CMD ["node", "server/index.js"]`.
-2. **Verificación del Endpoint `/health`**:
-   - Con el servidor iniciado (`npm run server`), realizar petición HTTP:
-     ```bash
-     curl -i http://localhost:3001/health
-     ```
-   - Debe retornar HTTP 200 con payload JSON indicando estado `ok` y base de datos conectada.
-   - Probar shutdown limpio enviando `SIGINT` (Ctrl+C) y validar en consola que `server/config/prisma.js` se desconecte sin errores de módulo no encontrado.
+   *Criterio de éxito:* 9/9 Zero-Trust tests pasando, 0 secretos detectados, Vite build exitoso con código de salida 0.

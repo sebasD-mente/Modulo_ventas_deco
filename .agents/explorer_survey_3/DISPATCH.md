@@ -1,22 +1,25 @@
-# Dispatch History
+# DISPATCH — Explorer Survey 3
 
-## 2026-09-09T14:23:32Z
-**From**: parent (40958512-4854-45d9-bf41-45feacb902c8)
-**To**: explorer_survey_3
+## Identity
+- Role: Codebase Investigator (R3: AbortController & Cache Resilience)
+- TypeName: teamwork_preview_explorer
+- Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_3
+- Parent orchestrator directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\orchestrator_24
 
-Investigation Scope:
-1. Google Cloud Storage (GCS) (R4):
-   - Inspect `server/services/gcsStorageService.js` (or existing storage service). Detail how files are uploaded and identify any fallback to local disk (`public/uploads`).
-   - Check GCP CLI tools (`gcloud`, `gsutil`) availability and active GCP configuration/project (`tienda-deco-vintage-web`).
-   - Investigate bucket requirements `gs://deko-eventsales-media/` in `us-central1` and Service Account configuration.
-2. Docker & Dokploy Multi-Stage Deployment (R6):
-   - Inspect current `Dockerfile`, `.dockerignore`, and entrypoint scripts.
-   - Identify Node.js version, package manager, build requirements (Prisma binaries, frontend build, Express server).
-   - Detail requirements for multi-stage Dockerfile with `node:22-bookworm-slim` (glibc / OpenSSL 3.0.x for Prisma), `entrypoint.sh` with PostgreSQL connectivity check and Prisma db push/migrate, and strict `.dockerignore`.
-3. Health Check & Observability:
-   - Check if `/health` endpoint exists and what it validates.
+## Mission
+Survey the codebase for **R3 (Cirugía 2.3)**: AbortController in manual search & asynchronous snapshot caching.
 
-Deliverables:
-- handoff.md
-- progress.md
-- send_message to caller
+Read:
+1. `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\ORIGINAL_REQUEST.md` (specifically header `2026-09-15T23:59:14Z`)
+2. `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 2)
+3. `src/components/manual-sale/hooks/useCatalogSearch.js` (inspect debounce logic, HTTP request dispatch, error handling, line count)
+4. `src/services/catalogCacheService.js` (inspect `TIMEOUT_MS`, `saveCatalogSnapshot`, localStorage sync, line count)
+5. `src/services/webCatalogService.js` (or whichever client service implements `searchPostersWithFallback`, check if it accepts an options object or `signal`)
+6. `tests/catalog/catalog-cache-service.test.js`
+
+Produce a comprehensive investigation report `handoff.md` with:
+- Exact lines in `src/components/manual-sale/hooks/useCatalogSearch.js` where `activeAbortRef` should be added, where `.abort()` should be called on query change, how `signal` should be passed to `searchPostersWithFallback`, and how `AbortError` should be ignored.
+- Exact signature of `searchPostersWithFallback` and whether it supports `{ signal }` or needs minor forwarding.
+- Exact lines in `src/services/catalogCacheService.js` for `TIMEOUT_MS` (change to 1500ms) and `saveCatalogSnapshot` deferred serialization (`setTimeout(..., 0)`).
+- Impact on `tests/catalog/catalog-cache-service.test.js` and how testing compatibility is preserved.
+- Line counts of `useCatalogSearch.js` (<= 200 lines) and `catalogCacheService.js` (<= 200 lines).

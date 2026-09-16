@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma.js';
+import { getSequenceName, invalidateSequenceCache } from './saleNumberGenerator.js';
 
 /**
  * Satélite para purga controlada de ventas de prueba y reseteo de secuencia.
@@ -36,7 +37,20 @@ export async function purgeEventSalesTransaction({ tenantId, eventId, userId }) 
       data: { currentSaleSequence: 0 },
     });
 
-    // 6. Registro de auditoría inmutable
+    // 6. Resetear secuencia nativa de PostgreSQL si existe y limpiar cache
+    if (typeof tx.$executeRawUnsafe === 'function') {
+      const seqName = getSequenceName(eventId);
+      await tx.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
+      invalidateSequenceCache(eventId);
+    } else if (typeof tx.$queryRawUnsafe === 'function') {
+      const seqName = getSequenceName(eventId);
+      await tx.$queryRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
+      invalidateSequenceCache(eventId);
+    } else {
+      invalidateSequenceCache(eventId);
+    }
+
+    // 7. Registro de auditoría inmutable
     await tx.auditLog.create({
       data: {
         tenantId,

@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-13T17:33:00Z
+# BRIEFING — 2026-09-16T01:32:28Z
 
 ## Mission
-Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módulo de punto de venta Stand {IA} de Deco Vintage Guate, despiezando quirúrgicamente los 3 monolitos peligrosos (saleService.js, semanticParserService.js, productionController.js) y blindando contingencias P0 sin dispersión de archivos ni sobreingeniería, cumpliendo R1-R3 y arnés de calidad al 100%.
+Implementación atómica y blindada de la Fase 3 del Roadmap Quirúrgico Cero Deuda (P1) en Modulo_Ventas, restituyendo el flujo completo de bucle cerrado SSE (Turno 2) en aiStreamService.js, eliminando textos duplicados frente a ChatDraftCard, modularizando la tarjeta de borrador con DraftItemRow.jsx para cumplir los techos de líneas (<140 líneas), previniendo cierres obsoletos (stale closures) con pendingDraftRef y garantizando áreas táctiles feriales WCAG 2.1 AAA (>= 44px).
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -40,8 +40,16 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - Victory Auditor (Cirugía Arquitectónica & Blindaje P0): closed
 - Orchestrator (RAG Vectorial & Copiloto STAND IA): 6ddcf51f-f397-4dd4-ad16-5a76fa7c9097 (orchestrator_20, completed)
 - Victory Auditor (RAG Vectorial & Copiloto STAND IA): 3db69a7d-e74e-42f6-904e-1c5ce91f58fd (VICTORY CONFIRMED, victory_auditor_20)
-- Orchestrator (Calibración Cognitiva & RAG Real STAND IA): 49bacfc9-111d-49c6-a56b-a5b485ca6767 (orchestrator_21, active)
-- Victory Auditor (Calibración Cognitiva & RAG Real STAND IA): to be spawned on victory claim
+- Orchestrator (Calibración Cognitiva & RAG Real STAND IA): 49bacfc9-111d-49c6-a56b-a5b485ca6767 (orchestrator_21, completed)
+- Victory Auditor (Calibración Cognitiva & RAG Real STAND IA): completed
+- Orchestrator (Auditoría Forense 360 Fred): 5045eebf-d54f-4d6a-895b-7a1f7cda50b3 (orchestrator_22, completed)
+- Victory Auditor (Auditoría Forense 360 Fred): 3f656233-98ac-4499-947e-88202dcd40fc (victory_auditor_22, VICTORY CONFIRMED)
+- Orchestrator (Fase 1 Roadmap Quirúrgico): 6408c0c3-26fa-4769-a9aa-efe396dfb647 (orchestrator_23, completed)
+- Victory Auditor (Fase 1 Roadmap Quirúrgico): d2fb8311-9b34-4961-915e-f6d594ad405a (victory_auditor_23, VICTORY CONFIRMED)
+- Orchestrator (Fase 2 Roadmap Quirúrgico): db233a73-dd6b-4945-8057-cdd1e9a20608 (orchestrator_24, completed)
+- Victory Auditor (Fase 2 Roadmap Quirúrgico): c355957c-7feb-4d66-b52d-fcb1a7fd6e6c (victory_auditor_24, VICTORY CONFIRMED)
+- Orchestrator (Fase 3 Roadmap Quirúrgico): fc099ae9-9a32-4092-80b2-44e5faf0a199 (orchestrator_25, running)
+- Victory Auditor (Fase 3 Roadmap Quirúrgico): TBD (to be spawned on victory claim)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -85,18 +93,24 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - Asistente nerd, formal, inteligente, respuestas en 1-3 líneas con Gemini 3.8 Flash, sugerencia de combos de feria (2xQ120, 3xQ180).
 - Repetición exhaustiva de pruebas 1, 2 y 3 en vivo en Chrome DevTools MCP con evidencia visual de alta resolución.
 - Reporte técnico y hoja de ruta arquitectónica para Comic Con 2026.
+- Auditoría forense 360° y diagnóstico exhaustivo de causa raíz 100% respaldado en código real con archivo y líneas exactas (Cero Suposiciones).
+- Despliegue y coordinación del Squad Especialista de Subagentes de Fred (4 Sabuesos: Búsqueda/RAG, Orquestador Conversacional, Monolitos/Estado, Resiliencia/DB).
+- Entrega del Informe Maestro Final de Fred estrictamente estructurado en las 5 secciones obligatorias de R5.
+- Fase 1 Roadmap Quirúrgico Cero Deuda (P0): R1 PostgreSQL secuencias nativas sin tx.event.update, R2 erradicación mocks aiMediaService y resiliencia UI con botón "Cargar Manual", R3 idempotencia real RFC 7231 con idempotencyKey @unique y replay HTTP 200.
+- Fase 2 Roadmap Quirúrgico Cero Deuda (P0): R1 Stop-words universales (50+) y entidades cortas ("f1", "cr7", KNOWN_SHORT_ENTITIES), R2 Calibración vectorial >= 0.72 y compuerta de entidad raíz con every, R3 AbortController en useCatalogSearch y snapshot asíncrono con TIMEOUT_MS 1500ms en catalogCacheService, R4 Techos de líneas estrictos (embeddingService <= 200, useCatalogSearch <= 200, catalogCacheService <= 200, entityAliases <= 600).
+- Fase 3 Roadmap Quirúrgico Cero Deuda (P1): R1 Bucle cerrado SSE Turno 2 en aiStreamService (eliminar if (hasDraft) return), directivas de prompt concisas (1-2 líneas vendedoras sin recitar catálogo duplicado) en aiPromptService, purga parámetro muerto en aiToolsService; R2 Modularización con DraftItemRow.jsx, ChatDraftCard < 140 líneas, useAiChatStream con pendingDraftRef erradicando stale closures (< 160 líneas); R3 Áreas táctiles mostrador ferial WCAG 2.1 AAA (>= 44px controles +/-, botones pago y ChatToolCards, >= 48px confirmar venta); R4 Techos de líneas estrictos (ChatDraftCard < 140, useAiChatStream < 160, ChatToolCards < 140, ChatSwapModal < 100, aiStreamService <= 200, aiClosedLoopService <= 200).
 
 ## User Context
-- **Last user request**: Calibración Cognitiva de Alto Nivel, RAG Vectorial 100% Funcional (gemini-embedding-001), bucle cerrado preservando thoughtSignature, purga de tarjetas falsas, personalidad nerd/formal/experta, pruebas en vivo con Chrome DevTools MCP y hoja de ruta para Comic Con 2026.
+- **Last user request**: Implementación atómica y blindada de la Fase 3 del Roadmap Quirúrgico Cero Deuda (P1) en el repositorio Modulo_Ventas (R1 Restitución bucle cerrado SSE Turno 2 y retiro texto duplicado, R2 Modularización DraftItemRow.jsx, line ceilings y erradicación stale closures con pendingDraftRef, R3 Rediseño zonas táctiles mostrador ferial >= 44px, R4 Techos de líneas y calidad de código).
 - **Pending clarifications**: none
-- **Delivered results**: none yet for this mission
+- **Delivered results**: Fase 2 certificada. Fase 3 iniciando ejecución.
 
 ## Project Status
-- **Phase**: in progress (Hito M1: Reparación de Motor RAG gemini-embedding-001 y Bucle Cerrado Cognitivo)
+- **Phase**: in progress
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_21 (49bacfc9-111d-49c6-a56b-a5b485ca6767, active)
-- **Active Auditor**: pending victory claim
-- **Monitoring Crons**: Cron 1 (task-30, */8 * * * *), Cron 2 (task-32, */10 * * * *)
+- **Active Orchestrator**: orchestrator_25 (fc099ae9-9a32-4092-80b2-44e5faf0a199, running)
+- **Active Auditor**: TBD (to be spawned on victory claim)
+- **Monitoring Crons**: task-46 (Cron 1 Progress: */8 * * * *), task-48 (Cron 2 Liveness: */10 * * * *)
 
 ## Victory Audit Status
 - **Triggered**: no
@@ -107,3 +121,7 @@ Cirugía arquitectónica y blindaje operativo de alta resiliencia para el módul
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/AUDITORIA_360_STAND_IA.md — Reference specification (Sección 5: Fase 3)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_25/ — Orchestrator Fase 3 workspace
+
+

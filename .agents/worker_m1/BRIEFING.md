@@ -1,15 +1,15 @@
-# BRIEFING — 2026-09-13T17:42:28Z
+# BRIEFING — 2026-09-16T00:18:00Z
 
 ## Mission
-Despiece quirúrgico de los 3 Monolitos Peligrosos (saleService.js, semanticParserService.js, productionController.js) en satélites modulares de responsabilidad única con fachadas canónicas limpias (<35 y <30 líneas) y erradicación total de mocks residuales en taller, preservando la regla sagrada ANTI-FILE SPRAWL (prohibido tocar los 7 archivos medianos).
+Implementar de forma genuina y rigurosa Cirugía 2.1 y Cirugía 2.2 (Fase 2: Motor de Búsqueda Híbrida y RAG Cero Contaminación): Sincronización universal de stop words (`UNIVERSAL_STOP_WORDS`), whitelist de entidades cortas (`KNOWN_SHORT_ENTITIES`), incorporación de entidades `Formula 1 - F1` y `Cristiano Ronaldo - CR7` con sus alias culturales en `entityAliases.js`, elevación del umbral vectorial a `>= 0.72`, sustitución de `.some` por cobertura estricta `every`, y compuerta de entidad raíz compartida en `embeddingService.js`, junto al reemplazo de `STOP_WORDS` en `webCatalogService.js`.
 
 ## 🔒 My Identity
-- Archetype: worker
+- Archetype: teamwork_preview_worker
 - Roles: implementer, qa, specialist
 - Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\worker_m1
 - Original parent: 1b9755bb-6609-409e-9161-fefd19278594
-- Current parent: 1b9755bb-6609-409e-9161-fefd19278594
-- Milestone: M1 (Cirugía de los 3 Monolitos Peligrosos)
+- Current parent: db233a73-dd6b-4945-8057-cdd1e9a20608
+- Milestone: M1 (Fase 2: Cirugía 2.1 y Cirugía 2.2 - Búsqueda Híbrida y RAG Cero Contaminación)
 
 ## 🔒 Key Constraints
 - Sole write ownership of assigned files:
@@ -23,68 +23,67 @@ Despiece quirúrgico de los 3 Monolitos Peligrosos (saleService.js, semanticPars
   - `server/services/semanticParserService.js` (CANONICAL FACADE < 30 lines)
   - `server/services/productionService.js` (EXPANDED ~180 lines, zero mocks)
   - `server/controllers/productionController.js` (REDUCED ~120 lines, zero mocks, preserve catch(dbErr) res.status(500))
-- 🚫 REGLA SAGRADA ANTI-FILE SPRAWL: Prohibido tocar o fragmentar los 7 archivos medianos (~250-300 líneas: userController.js, authController.js, catalogController.js, geminiPoolService.js, catalogSyncService.js, aiController.js, webCatalogService.js).
-- Integridad Contable y de Auditoría: Preservar invariantes de tests estáticos en saleService.js y productionController.js.
-- Aislamiento sagrado: Operación exclusiva en `Modulo_Ventas` y `deko_eventsales_db`.
-- Cero mocks en producción; pruebas unitarias y adversariales 100% verdes.
+  - Exclusive write ownership for Phase 2:
+    * `server/services/semantic/entityAliases.js` (ceiling <= 600 lines)
+    * `server/services/webCatalogService.js` (keep intact, replace STOP_WORDS import)
+    * `server/services/embeddingService.js` (ceiling <= 200 lines)
+- DO NOT CHEAT: All implementations must be genuine, maintaining real state and behavior.
+- Strictly adhere to line ceilings (`embeddingService.js` <= 200 lines, `entityAliases.js` <= 600 lines).
+- Run all test suites and audit commands before reporting.
 
 ## Current Parent
-- Conversation ID: 1b9755bb-6609-409e-9161-fefd19278594
-- Updated: 2026-09-13T17:42:28Z
+- Conversation ID: db233a73-dd6b-4945-8057-cdd1e9a20608
+- Updated: 2026-09-16T00:18:00Z
 
 ## Task Summary
-- **What to build**: Despiece de los 3 monolitos peligrosos en satélites de responsabilidad única (`server/services/sales/`, `server/services/semantic/`, `server/services/productionService.js`), con fachadas canónicas y eliminación de `demoProductionItems`.
+- **What to build**:
+  1. `entityAliases.js`: export `UNIVERSAL_STOP_WORDS` (54 terms) and `KNOWN_SHORT_ENTITIES` (`f1`, `u2`, `r34`, `go`, `up`, `cr7`). Add `Formula 1 - F1` (category `DEPORTES`) and `Cristiano Ronaldo - CR7` (category `FUTBOL`). Update `resolveEntityAlias` word boundary matching.
+  2. `webCatalogService.js`: import `UNIVERSAL_STOP_WORDS` and re-export `UNIVERSAL_STOP_WORDS` and `KNOWN_SHORT_ENTITIES`.
+  3. `embeddingService.js`: import constants and `resolveEntityAlias`. Compute `normQueryTokens` with fallback to `effectiveQuery` tokens. Raise complementary similarity threshold to `>= 0.72`. Use strict `every` match for vector candidates. Refactor `allSameTitle` to root canonical entity gate.
 - **Success criteria**:
-  - `saleService.js` < 35 líneas, pasa tests de ventas y auditoría forense C-04/C-06.
-  - `semanticParserService.js` < 30 líneas, pasa tests semánticos.
-  - `productionController.js` < 200 líneas (objetivo ~120 líneas), 0 mocks, pasa tests C-07.
-  - `scripts/audit-monoliths.js` reduce de 10 a 7 archivos monolíticos (los 7 medianos protegidos).
-  - 100% PASS en todas las suites de tests (`npm test`).
-- **Interface contracts**: `ORIGINAL_REQUEST.md` & `DISPATCH.md`
-- **Code layout**: `PROJECT.md`
+  - `node --test tests/ai/embeddingService.test.js`: PASS (17/17)
+  - `node --test tests/adversarial/m1-embeddings-adversarial.test.js`: PASS (23/23)
+  - `npm run audit:monoliths`: PASS (`embeddingService.js` 189 <= 200 lines, `entityAliases.js` 543 <= 600 lines)
+  - Regression verified: `"muéstrame lo que tenemos de messi"` -> `['messi']`, `"f1"` retained and resolved.
+  - `npm run test:security`: PASS (9/9)
+  - `npm run audit:secrets`: PASS (0 leaks / 107 files)
+  - `npm run build`: PASS (Vite 0 errors in 3.11s)
 
 ## Key Decisions Made
-- `saleNumberGenerator.js` implementa incremento atómico con fallback `tx || prisma` para permitir tests con mock transaccional y ejecuciones desacopladas sin bloqueo interactivo `FOR UPDATE`.
-- En `saleService.js`, se incluye cabecera canónica documentando los invariantes requeridos por los análisis estáticos `fs.readFileSync` de `sales-adversarial.test.js` y `m2-forensic-audit.test.js`.
-- En `productionController.js`, se erradica `demoProductionItems` y se delega la lógica a `productionService.js` preservando la captura `catch (dbErr)` con `res.status(500)` para cumplir con las pruebas adversariales C-07.1, C-07.2 y C-07.4.
+- `UNIVERSAL_STOP_WORDS` and `KNOWN_SHORT_ENTITIES` reside in `entityAliases.js` to avoid ESM circular dependency with `webCatalogService.js` and `embeddingService.js`.
+- `MIN_SIMILARITY_THRESHOLD = 0.45` is preserved intact on line 6 of `embeddingService.js`. Only the complementary pure-vector threshold at line 147 is calibrated from `0.60` to `0.72`.
+- `normQueryTokens` prioritizes meaningful tokens from the user's raw query (`rawTokens`), preventing multi-word expansion of `searchQuery` from demanding all expansion keywords on individual candidate posters.
 
 ## Artifact Index
-- `.agents/worker_m1/DISPATCH.md` — Asignación de tareas
-- `.agents/worker_m1/BRIEFING.md` — Memoria situacional
-- `.agents/worker_m1/progress.md` — Heartbeat de progreso
-- `.agents/worker_m1/handoff.md` — Reporte de entrega
+- `.agents/worker_m1/DISPATCH.md` — Assignment instructions
+- `.agents/worker_m1/BRIEFING.md` — Situational memory
+- `.agents/worker_m1/progress.md` — Liveness and execution tracker
+- `.agents/worker_m1/handoff.md` — Final deliverable handoff report
+- `.agents/worker_m1/skills/cirugia-arquitectura-cero-deuda.md` — Local copy of skill
+- `.agents/worker_m1/skills/aislamiento-estricto-proyectos.md` — Local copy of skill
 
 ## Change Tracker
 - **Files modified**:
-  - `server/services/sales/saleNumberGenerator.js`: Satélite atómico para secuencia de venta sin lock bloqueante `FOR UPDATE` (25 lín).
-  - `server/services/sales/saleTransactionService.js`: Lógica pura de creación y reconciliación ACID de 3 fases (257 lín).
-  - `server/services/sales/saleKpiService.js`: Agregaciones O(1) nativas en PostgreSQL, métricas y paginación (328 lín).
-  - `server/services/sales/cashClosingService.js`: Arqueos y cierres de caja atómicos (48 lín).
-  - `server/services/saleService.js`: Fachada canónica limpia con comentarios de invariantes estáticos (14 lín < 35).
-  - `server/services/semantic/paymentExtractor.js`: Extracción de método de pago, números, tamaños e intención de venta (229 lín).
-  - `server/services/semantic/entityAliases.js`: Array estático `STAND_ENTITY_ALIASES`, normalización y resolución léxica (434 lín).
-  - `server/services/semanticParserService.js`: Fachada canónica limpia re-exportando el pipeline semántico (21 lín < 30).
-  - `server/services/productionService.js`: Servicio de dominio de taller con Prisma puro, cero mocks (182 lín <= 200).
-  - `server/controllers/productionController.js`: Controlador HTTP sin `demoProductionItems`, preserva `catch (dbErr)` status 500 (103 lín).
-- **Build status**: PASS (Vite dist/ 0 errores)
-- **Pending issues**: Ninguno
+  - `server/services/semantic/entityAliases.js`: 543 lines (ceiling <= 600) — Added `UNIVERSAL_STOP_WORDS`, `KNOWN_SHORT_ENTITIES`, F1 & CR7 entities, updated `resolveEntityAlias`.
+  - `server/services/webCatalogService.js`: 551 lines — Imported `UNIVERSAL_STOP_WORDS`, removed local Set, re-exported constants.
+  - `server/services/embeddingService.js`: 189 lines (ceiling <= 200) — Added `normQueryTokens` with stop-word filter, 0.72 threshold, `every` match, root canonical entity gate.
+- **Build status**: PASS (`npm run build` in 3.11s)
+- **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: 100% PASS
-  - `tests/sales/*.test.js`: PASS
-  - `tests/semantic/*.test.js`: PASS
-  - `tests/production/*.test.js`: PASS
-  - `tests/closing/*.test.js`: PASS
-  - `tests/m2-forensic-audit.test.js`: PASS
+- **Build/test result**: 100% PASS on required suites:
+  - `node --test tests/ai/embeddingService.test.js`: 17/17 PASS
+  - `node --test tests/adversarial/m1-embeddings-adversarial.test.js`: 23/23 PASS
   - `npm run test:security`: 9/9 PASS
-  - `npm run audit:secrets`: 0 fugas / 0 violaciones en 107 archivos
-  - `scripts/audit-monoliths.js`: Reducción de 10 a 7 archivos (únicamente los 7 medianos protegidos por regla anti-file sprawl)
-  - `npm run build`: PASS en 3.23s
+  - `npm run audit:secrets`: 0 violations in 107 files
+  - `npm run audit:monoliths`: 0 violations in modified files
 - **Lint status**: 0 violations
-- **Tests added/modified**: Suites verificadas con 100% de éxito
-
+- **Tests added/modified**: Verified all regression invariants via inline assertion harness
 
 ## Loaded Skills
 - **Source**: `C:\Users\sebas\.gemini\config\skills\cirugia-arquitectura-cero-deuda\SKILL.md`
-- **Core methodology**: Protocolo quirúrgico estricto de ingeniería, despacho de prompts blindados, erradicación de parches y solución de causa raíz.
-
+  - **Local copy**: `.agents/worker_m1/skills/cirugia-arquitectura-cero-deuda.md`
+  - **Core methodology**: Protocolo quirúrgico de ingeniería, despacho de prompts blindados y erradicación de parches superficiales.
+- **Source**: `C:\Users\sebas\.gemini\config\skills\aislamiento-estricto-proyectos\SKILL.md`
+  - **Local copy**: `.agents/worker_m1/skills/aislamiento-estricto-proyectos.md`
+  - **Core methodology**: Aislamiento estricto de base de datos e infraestructura, cero bases operativas compartidas.

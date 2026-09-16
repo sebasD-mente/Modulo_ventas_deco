@@ -43,6 +43,7 @@ export const createSaleSchema = z.object({
     'IA_VIDEO_MOSTRADOR',
   ]).default('MANUAL_POS'),
   attachments: z.array(saleAttachmentSchema).optional().default([]),
+  idempotencyKey: z.string().max(255).optional().nullable(),
 });
 
 export const cashClosingSchema = z.object({

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingBag, RefreshCw, Trash2, X, Plus, Minus, CheckCircle2, Loader2 } from 'lucide-react';
 import { DEFAULT_EVENT_SIZES } from './chatConstants';
+import DraftItemRow from './DraftItemRow';
 
 export default function ChatDraftCard({
   pendingDraft, onUpdateSize, updateDraftItemSize, onUpdateQty, updateDraftItemQty,
@@ -39,73 +40,28 @@ export default function ChatDraftCard({
         </span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-neutral-400">Canal: <strong className="text-white">{pendingDraft.inputChannel || 'IA_CHAT_TEXTO'}</strong></span>
-          <button type="button" onClick={discard} className="text-neutral-400 hover:text-red-400 p-1 rounded transition-colors cursor-pointer" title="Descartar borrador">
+          <button type="button" onClick={discard} className="text-neutral-400 hover:text-red-400 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-colors cursor-pointer" title="Descartar borrador">
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
-        {(pendingDraft.items || []).map((it, idx) => {
-          const itemSizes = getSizes(it);
-          const currentSize = itemSizes.find((s) => s.sizeId === it.sizeId) || itemSizes[0];
-          return (
-            <div key={idx} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-black border border-neutral-800 text-xs">
-              {it.thumbUrl || it.imageUrl ? (
-                <img src={it.thumbUrl || it.imageUrl} alt="" className="w-10 h-14 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
-              ) : (
-                <div className="w-10 h-14 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
-                  <ShoppingBag className="w-4 h-4 text-neutral-600" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <span className="font-bold text-white block truncate">{it.baseTitle || it.description}</span>
-                <span className="text-[9px] text-neutral-400 uppercase font-semibold block">{it.category || 'ARTE'}</span>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <label className="text-[10px] text-neutral-400 font-medium">Tamaño:</label>
-                  {itemSizes.length <= 1 ? (
-                    <span className="bg-[#222222] border border-neutral-700/80 rounded px-2 py-0.5 text-[10px] text-emerald-400 font-bold">
-                      {currentSize?.nombre || 'Portada de Álbum'} (Q{currentSize?.precio || it.unitPrice})
-                    </span>
-                  ) : (
-                    <select
-                      value={it.sizeId || currentSize?.sizeId}
-                      onChange={(e) => updateSize?.(idx, e.target.value)}
-                      className="bg-[#222222] border border-neutral-700 rounded px-2 py-0.5 text-[10px] text-white font-bold focus:outline-none focus:border-white cursor-pointer"
-                    >
-                      {itemSizes.map((s) => (
-                        <option key={s.sizeId} value={s.sizeId}>{s.nombre} (Q{s.precio})</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {openSwap && (
-                  <button type="button" onClick={() => openSwap(idx)} className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 underline transition-colors cursor-pointer mt-1">
-                    <RefreshCw className="w-2.5 h-2.5" /> Cambiar diseño
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <div className="flex items-center gap-1 bg-[#222] border border-neutral-700 rounded-lg p-0.5">
-                  <button type="button" onClick={() => updateQty?.(idx, -1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
-                    <Minus className="w-2.5 h-2.5" />
-                  </button>
-                  <span className="font-bold text-xs text-white px-1">{it.quantity}</span>
-                  <button type="button" onClick={() => updateQty?.(idx, 1)} className="w-4 h-4 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-800 cursor-pointer">
-                    <Plus className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-                <span className="font-black text-xs text-emerald-400">Q{(it.quantity * it.unitPrice).toFixed(2)}</span>
-                <button type="button" onClick={() => removeItem?.(idx)} className="text-neutral-500 hover:text-red-400 p-0.5 transition-colors cursor-pointer" title="Eliminar este póster">
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div className="space-y-2 max-h-52 overflow-y-auto no-scrollbar">
+        {(pendingDraft.items || []).map((it, idx) => (
+          <DraftItemRow
+            key={idx}
+            item={it}
+            index={idx}
+            onUpdateSize={updateSize}
+            onUpdateQty={updateQty}
+            onRemoveItem={removeItem}
+            onOpenSwap={openSwap}
+            availableSizes={getSizes(it)}
+          />
+        ))}
       </div>
 
-      <div className="pt-2 border-t border-neutral-800 space-y-2">
+      <div className="pt-2 border-t border-neutral-800 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].map((m) => (
@@ -113,8 +69,8 @@ export default function ChatDraftCard({
                 key={m}
                 type="button"
                 onClick={() => updatePayment?.(m)}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
-                  pendingDraft.paymentMethod === m ? 'bg-white text-black border-white' : 'bg-black border-neutral-700 text-neutral-400 hover:text-white'
+                className={`min-h-[44px] text-xs font-bold px-3 py-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+                  pendingDraft.paymentMethod === m ? 'bg-white text-black border-white shadow-md' : 'bg-black border-neutral-700 text-neutral-400 hover:text-white'
                 }`}
               >
                 {m === 'EFECTIVO' ? '💵 Efectivo' : m === 'TARJETA' ? '💳 Tarjeta' : '📱 Transfer'}
@@ -129,11 +85,11 @@ export default function ChatDraftCard({
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-800">
-          <div className="flex items-center gap-1.5">
-            <button type="button" onClick={discard} className="px-3 py-1 rounded-lg bg-black hover:bg-red-950/50 hover:text-red-400 text-neutral-400 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={discard} className="min-h-[44px] px-3.5 py-2 rounded-xl bg-black hover:bg-red-950/50 hover:text-red-400 text-neutral-400 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer flex items-center justify-center">
               Descartar
             </button>
-            <button type="button" onClick={handleModify} className="px-3 py-1 rounded-lg bg-black hover:bg-neutral-800 text-neutral-300 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer">
+            <button type="button" onClick={handleModify} className="min-h-[44px] px-3.5 py-2 rounded-xl bg-black hover:bg-neutral-800 text-neutral-300 text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer flex items-center justify-center">
               Modificar
             </button>
           </div>
@@ -141,9 +97,9 @@ export default function ChatDraftCard({
             type="button"
             onClick={confirm}
             disabled={isLoading}
-            className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer transition-transform active:scale-95"
+            className="min-h-[48px] px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer transition-transform active:scale-95"
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
             <span>Confirmar Venta</span>
           </button>
         </div>

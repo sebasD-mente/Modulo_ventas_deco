@@ -1,21 +1,16 @@
 # Progress — Worker M1
 
-**Last visited**: 2026-09-13T17:51:00Z  
+**Last visited**: 2026-09-16T00:19:00Z  
 **Status**: COMPLETED  
 
 ## Steps
-- [x] Step 1: Initialize DISPATCH.md, BRIEFING.md, and baseline test audit (120/120 tests PASS)
-- [x] Step 2: Implement `server/services/sales/saleNumberGenerator.js` (25 lines)
-- [x] Step 3: Implement `server/services/sales/saleTransactionService.js` (257 lines)
-- [x] Step 4: Implement `server/services/sales/saleKpiService.js` (328 lines)
-- [x] Step 5: Implement `server/services/sales/cashClosingService.js` (48 lines)
-- [x] Step 6: Refactor `server/services/saleService.js` to canonical facade (14 lines < 35)
-- [x] Step 7: Implement `server/services/semantic/paymentExtractor.js` (229 lines)
-- [x] Step 8: Implement `server/services/semantic/entityAliases.js` (434 lines)
-- [x] Step 9: Refactor `server/services/semanticParserService.js` to canonical facade (21 lines < 30)
-- [x] Step 10: Implement `server/services/productionService.js` (182 lines <= 200, zero mocks)
-- [x] Step 11: Refactor `server/controllers/productionController.js` (103 lines, zero mocks, preserve catch(dbErr) res.status(500))
-- [x] Step 12: Verify with `scripts/audit-monoliths.js` (confirm 10 -> 7 files) and all test suites (120/120 PASS, security 9/9, secrets 0, build PASS)
-- [x] Step 13: Write `handoff.md` and send completion message to orchestrator
-
-
+- [x] Step 1: Read DISPATCH.md, ORIGINAL_REQUEST.md, and explorer survey handoffs 1 & 2.
+- [x] Step 2: Initialize BRIEFING.md and local skills.
+- [x] Step 3: Run baseline tests to verify current test state (17/17 embedding, 23/23 adversarial).
+- [x] Step 4: Implement Cirugía 2.1 in `server/services/semantic/entityAliases.js` (UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES, F1 & CR7 entities, resolveEntityAlias word boundary).
+- [x] Step 5: Implement Cirugía 2.1 in `server/services/webCatalogService.js` (replace local STOP_WORDS with import and re-export).
+- [x] Step 6: Implement Cirugía 2.1 & 2.2 in `server/services/embeddingService.js` (imports, effectiveQuery, normQueryTokens, vector threshold >= 0.72, every match, root canonical entity gate).
+- [x] Step 7: Run verification tests (`node --test tests/ai/embeddingService.test.js`, `node --test tests/adversarial/m1-embeddings-adversarial.test.js`, regression checks).
+- [x] Step 8: Verify monolith audit (`npm run audit:monoliths`) and line count limits (`entityAliases.js` 543 <= 600, `embeddingService.js` 189 <= 200).
+- [x] Step 9: Run security harness (`npm run test:security`, `npm run audit:secrets`) and production build (`npm run build`).
+- [x] Step 10: Produce `handoff.md` and notify parent orchestrator via send_message.

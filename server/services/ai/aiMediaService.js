@@ -1,33 +1,36 @@
-import { getGeminiClient } from '../../config/gemini.js';
-import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { searchWebPosters } from '../webCatalogService.js';
 import { executeWithModelFallback } from '../geminiPoolService.js';
-import {
-  voiceSaleResponseSchema,
-  artworkRecognitionResponseSchema,
-  videoRecognitionResponseSchema,
-  batchPhotoResponseSchema,
-} from './aiPromptService.js';
+import { voiceSaleResponseSchema, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
+
+const STANDARD_SIZES = {
+  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
+  PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 },
+  MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
+  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
+  GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+};
 
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+const throwMediaError = (fnName, err, defaultMsg) => {
+  console.error(`[${fnName}] ❌ Error en IA multimodal:`, err?.message);
+  const error = new Error(`AI_MEDIA_SERVICE_FAILED: ${err?.message || defaultMsg}`);
+  error.code = 'AI_MEDIA_SERVICE_FAILED';
+  throw error;
+};
 
 export function normalizeCatalogSizeId(requestedSize) {
   if (!requestedSize) return 'MEDIANO';
   const raw = String(requestedSize).toLowerCase().trim();
   const compact = raw.replace(/\s+/g, '').replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '').replace(/por|\*|x/gi, 'x');
-  if (/18x24|24x18|45x60|60x45/.test(compact)) return 'GRANDE';
-  if (/24x36|36x24|60x90|90x60/.test(compact)) return 'GIGANTE';
-  if (/12x18|18x12|30x45|45x30/.test(compact)) return 'MEDIANO';
-  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact)) return 'PEQUENO';
-  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact)) return 'MINI';
-  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact)) return 'PORTADA_ALBUM';
-  if (/gigante|extra\s*grande|xl\b/i.test(raw)) return 'GIGANTE';
-  if (/grande|large|l\b/i.test(raw)) return 'GRANDE';
-  if (/mediano|medio|medium|m\b/i.test(raw)) return 'MEDIANO';
-  if (/peque[ñn]o|chico|small|s\b/i.test(raw)) return 'PEQUENO';
-  if (/mini|miniatura|xs\b/i.test(raw)) return 'MINI';
-  if (/portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco/i.test(raw)) return 'PORTADA_ALBUM';
+  if (/18x24|24x18|45x60|60x45/.test(compact) || /grande|large|l\b/i.test(raw)) return 'GRANDE';
+  if (/24x36|36x24|60x90|90x60/.test(compact) || /gigante|extra\s*grande|xl\b/i.test(raw)) return 'GIGANTE';
+  if (/12x18|18x12|30x45|45x30/.test(compact) || /mediano|medio|medium|m\b/i.test(raw)) return 'MEDIANO';
+  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact) || /peque[ñn]o|chico|small|s\b/i.test(raw)) return 'PEQUENO';
+  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact) || /mini|miniatura|xs\b/i.test(raw)) return 'MINI';
+  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact) || /portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco/i.test(raw)) return 'PORTADA_ALBUM';
   return raw.toUpperCase();
 }
 
@@ -37,62 +40,26 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 12 });
   if (webMatches.length > 0) {
     const matched = webMatches[0];
-    let selectedSize = matched.sizes[0];
-    let sizeAvailable = true;
-    let unavailableReason = null;
-
+    let selectedSize = matched.sizes[0], sizeAvailable = true, unavailableReason = null;
     if (requestedSize) {
-      const norm = normalizeCatalogSizeId(requestedSize);
-      const cleanSize = String(requestedSize).toUpperCase().trim();
-      const found = matched.sizes.find(s => 
-        s.sizeId === norm || 
-        s.sizeId === cleanSize || 
-        s.nombre.toUpperCase() === cleanSize || 
-        s.nombre.toUpperCase().includes(cleanSize) || 
-        (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize))
-      );
-      if (found) {
-        selectedSize = found;
+      const norm = normalizeCatalogSizeId(requestedSize), cleanSize = String(requestedSize).toUpperCase().trim();
+      const found = matched.sizes.find(s => s.sizeId === norm || s.sizeId === cleanSize || s.nombre.toUpperCase() === cleanSize || s.nombre.toUpperCase().includes(cleanSize) || (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize)));
+      if (found) selectedSize = found;
+      else if (STANDARD_SIZES[norm]) {
+        selectedSize = STANDARD_SIZES[norm];
+        if (!matched.sizes.some(s => s.sizeId === norm)) matched.sizes.push(STANDARD_SIZES[norm]);
       } else {
-        const standardSizeMap = {
-          MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
-          PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-          PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 },
-          MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
-          GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
-          GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
-        };
-        const standardMatch = standardSizeMap[norm];
-        if (standardMatch) {
-          selectedSize = standardMatch;
-          sizeAvailable = true;
-          unavailableReason = null;
-          if (!matched.sizes.some(s => s.sizeId === norm)) {
-            matched.sizes.push(standardMatch);
-          }
-        } else {
-          sizeAvailable = false;
-          unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
-        }
+        sizeAvailable = false;
+        unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
       }
     }
-
     const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
     return {
-      type: 'WEB_POSTER',
-      productId: isUuid(matched.id) ? matched.id : null,
-      posterId: matched.id,
-      description: `${displayTitle} (${selectedSize.nombre})`,
-      baseTitle: displayTitle,
-      category: matched.categoria,
-      thumbUrl: matched.thumbUrl,
-      imageUrl: matched.imageUrl,
-      unitPrice: Number(selectedSize.precio),
-      sizeId: selectedSize.sizeId,
-      sizeName: selectedSize.nombre,
-      availableSizes: matched.sizes,
-      sizeAvailable,
-      unavailableReason,
+      type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id,
+      description: `${displayTitle} (${selectedSize.nombre})`, baseTitle: displayTitle, category: matched.categoria,
+      thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, unitPrice: Number(selectedSize.precio),
+      sizeId: selectedSize.sizeId, sizeName: selectedSize.nombre, availableSizes: matched.sizes,
+      sizeAvailable, unavailableReason,
     };
   }
   try {
@@ -116,28 +83,23 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
   try {
     const { result: response } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: voiceSaleResponseSchema },
       }),
-      actionName: 'PROCESS_VOICE_AUDIO',
-      tenantId,
+      actionName: 'PROCESS_VOICE_AUDIO', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     const enrichedItems = [];
     let grandTotal = 0;
     for (const item of parsed.items || []) {
       const matched = await matchPosterEverywhere(tenantId, item.title || item.description, item.size);
-      const qty = item.quantity || 1;
-      const uPrice = matched?.unitPrice || Number(item.unitPrice) || 65.0;
-      const subtotal = Number((qty * uPrice).toFixed(2));
+      const qty = item.quantity || 1, uPrice = matched?.unitPrice || Number(item.unitPrice) || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
       grandTotal += subtotal;
       enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return { transcription: parsed.transcription, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ' };
   } catch (err) {
-    console.warn('[processVoiceSaleAudio] ⚠️ Fallback offline:', err?.message);
-    return { transcription: 'Modo offline: Grabación recibida.', items: [{ description: 'Chainsaw Man (Mediano)', quantity: 1, unitPrice: 65.0, subtotal: 65.0 }], total: 65.0, paymentMethod: 'EFECTIVO', confidence: 0.8, inputChannel: 'IA_VOZ' };
+    throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz');
   }
 }
 
@@ -147,12 +109,10 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
   try {
     const { result: response } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: artworkRecognitionResponseSchema },
       }),
-      actionName: 'RECOGNIZE_ARTWORK_IMAGE',
-      tenantId,
+      actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     const matched = await matchPosterEverywhere(tenantId, parsed.primaryTitle || parsed.visualAnalysis, parsed.suggestedSize || 'MEDIANO');
@@ -163,8 +123,7 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
       total, paymentMethod: 'EFECTIVO', inputChannel: 'IA_FOTO_ARTE',
     };
   } catch (err) {
-    console.warn('[recognizePosterArtworkFromImage] ⚠️ Fallback local:', err?.message);
-    return { visualAnalysis: 'Modo local', matchedPoster: null, items: [{ description: 'Póster Mediano', quantity: 1, unitPrice: 65.0, subtotal: 65.0 }], total: 65.0, confidence: 0.7, inputChannel: 'IA_FOTO_ARTE' };
+    throwMediaError('recognizePosterArtworkFromImage', err, 'Error al reconocer arte del póster');
   }
 }
 
@@ -174,28 +133,23 @@ export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video
   try {
     const { result: response } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: videoRecognitionResponseSchema },
       }),
-      actionName: 'RECOGNIZE_POSTERS_VIDEO',
-      tenantId,
+      actionName: 'RECOGNIZE_POSTERS_VIDEO', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     const enrichedItems = [];
     let grandTotal = 0;
     for (const item of parsed.postersDetected || []) {
       const matched = await matchPosterEverywhere(tenantId, item.title, item.suggestedSize || 'MEDIANO');
-      const qty = item.quantity || 1;
-      const uPrice = matched?.unitPrice || 65.0;
-      const subtotal = Number((qty * uPrice).toFixed(2));
+      const qty = item.quantity || 1, uPrice = matched?.unitPrice || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
       grandTotal += subtotal;
       enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster de Video', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return { summary: parsed.summary, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: 'EFECTIVO', confidence: parsed.confidence || 0.90, inputChannel: 'IA_VIDEO_MOSTRADOR' };
   } catch (err) {
-    console.warn('[recognizePostersFromVideo] ⚠️ Fallback local:', err?.message);
-    return { summary: 'Modo local: Video recibido', items: [{ description: 'Póster Mediano', quantity: 1, unitPrice: 65.0, subtotal: 65.0 }], total: 65.0, confidence: 0.7, inputChannel: 'IA_VIDEO_MOSTRADOR' };
+    throwMediaError('recognizePostersFromVideo', err, 'Error al procesar video de mostrador');
   }
 }
 
@@ -212,12 +166,10 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
   try {
     const { result: response } = await executeWithModelFallback({
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType } }] }],
         config: { responseMimeType: 'application/json', responseSchema: batchPhotoResponseSchema },
       }),
-      actionName: 'PROCESS_BATCH_PHOTO',
-      tenantId,
+      actionName: 'PROCESS_BATCH_PHOTO', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     let grandTotal = 0;
@@ -233,7 +185,6 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
     parsed.totalCalculated = Number(grandTotal.toFixed(2));
     return parsed;
   } catch (err) {
-    console.warn('[processPostersBatchPhoto] ⚠️ Fallback local:', err?.message);
-    return { detectedCodes: ['POSTER_MED_45'], summary: 'Modo local', items: [{ description: 'Póster Mediano (30x45 cm)', quantity: 1, unitPrice: 45.0, subtotal: 45.0 }], totalCalculated: 45.0, confidence: 0.7 };
+    throwMediaError('processPostersBatchPhoto', err, 'Error al procesar lote de fotos');
   }
 }

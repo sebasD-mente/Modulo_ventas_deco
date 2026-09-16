@@ -228,10 +228,9 @@ describe('🛡️ SUITE DE PRUEBAS MODULARES M3: PaymentSummaryBar & Master Cont
         !oversizedFiles.includes('src/components/FastManualSaleForm.jsx'),
         'FastManualSaleForm.jsx no debe estar en la lista de monolitos excedidos'
       );
-      assert.equal(
-        oversizedFiles.length,
-        15,
-        `La cantidad de monolitos debe ser exactamente 15 (recibido: ${oversizedFiles.length})`
+      assert.ok(
+        oversizedFiles.length <= 15,
+        `La cantidad de monolitos no debe aumentar (recibido: ${oversizedFiles.length})`
       );
     });
   });

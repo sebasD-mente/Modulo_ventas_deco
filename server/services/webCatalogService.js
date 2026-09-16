@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { invalidateVectorCache, searchHybridPosters, searchPostersByEmbedding } from './embeddingService.js';
-import { resolveEntityAlias } from './semantic/entityAliases.js';
+import { resolveEntityAlias, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from './semantic/entityAliases.js';
 
 /**
  * Servicio Desacoplado de Catálogo de Pósters
@@ -348,15 +348,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     const alphaQuery = alphaOnly(cleanQuery);
 
     const rawTokens = normQuery.split(/\s+/).filter((t) => t.length > 0);
-    const STOP_WORDS = new Set([
-      'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas',
-      'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
-      'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster',
-      'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños',
-      'hola', 'buenas', 'buenos', 'muestrame', 'mustrame', 'muéstrame',
-      'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo',
-      'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'
-    ]);
+    const STOP_WORDS = UNIVERSAL_STOP_WORDS;
     const aliasRes = resolveEntityAlias(cleanQuery);
     const aliasTokens = (aliasRes.matched && aliasRes.searchQuery)
       ? normalize(aliasRes.searchQuery).split(/\s+/).filter((t) => !STOP_WORDS.has(t) && t.length > 1)
@@ -553,5 +545,6 @@ export async function getWebPosterById(posterId, tenantId = null) {
 // Alias de compatibilidad
 export const searchPosters = searchWebPosters;
 export const getCatalogPosters = searchWebPosters;
-export { searchHybridPosters, searchPostersByEmbedding };
+export { searchHybridPosters, searchPostersByEmbedding, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES };
+
 

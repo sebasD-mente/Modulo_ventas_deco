@@ -95,7 +95,7 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
                 <span className="font-bold text-white block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.title} - ${inv.artwork.subtitle}` : inv.artwork.title}</span>
                 <span className="text-[10px] text-neutral-400 block truncate">{inv.artwork.subtitle && !inv.artwork.title.includes(inv.artwork.subtitle) ? `${inv.artwork.category} • ${inv.artwork.subtitle}` : inv.artwork.category}</span>
               </div>
-              {addFn && (<button type="button" onClick={() => addFn({ id: inv.artwork.id, titulo: inv.artwork.rawTitle || inv.artwork.title, subtitulo: inv.artwork.subtitle, categoria: inv.artwork.category, thumbUrl: inv.artwork.thumbUrl, imageUrl: inv.artwork.imageUrl, sizes: inv.allAvailableSizes || [] })} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
+              {addFn && (<button type="button" onClick={() => addFn({ id: inv.artwork.id, titulo: inv.artwork.rawTitle || inv.artwork.title, subtitulo: inv.artwork.subtitle, categoria: inv.artwork.category, thumbUrl: inv.artwork.thumbUrl, imageUrl: inv.artwork.imageUrl, sizes: inv.allAvailableSizes || [] })} className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-neutral-200 text-black rounded-xl text-xs font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95 flex items-center justify-center">+ Vender</button>)}
             </div>
           )}
         </div>
@@ -114,7 +114,7 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
                     <span className="font-bold text-xs text-white block truncate">{sp.titulo}</span>
                     <span className="text-[10px] text-neutral-400 block truncate">{sp.subtitulo || sp.categoria}</span>
                   </div>
-                  {addFn && (<button type="button" onClick={() => addFn(sp)} className="px-2.5 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-[10px] font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95">+ Vender</button>)}
+                  {addFn && (<button type="button" onClick={() => addFn(sp)} className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-neutral-200 text-black rounded-xl text-xs font-black shrink-0 shadow cursor-pointer transition-transform active:scale-95 flex items-center justify-center">+ Vender</button>)}
                 </div>
               ))}
             </div>

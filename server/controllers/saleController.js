@@ -1,19 +1,17 @@
 import {
-  createSaleTransaction,
-  updateSaleTransaction,
-  getEventKPIs,
-  getMonitorDashboardMetrics,
-  createCashClosingTransaction,
-  getEventSalesList as getEventSalesServiceList,
-  purgeEventSalesTransaction,
+  createSaleTransaction, updateSaleTransaction, getEventKPIs,
+  getMonitorDashboardMetrics, createCashClosingTransaction,
+  getEventSalesList as getEventSalesServiceList, purgeEventSalesTransaction,
 } from '../services/saleService.js';
 import { prisma } from '../config/prisma.js';
 
 export async function createSale(req, res) {
   try {
-    const { eventId, items, payments, discount, notes, inputChannel, attachments } = req.body;
+    const { eventId, items, payments, discount, notes, inputChannel, attachments, idempotencyKey: bodyKey } = req.body;
     const sellerId = req.user?.id;
     const tenantId = req.tenantId;
+    const rawKey = req.headers['idempotency-key'] || bodyKey || null;
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() !== '' ? rawKey.trim() : null;
 
     if (!sellerId || !tenantId) {
       return res.status(400).json({ success: false, error: 'Contexto de usuario o empresa no válido.' });
@@ -29,7 +27,17 @@ export async function createSale(req, res) {
       notes,
       inputChannel,
       attachments: attachments || [],
+      idempotencyKey,
     });
+
+    if (sale.idempotentReplay) {
+      return res.status(200).json({
+        success: true,
+        idempotentReplay: true,
+        message: 'Venta previamente registrada (Idempotent Replay).',
+        data: sale,
+      });
+    }
 
     return res.status(201).json({
       success: true,

@@ -438,13 +438,10 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica para Hito M4 
   // =========================================================================
   describe('6. Resiliencia del Pool Multi-Modelo y Observabilidad de Degradación', () => {
 
-    it('6.1. Prioridad del pool: gemini-3.8-flash -> 3.7 -> 3.6 -> 3.5 -> 3.1-lite', () => {
+    it('6.1. Prioridad del pool: gemini-2.5-flash -> gemini-2.5-pro', () => {
       assert.deepStrictEqual(MODEL_PRIORITY_POOL, [
-        'gemini-3.8-flash',
-        'gemini-3.7-flash',
-        'gemini-3.6-flash',
-        'gemini-3.5-flash',
-        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
       ]);
     });
 

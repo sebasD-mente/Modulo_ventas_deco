@@ -1,9 +1,25 @@
 import { normalizeSemanticText } from './paymentExtractor.js';
 
+export const UNIVERSAL_STOP_WORDS = new Set([
+  'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas',
+  'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
+  'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster',
+  'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños',
+  'diseno', 'disenos',
+  'hola', 'buenas', 'buenos', 'tarde', 'tardes', 'dia', 'dias', 'día', 'días',
+  'noche', 'noches', 'favor', 'gracias',
+  'muestrame', 'mustrame', 'muéstrame',
+  'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo',
+  'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'
+]);
+
+export const KNOWN_SHORT_ENTITIES = new Set(['f1', 'u2', 'r34', 'go', 'up', 'cr7']);
+
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 2. DICCIONARIO CULTURAL DE ENTIDADES Y OBRAS DE ARTE (STAND_ENTITY_ALIASES)
  * ─────────────────────────────────────────────────────────────────────────────
+
  * Mapea la jerga coloquial, apodos y peticiones frecuentes de clientes en eventos
  * hacia los títulos canónicos y términos óptimos de búsqueda en el catálogo.
  */
@@ -265,6 +281,15 @@ export const STAND_ENTITY_ALIASES = [
 
   // ── MOTORSPORT & AUTOS ────────────────────────────────────────────────────
   {
+    canonicalTitle: 'Formula 1 - F1',
+    searchQuery: 'Formula 1 F1 Ferrari Red Bull',
+    category: 'DEPORTES',
+    aliases: [
+      'f1', 'formula 1', 'formula uno', 'carreras', 'ferrari f1', 'red bull f1',
+      'verstappen', 'hamilton', 'senna', 'ayrton senna'
+    ]
+  },
+  {
     canonicalTitle: 'F1 - Red Bull Racing (Checo Pérez & Verstappen)',
     searchQuery: 'Formula 1 Red Bull Checo Perez Verstappen',
     category: 'AUTOS',
@@ -412,6 +437,14 @@ export const STAND_ENTITY_ALIASES = [
       'messi', 'lionel messi', 'la pulga', 'd10s messi', 'lio messi', 'leo messi'
     ]
   },
+  {
+    canonicalTitle: 'Cristiano Ronaldo - CR7',
+    searchQuery: 'Cristiano Ronaldo CR7',
+    category: 'FUTBOL',
+    aliases: [
+      'el bicho', 'cr7', 'cristiano ronaldo', 'cristiano', 'ronaldo', 'siuu', 'el comandante'
+    ]
+  },
 
   // ── GAMING ────────────────────────────────────────────────────────────────
   {
@@ -471,7 +504,7 @@ export function resolveEntityAlias(query) {
   const sortedByLength = [...allEntries].sort((a, b) => b.cleanAlias.length - a.cleanAlias.length);
 
   for (const item of sortedByLength) {
-    if (item.cleanAlias.length >= 3) {
+    if (item.cleanAlias.length >= 3 || KNOWN_SHORT_ENTITIES.has(item.cleanAlias)) {
       const escaped = item.cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const wordBoundaryRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
       if (wordBoundaryRegex.test(clean)) {
