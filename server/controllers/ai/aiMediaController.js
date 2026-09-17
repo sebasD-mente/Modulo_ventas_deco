@@ -123,6 +123,15 @@ export async function handleArtworkRecognition(req, res) {
         eventId,
       }),
     ]);
+    if (analysis.isArtworkDetected === false || !analysis.items?.length) {
+      return res.json({
+        success: true, imageUrl, draftSale: null, isArtworkDetected: false,
+        primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
+        candidates: analysis.candidates || [],
+        message: 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.',
+      });
+    }
+
     const draftSale = analysis.draftSale || {
       items: analysis.items, total: analysis.total, paymentMethod: 'EFECTIVO',
       imageUrl, inputChannel: 'IA_FOTO_ARTE', notes: `Reconocimiento de obra visual: ${analysis.primaryTitle || 'Detectado'}`,
@@ -130,7 +139,7 @@ export async function handleArtworkRecognition(req, res) {
     if (imageUrl && !draftSale.imageUrl) draftSale.imageUrl = imageUrl;
 
     return res.json({
-      success: true, imageUrl, primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
+      success: true, imageUrl, isArtworkDetected: true, primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
       candidates: analysis.candidates || [], draftSale, requiresConfirmation: true,
       message: 'Obra analizada y encontrada en el catálogo web. Por favor verifica y confirma.',
     });

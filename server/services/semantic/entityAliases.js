@@ -5,7 +5,7 @@ export const UNIVERSAL_STOP_WORDS = new Set([
   'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio',
   'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster',
   'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños',
-  'diseno', 'disenos',
+  'diseno', 'disenos', 'sobre', 'sin', 'como', 'foto', 'fotos', 'imagen', 'imagenes', 'imágenes',
   'hola', 'buenas', 'buenos', 'tarde', 'tardes', 'dia', 'dias', 'día', 'días',
   'noche', 'noches', 'favor', 'gracias',
   'muestrame', 'mustrame', 'muéstrame',

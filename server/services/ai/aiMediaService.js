@@ -3,7 +3,7 @@ import { prisma } from '../../config/prisma.js';
 import { searchWebPosters } from '../webCatalogService.js';
 import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { voiceSaleResponseSchema, buildVoiceSalePrompt, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
-import { resolveEntityAlias, normalizeArtworkQuery } from '../semantic/entityAliases.js';
+import { resolveEntityAlias, normalizeArtworkQuery, UNIVERSAL_STOP_WORDS } from '../semantic/entityAliases.js';
 import { searchHybridPosters } from '../embeddingService.js';
 
 const getActivePool = () => [ENV.GEMINI_MODEL && !ENV.GEMINI_MODEL.includes('2.5') ? ENV.GEMINI_MODEL : 'gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', ...MODEL_PRIORITY_POOL].filter((v, i, a) => a.indexOf(v) === i);
@@ -37,8 +37,10 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
 
   if (webMatches.length > 0) {
     const matched = webMatches[0], matchText = `${matched.titulo || ''} ${matched.subtitulo || ''} ${(matched.tags || []).join(' ')}`.toLowerCase();
-    const queryTokens = effectiveQuery.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
-    if (aliasRes.matched || queryTokens.length === 0 || queryTokens.some((t) => matchText.includes(t))) {
+    const queryTokens = effectiveQuery.toLowerCase().split(/\s+/).filter((t) => t.length > 2 && !UNIVERSAL_STOP_WORDS.has(t));
+    const matchedTokens = queryTokens.filter((t) => matchText.includes(t));
+    const isTokenMatch = queryTokens.length >= 2 ? (matchedTokens.length >= 2 || (matchedTokens.length / queryTokens.length) >= 0.6) : (matchedTokens.length === 1);
+    if (aliasRes.matched || (queryTokens.length > 0 && isTokenMatch)) {
       let selectedSize = matched.sizes[0], sizeAvailable = true, unavailableReason = null;
       if (requestedSize) {
         const norm = normalizeCatalogSizeId(requestedSize), cleanSize = String(requestedSize).toUpperCase().trim();
@@ -106,7 +108,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       const matched = await matchPosterEverywhere(tenantId, item.title || item.description, item.size);
       const qty = item.quantity || 1, uPrice = matched?.unitPrice || Number(item.unitPrice) || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
       grandTotal += subtotal;
-      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
+      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster', baseTitle: matched?.baseTitle || item.title || 'Póster', sizeId: matched?.sizeId || 'MEDIANO', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return {
       transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null,
@@ -127,10 +129,14 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     const matched = await matchPosterEverywhere(tenantId, parsed.primaryTitle || parsed.visualAnalysis, parsed.suggestedSize || 'MEDIANO');
-    const total = matched?.unitPrice || 65.0;
+    if (!matched) {
+      return { isArtworkDetected: false, primaryTitle: parsed.primaryTitle, visualAnalysis: parsed.visualAnalysis, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null };
+    }
+    const total = matched.unitPrice || 65.0;
     return {
-      visualAnalysis: parsed.visualAnalysis, primaryTitle: parsed.primaryTitle, confidence: parsed.confidence,
-      items: [{ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched?.availableSizes }],
+      isArtworkDetected: true, visualAnalysis: parsed.visualAnalysis, primaryTitle: parsed.primaryTitle, confidence: parsed.confidence,
+      candidates: parsed.candidates || [],
+      items: [{ productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null, description: matched.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', baseTitle: matched.baseTitle || parsed.primaryTitle || 'Póster', sizeId: matched.sizeId || 'MEDIANO', thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched.availableSizes }],
       total, paymentMethod: 'EFECTIVO', inputChannel: 'IA_FOTO_ARTE',
     };
   } catch (err) { throwMediaError('recognizePosterArtworkFromImage', err, 'Error al reconocer arte del póster'); }
@@ -152,7 +158,7 @@ export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video
       const matched = await matchPosterEverywhere(tenantId, item.title, item.suggestedSize || 'MEDIANO');
       const qty = item.quantity || 1, uPrice = matched?.unitPrice || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
       grandTotal += subtotal;
-      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster de Video', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
+      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster de Video', baseTitle: matched?.baseTitle || parsed.primaryTitle || item.title || 'Póster de Video', sizeId: matched?.sizeId || 'MEDIANO', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return { summary: parsed.summary, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: 'EFECTIVO', confidence: parsed.confidence || 0.90, inputChannel: 'IA_VIDEO_MOSTRADOR' };
   } catch (err) { throwMediaError('recognizePostersFromVideo', err, 'Error al procesar video de mostrador'); }

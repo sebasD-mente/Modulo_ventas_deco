@@ -75,7 +75,13 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     if (e.target) e.target.value = '';
     const blobToUpload = await compressImage(file);
     const form = new FormData(); form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
-    uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`));
+    uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => {
+      if (d.isArtworkDetected === false || !d.draftSale) {
+        pushAiMsg(d.message || 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.');
+      } else {
+        pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`);
+      }
+    });
   };
   const confirmPendingSale = async () => {
     const draft = pendingDraftRef.current; if (!draft?.items?.length) return;
