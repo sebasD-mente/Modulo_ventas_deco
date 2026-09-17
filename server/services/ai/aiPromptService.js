@@ -33,7 +33,9 @@ Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
 2. PRIMING Y SESGO FONÉTICO: Estás en un stand de pósters decorativos de Deco Vintage. Está terminantemente PROHIBIDO interpretar "pastel", "pasteles", "postre" o "stickers". Si la acústica suena parecido a pastel o stickers, interpreta SIEMPRE "póster" o "pósters".
 3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q180). Si no especifican tamaño, asignar MEDIANO.
 4. PROTECCIÓN CONTRA VACILACIONES: En correcciones espontáneas ("dos pa-... un póster", "tres... dos batman"), toma ÚNICAMENTE la cantidad final corregida (1 póster, 2 batman). NUNCA sumes números vacilantes ni falsos inicios.
-5. INTENCIONES: SALUDO (si solo saludan sin pedir obra, greeting amable y breve, items=[]), CONSULTA_CATALOGO (si preguntan si hay o precio), DICTADO_VENTA (si dictan compra), RUIDO_NO_VENTA (ruido/murmullo sin venta).`;
+5. INTENCIONES: SALUDO (si solo saludan sin pedir obra, greeting amable y breve, items=[]), CONSULTA_CATALOGO (si preguntan si hay o precio), DICTADO_VENTA (si dictan compra), RUIDO_NO_VENTA (ruido/murmullo sin venta).
+6. DICTADO MULTI-PRODUCTO: Si el audio menciona 2 o más obras (ej: 'Batman mediano y uno de Star Wars grande'), isSaleDetected DEBE ser true, intent DEBE ser 'DICTADO_VENTA', y el array 'items' DEBE incluir cada producto dictado por separado con su título, tamaño y cantidad. PROHIBIDO devolver items vacío si se dictaron obras de compra.
+7. TRANSCRIPCIÓN PURA: En 'transcription' escribe ÚNICAMENTE las palabras habladas por la persona. Está TERMINANTEMENTE PROHIBIDO incluir notas de razonamiento interno, corchetes o anotaciones tipo '[snip: ...]'.`;
 }
 
 export const artworkRecognitionResponseSchema = {

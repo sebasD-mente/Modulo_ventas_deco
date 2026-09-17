@@ -91,12 +91,12 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       }),
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
-    const transcription = parsed.transcription?.trim() || '';
+    const cleanTranscription = (parsed.transcription || '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
     const isSale = Boolean(parsed.isSaleDetected && Array.isArray(parsed.items) && parsed.items.length > 0);
-    const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (transcription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
+    const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
     if (!isSale) {
       return {
-        transcription: parsed.transcription || transcription, isSaleDetected: false, intent, greeting: parsed.greeting || null,
+        transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null,
         items: [], total: 0, paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
       };
     }
@@ -109,7 +109,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return {
-      transcription: parsed.transcription || transcription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null,
+      transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null,
       items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
     };
   } catch (err) { throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz'); }

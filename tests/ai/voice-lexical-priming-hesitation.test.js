@@ -43,6 +43,20 @@ describe('🎙️ Voice Lexical Priming, Hesitation Guard & VAD Shielding Suite'
       assert.match(prompt, /literal|palabra por palabra/i, 'Debe exigir transcripción literal fiel');
       assert.ok(voiceSaleResponseSchema.properties.transcription, 'voiceSaleResponseSchema debe contener campo transcription');
     });
+
+    it('1.6. Regla 6: DICTADO MULTI-PRODUCTO explicita el manejo de 2 o más obras', () => {
+      const prompt = buildVoiceSalePrompt();
+      assert.match(prompt, /DICTADO MULTI-PRODUCTO/i, 'Debe incluir encabezado DICTADO MULTI-PRODUCTO');
+      assert.match(prompt, /2 o más obras/i, 'Debe mencionar 2 o más obras');
+      assert.match(prompt, /PROHIBIDO devolver items vacío/i, 'Debe prohibir items vacío si hay obras');
+    });
+
+    it('1.7. Regla 7: TRANSCRIPCIÓN PURA prohíbe corchetes y notas internas', () => {
+      const prompt = buildVoiceSalePrompt();
+      assert.match(prompt, /TRANSCRIPCIÓN PURA/i, 'Debe incluir encabezado TRANSCRIPCIÓN PURA');
+      assert.match(prompt, /TERMINANTEMENTE PROHIBIDO/i, 'Debe prohibir notas de razonamiento');
+      assert.match(prompt, /\[snip: \.\.\.\]/i, 'Debe mencionar ejemplo de corchetes prohibidos');
+    });
   });
 
   describe('2. Protección contra Vacilaciones Numéricas & Falsos Inicios', () => {
@@ -118,6 +132,10 @@ describe('🎙️ Voice Lexical Priming, Hesitation Guard & VAD Shielding Suite'
     it('4.2. aiMediaController paraleliza persistencia GCS e inferencia con Promise.all', () => {
       assert.match(controllerContent, /Promise\.all\(\s*\[\s*safePersistMedia/, 'Debe usar Promise.all con safePersistMedia');
       assert.match(controllerContent, /processVoiceSaleAudio/, 'Debe incluir processVoiceSaleAudio en Promise.all');
+    });
+
+    it('4.3. aiMediaService sanitiza transcription eliminando bloques entre corchetes', () => {
+      assert.match(mediaServiceContent, /cleanTranscription\s*=\s*\(parsed\.transcription\s*\|\|\s*['"]['"]\)\.replace\(\/\\\[\.\*\?\\\]\/g,\s*['"]['"]\)/, 'Debe sanitizar corchetes con RegEx');
     });
   });
 

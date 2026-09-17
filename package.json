@@ -12,6 +12,7 @@
     "start": "node server/index.js",
     "test": "node --test tests/security/zero-trust.test.js",
     "test:security": "node --test tests/security/zero-trust.test.js",
+    "test:voice": "node --test tests/ai/voice-lexical-priming-hesitation.test.js tests/ai/voice-vad-reengineering.test.js tests/adversarial/m1-voice-priming-hesitation-stress.test.js",
     "audit:secrets": "node scripts/audit-secrets.js",
     "audit:monoliths": "node scripts/audit-monoliths.js",
     "harness:check": "npm run test:security && npm run audit:secrets && npm run audit:monoliths && npm run build",
