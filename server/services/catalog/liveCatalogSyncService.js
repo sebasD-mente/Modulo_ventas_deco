@@ -8,6 +8,7 @@ import { resolvePosterSizes } from './catalogSizeResolver.js';
 import { formatProductForPos } from './catalogStringNormalizer.js';
 import { invalidateCatalogCache } from './catalogCacheStore.js';
 import { invalidateVectorCache } from '../embeddingService.js';
+import { UNIVERSAL_STOP_WORDS } from '../semantic/entityAliases.js';
 
 const recentQueryThrottle = new Map(), THROTTLE_MS = 10000;
 
@@ -96,9 +97,10 @@ export async function searchLiveWebParachute(cleanQuery, tenantId = null) {
   if (Date.now() - (recentQueryThrottle.get(cacheKey) || 0) < THROTTLE_MS) return [];
   recentQueryThrottle.set(cacheKey, Date.now());
 
-  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[-_]/g, ' ').trim();
-  const normQuery = norm(cleanQuery), STOP = new Set(['de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'con', 'por', 'para', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'dame', 'quiero']);
-  const queryTokens = Array.from(new Set(normQuery.split(/\s+/).filter((t) => t.length > 2 && !STOP.has(t))));
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[?!¿¡,.:;()]/g, ' ').replace(/[-_]/g, ' ').trim();
+  const normQuery = norm(cleanQuery);
+  const queryTokens = Array.from(new Set(normQuery.split(/\s+/).filter((t) => t.length >= 3 && !UNIVERSAL_STOP_WORDS.has(t))));
+  if (queryTokens.length === 0) return [];
   const allWebItems = new Map();
 
   for (const rawBase of getCatalogCandidateUrls()) {

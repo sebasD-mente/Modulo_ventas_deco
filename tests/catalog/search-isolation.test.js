@@ -2,6 +2,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { searchWebPosters } from '../../server/services/webCatalogService.js';
 import { productCache } from '../../server/services/catalog/catalogCacheStore.js';
+import { resolveEntityAlias } from '../../server/services/semantic/entityAliases.js';
 
 describe('🛡️ Suite de Aislamiento y Erradicación de Contaminación en Búsqueda de Catálogo', () => {
   const TEST_TENANT = 'tenant-search-isolation-test';
@@ -96,6 +97,42 @@ describe('🛡️ Suite de Aislamiento y Erradicación de Contaminación en Bús
       imageUrl: 'https://cdn.example.com/batman.jpg',
       precioMinimo: 65,
       tags: ['dc', 'batman', 'dark', 'knight']
+    },
+    {
+      id: 'pablo-1',
+      titulo: 'Pablo Escobar',
+      subtitulo: 'Sonrisa Histórica',
+      categoria: 'HISTORICOS',
+      imageUrl: 'https://cdn.example.com/pablo-sonrisa.jpg',
+      precioMinimo: 65,
+      tags: ['pablo', 'escobar', 'patron', 'historicos']
+    },
+    {
+      id: 'pablo-2',
+      titulo: 'Pablo Escobar',
+      subtitulo: 'Sneakerhead',
+      categoria: 'HISTORICOS',
+      imageUrl: 'https://cdn.example.com/pablo-sneakers.jpg',
+      precioMinimo: 65,
+      tags: ['pablo', 'escobar', 'sneakers']
+    },
+    {
+      id: 'demon-1',
+      titulo: 'Demon Slayer: Kimetsu no Yaiba',
+      subtitulo: 'Tanjiro & Nezuko',
+      categoria: 'ANIME',
+      imageUrl: 'https://cdn.example.com/demon.jpg',
+      precioMinimo: 65,
+      tags: ['anime', 'tanjiro', 'nezuko', 'del', 'los', 'pilares']
+    },
+    {
+      id: 'pink-1',
+      titulo: 'Pink Floyd',
+      subtitulo: 'The Dark Side of the Moon',
+      categoria: 'MUSICA',
+      imageUrl: 'https://cdn.example.com/pink.jpg',
+      precioMinimo: 55,
+      tags: ['musica', 'rock', 'prisma', 'del', 'triangulo']
     }
   ];
 
@@ -189,5 +226,59 @@ describe('🛡️ Suite de Aislamiento y Erradicación de Contaminación en Bús
 
     const lanaCount = results.filter(r => /lana/i.test(`${r.titulo} ${r.subtitulo}`)).length;
     assert.strictEqual(lanaCount, 0, 'No debe contener a Lana Del Rey');
+  });
+
+  it('6. resolveEntityAlias("y los del patron?") devuelve matched: true con canonicalTitle de Pablo Escobar', () => {
+    const res = resolveEntityAlias('y los del patron?');
+    assert.strictEqual(res.matched, true);
+    assert.ok(res.canonicalTitle.includes('Pablo Escobar'));
+    assert.strictEqual(res.searchQuery, 'Pablo Escobar');
+  });
+
+  it('7. resolveEntityAlias("el patron"), resolveEntityAlias("del patron") y resolveEntityAlias("patron") resuelven a Pablo Escobar', () => {
+    for (const q of ['el patron', 'del patron', 'patron', 'el patrón', 'del patrón', 'los del patron', 'los del patrón']) {
+      const res = resolveEntityAlias(q);
+      assert.strictEqual(res.matched, true, `Fallo al resolver alias: "${q}"`);
+      assert.ok(res.canonicalTitle.includes('Pablo Escobar'), `canonicalTitle incorrecto para "${q}"`);
+      assert.strictEqual(res.searchQuery, 'Pablo Escobar');
+    }
+  });
+
+  it('8. Búsqueda en catálogo de "y los del patron?" devuelve los pósters de Pablo Escobar y 0 pósters de Demon Slayer o Pink Floyd', async () => {
+    const results = await searchWebPosters({
+      tenantId: TEST_TENANT,
+      query: 'y los del patron?',
+      limit: 10
+    });
+
+    assert.ok(results.length >= 1, 'Debe devolver al menos un póster de Pablo Escobar');
+    for (const item of results) {
+      assert.strictEqual(item.titulo, 'Pablo Escobar', `El ítem retornado debe ser Pablo Escobar, no "${item.titulo}"`);
+    }
+
+    const demonCount = results.filter(r => /demon/i.test(`${r.titulo} ${r.subtitulo}`)).length;
+    assert.strictEqual(demonCount, 0, 'No debe retornar pósters de Demon Slayer');
+
+    const pinkCount = results.filter(r => /pink/i.test(`${r.titulo} ${r.subtitulo}`)).length;
+    assert.strictEqual(pinkCount, 0, 'No debe retornar pósters de Pink Floyd');
+  });
+
+  it('9. Búsqueda "el patron" devuelve pósters de Pablo Escobar y 0 de Demon Slayer o Pink Floyd', async () => {
+    const results = await searchWebPosters({
+      tenantId: TEST_TENANT,
+      query: 'el patron',
+      limit: 10
+    });
+
+    assert.ok(results.length >= 1, 'Debe devolver al menos un póster de Pablo Escobar');
+    for (const item of results) {
+      assert.strictEqual(item.titulo, 'Pablo Escobar');
+    }
+
+    const demonCount = results.filter(r => /demon/i.test(`${r.titulo} ${r.subtitulo}`)).length;
+    assert.strictEqual(demonCount, 0);
+
+    const pinkCount = results.filter(r => /pink/i.test(`${r.titulo} ${r.subtitulo}`)).length;
+    assert.strictEqual(pinkCount, 0);
   });
 });

@@ -335,11 +335,13 @@ export const STAND_ENTITY_ALIASES = [
   // ── CINE & SERIES DE CULTO ────────────────────────────────────────────────
   {
     canonicalTitle: 'Pablo Escobar (Sonrisa / Mugshot)',
-    searchQuery: 'Pablo Escobar Sonrisa Mugshot',
+    searchQuery: 'Pablo Escobar',
     category: 'HISTORICOS',
     aliases: [
-      'pablo', 'pablo escobar', 'el patron', 'el patrón', 'la sonrisa de pablo',
-      'el mugshot de pablo', 'pablo sonriendo', 'cartel de medellin', 'escobar'
+      'pablo', 'pablo escobar', 'patron', 'el patron', 'el patrón', 'del patron',
+      'del patrón', 'los del patron', 'los del patrón', 'el patron del mal',
+      'patron del mal', 'la sonrisa de pablo', 'el mugshot de pablo', 'pablo sonriendo',
+      'cartel de medellin', 'escobar'
     ]
   },
   {

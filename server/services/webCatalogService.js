@@ -24,7 +24,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
   if (cleanQuery) {
     const normalize = (str) =>
-      (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[-_]/g, ' ').trim();
+      (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[?!¿¡,.:;()]/g, ' ').replace(/[-_]/g, ' ').trim();
     const alphaOnly = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
     const normQuery = normalize(cleanQuery);
@@ -110,7 +110,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     scored.sort((a, b) => b.score - a.score);
     const deduplicated = deduplicatePosters(scored.map((item) => item.p));
 
-    const targetMeaningful = (aliasRes.matched && aliasTokens.length > 0) ? aliasTokens : meaningfulTokens;
+    const targetMeaningful = (aliasRes.matched && aliasTokens.length > 0) ? aliasTokens.slice(0, 2) : meaningfulTokens;
     const hasMissingTokens = targetMeaningful.length >= 2 && !deduplicated.some((p) => {
       const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' '));
       return targetMeaningful.every((tok) => pNorm.includes(tok));
