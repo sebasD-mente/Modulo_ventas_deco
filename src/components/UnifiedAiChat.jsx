@@ -22,25 +22,35 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
   }, [chatStream.messages, chatStream.pendingDraft, voiceRecorder.isRecording, chatStream.aiError]);
 
   return (
-    <div className="w-full max-w-2xl mx-auto rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-white relative">
-      <ChatHeader />
-      <ChatMessageList
-        messages={chatStream.messages} isLoading={chatStream.isLoading} processingNote={chatStream.processingNote}
-        onAddPosterToDraft={chatStream.addPosterToDraft} chatContainerRef={chatContainerRef}
-        isPinnedToBottomRef={isPinnedToBottomRef} chatBottomRef={chatBottomRef}
-      />
-      {chatStream.aiError && (
-        <AiErrorBanner
-          error={chatStream.aiError}
-          onDismiss={chatStream.clearAiError}
-          onManualSale={() => {
-            const channel = chatStream.aiError?.channel || 'MANUAL_RAPIDA';
-            const note = `Fallo IA (${chatStream.aiError?.title || 'Inferencia'}) - Carga manual directa`;
-            chatStream.clearAiError();
-            if (onPopulateManualForm) onPopulateManualForm({ inputChannel: channel, notes: note, items: [] });
-          }}
+    <div className="w-full max-w-2xl mx-auto space-y-4">
+      <div className="rounded-[36px] sm:rounded-[42px] border-[3px] sm:border-[4px] border-white shadow-2xl overflow-hidden flex flex-col bg-white relative">
+        <ChatHeader />
+        <ChatMessageList
+          messages={chatStream.messages} isLoading={chatStream.isLoading} processingNote={chatStream.processingNote}
+          onAddPosterToDraft={chatStream.addPosterToDraft} chatContainerRef={chatContainerRef}
+          isPinnedToBottomRef={isPinnedToBottomRef} chatBottomRef={chatBottomRef}
         />
-      )}
+        {chatStream.aiError && (
+          <AiErrorBanner
+            error={chatStream.aiError}
+            onDismiss={chatStream.clearAiError}
+            onManualSale={() => {
+              const channel = chatStream.aiError?.channel || 'MANUAL_RAPIDA';
+              const note = `Fallo IA (${chatStream.aiError?.title || 'Inferencia'}) - Carga manual directa`;
+              chatStream.clearAiError();
+              if (onPopulateManualForm) onPopulateManualForm({ inputChannel: channel, notes: note, items: [] });
+            }}
+          />
+        )}
+        <ChatInputBar
+          inputText={chatStream.inputText} setInputText={chatStream.setInputText}
+          onSendText={chatStream.handleSendText} isLoading={chatStream.isLoading}
+          isRecording={voiceRecorder.isRecording} recordingSeconds={voiceRecorder.recordingSeconds}
+          vadActive={voiceRecorder.vadActive} audioLevel={voiceRecorder.audioLevel}
+          onStartRecording={voiceRecorder.startRecording} onStopRecording={voiceRecorder.stopRecording}
+          onImageUpload={chatStream.handleImageUpload}
+        />
+      </div>
       {chatStream.pendingDraft && (
         <ChatDraftCard
           pendingDraft={chatStream.pendingDraft}
@@ -52,14 +62,6 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           isLoading={chatStream.isLoading}
         />
       )}
-      <ChatInputBar
-        inputText={chatStream.inputText} setInputText={chatStream.setInputText}
-        onSendText={chatStream.handleSendText} isLoading={chatStream.isLoading}
-        isRecording={voiceRecorder.isRecording} recordingSeconds={voiceRecorder.recordingSeconds}
-        vadActive={voiceRecorder.vadActive} audioLevel={voiceRecorder.audioLevel}
-        onStartRecording={voiceRecorder.startRecording} onStopRecording={voiceRecorder.stopRecording}
-        onImageUpload={chatStream.handleImageUpload}
-      />
       <ChatSwapModal
         isOpen={chatStream.swappingIndex !== null} onClose={() => chatStream.setSwappingIndex(null)}
         swapQuery={chatStream.swapQuery} onSearchChange={chatStream.handleSwapSearchChange}

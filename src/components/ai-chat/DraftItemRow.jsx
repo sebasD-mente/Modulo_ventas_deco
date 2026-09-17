@@ -51,7 +51,7 @@ export default function DraftItemRow({
             <button
               type="button"
               onClick={() => onUpdateQty?.(index, -1)}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 active:scale-95 transition-transform cursor-pointer"
+              className="min-h-[36px] min-w-[36px] h-9 w-9 flex items-center justify-center text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 active:scale-95 transition-transform cursor-pointer"
               title="Disminuir cantidad"
             >
               <Minus className="w-4 h-4" />
@@ -60,7 +60,7 @@ export default function DraftItemRow({
             <button
               type="button"
               onClick={() => onUpdateQty?.(index, 1)}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 active:scale-95 transition-transform cursor-pointer"
+              className="min-h-[36px] min-w-[36px] h-9 w-9 flex items-center justify-center text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 active:scale-95 transition-transform cursor-pointer"
               title="Aumentar cantidad"
             >
               <Plus className="w-4 h-4" />

@@ -31,28 +31,28 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
   const extractSizeFromText = (text) => {
     if (!text || typeof text !== 'string') return null;
     const str = text.toLowerCase();
-    if (/\b(extra\s*grande|gigante|xl|60x90|24x36)\b/i.test(str)) return 'GIGANTE';
-    if (/\b(grande|large|18x24|45x60)\b/i.test(str)) return 'GRANDE';
+    if (/\b(extra\s*grandes?|gigantes?|xl|60x90|24x36)\b/i.test(str)) return 'GIGANTE';
+    if (/\b(grandes?|large|18x24|45x60)\b/i.test(str)) return 'GRANDE';
     if (/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/i.test(str)) return 'PORTADA_ALBUM';
-    if (/\b(peque[ñn]o|chico|small|8\.?5?x1[01]|21x27)\b/i.test(str)) return 'PEQUENO';
-    if (/\b(mini|miniatura|xs|5x7|14x21)\b/i.test(str)) return 'MINI';
-    if (/\b(mediano|medio|medium|12x18|30x45)\b/i.test(str)) return 'MEDIANO';
+    if (/\b(peque[ñn]os?|chicos?|small|8\.?5?x1[01]|21x27)\b/i.test(str)) return 'PEQUENO';
+    if (/\b(minis?|miniaturas?|xs|5x7|14x21)\b/i.test(str)) return 'MINI';
+    if (/\b(medianos?|medios?|medium|12x18|30x45)\b/i.test(str)) return 'MEDIANO';
     return null;
   };
 
-  const globalMsgSize = rawItems.length === 1 ? extractSizeFromText(userMessage) : null;
+  const globalMsgSize = extractSizeFromText(userMessage);
 
   for (const it of rawItems) {
     let rawName = String(it.productName || it.title || it.description || 'Póster').trim();
     const nameExtractedSize = extractSizeFromText(rawName);
     if (nameExtractedSize) {
       rawName = rawName
-        .replace(/\b(extra\s*grande|gigante|xl|60x90|24x36)\b/gi, '')
-        .replace(/\b(grande|large|18x24|45x60)\b/gi, '')
+        .replace(/\b(extra\s*grandes?|gigantes?|xl|60x90|24x36)\b/gi, '')
+        .replace(/\b(grandes?|large|18x24|45x60)\b/gi, '')
         .replace(/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/gi, '')
-        .replace(/\b(peque[ñn]o|chico|small|8\.?5?x1[01]|21x27)\b/gi, '')
-        .replace(/\b(mini|miniatura|xs|5x7|14x21)\b/gi, '')
-        .replace(/\b(mediano|medio|medium|12x18|30x45)\b/gi, '')
+        .replace(/\b(peque[ñn]os?|chicos?|small|8\.?5?x1[01]|21x27)\b/gi, '')
+        .replace(/\b(minis?|miniaturas?|xs|5x7|14x21)\b/gi, '')
+        .replace(/\b(medianos?|medios?|medium|12x18|30x45)\b/gi, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
     }
