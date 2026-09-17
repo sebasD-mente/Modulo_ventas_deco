@@ -18,7 +18,7 @@ export const CANONICAL_SIZES = [
 ];
 export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
 const STORAGE_KEY = 'deko_local_catalog_snapshot_v1';
-export const TIMEOUT_MS = 1500;
+export const TIMEOUT_MS = 4500;
 const MAX_LOCAL_CATALOG_ITEMS = 300;
 
 export const SEED_POSTERS = [
