@@ -61,12 +61,11 @@ export const STAND_ENTITY_ALIASES = [
   },
   {
     canonicalTitle: 'Taylor Swift - The Eras Tour / 1989',
-    searchQuery: 'Taylor Swift Eras Tour 1989',
+    searchQuery: 'Taylor Swift',
     category: 'MUSICA',
     defaultSizeId: 'PORTADA_ALBUM',
     aliases: [
-      'taylor swift', 'la taylor', 'la de taylor', 'swiftie', 'eras tour', 'the eras tour',
-      '1989', 'folklore', 'midnights', 'reputation', 'red taylor', 'lover taylor'
+      'taylor swift', 'la taylor', 'la de taylor', 'swiftie'
     ]
   },
   {
@@ -501,6 +500,7 @@ export function resolveEntityAlias(query) {
     if (clean === item.cleanAlias) {
       return {
         matched: true,
+        exactMatch: true,
         canonicalTitle: item.entity.canonicalTitle,
         searchQuery: item.entity.searchQuery,
         category: item.entity.category,
@@ -519,10 +519,16 @@ export function resolveEntityAlias(query) {
       const escaped = item.cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const wordBoundaryRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
       if (wordBoundaryRegex.test(clean)) {
+        // En consultas compuestas NO descartamos discriminadores (ej: "spiderman debut" -> "Spider-Man debut")
+        const compositeQuery = clean.replace(wordBoundaryRegex, (match, p1, p2) => {
+          return `${p1 || ''}${item.entity.searchQuery}${p2 || ''}`;
+        }).replace(/\s{2,}/g, ' ').trim();
+
         return {
           matched: true,
+          exactMatch: false,
           canonicalTitle: item.entity.canonicalTitle,
-          searchQuery: item.entity.searchQuery,
+          searchQuery: compositeQuery || item.entity.searchQuery,
           category: item.entity.category,
           defaultSizeId: item.entity.defaultSizeId || null,
           query,
@@ -531,7 +537,7 @@ export function resolveEntityAlias(query) {
     }
   }
 
-  return { matched: false, query };
+  return { matched: false, exactMatch: false, query };
 }
 
 /**
@@ -543,12 +549,9 @@ export function resolveEntityAlias(query) {
 export function normalizeArtworkQuery(rawQuery) {
   if (!rawQuery || typeof rawQuery !== 'string') return '';
   const aliasRes = resolveEntityAlias(rawQuery);
-  if (aliasRes.matched && aliasRes.searchQuery) {
-    return aliasRes.searchQuery;
-  }
+  const baseQuery = (aliasRes.matched && aliasRes.searchQuery) ? aliasRes.searchQuery : rawQuery;
 
-  // Si no coincidió con un alias exacto, limpiar frases de relleno de mostrador
-  return rawQuery
+  return baseQuery
     .replace(/\b(el de|la de|el póster de|el poster de|el cuadro de|la portada de|un poster de|uno de|una de|el diseño de)\b/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();

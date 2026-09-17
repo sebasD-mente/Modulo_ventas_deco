@@ -1,5 +1,5 @@
 import { prisma } from '../config/prisma.js';
-import { searchWebPosters } from '../services/webCatalogService.js';
+import { searchHybridPosters, searchWebPosters } from '../services/webCatalogService.js';
 import { syncCatalogFromWeb } from '../services/catalogSyncService.js';
 
 export async function getProducts(req, res) {
@@ -20,12 +20,22 @@ export async function getProducts(req, res) {
 export async function searchWebPostersCatalog(req, res) {
   try {
     const { q, category, limit } = req.query;
-    const results = await searchWebPosters({
-      tenantId: req.tenantId,
-      query: q || '',
-      category: category || null,
-      limit: limit ? parseInt(limit, 10) : 24,
-    });
+    let results = [];
+    try {
+      results = await searchHybridPosters({
+        tenantId: req.tenantId,
+        query: q || '',
+        category: category || null,
+        limit: limit ? parseInt(limit, 10) : 24,
+      });
+    } catch {
+      results = await searchWebPosters({
+        tenantId: req.tenantId,
+        query: q || '',
+        category: category || null,
+        limit: limit ? parseInt(limit, 10) : 24,
+      });
+    }
 
     return res.json({ success: true, data: results, count: results.length });
   } catch (err) {

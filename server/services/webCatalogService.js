@@ -68,7 +68,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         else if (productFullCondensed.includes(queryCondensed)) score += 150;
       }
 
-      if (aliasCondensed.length >= 3) {
+      if (aliasCondensed.length >= 3 && aliasRes.exactMatch) {
         if (productTitleCondensed === aliasCondensed) score += 320;
         else if (productTitleCondensed.startsWith(aliasCondensed)) score += 260;
         else if (productTitleCondensed.includes(aliasCondensed)) score += 210;
@@ -87,12 +87,12 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       if (meaningfulTokens.length === 1) {
         const singleToken = meaningfulTokens[0];
         const matchesTitle = titleTokensSet.has(singleToken) || normTitleText.split(/\s+/).some((t) => t.startsWith(singleToken));
-        const hasAliasMatch = Boolean(aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
+        const hasAliasMatch = Boolean(aliasRes.exactMatch && aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasExactTitle = normTitleText === singleToken || normTitleText.startsWith(singleToken);
         if (!matchesTitle && !hasAliasMatch && !hasExactTitle) score = 0;
       } else if (meaningfulTokens.length >= 2) {
         const matchedMeaningful = meaningfulTokens.filter((t) => titleTokensSet.has(t) || isTokenMatch(t));
-        const hasAliasMatch = Boolean(aliasCondensed.length >= 3 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
+        const hasAliasMatch = Boolean(aliasRes.exactMatch && aliasCondensed.length >= 3 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasFullPhrase = normFullText.includes(normQuery) || (queryCondensed.length >= 3 && normFullText.includes(queryCondensed));
         const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.6;
         if (!hasAliasMatch && !hasFullPhrase && !meetsRatio) score = 0;
@@ -108,7 +108,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     scored.sort((a, b) => b.score - a.score);
     const deduplicated = deduplicatePosters(scored.map((item) => item.p));
 
-    const targetMeaningful = (aliasRes.matched && aliasTokens.length > 0) ? aliasTokens.slice(0, 2) : meaningfulTokens;
+    const targetMeaningful = (aliasRes.matched && aliasRes.exactMatch && aliasTokens.length > 0) ? aliasTokens.slice(0, 2) : meaningfulTokens;
     const hasMissingTokens = targetMeaningful.length >= 2 && !deduplicated.some((p) => {
       const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' '));
       return targetMeaningful.every((tok) => pNorm.includes(tok));

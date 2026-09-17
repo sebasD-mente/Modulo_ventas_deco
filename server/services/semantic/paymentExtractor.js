@@ -197,7 +197,7 @@ export function parseStandIntent(text) {
 
     // Resolver con diccionario cultural de entidades
     const aliasRes = resolveEntityAlias(rawTitle);
-    const canonicalName = aliasRes.matched ? aliasRes.canonicalTitle : rawTitle;
+    const canonicalName = (aliasRes.matched && aliasRes.exactMatch) ? aliasRes.canonicalTitle : rawTitle;
     const effectiveSearchQuery = aliasRes.matched ? aliasRes.searchQuery : rawTitle;
 
     // Si el tamaño no se mencionó explícitamente pero el alias tiene defaultSizeId (ej. música -> PORTADA_ALBUM)

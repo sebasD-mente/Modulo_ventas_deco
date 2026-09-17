@@ -145,16 +145,15 @@ export async function searchHybridPosters({ tenantId = null, query = '', categor
     lexicalList.forEach((poster, rank) => {
       const key = poster.id || poster.sku || poster.titulo, lexicalWeight = Math.max(0.2, 1.0 - (rank * 0.05));
       const vecEntry = vectorScores.get(key), vecSim = vecEntry ? vecEntry.similarity : 0.0;
-      combinedScores.set(key, { poster, hybridScore: (lexicalWeight * 0.65) + (vecSim * 0.35), isLexicalMatch: true, vecSim });
+      const vecBoost = vecSim >= 0.70 ? (vecSim - 0.70) * 2.0 : 0.0;
+      combinedScores.set(key, { poster, hybridScore: (lexicalWeight * 0.40) + (vecSim * 0.60) + vecBoost, isLexicalMatch: true, vecSim });
     });
 
     for (const [key, vecEntry] of vectorScores.entries()) {
-      if (!combinedScores.has(key) && vecEntry.similarity >= 0.72) {
-        const posterText = `${vecEntry.poster.titulo || ''} ${vecEntry.poster.subtitulo || ''} ${Array.isArray(vecEntry.poster.tags) ? vecEntry.poster.tags.join(' ') : ''}`.toLowerCase();
-        const matchesEntity = normQueryTokens.length > 0 && normQueryTokens.every((tok) => posterText.includes(tok));
-        if (normQueryTokens.length === 0 || matchesEntity) {
-          combinedScores.set(key, { poster: vecEntry.poster, hybridScore: vecEntry.similarity * 0.5, isLexicalMatch: false, vecSim: vecEntry.similarity });
-        }
+      if (!combinedScores.has(key) && vecEntry.similarity >= 0.68) {
+        const vecSim = vecEntry.similarity;
+        const vecBoost = vecSim >= 0.70 ? (vecSim - 0.70) * 2.0 : 0.0;
+        combinedScores.set(key, { poster: vecEntry.poster, hybridScore: (vecSim * 0.85) + vecBoost, isLexicalMatch: false, vecSim });
       }
     }
 
