@@ -35,7 +35,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
   const explicitClient = (geminiClient !== undefined && geminiClient !== null) ? geminiClient : null;
   const isAvailable = geminiClient === null ? false : Boolean(explicitClient || getGeminiClient());
   const { event, resolved, kpis } = await resolveEventContextData({ tenantId, eventId, date, contextData });
-  const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
+  const systemPrompt = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft, message });
   if (!isAvailable) {
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
     return { reply: isSale ? `[Modo Offline] Intención de venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} ventas.`, draftSale: null, suggestedPosters: [], toolCalls: [] };
@@ -81,7 +81,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   const isAvailable = clientArg === null ? false : Boolean(explicitClient || getGeminiClient());
 
   const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
-  const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft });
+  const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft, message });
   if (!isAvailable) {
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
     yield { type: 'token', text: isSale ? `[Modo Offline] Venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} transacciones.` };
@@ -122,6 +122,17 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
         if (toolRecord) executedTools.push(toolRecord);
       }
     }
+  }
+
+  const directSaleDraft = executedTools.find(t => t.name === 'prepareSaleDraft' && t.result?.items?.length > 0);
+  if (directSaleDraft) {
+    const sellerName = (contextData?.sellerName || 'vendedor').trim().split(' ')[0];
+    const paymentMethod = directSaleDraft.result.paymentMethod || 'efectivo';
+    yield {
+      type: 'token',
+      text: `¡Listo, ${sellerName}! Te monté el borrador en pantalla listo para cobrar con ${paymentMethod}. ¿Confirmamos la venta?`,
+    };
+    return;
   }
 
   if (executedTools.length > 0) {

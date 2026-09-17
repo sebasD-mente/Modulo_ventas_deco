@@ -65,7 +65,7 @@ export const batchPhotoResponseSchema = {
   required: ['detectedCodes', 'items'],
 };
 
-export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendingDraft = null }) {
+export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendingDraft = null, message = '' } = {}) {
   const eventName = event?.name || resolvedContextData?.evento || 'el evento';
   const eventLocation = event?.location || resolvedContextData?.ubicacion || 'el stand principal';
 
@@ -86,6 +86,11 @@ export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendin
 
   const sellerFullName = resolvedContextData?.vendedorNombre || 'Vendedor';
   const sellerFirstName = sellerFullName.trim().split(' ')[0] || sellerFullName;
+
+  const isOperationalQuery = !message || /caja|dinero|m[eé]tricas|ventas|cu[aá]nto|reporte|turno/i.test(message);
+  const operationalContext = isOperationalQuery
+    ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nDATOS OPERATIVOS DEL EVENTO EN VIVO (POSTGRESQL):\n${JSON.stringify(resolvedContextData, null, 2)}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    : '';
 
   return `Eres STAND {IA}, el Copiloto Táctico de Mostrador y Asistente Estrella de Ventas para ${sellerFirstName} en el stand de Deco Vintage Guate en "${eventName}" (${eventLocation}).
 
@@ -159,9 +164,5 @@ Cuentas con 7 herramientas oficiales conectadas a PostgreSQL y al motor de catá
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Si el usuario dice "la segunda que me mostraste" o una ordinal similar, lee el bloque "[Contexto de obras mostradas en pantalla al cliente en este turno: ...]" del mensaje anterior.
 - Mapeo estricto 1-based: Opción #1 -> la primera; Opción #2 -> la segunda; etc., sin pedirle al usuario que repita el nombre.
-${draftContext}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DATOS OPERATIVOS DEL EVENTO EN VIVO (POSTGRESQL):
-${JSON.stringify(resolvedContextData, null, 2)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+${draftContext}${operationalContext}`;
 }

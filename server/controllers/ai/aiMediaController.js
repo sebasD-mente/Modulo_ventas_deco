@@ -114,26 +114,24 @@ export async function handleArtworkRecognition(req, res) {
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen de la obra.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
-    const imageUrl = await safePersistMedia(file, 'artwork.jpg', 'image/jpeg', 'artwork_scans');
-    const analysis = await recognizePosterArtworkFromImage({
-      imageBuffer: file.buffer,
-      mimeType: file.mimetype || 'image/jpeg',
-      tenantId,
-      eventId,
-    });
+    const [imageUrl, analysis] = await Promise.all([
+      safePersistMedia(file, 'artwork.jpg', 'image/jpeg', 'artwork_scans'),
+      recognizePosterArtworkFromImage({
+        imageBuffer: file.buffer,
+        mimeType: file.mimetype || 'image/jpeg',
+        tenantId,
+        eventId,
+      }),
+    ]);
+    const draftSale = analysis.draftSale || {
+      items: analysis.items, total: analysis.total, paymentMethod: 'EFECTIVO',
+      imageUrl, inputChannel: 'IA_FOTO_ARTE', notes: `Reconocimiento de obra visual: ${analysis.primaryTitle || 'Detectado'}`,
+    };
+    if (imageUrl && !draftSale.imageUrl) draftSale.imageUrl = imageUrl;
+
     return res.json({
-      success: true,
-      draftSale: {
-        items: analysis.items,
-        total: analysis.total,
-        paymentMethod: 'EFECTIVO',
-        imageUrl,
-        inputChannel: 'IA_FOTO_ARTE',
-        notes: `Reconocimiento de obra visual: ${analysis.primaryTitle || 'Detectado'}`,
-      },
-      visualAnalysis: analysis.visualAnalysis,
-      primaryTitle: analysis.primaryTitle,
-      requiresConfirmation: true,
+      success: true, imageUrl, primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
+      candidates: analysis.candidates || [], draftSale, requiresConfirmation: true,
       message: 'Obra analizada y encontrada en el catálogo web. Por favor verifica y confirma.',
     });
   } catch (err) {

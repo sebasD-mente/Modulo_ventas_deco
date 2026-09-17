@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_EVENT_SIZES, buildOfflineFallbackReply } from '../chatConstants';
 import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
+import { compressImage } from '../../../utils/imageCompressor.js';
 
 const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
@@ -13,7 +14,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
 
   const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState(''), [pendingDraft, setPendingDraft] = useState(null), [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false), [aiError, setAiError] = useState(null), clearAiError = () => setAiError(null);
   const pendingDraftRef = useRef(pendingDraft); pendingDraftRef.current = pendingDraft;
-  const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null);
+  const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null), lastAudioBlobRef = useRef(null);
   const getNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), pushAiMsg = (text) => setMessages((p) => [...p, { id: genId(), sender: 'ai', text, timestamp: getNow() }]);
   const recalculateTotal = (items) => Number(items.reduce((s, i) => s + (i.subtotal || i.quantity * i.unitPrice), 0).toFixed(2)), cancelRaf = () => { if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; } };
   const getAtts = (p) => Array.isArray(p.attachments) && p.attachments.length ? p.attachments : p.audioUrl ? [{ fileUrl: p.audioUrl, fileType: 'AUDIO_VOZ', transcription: p.transcription || null }] : p.imageUrl ? [{ fileUrl: p.imageUrl, fileType: p.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }] : [];
@@ -23,11 +24,8 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})`, availableSizes: sizes };
     const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
   }), updateDraftItemQty = (idx, delta) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((prev) => {
-    const cur = prev || pendingDraftRef.current, items = [...cur.items], qty = Math.max(1, items[idx].quantity + delta);
-    items[idx] = { ...items[idx], quantity: qty, subtotal: Number((qty * items[idx].unitPrice).toFixed(2)) };
-    const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
-  }), removeDraftItem = (idx) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((p) => { const cur = p || pendingDraftRef.current, items = cur.items.filter((_, i) => i !== idx), next = items.length ? { ...cur, items, total: recalculateTotal(items) } : null; pendingDraftRef.current = next; return next; });
-  const updateDraftPaymentMethod = (method) => setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, paymentMethod: method } : null; pendingDraftRef.current = next; return next; }), discardDraft = () => { pendingDraftRef.current = null; setPendingDraft(null); pushAiMsg('🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?'); };
+    const cur = prev || pendingDraftRef.current, items = [...cur.items], qty = Math.max(1, items[idx].quantity + delta); items[idx] = { ...items[idx], quantity: qty, subtotal: Number((qty * items[idx].unitPrice).toFixed(2)) }; const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
+  }), removeDraftItem = (idx) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((p) => { const cur = p || pendingDraftRef.current, items = cur.items.filter((_, i) => i !== idx), next = items.length ? { ...cur, items, total: recalculateTotal(items) } : null; pendingDraftRef.current = next; return next; }), updateDraftPaymentMethod = (method) => setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, paymentMethod: method } : null; pendingDraftRef.current = next; return next; }), discardDraft = () => { pendingDraftRef.current = null; setPendingDraft(null); pushAiMsg('🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?'); };
 
   const addPosterToDraft = (poster) => {
     const sizes = poster.sizes?.length ? poster.sizes : DEFAULT_EVENT_SIZES, def = sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo, uPrice = Number(def.precio);
@@ -49,35 +47,35 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     try {
       const res = await authFetch(url, { method: 'POST', body: form }), data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando');
+      if (url.includes('voice')) lastAudioBlobRef.current = null;
       if (data.draftSale && !url.includes('voice')) { pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); }
       onDone(data);
     } catch (err) {
       const isQuota = /429|cuota|quota|resource_exhausted/i.test(err?.message), isNet = /fetch|network|conexi[oó]n|offline|failed/i.test(err?.message), friendlyMsg = isQuota ? 'Límite de cuota de IA alcanzado. Continúa en modo manual.' : isNet ? 'Problema de conexión con el servicio de IA.' : err?.message?.replace(/^.*AI_MEDIA_SERVICE_FAILED:\s*/, '').trim() || 'No fue posible procesar el archivo.';
-      setAiError({ title: url.includes('voice') ? 'Fallo en dictado de voz' : 'Fallo en foto/visión', message: friendlyMsg, channel: url.includes('voice') ? 'IA_VOZ' : 'IA_FOTO_ARTE' }); pushAiMsg(`⚠️ ${friendlyMsg}`);
+      const isVoice = url.includes('voice');
+      setAiError({ title: isVoice ? 'Fallo en dictado de voz' : 'Fallo en foto/visión', message: friendlyMsg, channel: isVoice ? 'IA_VOZ' : 'IA_FOTO_ARTE', canRetry: isVoice && Boolean(lastAudioBlobRef.current), hasAudioRetry: isVoice && Boolean(lastAudioBlobRef.current), onRetryAudio: retryVoiceUpload }); pushAiMsg(`⚠️ ${friendlyMsg}`);
     } finally { setIsLoading(false); setProcessingNote(''); }
   };
 
   const handleVoiceUpload = (audioBlob, meta = {}) => {
-    if (!audioBlob || meta?.empty) {
-      pushAiMsg('🎙️ No alcancé a escucharte. Pulsa el micrófono, dicta tu venta y presiona "Finalizar" cuando termines.');
-      return;
-    }
+    if (!audioBlob || meta?.empty) { pushAiMsg('🎙️ No alcancé a escucharte. Pulsa el micrófono, dicta tu venta y presiona "Finalizar" cuando termines.'); return; }
+    lastAudioBlobRef.current = audioBlob;
     const ext = audioBlob.type?.includes('mp4') ? 'mp4' : audioBlob.type?.includes('aac') ? 'aac' : 'webm', form = new FormData();
     form.append('audio', audioBlob, `voice-sale.${ext}`); form.append('eventId', eventId);
     uploadMedia('/api/ai/voice-sale', form, '🎙️ [Venta dictada por voz]', 'Gemini analizando dictado de voz...', (data) => {
       if (!data.draftSale?.items || data.draftSale.items.length === 0) {
         if (data.intent === 'SALUDO' || (!data.isSaleDetected && data.reply)) pushAiMsg(data.reply || '¡Hola! Con gusto te ayudo, ¿qué póster o venta preparamos?');
         else pushAiMsg('🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").');
-      } else {
-        pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale);
-        pushAiMsg(`Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`);
-      }
+      } else { pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); pushAiMsg(`Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`); }
     });
-  }, handleImageUpload = (e) => {
+  };
+  const retryVoiceUpload = useCallback(() => { if (lastAudioBlobRef.current) handleVoiceUpload(lastAudioBlobRef.current); }, [handleVoiceUpload]);
+  const handleImageUpload = async (e) => {
     const file = e?.target?.files?.[0]; if (!file) return;
-    const form = new FormData(); form.append('image', file, file.name); form.append('eventId', eventId);
-    uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`));
     if (e.target) e.target.value = '';
+    const blobToUpload = await compressImage(file);
+    const form = new FormData(); form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
+    uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`));
   };
   const confirmPendingSale = async () => {
     const draft = pendingDraftRef.current; if (!draft?.items?.length) return;
@@ -94,8 +92,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   };
   const transferDraftToManualForm = () => {
     const draft = pendingDraftRef.current; if (!onPopulateManualForm || !draft) return;
-    const items = (draft.items || []).map((it) => ({ ...it, selectedSizeId: it.selectedSizeId || it.sizeId || null, sizeId: it.sizeId || it.selectedSizeId || null }));
-    onPopulateManualForm({ ...draft, inputChannel: draft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(draft), items });
+    onPopulateManualForm({ ...draft, inputChannel: draft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(draft), items: (draft.items || []).map((it) => ({ ...it, selectedSizeId: it.selectedSizeId || it.sizeId || null, sizeId: it.sizeId || it.selectedSizeId || null })) });
     pendingDraftRef.current = null; setPendingDraft(null);
   };
 
@@ -151,6 +148,6 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   };
   useEffect(() => () => { cancelRaf(); abortControllerRef.current?.abort(); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); }, []);
 
-  return { messages, setMessages, inputText, setInputText, isLoading, processingNote, pendingDraft, setPendingDraft, swappingIndex, setSwappingIndex, swapQuery, setSwapQuery, swapResults, isSearchingSwap, openSwapModal, closeSwapModal, fetchInitialSwapPosters, handleSwapSearchChange, selectSwapPoster, updateDraftItemSize, updateDraftItemQty, removeDraftItem, updateDraftPaymentMethod, discardDraft, addPosterToDraft, handleSendText, handleVoiceUpload, handleImageUpload, confirmPendingSale, transferDraftToManualForm, aiError, clearAiError };
+  return { messages, setMessages, inputText, setInputText, isLoading, processingNote, pendingDraft, setPendingDraft, swappingIndex, setSwappingIndex, swapQuery, setSwapQuery, swapResults, isSearchingSwap, openSwapModal, closeSwapModal, fetchInitialSwapPosters, handleSwapSearchChange, selectSwapPoster, updateDraftItemSize, updateDraftItemQty, removeDraftItem, updateDraftPaymentMethod, discardDraft, addPosterToDraft, handleSendText, handleVoiceUpload, handleImageUpload, confirmPendingSale, transferDraftToManualForm, aiError, clearAiError, retryVoiceUpload, lastAudioBlobRef };
 }
 export default useAiChatStream;
