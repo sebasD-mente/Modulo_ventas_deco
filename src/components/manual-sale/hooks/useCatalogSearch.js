@@ -52,7 +52,7 @@ export function useCatalogSearch() {
           },
           queryText,
           30,
-          { signal: controller?.signal }
+          { signal: controller?.signal, timeoutMs: 12000 }
         );
 
         if (!isSelectingRef.current && activeAbortRef.current === controller) {
