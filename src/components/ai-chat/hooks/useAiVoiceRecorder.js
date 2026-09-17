@@ -16,17 +16,18 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
 
   const mediaRecorderRef = useRef(null), streamRef = useRef(null), audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null), audioContextRef = useRef(null), vadTimerRef = useRef(null), hardTimeoutRef = useRef(null);
-  const hasSpokenRef = useRef(false), recordingStartTimeRef = useRef(0), isCancelledRef = useRef(false);
+  const hasSpokenRef = useRef(false), recordingStartTimeRef = useRef(0), isCancelledRef = useRef(false), isManualStopRef = useRef(false);
   const onRecordingCompleteRef = useRef(onRecordingComplete);
   onRecordingCompleteRef.current = onRecordingComplete;
 
   const stopRecording = useCallback(() => {
+    isManualStopRef.current = true;
     if (hardTimeoutRef.current) { clearTimeout(hardTimeoutRef.current); hardTimeoutRef.current = null; }
     if (vadTimerRef.current) { clearInterval(vadTimerRef.current); vadTimerRef.current = null; }
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     setVadActive(false); setIsRecording(false); setAudioLevel(0);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch (_) {}
+      try { mediaRecorderRef.current.requestData?.(); mediaRecorderRef.current.stop(); } catch (_) {}
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -55,7 +56,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
       const mediaRecorder = createOpusMediaRecorder(stream, selectedMime);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-      hasSpokenRef.current = false;
+      hasSpokenRef.current = false; isManualStopRef.current = false;
       recordingStartTimeRef.current = Date.now();
 
       mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) audioChunksRef.current.push(e.data); };
@@ -70,7 +71,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
           audioContextRef.current = null;
         }
         if (onRecordingCompleteRef.current) {
-          const isEmpty = (!hasSpokenRef.current && duration < 1200) || audioBlob.size === 0;
+          const isEmpty = audioBlob.size === 0 || duration < 300 || (!isManualStopRef.current && !hasSpokenRef.current && duration < 1200);
           await onRecordingCompleteRef.current(isEmpty ? null : audioBlob, { empty: isEmpty });
         }
       };
@@ -87,7 +88,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
           const { ctx: audioCtx, analyser, buffer } = audioSetup;
           if (audioCtx.state === 'suspended') await audioCtx.resume();
           audioContextRef.current = audioCtx;
-          let lastSoundAt = Date.now(), startTime = Date.now(), noiseFloor = 0.003;
+          let lastSoundAt = Date.now(), startTime = Date.now(), noiseFloor = 0.003, prevLevel = 0;
           const noiseSamples = [];
 
           vadTimerRef.current = setInterval(() => {
@@ -95,19 +96,20 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
               clearInterval(vadTimerRef.current); vadTimerRef.current = null; return;
             }
             const { rms, level } = calculateDecibelsAndLevel(analyser, buffer, 0.035);
-            setAudioLevel(level);
+            const smoothLevel = Math.max(level, Math.round(prevLevel * 0.72)); prevLevel = smoothLevel;
+            setAudioLevel(smoothLevel);
             const elapsed = Date.now() - startTime;
             if (elapsed < 400) {
               noiseSamples.push(rms);
-              noiseFloor = Math.max(0.006, (noiseSamples.reduce((a, b) => a + b, 0) / noiseSamples.length) * 1.35);
+              noiseFloor = Math.max(0.006, Math.min(0.018, (noiseSamples.reduce((a, b) => a + b, 0) / noiseSamples.length) * 1.35));
             }
-            const voiceThreshold = Math.max(0.012, noiseFloor * 1.6);
+            const voiceThreshold = Math.max(0.012, Math.min(0.028, noiseFloor * 1.6));
             if (rms > voiceThreshold) {
               hasSpokenRef.current = true; lastSoundAt = Date.now(); setVadActive(false);
             } else if (hasSpokenRef.current) {
               const silence = Date.now() - lastSoundAt;
-              if (silence > 2500) stopRecording();
-              else if (silence > 1500) setVadActive(true);
+              if (silence > 3800) stopRecording();
+              else if (silence > 2500) setVadActive(true);
             }
           }, 100);
         }

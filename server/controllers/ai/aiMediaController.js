@@ -25,11 +25,13 @@ export async function handleVoiceSale(req, res) {
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún archivo de audio.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
-    const audioUrl = await safePersistMedia(file, 'voice-sale.webm', 'audio/webm', 'audio_sales');
     const t0Voice = Date.now();
-    const draft = await processVoiceSaleAudio({
-      audioBuffer: file.buffer, mimeType: file.mimetype || 'audio/webm', tenantId, eventId,
-    });
+    const [audioUrl, draft] = await Promise.all([
+      safePersistMedia(file, 'voice-sale.webm', 'audio/webm', 'audio_sales'),
+      processVoiceSaleAudio({
+        audioBuffer: file.buffer, mimeType: file.mimetype || 'audio/webm', tenantId, eventId,
+      }),
+    ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_VOICE_SALE',
       model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,

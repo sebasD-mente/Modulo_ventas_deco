@@ -2,7 +2,7 @@ import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { searchWebPosters } from '../webCatalogService.js';
 import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
-import { voiceSaleResponseSchema, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
+import { voiceSaleResponseSchema, buildVoiceSalePrompt, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
 import { resolveEntityAlias, normalizeArtworkQuery } from '../semantic/entityAliases.js';
 import { searchHybridPosters } from '../embeddingService.js';
 
@@ -80,25 +80,18 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
 export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId }) {
   const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
   try {
-    const { result: sttRes } = await executeWithModelFallback({
-      models: getActivePool(), actionName: 'STT_LITERAL_TRANSCRIPTION', tenantId,
+    const { result: response } = await executeWithModelFallback({
+      models: getActivePool(), actionName: 'DIRECT_VOICE_SALE_INFERENCE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [
-          { text: 'Transcribe palabra por palabra con máxima fidelidad literal el audio en español guatemalteco/latinoamericano. Devuelve únicamente el texto transcrito. Si no hay habla clara o solo ruido de fondo, responde vacío.' },
+          { text: buildVoiceSalePrompt() },
           { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }
         ] }],
-      }),
-    });
-    const transcription = sttRes.text?.trim() || '';
-    const nluPrompt = `Clasifica la intención del texto dictado en stand de pósters (SALUDO, CONSULTA_CATALOGO, DICTADO_VENTA, RUIDO_NO_VENTA). Si es DICTADO_VENTA, extrae obras, tamaños (MINI, PEQUENO, MEDIANO, GRANDE, GIGANTE, PORTADA_ALBUM), cantidades y método de pago (EFECTIVO, TARJETA, TRANSFERENCIA). Si es SALUDO o CONSULTA_CATALOGO, genera greeting breve y deja items vacío.\nTexto dictado: "${transcription}"`;
-    const { result: nluRes } = await executeWithModelFallback({
-      models: getActivePool(), actionName: 'NLU_INTENT_EXTRACTION', tenantId,
-      taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [{ text: nluPrompt }] }],
         config: { responseMimeType: 'application/json', responseSchema: voiceSaleResponseSchema },
       }),
     });
-    const parsed = JSON.parse(nluRes.text?.trim() || '{}');
+    const parsed = JSON.parse(response.text?.trim() || '{}');
+    const transcription = parsed.transcription?.trim() || '';
     const isSale = Boolean(parsed.isSaleDetected && Array.isArray(parsed.items) && parsed.items.length > 0);
     const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (transcription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
     if (!isSale) {

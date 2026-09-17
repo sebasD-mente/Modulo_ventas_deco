@@ -1,10 +1,8 @@
 import { Type, HarmCategory, HarmBlockThreshold } from '@google/genai';
 
 export const salesAssistantSafetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }, { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }, { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
 export const voiceSaleResponseSchema = {
@@ -28,6 +26,16 @@ export const voiceSaleResponseSchema = {
   required: ['isSaleDetected', 'intent'],
 };
 
+export function buildVoiceSalePrompt() {
+  return `Eres el transcriptor y clasificador de ventas por voz para Deco Vintage Guate en mostrador ferial de eventos (pósters, cuadros, marcos, arte impreso, cine, anime, series, música).
+Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
+1. TRANSCRIPCIÓN LITERAL: Transcribe en 'transcription' palabra por palabra fielmente en español. Si solo hay ruido o no hay habla clara, transcribe vacío, isSaleDetected=false e intent="RUIDO_NO_VENTA".
+2. PRIMING Y SESGO FONÉTICO: Estás en un stand de pósters decorativos de Deco Vintage. Está terminantemente PROHIBIDO interpretar "pastel", "pasteles", "postre" o "stickers". Si la acústica suena parecido a pastel o stickers, interpreta SIEMPRE "póster" o "pósters".
+3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q180). Si no especifican tamaño, asignar MEDIANO.
+4. PROTECCIÓN CONTRA VACILACIONES: En correcciones espontáneas ("dos pa-... un póster", "tres... dos batman"), toma ÚNICAMENTE la cantidad final corregida (1 póster, 2 batman). NUNCA sumes números vacilantes ni falsos inicios.
+5. INTENCIONES: SALUDO (si solo saludan sin pedir obra, greeting amable y breve, items=[]), CONSULTA_CATALOGO (si preguntan si hay o precio), DICTADO_VENTA (si dictan compra), RUIDO_NO_VENTA (ruido/murmullo sin venta).`;
+}
+
 export const artworkRecognitionResponseSchema = {
   type: Type.OBJECT, description: 'Reconocimiento visual estricto de arte en diseño de póster físico.',
   properties: {
@@ -40,12 +48,8 @@ export const artworkRecognitionResponseSchema = {
 export const videoRecognitionResponseSchema = {
   type: Type.OBJECT, description: 'Análisis estructurado de clip de video del mostrador de ventas.',
   properties: {
-    summary: { type: Type.STRING },
-    postersDetected: {
-      type: Type.ARRAY,
-      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, quantity: { type: Type.INTEGER }, suggestedSize: { type: Type.STRING } }, required: ['title', 'quantity'] },
-    },
-    confidence: { type: Type.NUMBER },
+    summary: { type: Type.STRING }, confidence: { type: Type.NUMBER },
+    postersDetected: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, quantity: { type: Type.INTEGER }, suggestedSize: { type: Type.STRING } }, required: ['title', 'quantity'] } },
   },
   required: ['summary', 'postersDetected'],
 };
@@ -53,12 +57,8 @@ export const videoRecognitionResponseSchema = {
 export const batchPhotoResponseSchema = {
   type: Type.OBJECT, description: 'Extracción estricta de códigos QR y barras en foto de lote de pósters.',
   properties: {
-    detectedCodes: { type: Type.ARRAY, items: { type: Type.STRING } }, summary: { type: Type.STRING },
-    items: {
-      type: Type.ARRAY,
-      items: { type: Type.OBJECT, properties: { description: { type: Type.STRING }, sku: { type: Type.STRING }, matchedCode: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, subtotal: { type: Type.NUMBER } }, required: ['matchedCode', 'quantity'] },
-    },
-    totalCalculated: { type: Type.NUMBER }, confidence: { type: Type.NUMBER },
+    detectedCodes: { type: Type.ARRAY, items: { type: Type.STRING } }, summary: { type: Type.STRING }, totalCalculated: { type: Type.NUMBER }, confidence: { type: Type.NUMBER },
+    items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { description: { type: Type.STRING }, sku: { type: Type.STRING }, matchedCode: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, subtotal: { type: Type.NUMBER } }, required: ['matchedCode', 'quantity'] } },
   },
   required: ['detectedCodes', 'items'],
 };

@@ -1,7 +1,7 @@
-# BRIEFING ? 2026-09-16T02:15:00Z
+# BRIEFING — 2026-09-17T14:17:48Z
 
 ## Mission
-Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_Ventas: unificaci?n de servicios de sincronizaci?n de cat?logo, despiece de monolitos cr?ticos del backend y frontend conforme a los techos de scripts/audit-monoliths.js, preservaci?n inquebrantable de contratos HTTP y verificaci?n visual en vivo.
+Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {IA}) en mostrador ferial para Deco Vintage Guate: erradicar sesgos fonéticos ("póster" vs "pastel"/"stickers"), reducción radical de latencia (< 5s), tolerancia a ruido ambiente (VAD 3.5-4.0s) y precedencia de control manual en frontend, garantizando cero deuda y arnés 100% verde.
 
 ## ?? My Identity
 - Archetype: sentinel
@@ -54,6 +54,8 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - Victory Auditor (Fase 4 Roadmap Quirúrgico): 8cd63529-a732-4ae3-a39c-b8f6da11bbb1 (victory_auditor_26, VICTORY CONFIRMED)
 - Orchestrator (Reingeniería Voz STAND IA): b540abb5-54e2-491e-8f28-9d5b174b4d68 (orchestrator_27, completed)
 - Victory Auditor (Reingeniería Voz STAND IA): 35f34917-d954-4884-a059-5a07bcd4ce4f (victory_auditor_27, VICTORY CONFIRMED)
+- Orchestrator (Calibración Voz & Blindaje Acústico): 1b6dfb0c-9540-427d-8d0e-861ec0488440 (orchestrator_28, in progress)
+- Victory Auditor (Calibración Voz & Blindaje Acústico): f6ca5fc7-4ade-4ae7-a1ab-63aba2a9234f (victory_auditor_28, in progress)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -106,22 +108,25 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - Fase 4 Roadmap Quirúrgico Cero Deuda: R1 Unificación servicios sincronización catálogo (catalogSizeResolver.js < 80, liveCatalogSyncService.js < 200, catalogSyncService.js fachada < 25); R2 Despiece webCatalogService.js (catalogCacheStore.js < 110, catalogStringNormalizer.js < 130, webCatalogService.js < 180); R3 Despiece controladores (eventController.js < 190, catalogController.js < 90, apiRoutes.js delegación /api/events/*, aiChatController.js < 170, aiMediaController.js < 180, aiController.js fachada < 30); R4 Modularización ventas/usuarios (saleController.js < 160 delegando arqueos, monitorKpiService.js < 130, saleKpiService.js < 190, saleUpdateService.js < 170, saleTransactionService.js < 170, userEventAssignmentService.js < 80, userController.js < 170); R5 Modularización frontend (RecentSaleRow.jsx < 90, RecentSalesList.jsx < 130 con useRef y clearTimeout en cleanup).
 - Archivos Protegidos Autorizados (🟢 INTOCABLES): Prohibido tocar los 8 archivos protegidos en verde (entityAliases.js, geminiPoolService.js, server/index.js, apiRoutes.js, authController.js, paymentExtractor.js, aiToolsService.js, src/App.jsx).
 - Reingeniería Voz STAND IA: Desacople STT vs NLU, voiceSaleResponseSchema con isSaleDetected e intent, RAG híbrido y entityAliases en aiMediaService, fix de tokens únicos en webCatalogService, calibración RMS Web Audio API (0.015-0.035), feedback dinámico en ChatInputBar y cancelación inmediata, respuestas conversacionales ante saludo sin borrador vacío, respeto estricto a scripts/audit-monoliths.js y tests/ai/voice-vad-reengineering.test.js.
+- Calibración Profesional y Blindaje Acústico STAND IA: R1 Priming de Dominio ferial ("póster" vs "pastel"/"stickers"), protección numérica ante vacilaciones en aiPromptService.js / aiMediaService.js; R2 Reducción radical de latencia (<5s) mediante inferencia multimodal directa con Gemini Flash; R3 VAD silencio 3.5s-4.0s, precedencia botón "Finalizar" manual, insensibilidad a elevación de noiseFloor, VU-meter dinámico; R4 Techos scripts/audit-monoliths.js, tests unitarios en tests/ai/, npm run harness:check limpio.
 
 ## User Context
-- **Last user request**: Auditoría forense e implementación de la reingeniería 360° del ecosistema de voz de STAND {IA}: desacople STT/NLU, RAG Híbrido y Entity Aliases, calibración Web Audio API y botón cancelar, respuestas conversacionales de mostrador.
+- **Last user request**: Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {IA}) en mostrador ferial para Deco Vintage Guate, erradicando sesgos fonéticos ("póster" vs "pastel"/"stickers"), reduciendo la latencia a menos de 5 segundos y garantizando tolerancia a ruido ambiental y control manual prioritario en el frontend.
 - **Pending clarifications**: none
-- **Delivered results**: Reingeniería 360° del ecosistema de voz STAND {IA} completada exitosamente y certificada con veredicto VICTORY CONFIRMED por victory_auditor_27. 10/10 criterios de aceptación cumplidos, desacople STT/NLU verificado, RAG híbrido y alias culturales integrados, token único protegido, Web Audio API calibrada (RMS 0.035), visualizador dinámico y cancelación en UI, respuestas conversacionales ante saludos sin borradores vacíos, 0 archivos excedidos en auditoría de monolitos, 100% de suites de tests aprobadas y 4 capturas de pantalla de evidencia visual en vivo.
+- **Delivered results**: Previous phase (Reingeniería Voz STAND IA) confirmed; current phase starting.
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: auditing
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_27 (b540abb5-54e2-491e-8f28-9d5b174b4d68)
-- **Active Auditor**: victory_auditor_27 (35f34917-d954-4884-a059-5a07bcd4ce4f)
-- **Monitoring Crons**: none (cleaned up)
+- **Active Orchestrator**: orchestrator_28 (1b6dfb0c-9540-427d-8d0e-861ec0488440)
+- **Active Auditor**: victory_auditor_28 (f6ca5fc7-4ade-4ae7-a1ab-63aba2a9234f)
+- **Monitoring Crons**:
+  - Cron 1 (Progress Reporting, */8 * * * *): task-36
+  - Cron 2 (Liveness Check, */10 * * * *): task-38
 
 ## Victory Audit Status
 - **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
@@ -129,10 +134,8 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Domain Ceilings Specification
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/plan.md — Orchestrator Reingeniería Voz Plan
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/progress.md — Orchestrator Reingeniería Voz Progress
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/handoff.md — Orchestrator Reingeniería Voz Handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_27/handoff.md — Independent Victory Audit Report (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/worker_m4_live/report.md — Live Chrome DevTools QA Report
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/plan.md — Orchestrator Plan (to be created)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/progress.md — Orchestrator Progress (to be created)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/handoff.md — Orchestrator Handoff (to be created)
 
 

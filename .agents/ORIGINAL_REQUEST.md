@@ -2107,3 +2107,53 @@ Integrity mode: development
 - [ ] `node scripts/audit-monoliths.js` concluye con 0 archivos excedidos.
 - [ ] `node --test tests/ai/voice-vad-reengineering.test.js` pasa al 100%.
 - [ ] `npm test` pasa al 100%.
+
+## 2026-09-17T14:17:48Z
+
+Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {IA}) en mostrador ferial para Deco Vintage Guate, erradicando sesgos fonéticos ("póster" vs "pastel"/"stickers"), reduciendo la latencia a menos de 5 segundos y garantizando tolerancia a ruido ambiental y control manual prioritario en el frontend.
+
+Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Priming de Dominio y Calibración Léxica de Mostrador (Backend)
+- Inyectar contexto semántico y fonético de dominio ferial de Deco Vintage Guate (tienda de pósters feriales, marcos, cuadros, arte impreso, títulos de cultura pop, cine, anime, música y tamaños estándar: Mini, Pequeño, Portada de Álbum, Mediano, Grande, Gigante) en la inferencia de voz para asegurar la interpretación inequívoca de "póster(s)" y evitar falsos positivos como "pastel(es)" o "stickers".
+- Proteger la extracción numérica contra vacilaciones fonéticas ("dos pa-") para evitar sobre-conteo de unidades o alteraciones de cantidad erróneas.
+- Centralizar las plantillas léxicas y prompts en `server/services/ai/aiPromptService.js`, preservando la cohesión y límites de líneas en `server/services/ai/aiMediaService.js`.
+
+### R2. Reducción Radical de Latencia en Mostrador Ferial
+- Implementar y evaluar inferencia multimodal directa (audio a extracción estructurada `voiceSaleResponseSchema` en una única llamada con Gemini Flash) para reducir la latencia de 8-13s a menos de 5s, manteniendo la transcripción literal en el resultado estructurado.
+- Si por motivos de fidelidad acústica se requiere preservar el flujo desacoplado, optimizar la brevedad y concurrencia de las llamadas garantizando la meta de latencia.
+
+### R3. Tolerancia a Ruido Ambiente y Precedencia de Control Manual (Frontend)
+- En `src/components/ai-chat/hooks/useAiVoiceRecorder.js`:
+  - Elevar el tiempo de silencio para corte automático por VAD a mínimo 3.5 a 4.0 segundos una vez detectada la voz, evitando cortes prematuros cuando el vendedor toma aire o piensa.
+  - Retardar o condicionar el aviso visual "Pausa detectada... finalizando" para que no interrumpa al 1.5s.
+  - Otorgar precedencia absoluta al botón manual "■ Finalizar": al ser pulsado por el vendedor, detener y despachar la grabación de forma inmediata sin esperar ciclos del VAD.
+  - Evitar cierres accidentales cuando el ruido de fondo (música ferial, TV, murmullo) eleve el piso de ruido (`noiseFloor`).
+- En `src/components/ai-chat/hooks/useAiChatAudio.js` y `ChatInputBar.jsx`:
+  - Calibrar la sensibilidad del VU-meter (`calculateDecibelsAndLevel`) para que las barras visuales del ecualizador respondan de manera reactiva y dinámica a la voz humana en tiempo real.
+
+### R4. Arnés Arquitectónico, Pruebas Automatizadas y Cero Deuda
+- Cumplir estrictamente con los límites de líneas establecidos en `scripts/audit-monoliths.js` (ningún archivo modificado debe exceder su techo asignado ni el límite base de 200 líneas).
+- Actualizar la suite de pruebas en `tests/ai/voice-vad-reengineering.test.js` y añadir pruebas unitarias dedicadas en `tests/ai/` que certifiquen el priming fonético ("póster" vs "pastel"), la precisión de conteo numérico y los nuevos umbrales de VAD.
+- Ejecutar y garantizar resultado 100% exitoso y limpio en `npm run harness:check` (seguridad, auditoría de secretos, monolitos y build de producción).
+
+## Acceptance Criteria
+
+### Inferencia y Backend
+- [ ] La transcripción y extracción procesan audios con vocabulario ferial ("póster", "pósters", obras de cine/series/anime) transcribiendo fielmente el término sin confundirlo con "pastel" ni "stickers".
+- [ ] Las vacilaciones verbales no generan sobre-conteo de cantidades en los ítems extraídos.
+- [ ] La latencia de respuesta se optimiza sustancialmente frente al flujo previo de 12s.
+- [ ] Las directivas y esquemas se mantienen centralizados en `aiPromptService.js`.
+
+### Frontend & Experiencia de Usuario
+- [ ] La grabación no se corta a los 2.5s si el usuario realiza pausas normales de habla (umbral de silencio configurado entre 3.5s y 4.0s).
+- [ ] El botón manual "Finalizar" detiene la captura y procesa la venta de inmediato al ser pulsado.
+- [ ] El ecualizador visual (VU-meter) muestra oscilación activa ante la modulación de voz en vivo.
+
+### Calidad y Arquitectura
+- [ ] `node --test tests/ai/voice-vad-reengineering.test.js` pasa con éxito con los nuevos umbrales.
+- [ ] `npm run harness:check` finaliza con código 0 y sin advertencias críticas.
+- [ ] `node scripts/audit-monoliths.js` confirma que 0 archivos exceden sus límites arquitectónicos.

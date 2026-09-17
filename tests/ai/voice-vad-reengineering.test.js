@@ -16,10 +16,10 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
 
     assert.ok(lines < 140, `useAiVoiceRecorder.js must be < 140 lines, got ${lines}`);
     assert.match(content, /hasSpokenRef\s*=\s*useRef\(false\)/, 'Must initialize hasSpokenRef');
-    assert.match(content, /voiceThreshold\s*=\s*Math\.max\(0\.012,\s*noiseFloor\s*\*\s*1\.6\)/, 'Must calculate dynamic voice threshold');
+    assert.match(content, /voiceThreshold\s*=\s*Math\.max\(0\.012,\s*(Math\.min\(0\.028,\s*)?noiseFloor\s*\*\s*1\.6\)?\)/, 'Must calculate dynamic voice threshold');
     assert.match(content, /setTimeout\(\(\)\s*=>\s*stopRecording\(\),\s*15000\)/, 'Must set hard timeout to 15000ms');
-    assert.match(content, /silence\s*>\s*2500/, 'Must have 2500ms silence threshold for stop');
-    assert.match(content, /silence\s*>\s*1500/, 'Must have 1500ms silence threshold for vadActive');
+    assert.match(content, /silence\s*>\s*(3500|3800|4000)/, 'Must have 3800ms silence threshold for stop');
+    assert.match(content, /silence\s*>\s*(2500|2800|3000)/, 'Must have 2500ms silence threshold for vadActive');
     assert.match(content, /empty:\s*isEmpty/, 'Must filter empty recordings onstop');
     assert.match(content, /isCancelledRef\s*=\s*useRef\(false\)/, 'Must initialize isCancelledRef');
     assert.match(content, /cancelRecording\s*=\s*useCallback/, 'Must define cancelRecording');
@@ -82,14 +82,14 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
     assert.ok(!voiceSaleResponseSchema.required.includes('paymentMethod'), 'paymentMethod must NOT be required');
   });
 
-  test('Archivo F: aiMediaService.js decoupled STT/NLU and line limits (<= 200)', () => {
+  test('Archivo F: aiMediaService.js direct multimodal inference and line limits (<= 200)', () => {
     const filePath = path.resolve('server/services/ai/aiMediaService.js');
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n').length;
 
     assert.ok(lines <= 200, `aiMediaService.js must be <= 200 lines, got ${lines}`);
-    assert.match(content, /STT_LITERAL_TRANSCRIPTION/, 'Must have literal STT phase');
-    assert.match(content, /NLU_INTENT_EXTRACTION/, 'Must have NLU intent extraction phase');
+    assert.match(content, /DIRECT_VOICE_SALE_INFERENCE/, 'Must have direct multimodal voice inference');
+    assert.match(content, /buildVoiceSalePrompt/, 'Must use centralized buildVoiceSalePrompt');
     assert.match(content, /resolveEntityAlias/, 'Must connect to resolveEntityAlias');
     assert.match(content, /searchHybridPosters/, 'Must connect to searchHybridPosters');
   });
