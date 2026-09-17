@@ -56,6 +56,8 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - Victory Auditor (Reingeniería Voz STAND IA): 35f34917-d954-4884-a059-5a07bcd4ce4f (victory_auditor_27, VICTORY CONFIRMED)
 - Orchestrator (Calibración Voz & Blindaje Acústico): 1b6dfb0c-9540-427d-8d0e-861ec0488440 (orchestrator_28, completed)
 - Victory Auditor (Calibración Voz & Blindaje Acústico): f6ca5fc7-4ade-4ae7-a1ab-63aba2a9234f (victory_auditor_28, VICTORY CONFIRMED)
+- Orchestrator (Optimización Latencia & Resiliencia STAND IA): cac033b4-6821-468a-bb18-9d5956c74d4c (orchestrator_29, active)
+- Victory Auditor (Optimización Latencia & Resiliencia STAND IA): 7dd31c07-6148-4cca-97d6-ab6de8a66043 (victory_auditor_29, active)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -109,22 +111,26 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - Archivos Protegidos Autorizados (🟢 INTOCABLES): Prohibido tocar los 8 archivos protegidos en verde (entityAliases.js, geminiPoolService.js, server/index.js, apiRoutes.js, authController.js, paymentExtractor.js, aiToolsService.js, src/App.jsx).
 - Reingeniería Voz STAND IA: Desacople STT vs NLU, voiceSaleResponseSchema con isSaleDetected e intent, RAG híbrido y entityAliases en aiMediaService, fix de tokens únicos en webCatalogService, calibración RMS Web Audio API (0.015-0.035), feedback dinámico en ChatInputBar y cancelación inmediata, respuestas conversacionales ante saludo sin borrador vacío, respeto estricto a scripts/audit-monoliths.js y tests/ai/voice-vad-reengineering.test.js.
 - Calibración Profesional y Blindaje Acústico STAND IA: R1 Priming de Dominio ferial ("póster" vs "pastel"/"stickers"), protección numérica ante vacilaciones en aiPromptService.js / aiMediaService.js; R2 Reducción radical de latencia (<5s) mediante inferencia multimodal directa con Gemini Flash; R3 VAD silencio 3.5s-4.0s, precedencia botón "Finalizar" manual, insensibilidad a elevación de noiseFloor, VU-meter dinámico; R4 Techos scripts/audit-monoliths.js, tests unitarios en tests/ai/, npm run harness:check limpio.
+- Optimización Latencia & Resiliencia STAND IA: R1 Eliminación del Doble Turno LLM en aiStreamService (< 2.5s), R2 Persistencia Asíncrona Paralela en Visión aiMediaController (< 2.0s), R3 Compresor de Imágenes en Cliente imageCompressor.js (<= 60 líneas, <= 1024px, JPEG 0.75, FormData), R4 Aligeramiento Dinámico del Prompt Operativo aiPromptService (omitir JSON masivo si no hay palabras clave de consulta operativa), R5 Buffer de Reintento de Audio en Memoria useAiChatStream (lastAudioBlobRef y botón de reintento ante error), R6 Script de Benchmarks latency-audit.test.js.
+- Techos de archivos: ningún archivo modificado/creado > 200 líneas, módulos auxiliares <= 60 líneas, imageCompressor.js <= 60 líneas.
+- Prohibido alterar contratos SSE, esquemas de Prisma o migraciones de base de datos.
+- Verificación en vivo obligatoria con Chrome DevTools MCP y captura de pantalla en alta resolución.
 
 ## User Context
-- **Last user request**: Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {IA}) en mostrador ferial para Deco Vintage Guate, erradicando sesgos fonéticos ("póster" vs "pastel"/"stickers"), reduciendo la latencia a menos de 5 segundos y garantizando tolerancia a ruido ambiental y control manual prioritario en el frontend.
+- **Last user request**: Optimización crítica de latencia y resiliencia ferial en STAND {IA}: erradicar cuellos de botella en chat (< 2.5s) y visión (< 2.0s) e incorporar buffer de reintento offline/4G, manteniendo cero deuda técnica y contratos intactos.
 - **Pending clarifications**: none
-- **Delivered results**: Calibración profesional y blindaje acústico del reconocimiento de voz STAND {IA} completado y certificado con veredicto VICTORY CONFIRMED por victory_auditor_28. Erradicación de sesgos fonéticos ("póster" vs "pastel"/"stickers"), inferencia multimodal directa con Gemini Flash (<5s), VAD 3.8s/2.5s, botón "■ Finalizar" manual con precedencia absoluta, VU-meter dinámico en UI, 0 archivos excedidos en auditoría de monolitos, 75/75 tests de voz aprobados, 9/9 Zero-Trust, 0 secretos, build limpio y 5 capturas de pantalla de alta resolución en producción.
+- **Delivered results**: Previous voice calibration and acoustic shielding completed and certified with VICTORY CONFIRMED. Now initiating latency optimization and resilience overhaul.
 
 ## Project Status
-- **Phase**: complete
+- **Phase**: in progress
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_28 (1b6dfb0c-9540-427d-8d0e-861ec0488440)
-- **Active Auditor**: victory_auditor_28 (f6ca5fc7-4ade-4ae7-a1ab-63aba2a9234f)
-- **Monitoring Crons**: none (cleaned up)
+- **Active Orchestrator**: orchestrator_29 (cac033b4-6821-468a-bb18-9d5956c74d4c)
+- **Active Auditor**: victory_auditor_29 (to be spawned on victory claim)
+- **Monitoring Crons**: active (Cron 1: task-46 reporting, Cron 2: task-48 liveness)
 
 ## Victory Audit Status
 - **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
@@ -132,8 +138,9 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Domain Ceilings Specification
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/plan.md — Orchestrator Plan (to be created)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/progress.md — Orchestrator Progress (to be created)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_28/handoff.md — Orchestrator Handoff (to be created)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/plan.md — Orchestrator Plan (to be created)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/progress.md — Orchestrator Progress (to be created)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/handoff.md — Orchestrator Handoff (to be created)
+
 
 

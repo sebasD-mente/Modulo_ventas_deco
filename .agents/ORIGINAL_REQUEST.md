@@ -2157,3 +2157,104 @@ Integrity mode: development
 - [ ] `node --test tests/ai/voice-vad-reengineering.test.js` pasa con éxito con los nuevos umbrales.
 - [ ] `npm run harness:check` finaliza con código 0 y sin advertencias críticas.
 - [ ] `node scripts/audit-monoliths.js` confirma que 0 archivos exceden sus límites arquitectónicos.
+
+## 2026-09-17T18:20:48Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Fred (Agente Implementador) y Equipo de Desarrollo, con supervisión y auditoría de Gary (Arquitecto de Sistemas & Auditor Forense)
+
+Optimización crítica de latencia y resiliencia ferial en STAND {IA}: erradicar cuellos de botella en chat (< 2.5s) y visión (< 2.0s) e incorporar buffer de reintento offline/4G, manteniendo cero deuda técnica y contratos intactos.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Eliminación del Doble Turno LLM en Ventas de Chat (aiStreamService.js)
+En `server/services/ai/aiStreamService.js`, cuando Gemini invoca la herramienta `prepareSaleDraft` y `toolRecord.result` contenga ítems resueltos:
+- Emitir inmediatamente el evento SSE `draft_sale` con el borrador resuelto.
+- Emitir por SSE un token con la confirmación dinámica sin llamar a Gemini por segunda vez:
+  *«¡Listo, [NombreVendedor]! Te monté el borrador en pantalla listo para cobrar con [método]. ¿Confirmamos la venta?»*
+- Concluir el stream con `done`.
+- Reservar `streamClosedLoopFollowUp` únicamente para consultas informativas complejas (catálogo amplio o métricas).
+
+### R2. Persistencia Asíncrona Paralela en Visión (aiMediaController.js)
+En `server/controllers/ai/aiMediaController.js` (`handleArtworkRecognition`):
+- Eliminar la ejecución secuencial de `safePersistMedia` y `recognizePosterArtworkFromImage`.
+- Ejecutar ambas operaciones en paralelo mediante `Promise.all` para lograr Zero-Wait GCS, manteniendo el retorno de `imageUrl` y `draftSale` idéntico e intacto.
+
+### R3. Compresor de Imágenes en Cliente (imageCompressor.js)
+- Crear `src/utils/imageCompressor.js` (máximo 60 líneas de código, función pura).
+- Redimensionar proporcionalmente a un máximo de 1024 px en su lado mayor y exportar a Blob `image/jpeg` con calidad 0.75 (~100 KB a 140 KB).
+- Integrar en `src/components/ai-chat/hooks/useAiChatStream.js` (`handleImageUpload`) para comprimir la imagen en el cliente antes de construir el `FormData`.
+
+### R4. Aligeramiento Dinámico del Prompt Operativo (aiPromptService.js)
+En `server/services/ai/aiPromptService.js` (`buildSalesSystemPrompt`):
+- Omitir el volcado JSON masivo de ventas del día y métricas detalladas en órdenes de venta directa y consultas de catálogo.
+- Inyectar el detalle transaccional completo únicamente si el mensaje del usuario contiene palabras clave de consulta operativa (`/caja|dinero|m[eé]tricas|ventas|cu[aá]nto|reporte|turno/i`).
+
+### R5. Buffer de Reintento de Audio en Memoria (useAiChatStream.js)
+En `src/components/ai-chat/hooks/useAiChatStream.js`:
+- Almacenar el último `audioBlob` en una referencia en memoria `lastAudioBlobRef`.
+- Ante fallo de red o timeout en `/api/ai/voice-sale`, habilitar acción visual o botón en el chat para reintentar el envío inmediato del buffer sin obligar al vendedor a volver a hablar.
+
+### R6. Script Programático de Benchmarks de Latencia (latency-audit.test.js)
+- Crear `tests/benchmarks/latency-audit.test.js` ejecutable con `node --test` para verificar de forma cuantitativa e independiente:
+  1. Que el stream SSE de venta directa completa el ciclo con token + `draft_sale` + `done` en un solo turno.
+  2. Que la persistencia en paralelo en visión ejecuta en simultáneo sin esperas bloqueantes.
+
+## Verification Resources
+- Suite de pruebas de seguridad y arnés existente:
+  - `npm run test:security`
+  - `npm run audit:secrets`
+  - `npm run audit:monoliths`
+  - `npm run build`
+  - `npm run harness:check`
+- Protocolos de calidad de la organización:
+  - `cirugia-arquitectura-cero-deuda`
+  - `arnes-verificacion-evidencia-forense`
+  - `aislamiento-estricto-proyectos`
+
+## Acceptance Criteria
+
+### Integridad Arquitectónica y Calidad de Código
+- [ ] `npm run harness:check` ejecuta y pasa al 100% limpio (seguridad, cero secretos, auditoría de monolitos y build de Vite).
+- [ ] `src/utils/imageCompressor.js` tiene <= 60 líneas de código.
+- [ ] Todos los archivos modificados cumplen estrictamente con los techos de `scripts/audit-monoliths.js` (< 200 líneas por defecto o excepciones de dominio).
+- [ ] Cero alteraciones a esquemas de Prisma o migraciones de base de datos.
+- [ ] Cero hardcodeo de credenciales, IPs o URLs absolutas.
+
+### Latencia y Rendimiento Medido
+- [ ] `node --test tests/benchmarks/latency-audit.test.js` pasa con éxito confirmando el ciclo directo.
+- [ ] Latencia de venta directa por chat reducida de 11.5s a < 2.5s.
+- [ ] Latencia de reconocimiento de imagen reducida de 6.6s a < 2.0s.
+- [ ] Payload de imagen capturada desde smartphone reducido a <= 1024px (~100-140 KB) previo a la subida HTTP.
+
+### Resiliencia y Contratos de Integración
+- [ ] Contrato SSE y estructura de `draft_sale` se mantienen 100% compatibles con el frontend.
+- [ ] Reintento de audio envía exitosamente el Blob almacenado en memoria tras un fallo de red simulado sin requerir re-grabación.
+
+### Despliegue y Auditoría Forense
+- [ ] Despliegue exitoso en Dokploy (`https://ventas.decovintage.online`).
+- [ ] Inspección y certificación en vivo en navegador con Chrome DevTools bajo el protocolo de 4 filtros forenses de `arnes-verificacion-evidencia-forense`.
+
+---
+
+# Directiva Quirúrgica de Gary (Supervisión y Auditoría Forense)
+Procedan pero ten en cuenta estas advertencias de Gary:
+- Archivos a intervenir:
+  1. `server/services/ai/aiStreamService.js` (Líneas 120-132)
+  2. `server/controllers/ai/aiMediaController.js` (Líneas 115-135)
+  3. `src/utils/imageCompressor.js` (NUEVO ARCHIVO, máx 60 líneas)
+  4. `src/components/ai-chat/hooks/useAiChatStream.js` (Líneas 60-85)
+  5. `server/services/ai/aiPromptService.js` (Líneas 160-168)
+- Restricciones de Calidad (Deko Labs):
+  - Ningún archivo nuevo o refactorizado puede superar las 200 líneas de código.
+  - Ningún componente o módulo auxiliar puede superar las 60 líneas.
+  - Prohibido hardcodear credenciales, IPs o URLs absolutas.
+  - Prohibido romper el contrato de Server-Sent Events (SSE) ni la estructura de `draft_sale`.
+  - Prohibido alterar esquemas de Prisma o migraciones de base de datos.
+
