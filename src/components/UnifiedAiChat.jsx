@@ -48,7 +48,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           isRecording={voiceRecorder.isRecording} recordingSeconds={voiceRecorder.recordingSeconds}
           vadActive={voiceRecorder.vadActive} audioLevel={voiceRecorder.audioLevel}
           onStartRecording={voiceRecorder.startRecording} onStopRecording={voiceRecorder.stopRecording}
-          onImageUpload={chatStream.handleImageUpload}
+          onCancelRecording={voiceRecorder.cancelRecording} onImageUpload={chatStream.handleImageUpload}
         />
       </div>
       {chatStream.pendingDraft && (

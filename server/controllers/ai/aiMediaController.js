@@ -38,12 +38,12 @@ export async function handleVoiceSale(req, res) {
     });
 
     if (!draft.items || draft.items.length === 0) {
+      const isGreeting = draft.intent === 'SALUDO' || (!draft.isSaleDetected && draft.greeting);
+      const replyMsg = isGreeting ? (draft.greeting || '¡Hola! ¿Listo para vender? Dicta el póster y tamaño.') : 'No se identificaron pósters ni obras en el dictado de voz.';
       return res.json({
-        success: true,
-        draftSale: null,
-        itemsDetected: false,
-        transcription: draft.transcription || '',
-        message: 'No se identificaron pósters ni obras en el dictado de voz.',
+        success: true, draftSale: null, itemsDetected: false,
+        transcription: draft.transcription || '', intent: draft.intent || (isGreeting ? 'SALUDO' : 'RUIDO_NO_VENTA'),
+        isSaleDetected: Boolean(draft.isSaleDetected), reply: isGreeting ? replyMsg : null, message: replyMsg,
       });
     }
 

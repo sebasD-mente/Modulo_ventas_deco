@@ -16,7 +16,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
 
   const mediaRecorderRef = useRef(null), streamRef = useRef(null), audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null), audioContextRef = useRef(null), vadTimerRef = useRef(null), hardTimeoutRef = useRef(null);
-  const hasSpokenRef = useRef(false), recordingStartTimeRef = useRef(0);
+  const hasSpokenRef = useRef(false), recordingStartTimeRef = useRef(0), isCancelledRef = useRef(false);
   const onRecordingCompleteRef = useRef(onRecordingComplete);
   onRecordingCompleteRef.current = onRecordingComplete;
 
@@ -34,6 +34,16 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
     }
   }, []);
 
+  const cancelRecording = useCallback(() => {
+    isCancelledRef.current = true;
+    audioChunksRef.current = [];
+    stopRecording();
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  }, [stopRecording]);
+
   const startRecording = useCallback(async () => {
     try {
       if (!navigator?.mediaDevices?.getUserMedia) throw new Error('getUserMedia not supported');
@@ -50,6 +60,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
 
       mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
+        if (isCancelledRef.current) { isCancelledRef.current = false; audioChunksRef.current = []; return; }
         const actualMime = mediaRecorder.mimeType || selectedMime || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
         const duration = Date.now() - recordingStartTimeRef.current;
@@ -83,7 +94,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
             if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
               clearInterval(vadTimerRef.current); vadTimerRef.current = null; return;
             }
-            const { rms, level } = calculateDecibelsAndLevel(analyser, buffer);
+            const { rms, level } = calculateDecibelsAndLevel(analyser, buffer, 0.035);
             setAudioLevel(level);
             const elapsed = Date.now() - startTime;
             if (elapsed < 400) {
@@ -112,19 +123,14 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
 
   useEffect(() => () => {
     if (hardTimeoutRef.current) clearTimeout(hardTimeoutRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch (_) {}
-    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') { try { mediaRecorderRef.current.stop(); } catch (_) {} }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     if (vadTimerRef.current) clearInterval(vadTimerRef.current);
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') { audioContextRef.current.close().catch(() => {}); audioContextRef.current = null; }
   }, []);
 
-  return { isRecording, recordingSeconds, vadActive, audioLevel, startRecording, stopRecording };
+  return { isRecording, recordingSeconds, vadActive, audioLevel, startRecording, stopRecording, cancelRecording };
 }
 
 export default useAiVoiceRecorder;

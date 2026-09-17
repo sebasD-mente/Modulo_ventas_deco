@@ -3,33 +3,21 @@ import { prisma } from '../../config/prisma.js';
 import { searchWebPosters } from '../webCatalogService.js';
 import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { voiceSaleResponseSchema, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
+import { resolveEntityAlias, normalizeArtworkQuery } from '../semantic/entityAliases.js';
+import { searchHybridPosters } from '../embeddingService.js';
 
-const getActivePool = () => {
-  const configured = ENV.GEMINI_MODEL && !ENV.GEMINI_MODEL.includes('2.5') ? ENV.GEMINI_MODEL : 'gemini-3.8-flash';
-  return Array.from(new Set([configured, 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...MODEL_PRIORITY_POOL]));
-};
+const getActivePool = () => [ENV.GEMINI_MODEL && !ENV.GEMINI_MODEL.includes('2.5') ? ENV.GEMINI_MODEL : 'gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', ...MODEL_PRIORITY_POOL].filter((v, i, a) => a.indexOf(v) === i);
 const STANDARD_SIZES = {
-  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
-  PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 },
-  MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
-  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
-  GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 }, MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
+  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
 };
-
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
-
-const throwMediaError = (fnName, err, defaultMsg) => {
-  console.error(`[${fnName}] ❌ Error en IA multimodal:`, err?.message);
-  const error = new Error(`AI_MEDIA_SERVICE_FAILED: ${err?.message || defaultMsg}`);
-  error.code = 'AI_MEDIA_SERVICE_FAILED';
-  throw error;
-};
+const throwMediaError = (fn, err, msg) => { console.error(`[${fn}] ❌`, err?.message); const error = new Error(`AI_MEDIA_SERVICE_FAILED: ${err?.message || msg}`); error.code = 'AI_MEDIA_SERVICE_FAILED'; throw error; };
 
 export function normalizeCatalogSizeId(requestedSize) {
   if (!requestedSize) return 'MEDIANO';
-  const raw = String(requestedSize).toLowerCase().trim();
-  const compact = raw.replace(/\s+/g, '').replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '').replace(/por|\*|x/gi, 'x');
+  const raw = String(requestedSize).toLowerCase().trim(), compact = raw.replace(/\s+/g, '').replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '').replace(/por|\*|x/gi, 'x');
   if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact) || /\b(portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco)\b/i.test(raw)) return 'PORTADA_ALBUM';
   if (/18x24|24x18|45x60|60x45/.test(compact) || /\b(grande|large|l)\b/i.test(raw)) return 'GRANDE';
   if (/24x36|36x24|60x90|90x60/.test(compact) || /\b(gigante|extra\s*grande|xl)\b/i.test(raw)) return 'GIGANTE';
@@ -41,31 +29,38 @@ export function normalizeCatalogSizeId(requestedSize) {
 
 export async function matchPosterEverywhere(tenantId, query, requestedSize = null) {
   if (!query) return null;
-  const clean = String(query).trim();
-  const webMatches = await searchWebPosters({ tenantId, query: clean, limit: 12 });
+  const clean = String(query).trim(), aliasRes = resolveEntityAlias(clean), normalizedQuery = normalizeArtworkQuery(clean);
+  const effectiveQuery = (aliasRes.matched && aliasRes.searchQuery) ? aliasRes.searchQuery : (normalizedQuery || clean);
+  let webMatches = [];
+  try { webMatches = await searchHybridPosters({ tenantId, query: effectiveQuery, limit: 12 }); }
+  catch { webMatches = await searchWebPosters({ tenantId, query: effectiveQuery, limit: 12 }); }
+
   if (webMatches.length > 0) {
-    const matched = webMatches[0];
-    let selectedSize = matched.sizes[0], sizeAvailable = true, unavailableReason = null;
-    if (requestedSize) {
-      const norm = normalizeCatalogSizeId(requestedSize), cleanSize = String(requestedSize).toUpperCase().trim();
-      const found = matched.sizes.find(s => s.sizeId === norm || s.sizeId === cleanSize || s.nombre.toUpperCase() === cleanSize || s.nombre.toUpperCase().includes(cleanSize) || (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize)));
-      if (found) selectedSize = found;
-      else if (STANDARD_SIZES[norm]) {
-        selectedSize = STANDARD_SIZES[norm];
-        if (!matched.sizes.some(s => s.sizeId === norm)) matched.sizes.push(STANDARD_SIZES[norm]);
-      } else {
-        sizeAvailable = false;
-        unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map(s => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
+    const matched = webMatches[0], matchText = `${matched.titulo || ''} ${matched.subtitulo || ''} ${(matched.tags || []).join(' ')}`.toLowerCase();
+    const queryTokens = effectiveQuery.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    if (aliasRes.matched || queryTokens.length === 0 || queryTokens.some((t) => matchText.includes(t))) {
+      let selectedSize = matched.sizes[0], sizeAvailable = true, unavailableReason = null;
+      if (requestedSize) {
+        const norm = normalizeCatalogSizeId(requestedSize), cleanSize = String(requestedSize).toUpperCase().trim();
+        const found = matched.sizes.find((s) => s.sizeId === norm || s.sizeId === cleanSize || s.nombre.toUpperCase() === cleanSize || s.nombre.toUpperCase().includes(cleanSize) || (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize)));
+        if (found) selectedSize = found;
+        else if (STANDARD_SIZES[norm]) {
+          selectedSize = STANDARD_SIZES[norm];
+          if (!matched.sizes.some((s) => s.sizeId === norm)) matched.sizes.push(STANDARD_SIZES[norm]);
+        } else {
+          sizeAvailable = false;
+          unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${matched.sizes.map((s) => `${s.nombre} (${s.dimensiones})`).join(', ')}.`;
+        }
       }
+      const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
+      return {
+        type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id,
+        description: `${displayTitle} (${selectedSize.nombre})`, baseTitle: displayTitle, category: matched.categoria,
+        thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, unitPrice: Number(selectedSize.precio),
+        sizeId: selectedSize.sizeId, sizeName: selectedSize.nombre, availableSizes: matched.sizes,
+        sizeAvailable, unavailableReason,
+      };
     }
-    const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
-    return {
-      type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id,
-      description: `${displayTitle} (${selectedSize.nombre})`, baseTitle: displayTitle, category: matched.categoria,
-      thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, unitPrice: Number(selectedSize.precio),
-      sizeId: selectedSize.sizeId, sizeName: selectedSize.nombre, availableSizes: matched.sizes,
-      sizeAvailable, unavailableReason,
-    };
   }
   try {
     const local = await prisma.product.findMany({ where: { tenantId, isActive: true } });
@@ -84,42 +79,58 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
 
 export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId }) {
   const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
-  const prompt = 'Extrae la venta dictada por voz en stand: obras, tamaños (MINI, PEQUENO, MEDIANO, GRANDE, GIGANTE, PORTADA_ALBUM), cantidades y método de pago (EFECTIVO, TARJETA, TRANSFERENCIA).';
   try {
-    const { result: response } = await executeWithModelFallback({
-      models: getActivePool(),
+    const { result: sttRes } = await executeWithModelFallback({
+      models: getActivePool(), actionName: 'STT_LITERAL_TRANSCRIPTION', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [
+          { text: 'Transcribe palabra por palabra con máxima fidelidad literal el audio en español guatemalteco/latinoamericano. Devuelve únicamente el texto transcrito. Si no hay habla clara o solo ruido de fondo, responde vacío.' },
+          { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }
+        ] }],
+      }),
+    });
+    const transcription = sttRes.text?.trim() || '';
+    const nluPrompt = `Clasifica la intención del texto dictado en stand de pósters (SALUDO, CONSULTA_CATALOGO, DICTADO_VENTA, RUIDO_NO_VENTA). Si es DICTADO_VENTA, extrae obras, tamaños (MINI, PEQUENO, MEDIANO, GRANDE, GIGANTE, PORTADA_ALBUM), cantidades y método de pago (EFECTIVO, TARJETA, TRANSFERENCIA). Si es SALUDO o CONSULTA_CATALOGO, genera greeting breve y deja items vacío.\nTexto dictado: "${transcription}"`;
+    const { result: nluRes } = await executeWithModelFallback({
+      models: getActivePool(), actionName: 'NLU_INTENT_EXTRACTION', tenantId,
+      taskFn: async ({ model, client }) => client.models.generateContent({
+        model, contents: [{ role: 'user', parts: [{ text: nluPrompt }] }],
         config: { responseMimeType: 'application/json', responseSchema: voiceSaleResponseSchema },
       }),
-      actionName: 'PROCESS_VOICE_AUDIO', tenantId,
     });
-    const parsed = JSON.parse(response.text?.trim() || '{}');
+    const parsed = JSON.parse(nluRes.text?.trim() || '{}');
+    const isSale = Boolean(parsed.isSaleDetected && Array.isArray(parsed.items) && parsed.items.length > 0);
+    const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (transcription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
+    if (!isSale) {
+      return {
+        transcription: parsed.transcription || transcription, isSaleDetected: false, intent, greeting: parsed.greeting || null,
+        items: [], total: 0, paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
+      };
+    }
     const enrichedItems = [];
     let grandTotal = 0;
-    for (const item of parsed.items || []) {
+    for (const item of parsed.items) {
       const matched = await matchPosterEverywhere(tenantId, item.title || item.description, item.size);
       const qty = item.quantity || 1, uPrice = matched?.unitPrice || Number(item.unitPrice) || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
       grandTotal += subtotal;
       enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
-    return { transcription: parsed.transcription, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ' };
-  } catch (err) {
-    throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz');
-  }
+    return {
+      transcription: parsed.transcription || transcription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null,
+      items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
+    };
+  } catch (err) { throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz'); }
 }
 
 export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 'image/jpeg', tenantId }) {
   const cleanMime = (mimeType || 'image/jpeg').split(';')[0].trim().toLowerCase();
-  const prompt = 'Reconoce el arte del póster fotografiado: personajes, título oficial más probable, franquicia y tamaño sugerido.';
   try {
     const { result: response } = await executeWithModelFallback({
-      models: getActivePool(),
+      models: getActivePool(), actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: 'Reconoce el arte del póster fotografiado: personajes, título oficial más probable, franquicia y tamaño sugerido.' }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: artworkRecognitionResponseSchema },
       }),
-      actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     const matched = await matchPosterEverywhere(tenantId, parsed.primaryTitle || parsed.visualAnalysis, parsed.suggestedSize || 'MEDIANO');
@@ -129,25 +140,20 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
       items: [{ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched?.availableSizes }],
       total, paymentMethod: 'EFECTIVO', inputChannel: 'IA_FOTO_ARTE',
     };
-  } catch (err) {
-    throwMediaError('recognizePosterArtworkFromImage', err, 'Error al reconocer arte del póster');
-  }
+  } catch (err) { throwMediaError('recognizePosterArtworkFromImage', err, 'Error al reconocer arte del póster'); }
 }
 
 export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video/mp4', tenantId }) {
   const cleanMime = (mimeType || 'video/mp4').split(';')[0].trim().toLowerCase();
-  const prompt = 'Analiza el video del mostrador de ventas: identifica cada póster visible y cuenta unidades.';
   try {
     const { result: response } = await executeWithModelFallback({
-      models: getActivePool(),
+      models: getActivePool(), actionName: 'RECOGNIZE_POSTERS_VIDEO', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: 'Analiza el video del mostrador de ventas: identifica cada póster visible y cuenta unidades.' }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: videoRecognitionResponseSchema },
       }),
-      actionName: 'RECOGNIZE_POSTERS_VIDEO', tenantId,
     });
-    const parsed = JSON.parse(response.text?.trim() || '{}');
-    const enrichedItems = [];
+    const parsed = JSON.parse(response.text?.trim() || '{}'), enrichedItems = [];
     let grandTotal = 0;
     for (const item of parsed.postersDetected || []) {
       const matched = await matchPosterEverywhere(tenantId, item.title, item.suggestedSize || 'MEDIANO');
@@ -156,44 +162,34 @@ export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video
       enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster de Video', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
     }
     return { summary: parsed.summary, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: 'EFECTIVO', confidence: parsed.confidence || 0.90, inputChannel: 'IA_VIDEO_MOSTRADOR' };
-  } catch (err) {
-    throwMediaError('recognizePostersFromVideo', err, 'Error al procesar video de mostrador');
-  }
+  } catch (err) { throwMediaError('recognizePostersFromVideo', err, 'Error al procesar video de mostrador'); }
 }
 
 export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/jpeg', tenantId }) {
   let catalogMap = '';
   try {
-    const products = await prisma.product.findMany({
-      where: { tenantId, isActive: true },
-      select: { id: true, name: true, basePrice: true, sku: true, qrCodeData: true, barcode: true },
-    });
+    const products = await prisma.product.findMany({ where: { tenantId, isActive: true }, select: { id: true, name: true, basePrice: true, sku: true, qrCodeData: true, barcode: true } });
     catalogMap = products.map((p) => `- "${p.name}", Q${p.basePrice}, SKU: "${p.sku}", QR: "${p.qrCodeData}", Barcode: "${p.barcode}"`).join('\n');
   } catch (_) {}
-  const prompt = `Identifica códigos QR o de barras en la foto del lote de pósters.\nCatálogo:\n${catalogMap}`;
   try {
     const { result: response } = await executeWithModelFallback({
-      models: getActivePool(),
+      models: getActivePool(), actionName: 'PROCESS_BATCH_PHOTO', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType } }] }],
+        model, contents: [{ role: 'user', parts: [{ text: `Identifica códigos QR o de barras en la foto del lote de pósters.\nCatálogo:\n${catalogMap}` }, { inlineData: { data: imageBuffer.toString('base64'), mimeType } }] }],
         config: { responseMimeType: 'application/json', responseSchema: batchPhotoResponseSchema },
       }),
-      actionName: 'PROCESS_BATCH_PHOTO', tenantId,
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
     let grandTotal = 0;
     for (const item of parsed.items || []) {
       const matched = await matchPosterEverywhere(tenantId, item.matchedCode || item.sku || item.description);
       if (matched) {
-        item.description = matched.description; item.unitPrice = matched.unitPrice;
-        item.thumbUrl = matched.thumbUrl; item.imageUrl = matched.imageUrl;
+        item.description = matched.description; item.unitPrice = matched.unitPrice; item.thumbUrl = matched.thumbUrl; item.imageUrl = matched.imageUrl;
         item.subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
       }
       grandTotal += item.subtotal || 0;
     }
     parsed.totalCalculated = Number(grandTotal.toFixed(2));
     return parsed;
-  } catch (err) {
-    throwMediaError('processPostersBatchPhoto', err, 'Error al procesar lote de fotos');
-  }
+  } catch (err) { throwMediaError('processPostersBatchPhoto', err, 'Error al procesar lote de fotos'); }
 }

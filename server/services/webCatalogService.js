@@ -1,18 +1,10 @@
-/**
- * server/services/webCatalogService.js
- * Servicio centralizado de catálogo web, scoring, autocompletado y fachadas públicas.
- */
 import { prisma } from '../config/prisma.js';
 import { invalidateVectorCache, searchHybridPosters, searchPostersByEmbedding } from './embeddingService.js';
 import { resolveEntityAlias, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from './semantic/entityAliases.js';
 import { productCache, invalidateCatalogCache as invalidateStoreCache, getCachedProducts } from './catalog/catalogCacheStore.js';
 import { formatProductForPos, extractImageSlug, extractPosterTitle, normalizePosterTitle, deduplicatePosters } from './catalog/catalogStringNormalizer.js';
 
-// Delegación de partición multitenant: const productCache = new Map();
-
-export function invalidateCatalogCache(tenantId = null) {
-  invalidateStoreCache(tenantId);
-}
+export function invalidateCatalogCache(tenantId = null) { invalidateStoreCache(tenantId); }
 
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
   const cleanQuery = String(query ?? '').trim().toLowerCase();
@@ -83,21 +75,27 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       }
 
       const isTokenMatch = (t) => fullTokensSet.has(t) || normFullText.startsWith(t);
-      if (tokens.length > 0 && tokens.every(isTokenMatch)) score += 150;
+      if (tokens.length > 0 && tokens.every(isTokenMatch)) {
+        if (tokens.length >= 2 || titleTokensSet.has(tokens[0]) || normTitleText.startsWith(tokens[0])) score += 150;
+      }
 
       for (const token of tokens) {
         if (titleTokensSet.has(token)) score += 35;
         else if (isTokenMatch(token)) score += 15;
       }
 
-      if (meaningfulTokens.length >= 2) {
+      if (meaningfulTokens.length === 1) {
+        const singleToken = meaningfulTokens[0];
+        const matchesTitle = titleTokensSet.has(singleToken) || normTitleText.split(/\s+/).some((t) => t.startsWith(singleToken));
+        const hasAliasMatch = Boolean(aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
+        const hasExactTitle = normTitleText === singleToken || normTitleText.startsWith(singleToken);
+        if (!matchesTitle && !hasAliasMatch && !hasExactTitle) score = 0;
+      } else if (meaningfulTokens.length >= 2) {
         const matchedMeaningful = meaningfulTokens.filter((t) => titleTokensSet.has(t) || isTokenMatch(t));
         const hasAliasMatch = Boolean(aliasCondensed.length >= 3 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasFullPhrase = normFullText.includes(normQuery) || (queryCondensed.length >= 3 && normFullText.includes(queryCondensed));
         const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.6;
-        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio) {
-          score = 0;
-        }
+        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio) score = 0;
       }
 
       return { p, score };

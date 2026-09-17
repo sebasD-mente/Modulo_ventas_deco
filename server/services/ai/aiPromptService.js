@@ -8,17 +8,24 @@ export const salesAssistantSafetySettings = [
 ];
 
 export const voiceSaleResponseSchema = {
-  type: Type.OBJECT, description: 'Extracción estricta de venta dictada por voz en stand.',
+  type: Type.OBJECT, description: 'Clasificación de intención y extracción estructurada de venta dictada por voz.',
   properties: {
     transcription: { type: Type.STRING, description: 'Transcripción literal completa.' },
+    isSaleDetected: { type: Type.BOOLEAN, description: 'true si el audio contiene dictado de venta; false si es saludo o consulta.' },
+    intent: {
+      type: Type.STRING,
+      enum: ['SALUDO', 'CONSULTA_CATALOGO', 'DICTADO_VENTA', 'RUIDO_NO_VENTA'],
+      description: 'Intención clasificada del usuario.',
+    },
+    greeting: { type: Type.STRING, description: 'Respuesta conversacional breve si es saludo o consulta.' },
     items: {
-      type: Type.ARRAY, description: 'Pósters o artículos dictados.',
+      type: Type.ARRAY, description: 'Pósters o artículos dictados si isSaleDetected es true.',
       items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, size: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER } }, required: ['title', 'size', 'quantity'] },
     },
     paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'OTRO'] },
     confidence: { type: Type.NUMBER },
   },
-  required: ['transcription', 'items', 'paymentMethod'],
+  required: ['isSaleDetected', 'intent'],
 };
 
 export const artworkRecognitionResponseSchema = {

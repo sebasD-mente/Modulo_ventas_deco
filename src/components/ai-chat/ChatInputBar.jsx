@@ -1,20 +1,16 @@
 import React, { useRef } from 'react';
-import { Send, Mic, Square, Camera } from 'lucide-react';
+import { Send, Mic, Square, Camera, X } from 'lucide-react';
 import { formatTime } from './chatConstants';
 
 export default function ChatInputBar({
-  inputText = '', setInputText, onSendText, isLoading = false,
-  isRecording = false, recordingSeconds = 0, vadActive = false,
-  audioLevel = 0, onStartRecording, onStopRecording, onImageUpload,
+  inputText = '', setInputText, onSendText, isLoading = false, isRecording = false,
+  recordingSeconds = 0, vadActive = false, audioLevel = 0, onStartRecording, onStopRecording, onCancelRecording, onImageUpload,
 }) {
   const fileInputRef = useRef(null);
 
   return (
     <div className="bg-white p-3.5 sm:p-5 select-none shrink-0 border-t border-slate-100">
-      <input
-        type="file" ref={fileInputRef} accept="image/*"
-        capture="environment" onChange={onImageUpload} className="hidden"
-      />
+      <input type="file" ref={fileInputRef} accept="image/*" capture="environment" onChange={onImageUpload} className="hidden" />
 
       {isRecording ? (
         <div className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-black text-white shadow-md">
@@ -24,22 +20,23 @@ export default function ChatInputBar({
               {vadActive ? 'Pausa detectada... finalizando' : `Grabando: ${formatTime(recordingSeconds)} • Pulsa Finalizar al terminar`}
             </span>
             <div className="flex items-end gap-0.5 h-3.5 px-1 bg-neutral-900/80 rounded-md" title={`Nivel: ${audioLevel}%`}>
-              {[0.3, 0.6, 1.0, 0.5].map((scale, i) => (
+              {[0.4, 0.85, 1.0, 0.6].map((scale, i) => (
                 <span
                   key={i}
                   className={`w-1 rounded-full transition-all duration-75 ${vadActive ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                  style={{ height: `${Math.max(3, Math.min(14, Math.round(audioLevel * scale * 0.14)))}px` }}
+                  style={{ height: `${Math.max(3, Math.min(14, Math.round((audioLevel * scale * 0.14) + 2)))}px` }}
                 />
               ))}
             </div>
           </div>
-          <button
-            type="button" onClick={onStopRecording}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
-          >
-            <Square className="w-3.5 h-3.5 fill-current" />
-            <span>Finalizar</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={onCancelRecording} title="Cancelar y descartar audio" className="px-2.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95">
+              <X className="w-3.5 h-3.5" /><span className="hidden sm:inline">Cancelar</span>
+            </button>
+            <button type="button" onClick={onStopRecording} className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95">
+              <Square className="w-3.5 h-3.5 fill-current" /><span>Finalizar</span>
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); onSendText?.(); }} className="flex items-center gap-2 sm:gap-2.5">

@@ -66,7 +66,8 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     form.append('audio', audioBlob, `voice-sale.${ext}`); form.append('eventId', eventId);
     uploadMedia('/api/ai/voice-sale', form, '🎙️ [Venta dictada por voz]', 'Gemini analizando dictado de voz...', (data) => {
       if (!data.draftSale?.items || data.draftSale.items.length === 0) {
-        pushAiMsg('🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").');
+        if (data.intent === 'SALUDO' || (!data.isSaleDetected && data.reply)) pushAiMsg(data.reply || '¡Hola! Con gusto te ayudo, ¿qué póster o venta preparamos?');
+        else pushAiMsg('🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").');
       } else {
         pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale);
         pushAiMsg(`Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`);
