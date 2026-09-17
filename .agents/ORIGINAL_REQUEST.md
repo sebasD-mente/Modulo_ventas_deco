@@ -2057,3 +2057,53 @@ Reference specification: Master Prompt de Ingeniería de Gary (Sesión `@:4dfbdf
 - [ ] `npm run harness:check` pasando 100% verde (9/9 Zero-Trust, 0 secretos, monolitos limpios, build en 0).
 - [ ] Cero dependencias cruzadas o llamadas a bases de datos de otros proyectos.
 - [ ] Evidencia visual en vivo mediante Chrome DevTools MCP demostrando operación fluida en catálogo, eventos y ventas recientes.
+
+## 2026-09-17T05:19:24Z
+
+Auditoría forense e implementación de la reingeniería 360° del ecosistema de voz de STAND {IA}: erradicar alucinaciones mediante desacople STT/NLU, conectar el reconocimiento de voz al RAG Híbrido y Entity Aliases, y calibrar hardware/UX en mostrador sin alterar bases de datos ajenas ni exceder techos monolíticos.
+
+Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas
+Integrity mode: development
+
+## Requirements
+
+### R1. Desacople Arquitectónico STT vs NLU y Blindaje Anti-Alucinación (Backend)
+- Desacoplar la inferencia de audio en 2 fases:
+  * Fase 1: Transcripción Fiel Literal (STT Puro). Obtener el texto literal exacto de lo dicho sin interpretar ni inferir ventas.
+  * Fase 2: Clasificación de Intención y Extracción de Venta (NLU). Evaluar el texto literal obtenido.
+- Refactorizar `voiceSaleResponseSchema` en `server/services/ai/aiPromptService.js`:
+  * Eliminar `items` y `paymentMethod` de la lista de campos obligatorios (`required`).
+  * Introducir `isSaleDetected: boolean` e `intent` (`'SALUDO' | 'CONSULTA_CATALOGO' | 'DICTADO_VENTA' | 'RUIDO_NO_VENTA'`).
+  * Si el audio es un saludo o no es venta, retornar `items: []` y `isSaleDetected: false`.
+
+### R2. Conexión de Voz con RAG Híbrido y Protección de Consultas de Token Único (Backend)
+- Conectar la resolución de obras en `server/services/ai/aiMediaService.js` al diccionario cultural `server/services/semantic/entityAliases.js` (`resolveEntityAlias`, `normalizeArtworkQuery`).
+- Conectar la búsqueda de obras de voz al motor de embeddings de `server/services/embeddingService.js` (`searchHybridPosters`).
+- Corregir en `server/services/webCatalogService.js` (`searchWebPosters`) la vulnerabilidad donde consultas con un solo token (`meaningfulTokens.length === 1`, como *"mundo"*) eluden el filtro de ratio de coincidencia y puntúan positivamente contra pósters no relacionados.
+- Validar umbral de relevancia antes de aceptar resultados en `matchPosterEverywhere`.
+
+### R3. Calibración de Sensibilidad Web Audio API, Visualizador Dinámico y Cancelación (Frontend)
+- Calibrar el cálculo de nivel y decibeles en `src/components/ai-chat/hooks/useAiChatAudio.js` y `src/components/ai-chat/hooks/useAiVoiceRecorder.js` para los niveles de presión sonora de habla normal (RMS 0.015 - 0.035) en lugar del umbral 0.12.
+- Mejorar el feedback visual en `src/components/ai-chat/ChatInputBar.jsx` para que las barras de nivel oscilen y reaccionen vivamente con el habla estándar, confirmando al vendedor que el micrófono está captando audio activamente.
+- Incorporar un botón o mecanismo de cancelación inmediata en `ChatInputBar.jsx` que permita abortar grabaciones accidentales sin enviar la petición al backend.
+
+### R4. Integración Conversacional de Mostrador y Respeto a Techos Monolíticos
+- En `src/components/ai-chat/hooks/useAiChatStream.js` y `server/controllers/ai/aiMediaController.js`, manejar respuestas conversacionales naturales ante audios clasificados como saludo (`intent: 'SALUDO'`), saludando al vendedor por su nombre y con tono enérgico sin abrir borradores vacíos.
+- Respetar estrictamente los límites de líneas de código definidos en `scripts/audit-monoliths.js` y los contratos fijados en `tests/ai/voice-vad-reengineering.test.js`.
+
+## Acceptance Criteria
+
+### Integridad y Anti-Alucinación (Backend)
+- [ ] Inferencia con audio de saludo ("Hola Hola" o "Buenos días") clasifica `intent: 'SALUDO'`, retorna `isSaleDetected: false`, `items: []` y un mensaje conversacional sin borrador de venta.
+- [ ] Inferencia con dictado de venta ("1 Batman mediano en efectivo" o "un conejo malo") detecta `intent: 'DICTADO_VENTA'`, `isSaleDetected: true`, resuelve el póster mediante el RAG/alias cultural y genera el borrador con tamaño y precio correctos.
+- [ ] Consulta aislada de una palabra ("mundo") no empareja con Bad Bunny ni con productos irrelevantes; `searchWebPosters` exige coincidencia estricta para tokens individuales.
+
+### Captura de Audio y UX (Frontend)
+- [ ] Las barras de audio en `ChatInputBar.jsx` reaccionan visiblemente con variaciones dinámicas de altura ante volumen de voz normal (RMS ~0.02).
+- [ ] La acción de cancelar grabación detiene el flujo y descarta los fragmentos de audio sin emitir llamada HTTP a `/api/ai/voice-sale`.
+
+### Aislamiento, Seguridad y No-Regresión
+- [ ] Cero interacción con bases de datos ajenas; únicamente opera sobre `deko_eventsales_db`.
+- [ ] `node scripts/audit-monoliths.js` concluye con 0 archivos excedidos.
+- [ ] `node --test tests/ai/voice-vad-reengineering.test.js` pasa al 100%.
+- [ ] `npm test` pasa al 100%.

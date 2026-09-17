@@ -50,11 +50,13 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - Victory Auditor (Fase 2 Roadmap Quir?rgico): c355957c-7feb-4d66-b52d-fcb1a7fd6e6c (victory_auditor_24, VICTORY CONFIRMED)
 - Orchestrator (Fase 3 Roadmap Quir?rgico): fc099ae9-9a32-4092-80b2-44e5faf0a199 (orchestrator_25, completed)
 - Victory Auditor (Fase 3 Roadmap Quir?rgico): f418e728-6063-4e5f-a2dc-4297f01517cb (victory_auditor_25, VICTORY CONFIRMED)
-- Orchestrator (Fase 4 Roadmap Quir?rgico): aacf7492-6e6d-48aa-bbd2-de16647bec52 (orchestrator_26, active)
-- Victory Auditor (Fase 4 Roadmap Quir?rgico): 8cd63529-a732-4ae3-a39c-b8f6da11bbb1 (victory_auditor_26, active auditing)
+- Orchestrator (Fase 4 Roadmap Quirúrgico): aacf7492-6e6d-48aa-bbd2-de16647bec52 (orchestrator_26, completed)
+- Victory Auditor (Fase 4 Roadmap Quirúrgico): 8cd63529-a732-4ae3-a39c-b8f6da11bbb1 (victory_auditor_26, VICTORY CONFIRMED)
+- Orchestrator (Reingeniería Voz STAND IA): b540abb5-54e2-491e-8f28-9d5b174b4d68 (orchestrator_27, completed)
+- Victory Auditor (Reingeniería Voz STAND IA): 35f34917-d954-4884-a059-5a07bcd4ce4f (victory_auditor_27, VICTORY CONFIRMED)
 
-## ?? Key Constraints
-- No technical decisions ? relay only
+## 🔒 Key Constraints
+- No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
 - Live browser verification with Chrome DevTools MCP & visual evidence screenshots before claiming completion (<RULE[user_global]>)
 - Strict database and infrastructure isolation per aislamiento-estricto-proyectos (100% en deko_eventsales_db)
@@ -70,50 +72,51 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - Zero mocks, zero hallucinations: all defects must be verified directly in code or via empirical scratch/ tests
 - Master report published at c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_12/AUDIT_REPORT_STAND_IA.md
 - Cero tolerancia a respuestas de buildOfflineFallbackReply en pruebas de IA: la IA debe responder en vivo desde Gemini.
-- Cero mutaci?n de mensajes de usuario y cero colisiones de ID en el chat.
+- Cero mutación de mensajes de usuario y cero colisiones de ID en el chat.
 - FASE 2 Line limits: aiStreamService < 150, aiToolsService < 200, useAiChatStream < 160, ChatToolCards < 140 lines
 - Closed-loop function calling with continuous dual streaming (eradicate hasTextTokens)
 - Multi-turn conversational memory (20 turns) with chain-of-thought draft editing
 - Eradicate N+1 queries in seller shift report via aiShiftReportService
 - UI cleanup for inventory stock and zero orphan empty containers
-- FASE 3 Modernizaci?n Gen 3: aiKeyPoolService < 120, geminiPoolService <= 334, aiClosedLoopService < 120, aiStreamService < 150, aiToolsService < 140, useAiChatStream < 160, ChatToolCards < 140, catalogCacheService < 90, useAiChatAudio < 60
+- FASE 3 Modernización Gen 3: aiKeyPoolService < 120, geminiPoolService <= 334, aiClosedLoopService < 120, aiStreamService < 150, aiToolsService < 140, useAiChatStream < 160, ChatToolCards < 140, catalogCacheService < 90, useAiChatAudio < 60
 - Master report published at AUDITORIA_360_STAND_IA.md in repository root
 - Zero code bloat added to audited files; npm run harness:check must pass 100%
-- REGLA SAGRADA ANTI-FILE SPRAWL: Prohibido despiezar o tocar los 7 archivos medianos (~250-300 l?neas: userController.js, authController.js, catalogController.js, geminiPoolService.js, catalogSyncService.js, etc.).
-- Despiece quir?rgico exclusivo en los 3 Monolitos Peligrosos: saleService.js (< 35 l?neas fachada), semanticParserService.js (< 30 l?neas fachada), productionController.js (erradicaci?n demoProductionItems, l?gica en productionService.js).
-- P0 Blindaje de feria: catalogCacheService Map acumulativo hasta 300 obras; deko_auth_user en localStorage para persistencia offline; useAiVoiceRecorder 7s timeout y calibraci?n 400ms; aiMediaService con executeWithModelFallback; requireEventAccess en PATCH /sales/:id y tenantId en userController; protecci?n de /health/ai.
+- REGLA SAGRADA ANTI-FILE SPRAWL: Prohibido despiezar o tocar los 7 archivos medianos (~250-300 líneas: userController.js, authController.js, catalogController.js, geminiPoolService.js, catalogSyncService.js, etc.).
+- Despiece quirúrgico exclusivo en los 3 Monolitos Peligrosos: saleService.js (< 35 líneas fachada), semanticParserService.js (< 30 líneas fachada), productionController.js (erradicación demoProductionItems, lógica en productionService.js).
+- P0 Blindaje de feria: catalogCacheService Map acumulativo hasta 300 obras; deko_auth_user en localStorage para persistencia offline; useAiVoiceRecorder 7s timeout y calibración 400ms; aiMediaService con executeWithModelFallback; requireEventAccess en PATCH /sales/:id y tenantId en userController; protección de /health/ai.
 - Higiene: npm uninstall bcryptjs qrcode; eliminar COPY .git de Dockerfile; migraciones formales en prisma/migrations.
 - Calidad 4/4: test:security, audit:secrets, npm test, npm run build limpios.
-- RAG Vectorial H?brido en RAM: embeddingService.js < 150 l?neas, text-embedding-004 / gemini-embedding-001, similitud coseno sub-15ms, MIN_SIMILARITY_THRESHOLD = 0.45 estricto sin falsos positivos irrelevantes.
-- Purga completa de textos enlatados ("tintas l?tex", "cintas tesa", "volumen alto de consultas").
-- Calibraci?n de personalidad de mostrador: copiloto t?ctico de vendedor, r?pido, en?rgico, combos de feria (2xQ120, 3xQ180).
-- Verificaci?n en vivo obligatoria con Chrome DevTools MCP y capturas de alta resoluci?n.
+- RAG Vectorial Híbrido en RAM: embeddingService.js < 150 líneas, text-embedding-004 / gemini-embedding-001, similitud coseno sub-15ms, MIN_SIMILARITY_THRESHOLD = 0.45 estricto sin falsos positivos irrelevantes.
+- Purga completa de textos enlatados ("tintas látex", "cintas tesa", "volumen alto de consultas").
+- Calibración de personalidad de mostrador: copiloto táctico de vendedor, rápido, enérgico, combos de feria (2xQ120, 3xQ180).
+- Verificación en vivo obligatoria con Chrome DevTools MCP y capturas de alta resolución.
 - Modelo de embeddings gemini-embedding-001 (3072 dims), MIN_SIMILARITY_THRESHOLD = 0.45.
 - Preservar candidates[0].content.parts originales (thoughtSignature) y formatear functionResponse con rol user en @google/genai.
-- Erradicar banner "?? Conexi?n con IA intermitente...".
-- Cero contaminaci?n cruzada en cat?logo (F1 solo automovilismo, el bicho solo CR7, saiyajin solo Goku/Dragon Ball).
-- Asistente nerd, formal, inteligente, respuestas en 1-3 l?neas con Gemini 3.8 Flash, sugerencia de combos de feria (2xQ120, 3xQ180).
-- Repetici?n exhaustiva de pruebas 1, 2 y 3 en vivo en Chrome DevTools MCP con evidencia visual de alta resoluci?n.
-- Reporte t?cnico y hoja de ruta arquitect?nica para Comic Con 2026.
-- Auditor?a forense 360? y diagn?stico exhaustivo de causa ra?z 100% respaldado en c?digo real con archivo y l?neas exactas (Cero Suposiciones).
-- Despliegue y coordinaci?n del Squad Especialista de Subagentes de Fred (4 Sabuesos: B?squeda/RAG, Orquestador Conversacional, Monolitos/Estado, Resiliencia/DB).
+- Erradicar banner "⚠️ Conexión con IA intermitente...".
+- Cero contaminación cruzada en catálogo (F1 solo automovilismo, el bicho solo CR7, saiyajin solo Goku/Dragon Ball).
+- Asistente nerd, formal, inteligente, respuestas en 1-3 líneas con Gemini 3.8 Flash, sugerencia de combos de feria (2xQ120, 3xQ180).
+- Repetición exhaustiva de pruebas 1, 2 y 3 en vivo en Chrome DevTools MCP con evidencia visual de alta resolución.
+- Reporte técnico y hoja de ruta arquitectónica para Comic Con 2026.
+- Auditoría forense 360° y diagnóstico exhaustivo de causa raíz 100% respaldado en código real con archivo y líneas exactas (Cero Suposiciones).
+- Despliegue y coordinación del Squad Especialista de Subagentes de Fred (4 Sabuesos: Búsqueda/RAG, Orquestador Conversacional, Monolitos/Estado, Resiliencia/DB).
 - Entrega del Informe Maestro Final de Fred estrictamente estructurado en las 5 secciones obligatorias de R5.
-- Fase 1 Roadmap Quir?rgico Cero Deuda (P0): R1 PostgreSQL secuencias nativas sin tx.event.update, R2 erradicaci?n mocks aiMediaService y resiliencia UI con bot?n "Cargar Manual", R3 idempotencia real RFC 7231 con idempotencyKey @unique y replay HTTP 200.
-- Fase 2 Roadmap Quir?rgico Cero Deuda (P0): R1 Stop-words universales (50+) y entidades cortas ("f1", "cr7", KNOWN_SHORT_ENTITIES), R2 Calibraci?n vectorial >= 0.72 y compuerta de entidad ra?z con every, R3 AbortController en useCatalogSearch y snapshot as?ncrono con TIMEOUT_MS 1500ms en catalogCacheService, R4 Techos de l?neas estrictos (embeddingService <= 200, useCatalogSearch <= 200, catalogCacheService <= 200, entityAliases <= 600).
-- Fase 3 Roadmap Quir?rgico Cero Deuda (P1): R1 Bucle cerrado SSE Turno 2 en aiStreamService (eliminar if (hasDraft) return), directivas de prompt concisas (1-2 l?neas vendedoras sin recitar cat?logo duplicado) en aiPromptService, purga par?metro muerto en aiToolsService; R2 Modularizaci?n con DraftItemRow.jsx, ChatDraftCard < 140 l?neas, useAiChatStream con pendingDraftRef erradicando stale closures (< 160 l?neas); R3 ?reas t?ctiles mostrador ferial WCAG 2.1 AAA (>= 44px controles +/-, botones pago y ChatToolCards, >= 48px confirmar venta); R4 Techos de l?neas estrictos (ChatDraftCard < 140, useAiChatStream < 160, ChatToolCards < 140, ChatSwapModal < 100, aiStreamService <= 200, aiClosedLoopService <= 200).
-- Fase 4 Roadmap Quir?rgico Cero Deuda: R1 Unificaci?n servicios sincronizaci?n cat?logo (catalogSizeResolver.js < 80, liveCatalogSyncService.js < 200, catalogSyncService.js fachada < 25); R2 Despiece webCatalogService.js (catalogCacheStore.js < 110, catalogStringNormalizer.js < 130, webCatalogService.js < 180); R3 Despiece controladores (eventController.js < 190, catalogController.js < 90, apiRoutes.js delegaci?n /api/events/*, aiChatController.js < 170, aiMediaController.js < 180, aiController.js fachada < 30); R4 Modularizaci?n ventas/usuarios (saleController.js < 160 delegando arqueos, monitorKpiService.js < 130, saleKpiService.js < 190, saleUpdateService.js < 170, saleTransactionService.js < 170, userEventAssignmentService.js < 80, userController.js < 170); R5 Modularizaci?n frontend (RecentSaleRow.jsx < 90, RecentSalesList.jsx < 130 con useRef y clearTimeout en cleanup).
-- Archivos Protegidos Autorizados (?? INTOCABLES): Prohibido tocar los 8 archivos protegidos en verde (entityAliases.js, geminiPoolService.js, server/index.js, apiRoutes.js, authController.js, paymentExtractor.js, aiToolsService.js, src/App.jsx).
+- Fase 1 Roadmap Quirúrgico Cero Deuda (P0): R1 PostgreSQL secuencias nativas sin tx.event.update, R2 erradicación mocks aiMediaService y resiliencia UI con botón "Cargar Manual", R3 idempotencia real RFC 7231 con idempotencyKey @unique y replay HTTP 200.
+- Fase 2 Roadmap Quirúrgico Cero Deuda (P0): R1 Stop-words universales (50+) y entidades cortas ("f1", "cr7", KNOWN_SHORT_ENTITIES), R2 Calibración vectorial >= 0.72 y compuerta de entidad raíz con every, R3 AbortController en useCatalogSearch y snapshot asíncrono con TIMEOUT_MS 1500ms en catalogCacheService, R4 Techos de líneas estrictos (embeddingService <= 200, useCatalogSearch <= 200, catalogCacheService <= 200, entityAliases <= 600).
+- Fase 3 Roadmap Quirúrgico Cero Deuda (P1): R1 Bucle cerrado SSE Turno 2 en aiStreamService (eliminar if (hasDraft) return), directivas de prompt concisas (1-2 líneas vendedoras sin recitar catálogo duplicado) en aiPromptService, purga parámetro muerto en aiToolsService; R2 Modularización con DraftItemRow.jsx, ChatDraftCard < 140 líneas, useAiChatStream con pendingDraftRef erradicando stale closures (< 160 líneas); R3 Áreas táctiles mostrador ferial WCAG 2.1 AAA (>= 44px controles +/-, botones pago y ChatToolCards, >= 48px confirmar venta); R4 Techos de líneas estrictos (ChatDraftCard < 140, useAiChatStream < 160, ChatToolCards < 140, ChatSwapModal < 100, aiStreamService <= 200, aiClosedLoopService <= 200).
+- Fase 4 Roadmap Quirúrgico Cero Deuda: R1 Unificación servicios sincronización catálogo (catalogSizeResolver.js < 80, liveCatalogSyncService.js < 200, catalogSyncService.js fachada < 25); R2 Despiece webCatalogService.js (catalogCacheStore.js < 110, catalogStringNormalizer.js < 130, webCatalogService.js < 180); R3 Despiece controladores (eventController.js < 190, catalogController.js < 90, apiRoutes.js delegación /api/events/*, aiChatController.js < 170, aiMediaController.js < 180, aiController.js fachada < 30); R4 Modularización ventas/usuarios (saleController.js < 160 delegando arqueos, monitorKpiService.js < 130, saleKpiService.js < 190, saleUpdateService.js < 170, saleTransactionService.js < 170, userEventAssignmentService.js < 80, userController.js < 170); R5 Modularización frontend (RecentSaleRow.jsx < 90, RecentSalesList.jsx < 130 con useRef y clearTimeout en cleanup).
+- Archivos Protegidos Autorizados (🟢 INTOCABLES): Prohibido tocar los 8 archivos protegidos en verde (entityAliases.js, geminiPoolService.js, server/index.js, apiRoutes.js, authController.js, paymentExtractor.js, aiToolsService.js, src/App.jsx).
+- Reingeniería Voz STAND IA: Desacople STT vs NLU, voiceSaleResponseSchema con isSaleDetected e intent, RAG híbrido y entityAliases en aiMediaService, fix de tokens únicos en webCatalogService, calibración RMS Web Audio API (0.015-0.035), feedback dinámico en ChatInputBar y cancelación inmediata, respuestas conversacionales ante saludo sin borrador vacío, respeto estricto a scripts/audit-monoliths.js y tests/ai/voice-vad-reengineering.test.js.
 
 ## User Context
-- **Last user request**: Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_Ventas (R1 Unificaci?n sync cat?logo, R2 Despiece webCatalogService, R3 Despiece controladores cat?logo/eventos e IA, R4 Modularizaci?n ventas/arqueos/KPIs/usuarios, R5 Modularizaci?n RecentSalesList frontend y cleanup timers).
+- **Last user request**: Auditoría forense e implementación de la reingeniería 360° del ecosistema de voz de STAND {IA}: desacople STT/NLU, RAG Híbrido y Entity Aliases, calibración Web Audio API y botón cancelar, respuestas conversacionales de mostrador.
 - **Pending clarifications**: none
-- **Delivered results**: Fase 4 completada y certificada con veredicto VICTORY CONFIRMED por victory_auditor_26. 22/22 m?dulos cumplidos, 0 archivos en deuda monol?tica real (scripts/audit-monoliths.js), 8 archivos protegidos intactos, 12/12 suites de tests en verde (100% pass), y pruebas en vivo con Chrome DevTools MCP demostrando funcionamiento sin errores en cat?logo, eventos y ventas recientes.
+- **Delivered results**: Reingeniería 360° del ecosistema de voz STAND {IA} completada exitosamente y certificada con veredicto VICTORY CONFIRMED por victory_auditor_27. 10/10 criterios de aceptación cumplidos, desacople STT/NLU verificado, RAG híbrido y alias culturales integrados, token único protegido, Web Audio API calibrada (RMS 0.035), visualizador dinámico y cancelación en UI, respuestas conversacionales ante saludos sin borradores vacíos, 0 archivos excedidos en auditoría de monolitos, 100% de suites de tests aprobadas y 4 capturas de pantalla de evidencia visual en vivo.
 
 ## Project Status
 - **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_26 (aacf7492-6e6d-48aa-bbd2-de16647bec52)
-- **Active Auditor**: victory_auditor_26 (8cd63529-a732-4ae3-a39c-b8f6da11bbb1)
+- **Active Orchestrator**: orchestrator_27 (b540abb5-54e2-491e-8f28-9d5b174b4d68)
+- **Active Auditor**: victory_auditor_27 (35f34917-d954-4884-a059-5a07bcd4ce4f)
 - **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
@@ -122,12 +125,14 @@ Implementaci?n at?mica de la Fase 4 del Roadmap Quir?rgico Cero Deuda en Modulo_
 - **Retry count**: 0
 
 ## Artifact Index
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md ? Authoritative verbatim user request
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md ? Sentinel persistent memory
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md ? Sentinel master handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js ? Domain Ceilings Specification
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_26/plan.md ? Orchestrator Fase 4 Plan
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_26/progress.md ? Orchestrator Fase 4 Progress
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_26/handoff.md ? Orchestrator Fase 4 Handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_26/handoff.md ? Independent Victory Audit Report (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/adversarial/phase4-challenger-empirical.test.js ? Phase 4 Empirical Challenger Suite (34/34 pass)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Domain Ceilings Specification
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/plan.md — Orchestrator Reingeniería Voz Plan
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/progress.md — Orchestrator Reingeniería Voz Progress
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_27/handoff.md — Orchestrator Reingeniería Voz Handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_27/handoff.md — Independent Victory Audit Report (VICTORY CONFIRMED)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/worker_m4_live/report.md — Live Chrome DevTools QA Report
+
+
