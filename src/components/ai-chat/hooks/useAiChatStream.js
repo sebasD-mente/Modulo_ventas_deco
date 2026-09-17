@@ -39,7 +39,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     if (swappingIndex === null || !pendingDraftRef.current) return;
     const cur = pendingDraftRef.current, items = [...cur.items], old = items[swappingIndex], sizes = newPoster.sizes?.length ? newPoster.sizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === old.sizeId) || sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = newPoster.subtitulo ? `${newPoster.titulo} - ${newPoster.subtitulo}` : newPoster.titulo, qty = old.quantity || 1, uPrice = Number(target.precio);
     items[swappingIndex] = { productId: newPoster.id, webPosterId: newPoster.id, description: `${title} (${target.nombre})`, baseTitle: title, category: newPoster.categoria, thumbUrl: newPoster.thumbUrl || newPoster.imageUrl, imageUrl: newPoster.imageUrl, quantity: qty, unitPrice: uPrice, subtotal: Number((qty * uPrice).toFixed(2)), sizeId: target.sizeId, availableSizes: sizes };
-    const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; setPendingDraft(next); closeSwapModal();
+    const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; setPendingDraft(next); closeSwapModal(); pushAiMsg(`🔄 Diseño actualizado en borrador: "${title}" (${target.nombre} - Q${uPrice.toFixed(2)}).`);
   };
 
   const uploadMedia = async (url, form, userText, note, onDone) => {
@@ -137,7 +137,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
             try {
               const data = JSON.parse(dataLines.join('\n'));
               if (ev === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
-              else if (ev === 'draft_sale') { const d = data.draftSale || data; if (d) { pendingDraftRef.current = d; setPendingDraft(d); } }
+              else if (ev === 'draft_sale') { const d = data.draftSale || data; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); } }
               else if (ev === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraftRef.current ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
               else if (ev === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
               else if (data && TOOL_EVENT_MAP[ev]) updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[ev]]: ev === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[ev] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
@@ -147,7 +147,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
         cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (pendingDraftRef.current ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') }));
       } else {
         const json = await res.json(); if (!res.ok || !json.success) throw new Error(json.error || 'Error al comunicarse con la IA');
-        const d = json.draftSale || json.draft; if (d) { pendingDraftRef.current = d; setPendingDraft(d); }
+        const d = json.draftSale || json.draft; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); }
         updateAiMsg((m) => ({ ...m, isStreaming: false, text: json.reply, suggestedPosters: json.suggestedPosters || [], eventKpis: json.eventKpis || null, cashDrawerStatus: json.cashDrawerStatus || null, sellerShiftReport: json.sellerShiftReport || null, productionQueueStatus: json.productionQueueStatus || null, inventoryStock: json.inventoryStock || null }));
       }
     } catch (err) { updateAiMsg((m) => ({ ...m, isStreaming: false, text: `⚠️ No pude responder: ${err.message}` })); } finally { setIsLoading(false); setProcessingNote(''); }
