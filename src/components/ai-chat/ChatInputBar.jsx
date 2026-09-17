@@ -21,7 +21,7 @@ export default function ChatInputBar({
           <div className="flex items-center gap-2.5">
             <span className={`w-3 h-3 rounded-full ${vadActive ? 'bg-amber-400 animate-pulse' : 'bg-red-500 animate-ping'}`} />
             <span className={`text-xs font-bold ${vadActive ? 'text-amber-400' : 'text-red-400'}`}>
-              {vadActive ? 'Detectando silencio... (1.5s)' : `Dictando: ${formatTime(recordingSeconds)}`}
+              {vadActive ? 'Pausa detectada... finalizando' : `Grabando: ${formatTime(recordingSeconds)} • Pulsa Finalizar al terminar`}
             </span>
             <div className="flex items-end gap-0.5 h-3.5 px-1 bg-neutral-900/80 rounded-md" title={`Nivel: ${audioLevel}%`}>
               {[0.3, 0.6, 1.0, 0.5].map((scale, i) => (

@@ -69,9 +69,9 @@ describe('🔒 Milestone 2: Hardening P0 & Multitenancy Independent Verification
     const content = fs.readFileSync(hookPath, 'utf8');
     const lines = content.split('\n').length;
 
-    it('3.1 Implementa hard timeout de 7 segundos', () => {
+    it('3.1 Implementa hard timeout de voz (15 segundos)', () => {
       assert.match(content, /hardTimeoutRef/, 'Debe tener ref para hard timeout');
-      assert.match(content, /setTimeout\(\(\)\s*=>\s*stopRecording\(\),\s*7000\)/, 'Debe configurar timeout de 7000ms');
+      assert.match(content, /setTimeout\(\(\)\s*=>\s*stopRecording\(\),\s*(7000|15000)\)/, 'Debe configurar timeout de 15000ms o 7000ms');
     });
 
     it('3.2 Calibra piso de ruido dinámicamente en los primeros 400ms', () => {

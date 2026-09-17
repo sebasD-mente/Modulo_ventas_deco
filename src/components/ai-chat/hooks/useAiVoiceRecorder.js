@@ -16,6 +16,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
 
   const mediaRecorderRef = useRef(null), streamRef = useRef(null), audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null), audioContextRef = useRef(null), vadTimerRef = useRef(null), hardTimeoutRef = useRef(null);
+  const hasSpokenRef = useRef(false), recordingStartTimeRef = useRef(0);
   const onRecordingCompleteRef = useRef(onRecordingComplete);
   onRecordingCompleteRef.current = onRecordingComplete;
 
@@ -44,23 +45,29 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
       const mediaRecorder = createOpusMediaRecorder(stream, selectedMime);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      hasSpokenRef.current = false;
+      recordingStartTimeRef.current = Date.now();
 
       mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
         const actualMime = mediaRecorder.mimeType || selectedMime || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        const duration = Date.now() - recordingStartTimeRef.current;
         if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
           audioContextRef.current.close().catch(() => {});
           audioContextRef.current = null;
         }
-        if (onRecordingCompleteRef.current && audioBlob.size > 0) await onRecordingCompleteRef.current(audioBlob);
+        if (onRecordingCompleteRef.current) {
+          const isEmpty = (!hasSpokenRef.current && duration < 1200) || audioBlob.size === 0;
+          await onRecordingCompleteRef.current(isEmpty ? null : audioBlob, { empty: isEmpty });
+        }
       };
 
       mediaRecorder.start(250);
       setIsRecording(true); setVadActive(false); setRecordingSeconds(0); setAudioLevel(0);
       recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
-      hardTimeoutRef.current = setTimeout(() => stopRecording(), 7000);
+      hardTimeoutRef.current = setTimeout(() => stopRecording(), 15000);
 
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -83,12 +90,13 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
               noiseSamples.push(rms);
               noiseFloor = Math.max(0.006, (noiseSamples.reduce((a, b) => a + b, 0) / noiseSamples.length) * 1.35);
             }
-            if (rms > noiseFloor) {
-              lastSoundAt = Date.now(); setVadActive(false);
-            } else if (Date.now() - lastSoundAt > 1500) {
-              stopRecording();
-            } else if (Date.now() - lastSoundAt > 500) {
-              setVadActive(true);
+            const voiceThreshold = Math.max(0.012, noiseFloor * 1.6);
+            if (rms > voiceThreshold) {
+              hasSpokenRef.current = true; lastSoundAt = Date.now(); setVadActive(false);
+            } else if (hasSpokenRef.current) {
+              const silence = Date.now() - lastSoundAt;
+              if (silence > 2500) stopRecording();
+              else if (silence > 1500) setVadActive(true);
             }
           }, 100);
         }

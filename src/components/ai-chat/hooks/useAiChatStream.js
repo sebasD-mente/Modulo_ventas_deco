@@ -49,17 +49,29 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     try {
       const res = await authFetch(url, { method: 'POST', body: form }), data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando');
-      pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); onDone(data);
+      if (data.draftSale && !url.includes('voice')) { pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); }
+      onDone(data);
     } catch (err) {
       const isQuota = /429|cuota|quota|resource_exhausted/i.test(err?.message), isNet = /fetch|network|conexi[oó]n|offline|failed/i.test(err?.message), friendlyMsg = isQuota ? 'Límite de cuota de IA alcanzado. Continúa en modo manual.' : isNet ? 'Problema de conexión con el servicio de IA.' : err?.message?.replace(/^.*AI_MEDIA_SERVICE_FAILED:\s*/, '').trim() || 'No fue posible procesar el archivo.';
       setAiError({ title: url.includes('voice') ? 'Fallo en dictado de voz' : 'Fallo en foto/visión', message: friendlyMsg, channel: url.includes('voice') ? 'IA_VOZ' : 'IA_FOTO_ARTE' }); pushAiMsg(`⚠️ ${friendlyMsg}`);
     } finally { setIsLoading(false); setProcessingNote(''); }
   };
 
-  const handleVoiceUpload = (audioBlob) => {
-    const ext = audioBlob.type.includes('mp4') ? 'mp4' : audioBlob.type.includes('aac') ? 'aac' : 'webm', form = new FormData();
+  const handleVoiceUpload = (audioBlob, meta = {}) => {
+    if (!audioBlob || meta?.empty) {
+      pushAiMsg('🎙️ No alcancé a escucharte. Pulsa el micrófono, dicta tu venta y presiona "Finalizar" cuando termines.');
+      return;
+    }
+    const ext = audioBlob.type?.includes('mp4') ? 'mp4' : audioBlob.type?.includes('aac') ? 'aac' : 'webm', form = new FormData();
     form.append('audio', audioBlob, `voice-sale.${ext}`); form.append('eventId', eventId);
-    uploadMedia('/api/ai/voice-sale', form, '🎙️ [Venta dictada por voz]', 'Gemini analizando dictado de voz...', (d) => pushAiMsg(`Entendí tu dictado: "${d.draftSale?.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`));
+    uploadMedia('/api/ai/voice-sale', form, '🎙️ [Venta dictada por voz]', 'Gemini analizando dictado de voz...', (data) => {
+      if (!data.draftSale?.items || data.draftSale.items.length === 0) {
+        pushAiMsg('🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").');
+      } else {
+        pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale);
+        pushAiMsg(`Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`);
+      }
+    });
   }, handleImageUpload = (e) => {
     const file = e?.target?.files?.[0]; if (!file) return;
     const form = new FormData(); form.append('image', file, file.name); form.append('eventId', eventId);

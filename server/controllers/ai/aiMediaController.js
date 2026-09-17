@@ -1,8 +1,6 @@
 import {
-  processVoiceSaleAudio,
-  processPostersBatchPhoto,
-  recognizePosterArtworkFromImage,
-  recognizePostersFromVideo,
+  processVoiceSaleAudio, processPostersBatchPhoto,
+  recognizePosterArtworkFromImage, recognizePostersFromVideo,
 } from '../../services/aiMultimodalService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
@@ -11,10 +9,8 @@ import { ENV } from '../../config/env.js';
 async function safePersistMedia(file, defaultName, defaultMime, folder) {
   try {
     const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer,
-      originalname: file.originalname || defaultName,
-      mimetype: file.mimetype || defaultMime,
-      folder,
+      buffer: file.buffer, originalname: file.originalname || defaultName,
+      mimetype: file.mimetype || defaultMime, folder,
     });
     return uploadRes?.url || null;
   } catch (gcsErr) {
@@ -32,22 +28,24 @@ export async function handleVoiceSale(req, res) {
     const audioUrl = await safePersistMedia(file, 'voice-sale.webm', 'audio/webm', 'audio_sales');
     const t0Voice = Date.now();
     const draft = await processVoiceSaleAudio({
-      audioBuffer: file.buffer,
-      mimeType: file.mimetype || 'audio/webm',
-      tenantId,
-      eventId,
+      audioBuffer: file.buffer, mimeType: file.mimetype || 'audio/webm', tenantId, eventId,
     });
     recordLlmInteraction({
-      tenantId,
-      userId: req.userId || null,
-      action: 'AI_VOICE_SALE',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
-      tokensIn: null,
-      tokensOut: null,
-      latencyMs: Date.now() - t0Voice,
-      ipAddress: req.ip,
+      tenantId, userId: req.userId || null, action: 'AI_VOICE_SALE',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      latencyMs: Date.now() - t0Voice, ipAddress: req.ip,
       details: { eventId, confidence: draft.confidence },
     });
+
+    if (!draft.items || draft.items.length === 0) {
+      return res.json({
+        success: true,
+        draftSale: null,
+        itemsDetected: false,
+        transcription: draft.transcription || '',
+        message: 'No se identificaron pósters ni obras en el dictado de voz.',
+      });
+    }
 
     return res.json({
       success: true,
