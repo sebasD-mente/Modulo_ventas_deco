@@ -5,7 +5,7 @@
  */
 
 export const DEVTOOLS_AUTH_SNIPPET = `(() => {
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6InNlYmFzamltZW5lejAzMzAiLCJyb2xlIjoiU1VQRVJfQURNSU4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiIsIlZFTkRFRE9SIl0sInRlbmFudElkIjoiNThiODI5YTQtMTAwNi00MWMyLThlOTAtYjA2MTAyMzBjMjVmIiwiYXNzaWduZWRFdmVudElkIjpudWxsLCJhdmF0YXJVcmwiOiJodHRwczovL2xoMy5nb29nbGV1c2VyY29udGVudC5jb20vYS9kZWZhdWx0LXVzZXI9czk2LWMiLCJpYXQiOjE3ODkwNTAxMDQsImV4cCI6MTc4OTY1NDkwNH0.ON7uRWXp-iFXJCEqKcfG8vUSHWeU9hTwxYVh_VuYDqU";
+  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6IlNlYmFzdGlhbiBKaW1lbmV6Iiwicm9sZSI6IlNVUEVSX0FETUlOIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iLCJWRU5ERURPUiJdLCJ0ZW5hbnRJZCI6IjU4YjgyOWE0LTEwMDYtNDFjMi04ZTkwLWIwNjEwMjMwYzI1ZiIsInN0YXR1cyI6IkFDVElWTyIsImF2YXRhclVybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k3VndtYzUwNUozOEN6VXpaZk1XOGRMaVZNVy1HS25WRUtsRjBaeGV6Zk5BQ29aZlNieUE9czk2LWMiLCJpYXQiOjE3ODk2NzI1NDQsImV4cCI6MTc5MjI2NDU0NH0._WAeNjuFaaZL2w_8PfMZp8oNjzNK76tKm1T_HT14C0I";
   
   const user = {
     id: "30bb4712-f551-418e-bb03-5eeb60015f68",
@@ -18,6 +18,15 @@ export const DEVTOOLS_AUTH_SNIPPET = `(() => {
   };
   localStorage.setItem('token', token);
   localStorage.setItem('user', JSON.stringify(user));
+  localStorage.setItem('deko_auth_token', token);
+  localStorage.setItem('deko_auth_user', JSON.stringify(user));
+  localStorage.setItem('deko_active_event', JSON.stringify({
+    id: 'event-stand-active-2026',
+    name: 'Stand Principal Expo 2026',
+    location: 'Deco Vintage Guate',
+    status: 'ACTIVO',
+    tenantId: '58b829a4-1006-41c2-8e90-b0610230c25f'
+  }));
   location.reload();
   return { status: "AUTH_INJECTED", user: user.email, role: user.role };
 })()`;

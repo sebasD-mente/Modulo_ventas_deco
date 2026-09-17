@@ -8,11 +8,17 @@ import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService
 import { getGeminiClient } from '../../config/gemini.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
-
 async function resolveEventContextData({ tenantId, eventId, date = null, contextData = {} }) {
-  let event = null, kpis = null;
+  let event = null, kpis = null, timerId = null;
   if (eventId) {
-    try { [event, kpis] = await Promise.all([prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, location: true, salesTarget: true } }), getEventKPIs({ tenantId, eventId, date })]); } catch (e) { /* DB fallback */ }
+    try {
+      const dbOp = Promise.all([
+        prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, location: true, salesTarget: true } }),
+        getEventKPIs({ tenantId, eventId, date }),
+      ]);
+      const timer = new Promise((_, reject) => { timerId = setTimeout(() => reject(new Error('DB_TIMEOUT')), 1500); });
+      [event, kpis] = await Promise.race([dbOp, timer]);
+    } catch (e) { /* DB fallback */ } finally { if (timerId) clearTimeout(timerId); }
   }
   return {
     event, kpis,
@@ -79,7 +85,6 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   const clientArg = o.geminiClient !== undefined ? o.geminiClient : geminiClientParam;
   const explicitClient = (clientArg !== undefined && clientArg !== null) ? clientArg : null;
   const isAvailable = clientArg === null ? false : Boolean(explicitClient || getGeminiClient());
-
   const { event, resolved } = await resolveEventContextData({ tenantId, eventId, date, contextData });
   const systemInstruction = buildSalesSystemPrompt({ event, resolvedContextData: resolved, pendingDraft, message });
   if (!isAvailable) {
@@ -93,7 +98,6 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   const executedTools = [];
   const rawModelParts = [];
   let trailingTextTokens = 0, hasEmittedTokens = false;
-
   for await (const chunk of stream) {
     const candidateParts = chunk.candidates?.[0]?.content?.parts || [];
     for (const p of candidateParts) {
