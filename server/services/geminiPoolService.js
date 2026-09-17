@@ -113,6 +113,16 @@ export async function sleepWithJitter(attempt, baseDelayMs = 300, maxDelayMs = 1
   return jitteredDelay;
 }
 
+export function resolveEffectiveModels(models) {
+  if (!models || !Array.isArray(models) || models.length === 0) {
+    return ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...MODEL_PRIORITY_POOL];
+  }
+  if (models.some((m) => typeof m === 'string' && m.includes('2.5'))) {
+    return Array.from(new Set(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...models]));
+  }
+  return models;
+}
+
 export async function executeWithModelFallback({
   taskFn,
   models = MODEL_PRIORITY_POOL,
@@ -121,12 +131,13 @@ export async function executeWithModelFallback({
   context = {},
   client = null,
 }) {
+  const effectiveModels = resolveEffectiveModels(models);
   let lastError = null;
   const passedClient = client;
 
-  for (let modelIdx = 0; modelIdx < models.length; modelIdx++) {
-    const currentModel = models[modelIdx];
-    const isLastModel = modelIdx === models.length - 1;
+  for (let modelIdx = 0; modelIdx < effectiveModels.length; modelIdx++) {
+    const currentModel = effectiveModels[modelIdx];
+    const isLastModel = modelIdx === effectiveModels.length - 1;
 
     const availableKeys = passedClient ? [null] : getAvailableKeys();
     const maxKeyAttempts = passedClient ? 1 : Math.max(1, availableKeys.length);
@@ -156,14 +167,14 @@ export async function executeWithModelFallback({
           const result = await taskFn({ model: currentModel, client: activeClient });
 
           if (modelIdx > 0) {
-            console.warn(`[Gemini Pool] 🔄 Éxito con modelo de contingencia "${currentModel}" (Fallback desde "${models[0]}")`);
+            console.warn(`[Gemini Pool] 🔄 Éxito con modelo de contingencia "${currentModel}" (Fallback desde "${effectiveModels[0]}")`);
           }
 
           return {
             result,
             usedModel: currentModel,
             fallbackOccurred: modelIdx > 0,
-            initialModel: models[0],
+            initialModel: effectiveModels[0],
           };
         } catch (err) {
           lastError = err;
@@ -222,8 +233,9 @@ export async function* streamWithModelFallback({
   onModelSelected = () => {},
   client = undefined,
 }) {
+  const effectiveModels = resolveEffectiveModels(models);
   let stream = null;
-  let activeModel = models[0];
+  let activeModel = effectiveModels[0];
   let lastError = null;
 
   if (client === null) {
@@ -231,8 +243,8 @@ export async function* streamWithModelFallback({
     return;
   }
 
-  for (let i = 0; i < models.length; i++) {
-    activeModel = models[i];
+  for (let i = 0; i < effectiveModels.length; i++) {
+    activeModel = effectiveModels[i];
     const availableKeys = client ? [null] : getAvailableKeys();
     const maxKeys = client ? 1 : Math.max(1, availableKeys.length);
 
@@ -287,8 +299,8 @@ export async function* streamWithModelFallback({
     }
 
     if (stream) break;
-    if (i < models.length - 1) {
-      console.warn(`[Gemini Stream Pool] ⚡ Conmutando stream a "${models[i + 1]}"...`);
+    if (i < effectiveModels.length - 1) {
+      console.warn(`[Gemini Stream Pool] ⚡ Conmutando stream a "${effectiveModels[i + 1]}"...`);
     }
   }
 

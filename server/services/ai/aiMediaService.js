@@ -1,8 +1,13 @@
+import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { searchWebPosters } from '../webCatalogService.js';
-import { executeWithModelFallback } from '../geminiPoolService.js';
+import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { voiceSaleResponseSchema, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
 
+const getActivePool = () => {
+  const configured = ENV.GEMINI_MODEL && !ENV.GEMINI_MODEL.includes('2.5') ? ENV.GEMINI_MODEL : 'gemini-3.8-flash';
+  return Array.from(new Set([configured, 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...MODEL_PRIORITY_POOL]));
+};
 const STANDARD_SIZES = {
   MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
   PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
@@ -82,6 +87,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
   const prompt = 'Extrae la venta dictada por voz en stand: obras, tamaños (MINI, PEQUENO, MEDIANO, GRANDE, GIGANTE, PORTADA_ALBUM), cantidades y método de pago (EFECTIVO, TARJETA, TRANSFERENCIA).';
   try {
     const { result: response } = await executeWithModelFallback({
+      models: getActivePool(),
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: voiceSaleResponseSchema },
@@ -108,6 +114,7 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
   const prompt = 'Reconoce el arte del póster fotografiado: personajes, título oficial más probable, franquicia y tamaño sugerido.';
   try {
     const { result: response } = await executeWithModelFallback({
+      models: getActivePool(),
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: artworkRecognitionResponseSchema },
@@ -132,6 +139,7 @@ export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video
   const prompt = 'Analiza el video del mostrador de ventas: identifica cada póster visible y cuenta unidades.';
   try {
     const { result: response } = await executeWithModelFallback({
+      models: getActivePool(),
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: videoRecognitionResponseSchema },
@@ -165,6 +173,7 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
   const prompt = `Identifica códigos QR o de barras en la foto del lote de pósters.\nCatálogo:\n${catalogMap}`;
   try {
     const { result: response } = await executeWithModelFallback({
+      models: getActivePool(),
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { data: imageBuffer.toString('base64'), mimeType } }] }],
         config: { responseMimeType: 'application/json', responseSchema: batchPhotoResponseSchema },
