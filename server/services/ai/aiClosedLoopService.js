@@ -10,8 +10,14 @@ export function buildFallbackSummaries(executedTools) {
   const summaries = [];
   for (const t of executedTools) {
     if (t.name === 'prepareSaleDraft' && t.result) {
-      const d = t.result, items = (d.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
-      summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
+      const d = t.result;
+      if (d.items?.length > 0) {
+        const items = d.items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
+        const warn = d.unmatchedItems?.length > 0 ? `\n⚠️ *No encontradas en catálogo: ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')}*` : '';
+        summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}${warn}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
+      } else if (d.unmatchedItems?.length > 0) {
+        summaries.push(`No encontré la obra ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')} en el catálogo de Deco Vintage.`);
+      }
     } else if (t.name === 'searchCatalog') {
       const count = t.result?.matchesCount || (Array.isArray(t.result) ? t.result.length : 0);
       summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla (Mediano Q65 más vendido). ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');

@@ -24,6 +24,7 @@ async function resolveActiveEvent(tenantId, eventId) {
 export async function constructDraftPayload(tenantId, args, userMessage = '') {
   const rawItems = Array.isArray(args?.items) ? args.items.filter((it) => it && typeof it === 'object') : [];
   const enrichedItems = [];
+  const unmatchedItems = [];
   let grandTotal = 0;
   const textToScan = [userMessage, args?.notes].filter(Boolean).join(' ');
   const finalPayment = extractPaymentMethod(textToScan) || args?.paymentMethod || 'EFECTIVO';
@@ -71,11 +72,11 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
 
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
     const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
-    const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : (matched ? Number(matched.unitPrice || 65.0) : (Number(it.unitPrice) || sizePrice(normSize)));
-    const subtotal = Number((qty * unitPrice).toFixed(2));
-    grandTotal += subtotal;
 
     if (matched) {
+      const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
+      const subtotal = Number((qty * unitPrice).toFixed(2));
+      grandTotal += subtotal;
       enrichedItems.push({
         productId: isUuid(matched?.productId) ? matched.productId : null,
         webPosterId: matched.posterId || null,
@@ -93,18 +94,27 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
         unavailableReason: matched.unavailableReason || null,
       });
     } else {
-      enrichedItems.push({
-        productId: null,
-        description: `${aliasRes.matched ? aliasRes.canonicalTitle : rawName} (${normSize})`,
-        baseTitle: aliasRes.matched ? aliasRes.canonicalTitle : rawName,
+      let candidates = [];
+      try {
+        const queryTerm = rawName.split(/\s+/)[0] || rawName;
+        candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3 });
+      } catch (err) {
+        console.warn('[constructDraftPayload] Error buscando candidatos para obra no encontrada:', err.message);
+      }
+      unmatchedItems.push({
+        rawName,
+        requestedSize: normSize,
         quantity: qty,
-        unitPrice,
-        subtotal,
-        sizeId: normSize,
+        candidates: (candidates || []).map((c) => ({
+          id: c.id,
+          titulo: c.titulo,
+          subtitulo: c.subtitulo,
+          categoria: c.categoria,
+        })),
       });
     }
   }
-  return { items: enrichedItems, total: Number(grandTotal.toFixed(2)), discount: Number(args?.discount || 0), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };
+  return { items: enrichedItems, unmatchedItems, total: Number(grandTotal.toFixed(2)), discount: Number(args?.discount || 0), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };
 }
 
 export async function executeGetCashDrawerStatus(tenantId, eventId) {

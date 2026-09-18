@@ -58,7 +58,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
           onRemoveItem={chatStream.removeDraftItem} onUpdatePaymentMethod={chatStream.updateDraftPaymentMethod}
           onDiscard={chatStream.discardDraft} onConfirmSale={chatStream.confirmPendingSale}
           onPopulateManualForm={onPopulateManualForm}
-          onOpenSwapModal={(idx) => { chatStream.setSwappingIndex(idx); chatStream.fetchInitialSwapPosters(); }}
+          onOpenSwapModal={(idx, initialQuery) => { chatStream.setSwappingIndex(idx); if (initialQuery) { chatStream.handleSwapSearchChange(initialQuery); } else { chatStream.fetchInitialSwapPosters(); } }}
           isLoading={chatStream.isLoading}
         />
       )}

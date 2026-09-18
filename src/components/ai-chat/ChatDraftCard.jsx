@@ -46,6 +46,32 @@ export default function ChatDraftCard({
         </div>
       </div>
 
+      {pendingDraft.unmatchedItems?.length > 0 && (
+        <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2">
+          <div className="flex items-start gap-1.5">
+            <span className="text-amber-400 font-bold shrink-0">⚠️ No encontradas en catálogo:</span>
+            <div className="min-w-0 flex-1">
+              <span className="font-semibold text-white">
+                {pendingDraft.unmatchedItems.map((u) => u.rawName || u.baseTitle || u.title).filter(Boolean).join(', ')}
+              </span>
+              <span className="text-[11px] text-amber-400/80 ml-1.5">(No sumadas al total)</span>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const query = pendingDraft.unmatchedItems[0]?.rawName || '';
+                if (openSwap) openSwap(-1, query);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              🔍 Buscar diseño en catálogo
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2 max-h-52 overflow-y-auto no-scrollbar">
         {(pendingDraft.items || []).map((it, idx) => (
           <DraftItemRow

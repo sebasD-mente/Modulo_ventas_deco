@@ -33,10 +33,16 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, items: [...cur.items, item], total: recalculateTotal([...cur.items, item]) } : { items: [item], total: uPrice, paymentMethod: 'EFECTIVO', inputChannel: 'IA_CHAT_TEXTO', notes: 'Venta iniciada desde catálogo sugerido' }; pendingDraftRef.current = next; return next; });
   };
 
-  const fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=30', { signal: sig })).json())?.data || [], '', 30); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx) => { setSwappingIndex(idx); setSwapQuery(''); setSwapResults([]); fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
+  const fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=30', { signal: sig })).json())?.data || [], '', 30); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx, query = '') => { setSwappingIndex(idx); setSwapQuery(query); setSwapResults([]); if (query) handleSwapSearchChange(query); else fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
   const handleSwapSearchChange = (text) => { setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=30`, { signal: sig })).json())?.data || [], text, 30); setSwapResults(data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150); };
   const selectSwapPoster = (newPoster) => {
-    if (swappingIndex === null || !pendingDraftRef.current) return;
+    if (swappingIndex === null) return;
+    if (swappingIndex === -1 || swappingIndex === 'new' || !pendingDraftRef.current) {
+      addPosterToDraft(newPoster);
+      closeSwapModal();
+      pushAiMsg(`➕ Diseño agregado al borrador: "${newPoster.titulo}".`);
+      return;
+    }
     const cur = pendingDraftRef.current, items = [...cur.items], old = items[swappingIndex], sizes = newPoster.sizes?.length ? newPoster.sizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === old.sizeId) || sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = newPoster.subtitulo ? `${newPoster.titulo} - ${newPoster.subtitulo}` : newPoster.titulo, qty = old.quantity || 1, uPrice = Number(target.precio);
     items[swappingIndex] = { productId: newPoster.id, webPosterId: newPoster.id, description: `${title} (${target.nombre})`, baseTitle: title, category: newPoster.categoria, thumbUrl: newPoster.thumbUrl || newPoster.imageUrl, imageUrl: newPoster.imageUrl, quantity: qty, unitPrice: uPrice, subtotal: Number((qty * uPrice).toFixed(2)), sizeId: target.sizeId, availableSizes: sizes };
     const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; setPendingDraft(next); closeSwapModal(); pushAiMsg(`🔄 Diseño actualizado en borrador: "${title}" (${target.nombre} - Q${uPrice.toFixed(2)}).`);

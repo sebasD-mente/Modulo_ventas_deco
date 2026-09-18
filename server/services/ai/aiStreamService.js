@@ -69,11 +69,25 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     }
     let cleanReply = response.text || '';
     if (!cleanReply?.trim()) {
-      if (draftSale) cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
-      else if (suggestedPosters?.length) cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla (Mediano Q65 más vendido). ¿Cuál te gustaría agregar al borrador?`;
-      else cleanReply = 'Indica el personaje, película o artista y busco de inmediato las obras disponibles en el stand.';
+      if (draftSale && draftSale.items?.length > 0) {
+        if (draftSale.unmatchedItems?.length > 0) {
+          const mountedStr = draftSale.items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
+          const missingStr = draftSale.unmatchedItems.map(u => `'${u.rawName}'`).join(', ');
+          cleanReply = `⚠️ Monté en el borrador:\n${mountedStr}\n\nSin embargo, **no encontré ${missingStr} en el catálogo**. Presiona **"Confirmar Venta"** para las obras reales o busca el diseño en el catálogo.`;
+        } else {
+          cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
+        }
+      } else if (draftSale && draftSale.unmatchedItems?.length > 0) {
+        const missingStr = draftSale.unmatchedItems.map(u => `'${u.rawName}'`).join(', ');
+        cleanReply = `No encontré la obra ${missingStr} en el catálogo de Deco Vintage. ¿Deseas consultar por otro artista o buscarlo en el catálogo?`;
+      } else if (suggestedPosters?.length) {
+        cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla (Mediano Q65 más vendido). ¿Cuál te gustaría agregar al borrador?`;
+      } else {
+        cleanReply = 'Indica el personaje, película o artista y busco de inmediato las obras disponibles en el stand.';
+      }
     }
-    return { reply: cleanReply, draftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
+    const finalDraftSale = draftSale?.items?.length ? draftSale : null;
+    return { reply: cleanReply, draftSale: finalDraftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
   } catch (err) {
     return { reply: `Error consultando IA: ${err.message}`, draftSale: null, suggestedPosters: [], toolCalls: [], functionCalls: [] };
   }
@@ -128,15 +142,37 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     }
   }
 
-  const directSaleDraft = executedTools.find(t => t.name === 'prepareSaleDraft' && t.result?.items?.length > 0);
+  const directSaleDraft = executedTools.find(t => t.name === 'prepareSaleDraft' && t.result);
   if (directSaleDraft) {
-    const sellerName = (contextData?.sellerName || 'vendedor').trim().split(' ')[0];
-    const paymentMethod = directSaleDraft.result.paymentMethod || 'efectivo';
-    yield {
-      type: 'token',
-      text: `¡Listo, ${sellerName}! Te monté el borrador en pantalla listo para cobrar con ${paymentMethod}. ¿Confirmamos la venta?`,
+    const draft = directSaleDraft.result, sellerName = (contextData?.sellerName || 'vendedor').trim().split(' ')[0];
+    const rawMethod = draft.paymentMethod || 'EFECTIVO';
+    const payMethodFormatted = rawMethod.charAt(0).toUpperCase() + rawMethod.slice(1).toLowerCase();
+    const items = draft.items || [], unmatched = draft.unmatchedItems || [];
+    const formatCandidates = (unmatchedList) => {
+      const candidates = unmatchedList.filter(u => u.candidates?.length > 0).flatMap(u => u.candidates.map(c => c.subtitulo ? `${c.titulo} (${c.subtitulo})` : c.titulo));
+      const unique = Array.from(new Set(candidates)).slice(0, 3);
+      if (unique.length === 1) return ` Tengo disponibles pósters de **${unique[0]}**.`;
+      if (unique.length > 1) { const last = unique.pop(); return ` Tengo disponibles pósters de **${unique.join(', ')} y ${last}**.`; }
+      return '';
     };
-    return;
+
+    if (items.length > 0 && unmatched.length > 0) {
+      const mountedStr = items.map(it => `**${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'} - Q${Number(it.unitPrice).toFixed(2)} en ${payMethodFormatted})`).join(', ');
+      const missingStr = unmatched.map(u => `'${u.rawName}'`).join(', ');
+      const suggestions = formatCandidates(unmatched);
+      yield { type: 'token', text: `⚠️ Monté en el borrador: ${mountedStr}. Sin embargo, **no encontré ${missingStr} en el catálogo**.${suggestions} ¿Deseas que agregue alguno de esos o buscas otro diseño?` };
+      return;
+    }
+    if (items.length === 0 && unmatched.length > 0) {
+      const missingStr = unmatched.map(u => `'${u.rawName}'`).join(', ');
+      const suggestions = formatCandidates(unmatched);
+      yield { type: 'token', text: `No encontré la obra ${missingStr} en el catálogo de Deco Vintage.${suggestions} ¿Deseas consultar por otro artista o buscarlo en el catálogo?` };
+      return;
+    }
+    if (items.length > 0) {
+      yield { type: 'token', text: `¡Listo, ${sellerName}! Te monté el borrador en pantalla listo para cobrar con ${rawMethod.toLowerCase()}. ¿Confirmamos la venta?` };
+      return;
+    }
   }
 
   if (executedTools.length > 0) {
