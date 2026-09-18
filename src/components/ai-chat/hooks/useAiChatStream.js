@@ -11,14 +11,12 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   const { authFetch, user } = useAuth(), getGreeting = (u) => { const f = u?.fullName?.trim().split(' ')[0] || u?.name; return f ? `¡Hola ${f}! Estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?` : '¡Hola! Soy STAND IA y estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?'; };
   const [messages, setMessages] = useState(() => [{ id: genId(), sender: 'ai', text: getGreeting(user), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
   useEffect(() => { if (user?.fullName) { const g = getGreeting(user); setMessages((p) => (p.length === 1 && p[0].sender === 'ai' && p[0].text.startsWith('¡Hola') ? [{ ...p[0], text: g }] : p)); } }, [user?.fullName]);
-
   const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState(''), [pendingDraft, setPendingDraft] = useState(null), [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false), [aiError, setAiError] = useState(null), clearAiError = () => setAiError(null);
   const pendingDraftRef = useRef(pendingDraft); pendingDraftRef.current = pendingDraft;
   const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null), lastAudioBlobRef = useRef(null);
-  const getNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), pushAiMsg = (text) => setMessages((p) => [...p, { id: genId(), sender: 'ai', text, timestamp: getNow() }]);
+  const getNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), pushAiMsg = (text, extra = {}) => setMessages((p) => [...p, { id: genId(), sender: 'ai', text, timestamp: getNow(), ...extra }]);
   const recalculateTotal = (items) => Number(items.reduce((s, i) => s + (i.subtotal || i.quantity * i.unitPrice), 0).toFixed(2)), cancelRaf = () => { if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; } };
   const getAtts = (p) => Array.isArray(p.attachments) && p.attachments.length ? p.attachments : p.audioUrl ? [{ fileUrl: p.audioUrl, fileType: 'AUDIO_VOZ', transcription: p.transcription || null }] : p.imageUrl ? [{ fileUrl: p.imageUrl, fileType: p.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }] : [];
-
   const updateDraftItemSize = (idx, newSizeId) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((prev) => {
     const cur = prev || pendingDraftRef.current, items = [...cur.items], it = items[idx], sizes = Array.isArray(it.availableSizes) && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === newSizeId) || sizes[0];
     items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})`, availableSizes: sizes };
@@ -26,28 +24,22 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   }), updateDraftItemQty = (idx, delta) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((prev) => {
     const cur = prev || pendingDraftRef.current, items = [...cur.items], qty = Math.max(1, items[idx].quantity + delta); items[idx] = { ...items[idx], quantity: qty, subtotal: Number((qty * items[idx].unitPrice).toFixed(2)) }; const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
   }), removeDraftItem = (idx) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((p) => { const cur = p || pendingDraftRef.current, items = cur.items.filter((_, i) => i !== idx), next = items.length ? { ...cur, items, total: recalculateTotal(items) } : null; pendingDraftRef.current = next; return next; }), updateDraftPaymentMethod = (method) => setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, paymentMethod: method } : null; pendingDraftRef.current = next; return next; }), discardDraft = () => { pendingDraftRef.current = null; setPendingDraft(null); pushAiMsg('🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?'); };
-
   const addPosterToDraft = (poster) => {
     const sizes = poster.sizes?.length ? poster.sizes : DEFAULT_EVENT_SIZES, def = sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo, uPrice = Number(def.precio);
     const item = { productId: poster.id, webPosterId: poster.id, description: `${title} (${def.nombre})`, baseTitle: title, category: poster.categoria, thumbUrl: poster.thumbUrl || poster.imageUrl, imageUrl: poster.imageUrl, quantity: 1, unitPrice: uPrice, subtotal: uPrice, sizeId: def.sizeId, availableSizes: sizes };
     setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, items: [...cur.items, item], total: recalculateTotal([...cur.items, item]) } : { items: [item], total: uPrice, paymentMethod: 'EFECTIVO', inputChannel: 'IA_CHAT_TEXTO', notes: 'Venta iniciada desde catálogo sugerido' }; pendingDraftRef.current = next; return next; });
   };
-
   const fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=30', { signal: sig })).json())?.data || [], '', 30); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx, query = '') => { setSwappingIndex(idx); setSwapQuery(query); setSwapResults([]); if (query) handleSwapSearchChange(query); else fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
   const handleSwapSearchChange = (text) => { setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=30`, { signal: sig })).json())?.data || [], text, 30); setSwapResults(data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150); };
   const selectSwapPoster = (newPoster) => {
     if (swappingIndex === null) return;
     if (swappingIndex === -1 || swappingIndex === 'new' || !pendingDraftRef.current) {
-      addPosterToDraft(newPoster);
-      closeSwapModal();
-      pushAiMsg(`➕ Diseño agregado al borrador: "${newPoster.titulo}".`);
-      return;
+      addPosterToDraft(newPoster); closeSwapModal(); pushAiMsg(`➕ Diseño agregado al borrador: "${newPoster.titulo}".`); return;
     }
     const cur = pendingDraftRef.current, items = [...cur.items], old = items[swappingIndex], sizes = newPoster.sizes?.length ? newPoster.sizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === old.sizeId) || sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = newPoster.subtitulo ? `${newPoster.titulo} - ${newPoster.subtitulo}` : newPoster.titulo, qty = old.quantity || 1, uPrice = Number(target.precio);
     items[swappingIndex] = { productId: newPoster.id, webPosterId: newPoster.id, description: `${title} (${target.nombre})`, baseTitle: title, category: newPoster.categoria, thumbUrl: newPoster.thumbUrl || newPoster.imageUrl, imageUrl: newPoster.imageUrl, quantity: qty, unitPrice: uPrice, subtotal: Number((qty * uPrice).toFixed(2)), sizeId: target.sizeId, availableSizes: sizes };
     const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; setPendingDraft(next); closeSwapModal(); pushAiMsg(`🔄 Diseño actualizado en borrador: "${title}" (${target.nombre} - Q${uPrice.toFixed(2)}).`);
   };
-
   const uploadMedia = async (url, form, userText, note, onDone) => {
     setIsLoading(true); setProcessingNote(note); setAiError(null); setMessages((p) => [...p, { id: genId(), sender: 'user', text: userText, timestamp: getNow() }]);
     try {
@@ -62,25 +54,28 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
       setAiError({ title: isVoice ? 'Fallo en dictado de voz' : 'Fallo en foto/visión', message: friendlyMsg, channel: isVoice ? 'IA_VOZ' : 'IA_FOTO_ARTE', canRetry: isVoice && Boolean(lastAudioBlobRef.current), hasAudioRetry: isVoice && Boolean(lastAudioBlobRef.current), onRetryAudio: retryVoiceUpload }); pushAiMsg(`⚠️ ${friendlyMsg}`);
     } finally { setIsLoading(false); setProcessingNote(''); }
   };
-
   const handleVoiceUpload = (audioBlob, meta = {}) => {
     if (!audioBlob || meta?.empty) { pushAiMsg('🎙️ No alcancé a escucharte. Pulsa el micrófono, dicta tu venta y presiona "Finalizar" cuando termines.'); return; }
     lastAudioBlobRef.current = audioBlob;
     const ext = audioBlob.type?.includes('mp4') ? 'mp4' : audioBlob.type?.includes('aac') ? 'aac' : 'webm', form = new FormData();
     form.append('audio', audioBlob, `voice-sale.${ext}`); form.append('eventId', eventId);
     uploadMedia('/api/ai/voice-sale', form, '🎙️ [Venta dictada por voz]', 'Gemini analizando dictado de voz...', (data) => {
+      const extraMeta = data.suggestedPosters?.length ? { suggestedPosters: data.suggestedPosters } : {};
       if (!data.draftSale?.items || data.draftSale.items.length === 0) {
-        if (data.intent === 'SALUDO' || (!data.isSaleDetected && data.reply)) pushAiMsg(data.reply || '¡Hola! Con gusto te ayudo, ¿qué póster o venta preparamos?');
-        else pushAiMsg('🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").');
-      } else { pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); pushAiMsg(`Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`); }
+        if (data.intent === 'SALUDO' || (!data.isSaleDetected && data.reply)) pushAiMsg(data.reply || '¡Hola! Con gusto te ayudo, ¿qué póster o venta preparamos?', extraMeta);
+        else pushAiMsg(data.message || '🎙️ Escuché tu audio ("' + (data.draftSale?.transcription || data.transcription || 'Sin voz clara') + '"), pero no identifiqué obras del catálogo. Por favor repite indicando el póster y tamaño (ej: "1 Batman mediano").', extraMeta);
+      } else {
+        pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale);
+        pushAiMsg(data.message || `Entendí tu dictado: "${data.draftSale.transcription || 'Venta extraída'}". Puedes cambiar tamaño o diseño en la tarjeta antes de confirmar:`, extraMeta);
+      }
     });
   };
   const retryVoiceUpload = useCallback(() => { if (lastAudioBlobRef.current) handleVoiceUpload(lastAudioBlobRef.current); }, [handleVoiceUpload]);
   const handleImageUpload = async (e) => {
     const file = e?.target?.files?.[0]; if (!file) return;
     if (e.target) e.target.value = '';
-    const blobToUpload = await compressImage(file);
-    const form = new FormData(); form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
+    const blobToUpload = await compressImage(file), form = new FormData();
+    form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
     uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => {
       if (d.isArtworkDetected === false || !d.draftSale) {
         pushAiMsg(d.message || 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.');
@@ -107,7 +102,6 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     onPopulateManualForm({ ...draft, inputChannel: draft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(draft), items: (draft.items || []).map((it) => ({ ...it, selectedSizeId: it.selectedSizeId || it.sizeId || null, sizeId: it.sizeId || it.selectedSizeId || null })) });
     pendingDraftRef.current = null; setPendingDraft(null);
   };
-
   const handleSendText = async (customText = null) => {
     const query = (customText || inputText).trim(); if (!query || isLoading) return;
     setInputText(''); setAiError(null); const userMsgId = genId(), aiMsgId = genId();

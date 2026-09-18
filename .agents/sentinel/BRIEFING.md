@@ -1,21 +1,21 @@
-# BRIEFING — 2026-09-17T14:17:48Z
+# BRIEFING — 2026-09-18T21:32:20Z
 
 ## Mission
-Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {IA}) en mostrador ferial para Deco Vintage Guate: erradicar sesgos fonéticos ("póster" vs "pastel"/"stickers"), reducción radical de latencia (< 5s), tolerancia a ruido ambiente (VAD 3.5-4.0s) y precedencia de control manual en frontend, garantizando cero deuda y arnés 100% verde.
+Blindaje de catálogo y cero alucinaciones en STAND {IA} (Deco Vintage Guate / Deko Labs): erradicar falsos positivos y productos inventados en Audio (/api/ai/voice-sale) y Visión (/api/ai/recognize-artwork), garantizando que solo obras verificadas con ID de catálogo oficial ingresen al borrador de venta, con refinamiento inteligente del comparador (cobertura léxica >= 70%, sin coladero de 2 tokens) y arnés de calidad 100% verde.
 
-## ?? My Identity
+## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel
 - Orchestrator (Phase 1 Fixes): c9b31c4e-2a28-49d5-bb78-e8c2bffdfd7c (completed)
 - Victory Auditor (Phase 1 Fixes): cdcacae0-a987-4747-b517-31685a840676 (VICTORY CONFIRMED)
 - Orchestrator (Phase 2): 5a4ca9da-f208-4b77-9f56-561dbd3809fc (completed)
 - Victory Auditor (Phase 2): f707bc62-ed20-4c3e-8142-e20f90e17f95 (VICTORY CONFIRMED)
-- Orchestrator (Auditor?a 360): 90425077-fad3-4f25-aaeb-7fd30a0e5a41 (completed)
-- Victory Auditor (Auditor?a 360): bb28db25-f78e-43ea-ae28-677d87415619 (VICTORY CONFIRMED)
-- Orchestrator (Modernizaci?n STAND IA): 4f9147ba-7ab0-47c4-ba7b-7275197efacc (completed)
-- Victory Auditor (Modernizaci?n STAND IA): 0815f5ed-bfbc-450f-8240-790e8aca73df (VICTORY CONFIRMED)
-- Orchestrator (Cirug?a Modular aiMultimodalService): e10a6ac6-c756-4f75-b83b-4e5bad61d322 (completed, orchestrator_7)
-- Victory Auditor (Cirug?a Modular aiMultimodalService): 5f048d08-8f81-426b-a2d5-455b57d00f68 (VICTORY CONFIRMED, victory_auditor_7)
+- Orchestrator (Auditoría 360): 90425077-fad3-4f25-aaeb-7fd30a0e5a41 (completed)
+- Victory Auditor (Auditoría 360): bb28db25-f78e-43ea-ae28-677d87415619 (VICTORY CONFIRMED)
+- Orchestrator (Modernización STAND IA): 4f9147ba-7ab0-47c4-ba7b-7275197efacc (completed)
+- Victory Auditor (Modernización STAND IA): 0815f5ed-bfbc-450f-8240-790e8aca73df (VICTORY CONFIRMED)
+- Orchestrator (Cirugía Modular aiMultimodalService): e10a6ac6-c756-4f75-b83b-4e5bad61d322 (completed, orchestrator_7)
+- Victory Auditor (Cirugía Modular aiMultimodalService): 5f048d08-8f81-426b-a2d5-455b57d00f68 (VICTORY CONFIRMED, victory_auditor_7)
 - Orchestrator (Modular Refactor UnifiedAiChat): 77de464d-cbe1-4d4d-b079-fc3688d9c5ea (completed, orchestrator_8)
 - Victory Auditor (Modular Refactor UnifiedAiChat): 38786f75-8cd6-4fd8-a321-0adeffbf37c6 (VICTORY CONFIRMED, victory_auditor_8)
 - Orchestrator (Phase 3 Refactor EventsManagementView): 3984481d-f6d5-430f-bedd-75ffd00ba8cc (completed, orchestrator_9)
@@ -24,40 +24,42 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - Victory Auditor (Phase 4 Refactor FastManualSaleForm): b7ba2c28-d8ed-488e-b333-2f13ce8b060b (VICTORY CONFIRMED, victory_auditor_10)
 - Orchestrator (Phase 5 Frontend Monolith Eradication): e47969bc-381d-4146-86fc-9a0d0cc8343f (orchestrator_11, completed)
 - Victory Auditor (Phase 5 Frontend Monolith Eradication): cd632a21-d029-4a56-a93d-a33db2a48362 (victory_auditor_11, VICTORY CONFIRMED)
-- Orchestrator (Auditor?a Forense 360 STAND IA): e1b926ca-db1d-45ad-9385-7a7a940f1c72 (orchestrator_12, completed)
-- Victory Auditor (Auditor?a Forense 360 STAND IA): 21069150-5191-410b-b878-407fe086fb8a (victory_auditor_12, VICTORY CONFIRMED)
-- Orchestrator (Fase 1 Estabilizaci?n STAND IA): orchestrator_13 (superseded)
-- Orchestrator (REHACER Fase 1 Conexi?n Viva STAND IA): f7ea2546-0c7d-497d-97e8-791a3e75db08 (orchestrator_14, completed in production 1d41cec)
-- Victory Auditor (REHACER Fase 1 Conexi?n Viva STAND IA): f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, closed)
+- Orchestrator (Auditoría Forense 360 STAND IA): e1b926ca-db1d-45ad-9385-7a7a940f1c72 (orchestrator_12, completed)
+- Victory Auditor (Auditoría Forense 360 STAND IA): 21069150-5191-410b-b878-407fe086fb8a (victory_auditor_12, VICTORY CONFIRMED)
+- Orchestrator (Fase 1 Estabilización STAND IA): orchestrator_13 (superseded)
+- Orchestrator (REHACER Fase 1 Conexión Viva STAND IA): f7ea2546-0c7d-497d-97e8-791a3e75db08 (orchestrator_14, completed in production 1d41cec)
+- Victory Auditor (REHACER Fase 1 Conexión Viva STAND IA): f6209258-5422-4373-8009-9c2dcf932823 (victory_auditor_sentinel_14, closed)
 - Orchestrator (FASE 2 Closed-Loop STAND IA): 3098e265-0f6c-4aa8-8742-949cf2bf333c (orchestrator_15, completed)
 - Victory Auditor (FASE 2 Closed-Loop STAND IA): 4d8c7534-6abd-4e0a-9a54-076dbf70b380 (victory_auditor_sentinel_15, VICTORY CONFIRMED)
-- Orchestrator (Modernizaci?n Gen 3 & Resiliencia): 8032eb16-445b-4b60-9d2c-03db10d5b529 (orchestrator_16, M1 completed, succeeded)
+- Orchestrator (Modernización Gen 3 & Resiliencia): 8032eb16-445b-4b60-9d2c-03db10d5b529 (orchestrator_16, M1 completed, succeeded)
 - Orchestrator Successor: orchestrator_17 (completed M2, M3, M4)
-- Victory Auditor (Modernizaci?n Gen 3 & Resiliencia): 15479362-8856-47fd-8842-f53a371c3b40 (victory_auditor_sentinel_16, VICTORY CONFIRMED)
-- Orchestrator (Auditor?a Forense 360 & Blueprint STAND IA): 44270e0b-1540-4a69-abea-7df48f0385e2 (orchestrator_18, completed)
-- Victory Auditor (Auditor?a Forense 360 & Blueprint STAND IA): 74d11d9a-455c-4c21-a28d-37e837e7f261 (victory_auditor_18, VICTORY CONFIRMED)
-- Orchestrator (Cirug?a Arquitect?nica & Blindaje P0): orchestrator_19 (completed)
-- Victory Auditor (Cirug?a Arquitect?nica & Blindaje P0): closed
+- Victory Auditor (Modernización Gen 3 & Resiliencia): 15479362-8856-47fd-8842-f53a371c3b40 (victory_auditor_sentinel_16, VICTORY CONFIRMED)
+- Orchestrator (Auditoría Forense 360 & Blueprint STAND IA): 44270e0b-1540-4a69-abea-7df48f0385e2 (orchestrator_18, completed)
+- Victory Auditor (Auditoría Forense 360 & Blueprint STAND IA): 74d11d9a-455c-4c21-a28d-37e837e7f261 (victory_auditor_18, VICTORY CONFIRMED)
+- Orchestrator (Cirugía Arquitectónica & Blindaje P0): orchestrator_19 (completed)
+- Victory Auditor (Cirugía Arquitectónica & Blindaje P0): closed
 - Orchestrator (RAG Vectorial & Copiloto STAND IA): 6ddcf51f-f397-4dd4-ad16-5a76fa7c9097 (orchestrator_20, completed)
 - Victory Auditor (RAG Vectorial & Copiloto STAND IA): 3db69a7d-e74e-42f6-904e-1c5ce91f58fd (VICTORY CONFIRMED, victory_auditor_20)
-- Orchestrator (Calibraci?n Cognitiva & RAG Real STAND IA): 49bacfc9-111d-49c6-a56b-a5b485ca6767 (orchestrator_21, completed)
-- Victory Auditor (Calibraci?n Cognitiva & RAG Real STAND IA): completed
-- Orchestrator (Auditor?a Forense 360 Fred): 5045eebf-d54f-4d6a-895b-7a1f7cda50b3 (orchestrator_22, completed)
-- Victory Auditor (Auditor?a Forense 360 Fred): 3f656233-98ac-4499-947e-88202dcd40fc (victory_auditor_22, VICTORY CONFIRMED)
-- Orchestrator (Fase 1 Roadmap Quir?rgico): 6408c0c3-26fa-4769-a9aa-efe396dfb647 (orchestrator_23, completed)
-- Victory Auditor (Fase 1 Roadmap Quir?rgico): d2fb8311-9b34-4961-915e-f6d594ad405a (victory_auditor_23, VICTORY CONFIRMED)
-- Orchestrator (Fase 2 Roadmap Quir?rgico): db233a73-dd6b-4945-8057-cdd1e9a20608 (orchestrator_24, completed)
-- Victory Auditor (Fase 2 Roadmap Quir?rgico): c355957c-7feb-4d66-b52d-fcb1a7fd6e6c (victory_auditor_24, VICTORY CONFIRMED)
-- Orchestrator (Fase 3 Roadmap Quir?rgico): fc099ae9-9a32-4092-80b2-44e5faf0a199 (orchestrator_25, completed)
-- Victory Auditor (Fase 3 Roadmap Quir?rgico): f418e728-6063-4e5f-a2dc-4297f01517cb (victory_auditor_25, VICTORY CONFIRMED)
+- Orchestrator (Calibración Cognitiva & RAG Real STAND IA): 49bacfc9-111d-49c6-a56b-a5b485ca6767 (orchestrator_21, completed)
+- Victory Auditor (Calibración Cognitiva & RAG Real STAND IA): completed
+- Orchestrator (Auditoría Forense 360 Fred): 5045eebf-d54f-4d6a-895b-7a1f7cda50b3 (orchestrator_22, completed)
+- Victory Auditor (Auditoría Forense 360 Fred): 3f656233-98ac-4499-947e-88202dcd40fc (victory_auditor_22, VICTORY CONFIRMED)
+- Orchestrator (Fase 1 Roadmap Quirúrgico): 6408c0c3-26fa-4769-a9aa-efe396dfb647 (orchestrator_23, completed)
+- Victory Auditor (Fase 1 Roadmap Quirúrgico): d2fb8311-9b34-4961-915e-f6d594ad405a (victory_auditor_23, VICTORY CONFIRMED)
+- Orchestrator (Fase 2 Roadmap Quirúrgico): db233a73-dd6b-4945-8057-cdd1e9a20608 (orchestrator_24, completed)
+- Victory Auditor (Fase 2 Roadmap Quirúrgico): c355957c-7feb-4d66-b52d-fcb1a7fd6e6c (victory_auditor_24, VICTORY CONFIRMED)
+- Orchestrator (Fase 3 Roadmap Quirúrgico): fc099ae9-9a32-4092-80b2-44e5faf0a199 (orchestrator_25, completed)
+- Victory Auditor (Fase 3 Roadmap Quirúrgico): f418e728-6063-4e5f-a2dc-4297f01517cb (victory_auditor_25, VICTORY CONFIRMED)
 - Orchestrator (Fase 4 Roadmap Quirúrgico): aacf7492-6e6d-48aa-bbd2-de16647bec52 (orchestrator_26, completed)
 - Victory Auditor (Fase 4 Roadmap Quirúrgico): 8cd63529-a732-4ae3-a39c-b8f6da11bbb1 (victory_auditor_26, VICTORY CONFIRMED)
 - Orchestrator (Reingeniería Voz STAND IA): b540abb5-54e2-491e-8f28-9d5b174b4d68 (orchestrator_27, completed)
 - Victory Auditor (Reingeniería Voz STAND IA): 35f34917-d954-4884-a059-5a07bcd4ce4f (victory_auditor_27, VICTORY CONFIRMED)
 - Orchestrator (Calibración Voz & Blindaje Acústico): 1b6dfb0c-9540-427d-8d0e-861ec0488440 (orchestrator_28, completed)
 - Victory Auditor (Calibración Voz & Blindaje Acústico): f6ca5fc7-4ade-4ae7-a1ab-63aba2a9234f (victory_auditor_28, VICTORY CONFIRMED)
-- Orchestrator (Optimización Latencia & Resiliencia STAND IA): cac033b4-6821-468a-bb18-9d5956c74d4c (orchestrator_29, active)
-- Victory Auditor (Optimización Latencia & Resiliencia STAND IA): 7dd31c07-6148-4cca-97d6-ab6de8a66043 (victory_auditor_29, active)
+- Orchestrator (Optimización Latencia & Resiliencia STAND IA): cac033b4-6821-468a-bb18-9d5956c74d4c (orchestrator_29, completed)
+- Victory Auditor (Optimización Latencia & Resiliencia STAND IA): 7dd31c07-6148-4cca-97d6-ab6de8a66043 (victory_auditor_29, VICTORY CONFIRMED)
+- Orchestrator (Blindaje Catálogo & Cero Alucinaciones): 4b69e24e-ec96-4db1-bb83-90c2279d7f86 (orchestrator_30, completed)
+- Victory Auditor (Blindaje Catálogo & Cero Alucinaciones): 4f98bc6e-f4a2-440c-b2d4-96facfe10b3c (victory_auditor_30, VICTORY CONFIRMED)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -115,17 +117,22 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - Techos de archivos: ningún archivo modificado/creado > 200 líneas, módulos auxiliares <= 60 líneas, imageCompressor.js <= 60 líneas.
 - Prohibido alterar contratos SSE, esquemas de Prisma o migraciones de base de datos.
 - Verificación en vivo obligatoria con Chrome DevTools MCP y captura de pantalla en alta resolución.
+- Directiva Sagrada de Sebastián Jiménez: Bajo ninguna circunstancia se puede vender o presupuestar nada que no exista en el catálogo oficial de Deco Vintage.
+- R1 Audio: Prohibición total de borradores fantasma (matched == null no puede entrar a items/enrichedItems, ni productId/webPosterId null). Dictados mixtos: obras no catalogadas en unmatchedItems con advertencia visual. Rechazo total si 0 obras catalogadas (isSaleDetected=false, draftSale=null, items=[]) con hasta 3 suggestedPosters opcionales.
+- R2 Matcher: Eliminar coladero matchedTokens.length >= 2 de matchPosterEverywhere. Normalización previa (stopwords, acentos, plurales s/es). Cobertura léxica >= 70% en multi-palabra y preservación obligatoria de término clave/franquicia. Búsqueda mono-término solo contra título, franquicia o alias canónico.
+- R3 Visión: Cero forzado de nearest-neighbors; ante matched == null: isArtworkDetected=false, draftSale=null, items=[].
+- R4 Arquitectura y Calidad: Cero micro-fragmentación dogmática; si aiMediaService crece justificadamente hasta ~240 líneas, registrar DOMAIN_CEILINGS max: 260 en scripts/audit-monoliths.js. npm run harness:check 100% verde (9/9 Zero-Trust, 0 secretos, 0 violaciones de techos dinámicos, build producción limpio con código de salida 0).
 
 ## User Context
-- **Last user request**: Optimización crítica de latencia y resiliencia ferial en STAND {IA}: erradicar cuellos de botella en chat (< 2.5s) y visión (< 2.0s) e incorporar buffer de reintento offline/4G, manteniendo cero deuda técnica y contratos intactos.
+- **Last user request**: Blindaje de Catálogo y Cero Alucinaciones en STAND {IA} (R1 audio/alternativas, R2 matcher léxico >= 70%, R3 visión sin nearest-neighbor forzado, R4 arnés y techos de dominio).
 - **Pending clarifications**: none
-- **Delivered results**: Optimización crítica de latencia y resiliencia ferial en STAND {IA} completada, verificada y certificada con veredicto VICTORY CONFIRMED por victory_auditor_29. R1 (eliminación de 2do turno LLM en chat a 1 solo turno < 2.5s), R2 (Zero-Wait GCS vía Promise.all en visión < 2.0s), R3 (compresor de fotos cliente imageCompressor.js 50 líneas ≤ 60, redimensionamiento ≤ 1024px JPEG 0.75), R4 (aligeramiento dinámico de prompt en aiPromptService.js), R5 (buffer de audio lastAudioBlobRef y reintento en useAiChatStream.js), R6 (tests/benchmarks/latency-audit.test.js 4/4 PASS), arnés npm run harness:check 100% verde (9/9 Zero-Trust, 0 secretos, 0 monolitos excedidos, build en 3.01s), despliegue en Dokploy confirmado (commit 4ef2dcd) y verificación visual en vivo mediante Chrome DevTools MCP en https://ventas.decovintage.online con los 4 filtros forenses aprobados.
+- **Delivered results**: Blindaje de Catálogo y Cero Alucinaciones en STAND {IA} completado, validado y formalmente certificado con veredicto VICTORY CONFIRMED por victory_auditor_30. R1 (frontera dura en audio con rechazo de productId: null, aislamiento de unmatchedItems y suggestedPosters), R2 (comparador de 4 pasos con cobertura léxica >= 70%, erradicación del coladero de 2 tokens y preservación de franquicias), R3 (umbral de certeza en visión con mensaje estándar y cero nearest-neighbors forzados), R4 (DOMAIN_CEILINGS actualizado para aiMediaService.js max: 260 y arnés npm run harness:check 100% verde: Zero-Trust 9/9, 0 secretos, 0 monolitos, build exitoso).
 
 ## Project Status
 - **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_29 (cac033b4-6821-468a-bb18-9d5956c74d4c, completed)
-- **Active Auditor**: victory_auditor_29 (7dd31c07-6148-4cca-97d6-ab6de8a66043, VICTORY CONFIRMED)
+- **Active Orchestrator**: orchestrator_30 (4b69e24e-ec96-4db1-bb83-90c2279d7f86, completed)
+- **Active Auditor**: victory_auditor_30 (4f98bc6e-f4a2-440c-b2d4-96facfe10b3c, VICTORY CONFIRMED)
 - **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
@@ -137,13 +144,16 @@ Calibración profesional y blindaje acústico del reconocimiento de voz (STAND {
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Domain Ceilings Specification
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/plan.md — Orchestrator Plan
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/progress.md — Orchestrator Progress
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_29/handoff.md — Orchestrator Handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_29/handoff.md — Victory Auditor Handoff (VICTORY CONFIRMED)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/benchmarks/latency-audit.test.js — Latency Benchmarks Suite
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/src/utils/imageCompressor.js — Client Image Compressor Utility
-
-
-
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_30/handoff.md — Orchestrator Fred final handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_30/handoff.md — Victory Auditor final handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/catalog/webCatalogService.js — Refined 4-step catalog comparator
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiMediaService.js — Multimodal audio & vision service with hard boundaries
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/controllers/ai/aiMediaController.js — Media endpoints controller
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/src/components/ai-chat/hooks/useAiChatStream.js — Chat stream hook with suggestedPosters support
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Monolith auditor with domain ceiling
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/ai/voice-hard-catalog-boundary.test.js — Audio boundary test suite
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/adversarial/m3-matcher-vision-challenger2.test.js — Adversarial matcher test suite (27/27 PASS)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiMediaService.js — Multimodal audio & vision service
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/catalog/webCatalogService.js — Catalog search & matching engine
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Monolith auditor & domain ceilings

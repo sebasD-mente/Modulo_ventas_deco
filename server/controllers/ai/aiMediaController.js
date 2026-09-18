@@ -41,11 +41,12 @@ export async function handleVoiceSale(req, res) {
 
     if (!draft.items || draft.items.length === 0) {
       const isGreeting = draft.intent === 'SALUDO' || (!draft.isSaleDetected && draft.greeting);
-      const replyMsg = isGreeting ? (draft.greeting || '¡Hola! ¿Listo para vender? Dicta el póster y tamaño.') : 'No se identificaron pósters ni obras en el dictado de voz.';
+      const replyMsg = isGreeting ? (draft.greeting || '¡Hola! ¿Listo para vender? Dicta el póster y tamaño.') : (draft.message || 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.');
       return res.json({
         success: true, draftSale: null, itemsDetected: false,
         transcription: draft.transcription || '', intent: draft.intent || (isGreeting ? 'SALUDO' : 'RUIDO_NO_VENTA'),
         isSaleDetected: Boolean(draft.isSaleDetected), reply: isGreeting ? replyMsg : null, message: replyMsg,
+        unmatchedItems: draft.unmatchedItems || [], suggestedPosters: draft.suggestedPosters || [],
       });
     }
 
@@ -53,7 +54,9 @@ export async function handleVoiceSale(req, res) {
       success: true,
       draftSale: { ...draft, audioUrl, inputChannel: 'IA_VOZ' },
       requiresConfirmation: true,
-      message: 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.',
+      unmatchedItems: draft.unmatchedItems || [],
+      suggestedPosters: draft.suggestedPosters || [],
+      message: draft.message || 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.',
     });
   } catch (err) {
     console.error('❌ Error en handleVoiceSale:', err);
@@ -70,36 +73,22 @@ export async function handleBatchPhoto(req, res) {
     const imageUrl = await safePersistMedia(file, 'posters-bundle.jpg', 'image/jpeg', 'posters_scans');
     const t0Batch = Date.now();
     const analysis = await processPostersBatchPhoto({
-      imageBuffer: file.buffer,
-      mimeType: file.mimetype || 'image/jpeg',
-      tenantId,
-      eventId,
+      imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId,
     });
     recordLlmInteraction({
-      tenantId,
-      userId: req.userId || null,
-      action: 'AI_BATCH_QR_SCAN',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
-      tokensIn: null,
-      tokensOut: null,
-      latencyMs: Date.now() - t0Batch,
-      ipAddress: req.ip,
+      tenantId, userId: req.userId || null, action: 'AI_BATCH_QR_SCAN',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      latencyMs: Date.now() - t0Batch, ipAddress: req.ip,
       details: { eventId, codesDetected: analysis.detectedCodes?.length || 0 },
     });
 
     return res.json({
       success: true,
       draftSale: {
-        items: analysis.items,
-        total: analysis.totalCalculated,
-        paymentMethod: 'EFECTIVO',
-        imageUrl,
-        inputChannel: 'IA_IMAGEN_QR',
+        items: analysis.items, total: analysis.totalCalculated, paymentMethod: 'EFECTIVO', imageUrl, inputChannel: 'IA_IMAGEN_QR',
         notes: `Escaneo de foto (${analysis.detectedCodes?.length || 0} códigos detectados: ${analysis.detectedCodes?.join(', ') || 'N/A'})`,
       },
-      summary: analysis.summary,
-      detectedCodes: analysis.detectedCodes,
-      requiresConfirmation: true,
+      summary: analysis.summary, detectedCodes: analysis.detectedCodes, requiresConfirmation: true,
       message: 'Foto de pósters analizada con éxito. Verifica los ítems y selecciona el método de pago.',
     });
   } catch (err) {
@@ -117,10 +106,7 @@ export async function handleArtworkRecognition(req, res) {
     const [imageUrl, analysis] = await Promise.all([
       safePersistMedia(file, 'artwork.jpg', 'image/jpeg', 'artwork_scans'),
       recognizePosterArtworkFromImage({
-        imageBuffer: file.buffer,
-        mimeType: file.mimetype || 'image/jpeg',
-        tenantId,
-        eventId,
+        imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId,
       }),
     ]);
     if (analysis.isArtworkDetected === false || !analysis.items?.length) {
@@ -128,7 +114,7 @@ export async function handleArtworkRecognition(req, res) {
         success: true, imageUrl, draftSale: null, isArtworkDetected: false,
         primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
         candidates: analysis.candidates || [],
-        message: 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.',
+        message: analysis.message || 'La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo.',
       });
     }
 
@@ -141,7 +127,7 @@ export async function handleArtworkRecognition(req, res) {
     return res.json({
       success: true, imageUrl, isArtworkDetected: true, primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
       candidates: analysis.candidates || [], draftSale, requiresConfirmation: true,
-      message: 'Obra analizada y encontrada en el catálogo web. Por favor verifica y confirma.',
+      message: analysis.message || 'Obra analizada y encontrada en el catálogo web. Por favor verifica y confirma.',
     });
   } catch (err) {
     console.error('❌ Error en handleArtworkRecognition:', err);
@@ -157,23 +143,15 @@ export async function handleVideoRecognition(req, res) {
 
     const videoUrl = await safePersistMedia(file, 'counter-video.mp4', 'video/mp4', 'counter_videos');
     const analysis = await recognizePostersFromVideo({
-      videoBuffer: file.buffer,
-      mimeType: file.mimetype || 'video/mp4',
-      tenantId,
-      eventId,
+      videoBuffer: file.buffer, mimeType: file.mimetype || 'video/mp4', tenantId, eventId,
     });
     return res.json({
       success: true,
       draftSale: {
-        items: analysis.items,
-        total: analysis.total,
-        paymentMethod: 'EFECTIVO',
-        videoUrl,
-        inputChannel: 'IA_VIDEO_MOSTRADOR',
+        items: analysis.items, total: analysis.total, paymentMethod: 'EFECTIVO', videoUrl, inputChannel: 'IA_VIDEO_MOSTRADOR',
         notes: `Video del mostrador: ${analysis.items.length} obras detectadas`,
       },
-      summary: analysis.summary,
-      requiresConfirmation: true,
+      summary: analysis.summary, requiresConfirmation: true,
       message: 'Video analizado con éxito. Se detectaron las obras mostradas en el mostrador.',
     });
   } catch (err) {

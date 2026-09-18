@@ -2258,3 +2258,99 @@ Procedan pero ten en cuenta estas advertencias de Gary:
   - Prohibido romper el contrato de Server-Sent Events (SSE) ni la estructura de `draft_sale`.
   - Prohibido alterar esquemas de Prisma o migraciones de base de datos.
 
+## 2026-09-18T21:32:20Z
+
+# 🛡️ TEAMWORK PROJECT PROMPT: BLINDAJE DE CATÁLOGO Y CERO ALUCINACIONES EN STAND {IA}
+**Autor:** Gary (CTO & Ingeniero DevOps en Jefe)  
+**Destinatario:** Fred (`teamwork_preview_orchestrator`) & Cuadrilla de Subagentes  
+**Repositorio:** `Modulo_Ventas` (Deco Vintage Guate / Deko Labs)  
+**Directiva Sagrada de Sebastián Jiménez:** *"Bajo ninguna circunstancia se puede vender o presupuestar nada que no exista en el catálogo oficial de Deco Vintage."*
+
+Erradicar los falsos positivos y la invención de productos en los canales de Audio (`/api/ai/voice-sale`) y Visión (`/api/ai/recognize-artwork`), garantizando que solo productos verificados con ID de catálogo oficial puedan ingresar a un borrador de venta.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas  
+Integrity mode: development  
+
+## Context & Directives
+- **Directiva Sagrada de Sebastián Jiménez:** *"Bajo ninguna circunstancia se puede vender o presupuestar nada que no exista en el catálogo oficial de Deco Vintage."*
+- **Entorno:** Stand ferial en vivo / POS Inteligente (`Modulo_Ventas`).
+- **Arquitectura:** Cero micro-fragmentación dogmática; justificación de techos de dominio y verificación Zero-Trust inquebrantable.
+
+## Requirements
+
+### R1. Frontera Dura y Manejo de Alternativas en Audio (`server/services/ai/aiMediaService.js`)
+1. **Prohibición Total de Borradores Fantasma:**
+   - En `processVoiceSaleAudio`, si `matched` es `null` (la obra dictada no existe en el catálogo con certeza), queda terminantemente prohibido hacer fallback a `item.title` o agregar ítems con `productId: null` o `webPosterId: null` a `enrichedItems`.
+2. **Manejo Transparente de Dictados Mixtos:**
+   - Si se dictan 2 o más obras y solo un subconjunto existe en el catálogo oficial (ej. *"1 Batman mediano y 2 pares de zapatos"*):
+     - Únicamente la obra real del catálogo entra a `enrichedItems`.
+     - Las obras no catalogadas se aíslan en `unmatchedItems`.
+     - El mensaje de respuesta al vendedor debe notificar con claridad:  
+       `"⚠️ Se preparó el borrador con Batman. Nota: No se encontró 'zapatos' en el catálogo oficial."`
+3. **Rechazo con Sugerencias Amigables:**
+   - Si ninguna obra dictada existe en el catálogo: `isSaleDetected = false`, `draftSale = null`, `items = []`.
+   - El endpoint debe retornar `suggestedPosters` con las 3 alternativas más cercanas (si existen) para que el vendedor pueda agregarlas en 1 toque desde la pantalla ante posibles errores de pronunciación o ruido acústico.
+   - Mensaje al vendedor: *"No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador."*
+
+### R2. Refinamiento Inteligente del Comparador (`matchPosterEverywhere`)
+1. **Eliminación del Coladero de 2 Tokens:**
+   - Eliminar la condición laxa `matchedTokens.length >= 2` que permite que palabras genéricas accidentales (*live*, *rain*, *sombrero*, *street*, *mundo*) emparejen obras completamente ajenas.
+2. **Criterios de Aceptación con Tolerancia Inteligente:**
+   - **Paso 1 (Alias / Códigos):** Coincidencia inmediata si hay match de alias canónico (`aliasRes.matched === true`) o código QR/SKU exacto.
+   - **Paso 2 (Normalización Previa):** Filtrar stopwords (*de, la, el, los, un, una, dos, en, con*), remover acentos y normalizar plurales simples (`s/es`).
+   - **Paso 3 (Múltiples Palabras Significativas):** Exigir cobertura léxica real $\ge 70\%$ de los términos significativos sobre el título o franquicia principal de la obra. Si la consulta menciona un personaje/franquicia clave (ej. *Spider-Man*, *Batman*, *Taylor Swift*), dicho término debe estar presente obligatoriamente en el resultado.
+   - **Paso 4 (1 Sola Palabra Significativa):** Solo se acepta si coincide directamente con el título primario, franquicia o alias registrado (prohibido validar basándose en tags secundarios o descripciones accesorias).
+
+### R3. Umbral de Certeza en Visión (`recognizePosterArtworkFromImage`)
+1. **Cero Forzado de Nearest-Neighbors:**
+   - Prohibido tomar el primer resultado vectorial o búsqueda aproximada si la similitud léxica/semántica no supera el umbral de certeza estricto.
+2. **Respuesta ante Obras Desconocidas:**
+   - Si la obra fotografiada no se encuentra en el catálogo con certeza (`matched === null`):
+     - `isArtworkDetected` DEBE ser `false`.
+     - `draftSale` DEBE ser estrictamente `null`.
+     - `items` DEBE ser `[]`.
+     - Mensaje al vendedor: *"La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo."*
+
+### R4. Cohesión y Arnés de Calidad (Sin Dogmas de 200 Líneas)
+1. **Cohesión Justificada y Techos de Dominio:**
+   - No micro-fragmentar archivos de forma artificial. Si `aiMediaService.js` crece de forma natural hasta ~240 líneas por la validación robusta, registrarlo legítimamente en `DOMAIN_CEILINGS` de `scripts/audit-monoliths.js` (`max: 260`, *"Orquestador multimodal de medios e inferencia"*).
+   - Si se decide extraer el matcher a `server/services/ai/aiMatchService.js`, realizarlo únicamente si aporta claridad modular real.
+2. **Compuertas Obligatorias del Arnés:**
+   - Ejecutar y aprobar en verde total:
+     ```powershell
+     npm run harness:check
+     ```
+     (9/9 pruebas Zero-Trust, 0 fugas de secretos, 0 violaciones de techos dinámicos y build de producción limpio con código de salida 0).
+
+## Acceptance Criteria
+
+### Audio Channel & Voice Sale Integrity
+- [ ] En `processVoiceSaleAudio`, ningún ítem con `productId: null` o `webPosterId: null` ingresa a `items`/`enrichedItems`.
+- [ ] Dictados con obras inexistentes (ej. *"zapatos deportivos y un sombrero mediano"*):
+  - Retorna `isSaleDetected: false`, `draftSale: null`, `items: []`, `total: 0`.
+  - Retorna `suggestedPosters` con hasta 3 sugerencias opcionales.
+  - Mensaje claro indicando que no se identificaron pósters del catálogo.
+- [ ] Dictados mixtos (ej. *"1 Batman mediano y 2 pares de zapatos"*):
+  - Solo la obra de catálogo entra a `items` y suma al total.
+  - Obras ajenas se aíslan en `unmatchedItems`.
+  - Mensaje advierte la exclusión de los ítems no encontrados.
+- [ ] Dictados con obras reales (ej. *"Spider-Man debut grande en tarjeta"*):
+  - Detecta la obra oficial al 100% sin regresiones.
+
+### Catalog Comparator Precision
+- [ ] La condición `matchedTokens.length >= 2` eliminada de `matchPosterEverywhere`.
+- [ ] Consultas multi-palabra exigen $\ge 70\%$ de cobertura léxica sobre título/franquicia y preservan términos clave de franquicia.
+- [ ] Consultas de una sola palabra solo emparejan contra título primario, franquicia o alias canónico registrado.
+- [ ] Normalización previa remueve stopwords, acentos y plurales simples de forma determinista.
+
+### Vision Artwork Recognition Integrity
+- [ ] Foto de arte ajeno/no catalogado (*Neon Cyber Lobster*):
+  - Retorna `isArtworkDetected: false`, `draftSale: null`, `items: []`.
+  - Prohibido asociar por proximidad vectorial forzada a obras ajenas (ej. Pink Floyd).
+- [ ] Foto de arte oficial (*La noche estrellada*):
+  - Reconoce la obra oficial sin fallos ni regresiones.
+
+### Verification & Quality Harness
+- [ ] Suite de pruebas automatizadas en `tests/` cubriendo los 4 casos límite locales obligatorios.
+- [ ] `scripts/audit-monoliths.js` actualizado en `DOMAIN_CEILINGS` para `aiMediaService.js` (`max: 260`) si excede el límite base.
+- [ ] `npm run harness:check` aprueba al 100% (Zero-Trust 9/9, audit:secrets, audit:monoliths, build).

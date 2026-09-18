@@ -104,7 +104,7 @@ describe('🛡️ VALIDACIÓN DE BLINDAJE: CERO BORRADORES FANTASMA Y SIZEID EN 
     assert.strictEqual(responseData.success, true);
     assert.strictEqual(responseData.isArtworkDetected, false);
     assert.strictEqual(responseData.draftSale, null, 'Cero borradores fantasma');
-    assert.match(responseData.message, /No se identificó ningún póster del catálogo/i);
+    assert.match(responseData.message, /No se identificó ningún póster del catálogo|no pertenece al catálogo oficial/i);
   });
 
   it('2.1 recognizePosterArtworkFromImage enlaza sizeId y baseTitle cuando hay match', async () => {

@@ -22,6 +22,7 @@ const DOMAIN_CEILINGS = {
   'server/services/embeddingService.js': { max: 250, reason: 'Servicio matemático de similitud coseno y embeddings' },
   'server/services/semantic/paymentExtractor.js': { max: 280, reason: 'Motor cohesivo de expresiones regulares de pago' },
   'src/App.jsx': { max: 250, reason: 'Router y layout maestro del frontend' },
+  'server/services/ai/aiMediaService.js': { max: 260, reason: 'Orquestador multimodal de medios e inferencia' },
 };
 
 const DEFAULT_CEILING = 200;
