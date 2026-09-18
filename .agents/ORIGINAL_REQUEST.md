@@ -2354,3 +2354,108 @@ Integrity mode: development
 - [ ] Suite de pruebas automatizadas en `tests/` cubriendo los 4 casos límite locales obligatorios.
 - [ ] `scripts/audit-monoliths.js` actualizado en `DOMAIN_CEILINGS` para `aiMediaService.js` (`max: 260`) si excede el límite base.
 - [ ] `npm run harness:check` aprueba al 100% (Zero-Trust 9/9, audit:secrets, audit:monoliths, build).
+
+## 2026-09-18T22:45:52Z
+
+# ⚔️ TEAMWORK PROJECT PROMPT — MILESTONE 2: INTEGRIDAD DIMENSIONAL, CANCELACIÓN DETERMINISTA Y REACTIVIDAD DE CHAT
+
+**Para:** Fred (`teamwork_preview_orchestrator`) y Cuadrilla de Ingeniería  
+**De:** Gary — CTO & Ingeniero DevOps en Jefe de Deko Labs  
+**Proyecto:** STAND {IA} — Módulo de Ventas Oficial (`Deco Vintage Guate`)  
+**Contexto Operativo:** El Milestone 1 (Frontera Dura de Audio y Cobertura 70% en Visión) ha sido desplegado y verificado al 100% en producción (Commit `c88f507`). Este Milestone 2 ataca los 3 defectos aislados descubiertos durante la auditoría forense profunda.
+
+Corregir los 3 defectos aislados descubiertos durante la auditoría forense del Milestone 1 en Stand {IA}: erradicar la inyección complaciente de tamaños estándar no fabricados, implementar la herramienta de descarte y cancelación determinista de borradores de venta en chat, y asegurar el auto-scroll reactivo en el viewport del cajero.
+
+Working directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas  
+Integrity mode: development  
+
+## Context & Operational Rules
+- **Repositorio:** `Modulo_Ventas` (Deco Vintage Guate / Deko Labs)
+- **Base previa:** Milestone 1 desplegado y verificado al 100% (Commit `c88f507`).
+- **Directiva Sagrada de Sebastián:** *"Bajo ninguna circunstancia se puede vender o presupuestar nada que no exista en el catálogo oficial de Deco Vintage."*
+- **Aislamiento Sagrado & Zero-Trust:** Prohibido tocar código de infraestructura ajena o credenciales de producción.
+
+## Requirements
+
+### R1. Fidelidad Dimensional Estricta (`server/services/catalog/webCatalogService.js` & `server/services/ai/aiToolsService.js`)
+1. **Eliminar la Puerta Trasera Complaciente:**
+   - En `server/services/catalog/webCatalogService.js` (función `buildPosterResult`), eliminar la inyección complaciente:
+     ```javascript
+     else if (STANDARD_SIZES[norm]) {
+       selectedSize = STANDARD_SIZES[norm];
+       if (!sizes.some((s) => s.sizeId === norm)) sizes.push(STANDARD_SIZES[norm]);
+     }
+     ```
+   - Si la obra tiene definido un array `sizes` oficial no vacío y el tamaño solicitado (`norm`) no existe dentro de sus opciones oficiales:
+     1. Marcar `sizeAvailable = false`.
+     2. Asignar `unavailableReason = `El diseño "${matched.titulo}" es exclusivo en: ${sizes.map(s => `${s.nombre} (${s.dimensiones || s.sizeId})`).join(', ')}. No se fabrica en ${requestedSize}.``.
+     3. `selectedSize` debe permanecer anclado en el tamaño primario legítimo de la obra (ej. `PORTADA_ALBUM`).
+2. **Respeto a Disponibilidad en el Asistente:**
+   - En `server/services/ai/aiToolsService.js` (`constructDraftPayload`), si `matched.sizeAvailable === false`, el asistente NO debe montar el borrador forzado en `enrichedItems`, sino aislar la obra o notificar al cliente los únicos formatos fabricados legítimamente.
+
+### R2. Cancelación Determinista en Chat — Tool `discardSaleDraft` (`aiToolsService.js` & `aiClosedLoopService.js`)
+1. **Declaración Oficial de Herramienta:**
+   - Declarar en `server/services/ai/aiToolsService.js`:
+     ```javascript
+     export const discardSaleDraftDeclaration = {
+       name: 'discardSaleDraft',
+       description: 'Descarta, cancela o vacía inmediatamente el borrador de venta actual ante peticiones de cancelación del cliente o vendedor ("cancela la orden", "no me llevo nada", "olvídalo", "borra el carrito").',
+       parameters: {
+         type: Type.OBJECT,
+         properties: {
+           reason: { type: Type.STRING, description: 'Motivo de la cancelación o descarte' }
+         }
+       }
+     };
+     ```
+   - Añadir `discardSaleDraftDeclaration` a `salesAssistantTools` (actualizando la cuenta de herramientas oficiales a 8 y ajustando las aserciones de prueba existentes en `db-tools.test.js` y `m1-challenger2-facade-adversarial.test.js`).
+2. **Ejecución y Emisión SSE de Limpieza:**
+   - En `server/services/ai/aiClosedLoopService.js`, al ejecutarse `discardSaleDraft`, emitir el evento SSE:
+     `{ event: { type: 'draft_sale', data: null }, toolRecord: { name: 'discardSaleDraft', args, result: { discarded: true, reason: args?.reason || 'Cancelado por usuario' }, id } }`.
+   - En `buildFallbackSummaries`, agregar el resumen correspondiente para confirmar la limpieza del borrador.
+   - Garantizar que el frontend hook (`useAiChatStream.js`) reciba `draft_sale: null` y limpie `setPendingDraft(null)` reactivamente, eliminando el widget flotante y el botón de confirmar.
+
+### R3. Corrección Reactiva de Auto-Scroll en Chat UI (`src/components/ai-chat/ChatMessageList.jsx` & `UnifiedAiChat.jsx`)
+1. **Auto-Scroll Confiable:**
+   - Garantizar que `chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })` se dispare de forma reactiva cada vez que se agrega un mensaje de usuario o asistente, y cuando se completa la respuesta de streaming, sin quedar bloqueado permanentemente por la heurística manual de scroll cuando el cajero necesita ver la respuesta activa en el viewport.
+
+### R4. Techos de Dominio y Calidad de Arnés
+1. **Cohesión Sin Micro-Fragmentación:**
+   - Respetar `DOMAIN_CEILINGS` en `scripts/audit-monoliths.js`. Si `aiToolsService.js` requiere líneas para acomodar la nueva herramienta y validaciones, ajustar su techo con justificación técnica si sobrepasa su límite de 250 líneas.
+2. **Suite Automatizada Obligatoria:**
+   - Crear suite de pruebas `tests/ai/milestone2-integrity.test.js` que valide formalmente:
+     - Intento de pedir obras exclusivas en tamaños no fabricados (ej. *Taylor Swift Cruel Summer* o *Pink Floyd* en Grande) -> Rechazo con `sizeAvailable: false` y formato exclusivo detallado.
+     - Disparo de `discardSaleDraft` ante intenciones de cancelación -> Emisión de `draft_sale: null` y descarte del borrador.
+3. **Compuertas del Arnés:**
+   - Ejecutar y aprobar:
+     ```powershell
+     npm run harness:check
+     ```
+     (9/9 pruebas Zero-Trust, 0 secretos, 0 monolitos, Vite build limpio con código de salida 0).
+
+## Acceptance Criteria
+
+### Dimensional Fidelity
+- [ ] La inyección artificial de `STANDARD_SIZES[norm]` en `buildPosterResult` está completamente eliminada.
+- [ ] Si un cliente solicita una obra de formato exclusivo (ej. `PORTADA_ALBUM`) en tamaño Grande o Mediano:
+  - `sizeAvailable` es estrictamente `false`.
+  - `unavailableReason` lista exactamente los formatos oficiales fabricados.
+  - `selectedSize` permanece en el tamaño primario legítimo de la obra.
+- [ ] En `constructDraftPayload`, obras con `sizeAvailable === false` no se añaden como válidas para venta en tamaños inexistentes.
+
+### Deterministic Cancellation
+- [ ] `discardSaleDraftDeclaration` está formalmente definida e integrada en `salesAssistantTools`.
+- [ ] Al invocar `discardSaleDraft` ante frases como *"cancela la orden"*, *"olvídalo"* o *"no me llevo nada"*:
+  - Se emite el evento SSE `{ type: 'draft_sale', data: null }`.
+  - El frontend hook `useAiChatStream.js` limpia `pendingDraft` a `null`.
+  - El widget de borrador desaparece inmediatamente de la interfaz.
+- [ ] Las pruebas existentes que validan el número de herramientas oficiales en `salesAssistantTools` se actualizan congruentemente a 8 declaraciones sin regresiones.
+
+### UI Auto-Scroll
+- [ ] El contenedor de mensajes desplaza automáticamente el scroll hacia abajo al emitirse nuevos mensajes o finalizar el streaming, asegurando que el contenido del asistente siempre sea visible.
+
+### Test Automation & Quality Harness
+- [ ] Nueva suite de pruebas `tests/ai/milestone2-integrity.test.js` cubre con 100% de éxito los casos de fidelidad dimensional y descarte determinista.
+- [ ] `scripts/audit-monoliths.js` no reporta infracciones.
+- [ ] `npm run harness:check` aprueba en verde total (Zero-Trust 9/9, 0 secretos, build de producción limpio).
+

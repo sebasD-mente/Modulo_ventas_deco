@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import ChatToolCards from './ChatToolCards';
 
@@ -6,19 +6,45 @@ export default function ChatMessageList({
   messages = [], isLoading = false, processingNote = '', onAddPosterToDraft, onAddPoster,
   chatContainerRef, isPinnedToBottomRef, chatBottomRef, children
 }) {
+  const isProgrammaticScrollRef = useRef(false);
+  const prevMsgCountRef = useRef(messages.length);
+  const prevLastMsgStreamingRef = useRef(false);
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    const c = chatContainerRef?.current;
+    if (!c) return;
+    isProgrammaticScrollRef.current = true;
+    if (isPinnedToBottomRef) isPinnedToBottomRef.current = true;
+    if (behavior === 'auto') { c.scrollTop = c.scrollHeight; isProgrammaticScrollRef.current = false; }
+    else { c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }); setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400); }
+  };
+
   const handleScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
     const c = chatContainerRef?.current;
     if (c && isPinnedToBottomRef) isPinnedToBottomRef.current = (c.scrollHeight - c.scrollTop - c.clientHeight <= 80);
   };
+
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    const isNewMessage = messages.length > prevMsgCountRef.current;
+    const streamJustFinished = prevLastMsgStreamingRef.current && !lastMsg?.isStreaming;
+    const isStreaming = Boolean(lastMsg?.isStreaming);
+
+    if (isNewMessage || streamJustFinished) scrollToBottom('smooth');
+    else if (isStreaming && isPinnedToBottomRef?.current) scrollToBottom('auto');
+
+    prevMsgCountRef.current = messages.length;
+    prevLastMsgStreamingRef.current = isStreaming;
+  }, [messages]);
+
   const addFn = onAddPosterToDraft || onAddPoster;
 
   const renderContent = (txt) => {
     if (!txt) return null;
     return txt.split('\n').map((line, i) => (
       <span key={i} className={`block ${line.startsWith('• ') || line.startsWith('- ') ? 'pl-2' : ''}`}>
-        {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-          part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-bold text-white">{part.slice(2, -2)}</strong> : part
-        )}
+        {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-bold text-white">{part.slice(2, -2)}</strong> : part)}
       </span>
     ));
   };
@@ -46,9 +72,7 @@ export default function ChatMessageList({
             >
               <div className="whitespace-pre-wrap">
                 {renderContent(m.text)}
-                {m.isStreaming && (
-                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />
-                )}
+                {m.isStreaming && <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />}
               </div>
               <ChatToolCards message={m} msg={m} onAddPoster={addFn} onAddPosterToDraft={addFn} />
             </div>

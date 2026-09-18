@@ -18,7 +18,7 @@ const DOMAIN_CEILINGS = {
   'server/services/geminiPoolService.js': { max: 350, reason: 'Máquina de estados para rotación y pool de API Keys' },
 
   // 3. Herramientas, Motores RegEx compactos y Embeddings
-  'server/services/ai/aiToolsService.js': { max: 250, reason: 'Catálogo oficial de Function Calling de Gemini' },
+  'server/services/ai/aiToolsService.js': { max: 280, reason: 'Catálogo oficial de Function Calling de Gemini (8 herramientas) y validación de borradores' },
   'server/services/embeddingService.js': { max: 250, reason: 'Servicio matemático de similitud coseno y embeddings' },
   'server/services/semantic/paymentExtractor.js': { max: 280, reason: 'Motor cohesivo de expresiones regulares de pago' },
   'src/App.jsx': { max: 250, reason: 'Router y layout maestro del frontend' },

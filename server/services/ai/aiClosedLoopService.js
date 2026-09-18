@@ -16,8 +16,11 @@ export function buildFallbackSummaries(executedTools) {
         const warn = d.unmatchedItems?.length > 0 ? `\n⚠️ *No encontradas en catálogo: ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')}*` : '';
         summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}${warn}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
       } else if (d.unmatchedItems?.length > 0) {
-        summaries.push(`No encontré la obra ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')} en el catálogo de Deco Vintage.`);
+        const unavail = d.unmatchedItems.find(u => u.unavailableReason);
+        summaries.push(unavail?.unavailableReason || `No encontré la obra ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')} en el catálogo de Deco Vintage.`);
       }
+    } else if (t.name === 'discardSaleDraft') {
+      summaries.push('🗑️ Borrador de venta cancelado y vaciado.');
     } else if (t.name === 'searchCatalog') {
       const count = t.result?.matchesCount || (Array.isArray(t.result) ? t.result.length : 0);
       summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla (Mediano Q65 más vendido). ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
@@ -40,6 +43,10 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
   const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
   const id = call.id || null;
   try {
+    if (call.name === 'discardSaleDraft') {
+      const result = { discarded: true, reason: call.args?.reason || 'Cancelado por usuario' };
+      return { event: { type: 'draft_sale', data: null }, toolRecord: { name: call.name, args: call.args || {}, result, id } };
+    }
     if (call.name === 'prepareSaleDraft' && call.args) {
       const draft = await constructDraftPayload(tenantId, call.args, message);
       return { event: { type: 'draft_sale', data: draft }, toolRecord: { name: call.name, args: call.args, result: draft, id } };

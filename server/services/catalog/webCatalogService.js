@@ -48,17 +48,37 @@ function normSize(requestedSize) {
   return raw.toUpperCase();
 }
 
-function buildPosterResult(matched, requestedSize) {
-  let selectedSize = matched.sizes && matched.sizes[0] ? matched.sizes[0] : STANDARD_SIZES.MEDIANO, sizeAvailable = true, unavailableReason = null;
+function resolvePosterSize(item, requestedSize) {
+  const hasOfficialSizes = Array.isArray(item.sizes) && item.sizes.length > 0;
+  const sizes = hasOfficialSizes ? item.sizes : Object.values(STANDARD_SIZES);
+  const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize)
+    || sizes.find((s) => s.sizeId === item.primarySize)
+    || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM')
+    || sizes[0]
+    || STANDARD_SIZES.MEDIANO;
+
+  let selectedSize = legitPrimary, sizeAvailable = true, unavailableReason = null;
   if (requestedSize) {
     const norm = normSize(requestedSize), cleanSize = String(requestedSize).toUpperCase().trim();
-    const sizes = Array.isArray(matched.sizes) && matched.sizes.length > 0 ? matched.sizes : Object.values(STANDARD_SIZES);
     const found = sizes.find((s) => s.sizeId === norm || s.sizeId === cleanSize || s.nombre?.toUpperCase() === cleanSize || s.nombre?.toUpperCase().includes(cleanSize) || (s.dimensiones && s.dimensiones.toUpperCase().includes(cleanSize)));
-    if (found) selectedSize = found;
-    else if (STANDARD_SIZES[norm]) { selectedSize = STANDARD_SIZES[norm]; if (!sizes.some((s) => s.sizeId === norm)) sizes.push(STANDARD_SIZES[norm]); }
-    else { sizeAvailable = false; unavailableReason = `El diseño "${matched.titulo}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${sizes.map((s) => `${s.nombre} (${s.dimensiones})`).join(', ')}.`; }
+    if (found) {
+      selectedSize = found;
+    } else {
+      sizeAvailable = false;
+      const title = item.titulo || item.name || 'Póster';
+      const availStr = sizes.map((s) => `${s.nombre} (${s.dimensiones || s.sizeId})`).join(', ');
+      unavailableReason = hasOfficialSizes
+        ? `El diseño "${title}" es exclusivo en: ${availStr}. No se fabrica en ${requestedSize}.`
+        : `El diseño "${title}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${availStr}.`;
+      selectedSize = legitPrimary;
+    }
   }
-  const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : matched.titulo;
+  return { selectedSize, sizes, sizeAvailable, unavailableReason };
+}
+
+function buildPosterResult(matched, requestedSize) {
+  const { selectedSize, sizeAvailable, unavailableReason } = resolvePosterSize(matched, requestedSize);
+  const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : (matched.titulo || matched.name || 'Póster');
   return {
     type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id, description: `${displayTitle} (${selectedSize.nombre})`,
     baseTitle: displayTitle, category: matched.categoria || matched.category || 'ARTE', thumbUrl: matched.thumbUrl || matched.imageUrl, imageUrl: matched.imageUrl,
@@ -81,17 +101,13 @@ async function findLocalMatch(tenantId, clean, requestedSize) {
       return pNorm === cleanNorm || pNorm.includes(cleanNorm) || cleanNorm.includes(pNorm);
     });
     if (match) {
-      let selectedSize = match.sizes?.[0] || { sizeId: 'MEDIANO', nombre: 'Mediano', precio: Number(match.basePrice || match.precioMinimo || 65) };
-      if (requestedSize && Array.isArray(match.sizes)) {
-        const norm = normSize(requestedSize), found = match.sizes.find((s) => s.sizeId === norm || s.nombre?.toUpperCase() === norm);
-        if (found) selectedSize = found;
-      }
+      const { selectedSize, sizes, sizeAvailable, unavailableReason } = resolvePosterSize(match, requestedSize);
       const title = match.name || match.titulo || 'Póster';
       return {
         type: match.type || 'LOCAL_PRODUCT', productId: isUuid(match.id) ? match.id : null, posterId: match.id, description: `${title} (${selectedSize.nombre || 'Mediano'})`, baseTitle: title,
         category: match.category || match.categoria || 'ARTE', thumbUrl: match.thumbUrl || match.imageUrl || null, imageUrl: match.imageUrl || null, unitPrice: Number(selectedSize.precio || match.basePrice || match.precioMinimo || 65),
-        sizeId: selectedSize.sizeId || 'MEDIANO', sizeName: selectedSize.nombre || 'Mediano', availableSizes: match.sizes || [{ sizeId: 'ESTANDAR', nombre: 'Estándar', precio: Number(match.basePrice || 65) }],
-        sizeAvailable: true, unavailableReason: null,
+        sizeId: selectedSize.sizeId || 'MEDIANO', sizeName: selectedSize.nombre || 'Mediano', availableSizes: sizes,
+        sizeAvailable, unavailableReason,
       };
     }
   } catch (err) { console.warn('[matchPosterEverywhere] ⚠️ Error local:', err.message); }

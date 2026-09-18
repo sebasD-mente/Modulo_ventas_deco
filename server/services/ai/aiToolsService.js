@@ -11,7 +11,17 @@ export const getCashDrawerStatusDeclaration = { name: 'getCashDrawerStatus', des
 export const getSellerShiftReportDeclaration = { name: 'getSellerShiftReport', description: 'Consulta el ranking y métricas de ventas por vendedor en el evento activo (ventas totales, monto total, ticket promedio).', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, sellerId: { type: Type.STRING } } } };
 export const getProductionQueueStatusDeclaration = { name: 'getProductionQueueStatus', description: 'Consulta el estado de la cola de impresión y producción de obras en taller (PENDIENTE, SEPARADO, A_PRODUCCION, IMPRESO) y demoras.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING } } } };
 export const checkInventoryStockDeclaration = { name: 'checkInventoryStock', description: 'Verifica las existencias y disponibilidad física de una obra en el stand o catálogo.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, sizeId: { type: Type.STRING } }, required: ['query'] } };
-export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
+export const discardSaleDraftDeclaration = {
+  name: 'discardSaleDraft',
+  description: 'Descarta, cancela o vacía inmediatamente el borrador de venta actual ante peticiones de cancelación del cliente o vendedor ("cancela la orden", "no me llevo nada", "olvídalo", "borra el carrito").',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      reason: { type: Type.STRING, description: 'Motivo de la cancelación o descarte' }
+    }
+  }
+};
+export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, discardSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
 
 const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 }];
 const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s === 'PEQUENO' ? 35.0 : s === 'GRANDE' ? 125.0 : s === 'GIGANTE' ? 180.0 : 65.0;
@@ -74,25 +84,42 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
 
     if (matched) {
-      const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
-      const subtotal = Number((qty * unitPrice).toFixed(2));
-      grandTotal += subtotal;
-      enrichedItems.push({
-        productId: isUuid(matched?.productId) ? matched.productId : null,
-        webPosterId: matched.posterId || null,
-        description: matched.description,
-        baseTitle: matched.baseTitle || rawName,
-        category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
-        thumbUrl: matched.thumbUrl || null,
-        imageUrl: matched.imageUrl || null,
-        quantity: qty,
-        unitPrice,
-        subtotal,
-        sizeId: matched.sizeId || normSize,
-        availableSizes: matched.availableSizes || [],
-        sizeAvailable: matched.sizeAvailable !== false,
-        unavailableReason: matched.unavailableReason || null,
-      });
+      if (matched.sizeAvailable === false) {
+        unmatchedItems.push({
+          rawName,
+          requestedSize: normSize,
+          quantity: qty,
+          sizeAvailable: false,
+          unavailableReason: matched.unavailableReason,
+          availableSizes: matched.availableSizes || [],
+          candidates: [{
+            id: matched.posterId || matched.productId,
+            titulo: matched.baseTitle || rawName,
+            subtitulo: matched.unavailableReason,
+            categoria: matched.category,
+          }],
+        });
+      } else {
+        const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
+        const subtotal = Number((qty * unitPrice).toFixed(2));
+        grandTotal += subtotal;
+        enrichedItems.push({
+          productId: isUuid(matched?.productId) ? matched.productId : null,
+          webPosterId: matched.posterId || null,
+          description: matched.description,
+          baseTitle: matched.baseTitle || rawName,
+          category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
+          thumbUrl: matched.thumbUrl || null,
+          imageUrl: matched.imageUrl || null,
+          quantity: qty,
+          unitPrice,
+          subtotal,
+          sizeId: matched.sizeId || normSize,
+          availableSizes: matched.availableSizes || [],
+          sizeAvailable: true,
+          unavailableReason: null,
+        });
+      }
     } else {
       let candidates = [];
       try {

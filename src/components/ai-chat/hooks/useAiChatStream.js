@@ -137,7 +137,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
             try {
               const data = JSON.parse(dataLines.join('\n'));
               if (ev === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
-              else if (ev === 'draft_sale') { const d = data.draftSale || data; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); } }
+              else if (ev === 'draft_sale') { const d = data ? (data.draftSale || data) : null; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); } }
               else if (ev === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraftRef.current ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
               else if (ev === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
               else if (data && TOOL_EVENT_MAP[ev]) updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[ev]]: ev === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[ev] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
@@ -153,7 +153,6 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
     } catch (err) { updateAiMsg((m) => ({ ...m, isStreaming: false, text: `⚠️ No pude responder: ${err.message}` })); } finally { setIsLoading(false); setProcessingNote(''); }
   };
   useEffect(() => () => { cancelRaf(); abortControllerRef.current?.abort(); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); }, []);
-
   return { messages, setMessages, inputText, setInputText, isLoading, processingNote, pendingDraft, setPendingDraft, swappingIndex, setSwappingIndex, swapQuery, setSwapQuery, swapResults, isSearchingSwap, openSwapModal, closeSwapModal, fetchInitialSwapPosters, handleSwapSearchChange, selectSwapPoster, updateDraftItemSize, updateDraftItemQty, removeDraftItem, updateDraftPaymentMethod, discardDraft, addPosterToDraft, handleSendText, handleVoiceUpload, handleImageUpload, confirmPendingSale, transferDraftToManualForm, aiError, clearAiError, retryVoiceUpload, lastAudioBlobRef };
 }
 export default useAiChatStream;

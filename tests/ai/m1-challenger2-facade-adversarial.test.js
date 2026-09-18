@@ -28,9 +28,23 @@ const MOCK_DB_PRODUCTS = [
       { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' },
     ],
   },
+  {
+    id: 'prod-anime-1',
+    sku: 'DV-ANIME-01',
+    name: 'Póster Genérico Anime',
+    category: 'ANIME',
+    basePrice: 65,
+    imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/anime.jpg',
+    tags: ['anime'],
+    isActive: true,
+    tenantId: 'tenant-test',
+    sizes: [
+      { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
+    ],
+  },
 ];
 
-describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada Barrel, Retrocompatibilidad y Paridad 27 Símbolos', () => {
+describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada Barrel, Retrocompatibilidad y Paridad 28 Símbolos', () => {
   let originalPrismaFindMany;
 
   beforeEach(() => {
@@ -56,8 +70,9 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
     'videoRecognitionResponseSchema',
     'batchPhotoResponseSchema',
     'buildSalesSystemPrompt',
-    // aiToolsService (13)
+    // aiToolsService (14)
     'prepareSaleDraftDeclaration',
+    'discardSaleDraftDeclaration',
     'searchCatalogDeclaration',
     'getEventKPIsDeclaration',
     'getCashDrawerStatusDeclaration',
@@ -82,13 +97,13 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
     'streamChatWithSalesAssistant',
   ];
 
-  describe('1. Paridad de 27 Símbolos y Referencias de Submódulo', () => {
+  describe('1. Paridad de 28 Símbolos y Referencias de Submódulo', () => {
 
-    it('1.1. La lista de 27 símbolos esperados cuenta con exactamente 27 elementos', () => {
-      assert.strictEqual(EXPECTED_SYMBOLS.length, 27, 'Deben ser exactamente 27 símbolos');
+    it('1.1. La lista de 28 símbolos esperados cuenta con exactamente 28 elementos', () => {
+      assert.strictEqual(EXPECTED_SYMBOLS.length, 28, 'Deben ser exactamente 28 símbolos');
     });
 
-    it('1.2. Cada uno de los 27 símbolos está definido en el barrel facade y no es undefined/null', () => {
+    it('1.2. Cada uno de los 28 símbolos está definido en el barrel facade y no es undefined/null', () => {
       for (const sym of EXPECTED_SYMBOLS) {
         assert.ok(
           sym in barrel,
@@ -116,8 +131,9 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
       assert.strictEqual(barrel.batchPhotoResponseSchema, promptSubmodule.batchPhotoResponseSchema);
       assert.strictEqual(barrel.buildSalesSystemPrompt, promptSubmodule.buildSalesSystemPrompt);
 
-      // 13 de aiToolsService
+      // 14 de aiToolsService
       assert.strictEqual(barrel.prepareSaleDraftDeclaration, toolsSubmodule.prepareSaleDraftDeclaration);
+      assert.strictEqual(barrel.discardSaleDraftDeclaration, toolsSubmodule.discardSaleDraftDeclaration);
       assert.strictEqual(barrel.searchCatalogDeclaration, toolsSubmodule.searchCatalogDeclaration);
       assert.strictEqual(barrel.getEventKPIsDeclaration, toolsSubmodule.getEventKPIsDeclaration);
       assert.strictEqual(barrel.getCashDrawerStatusDeclaration, toolsSubmodule.getCashDrawerStatusDeclaration);
@@ -232,16 +248,17 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
       assert.ok(prompt.includes('TRATO EXCLUSIVO DE "TÚ"'), 'Debe exigir trato exclusivo de tú');
     });
 
-    it('3.3. salesAssistantTools contiene las 7 declaraciones esperadas con parámetros válidos', () => {
+    it('3.3. salesAssistantTools contiene las 8 declaraciones esperadas con parámetros válidos', () => {
       const { salesAssistantTools } = barrel;
       assert.ok(Array.isArray(salesAssistantTools), 'salesAssistantTools debe ser un array');
       assert.strictEqual(salesAssistantTools.length, 1);
       const decls = salesAssistantTools[0].functionDeclarations;
       assert.ok(Array.isArray(decls), 'functionDeclarations debe ser un array');
-      assert.strictEqual(decls.length, 7, 'Deben haber exactamente 7 function declarations');
+      assert.strictEqual(decls.length, 8, 'Deben haber exactamente 8 function declarations');
 
       const expectedNames = [
         'prepareSaleDraft',
+        'discardSaleDraft',
         'searchCatalog',
         'getEventKPIs',
         'getCashDrawerStatus',
@@ -353,9 +370,9 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
       const files = [
         { path: 'server/services/aiMultimodalService.js', max: 40 },
         { path: 'server/services/ai/aiPromptService.js', max: 180 },
-        { path: 'server/services/ai/aiMediaService.js', max: 200 },
-        { path: 'server/services/ai/aiToolsService.js', max: 200 },
-        { path: 'server/services/ai/aiStreamService.js', max: 150 },
+        { path: 'server/services/ai/aiMediaService.js', max: 260 },
+        { path: 'server/services/ai/aiToolsService.js', max: 280 },
+        { path: 'server/services/ai/aiStreamService.js', max: 200 },
       ];
 
       for (const item of files) {

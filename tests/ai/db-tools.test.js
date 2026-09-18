@@ -1,10 +1,13 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { Type } from '@google/genai';
 import { ENV } from '../../server/config/env.js';
 import { getGeminiClient } from '../../server/config/gemini.js';
+import { prisma } from '../../server/config/prisma.js';
+import { invalidateCatalogCache } from '../../server/services/webCatalogService.js';
 import {
   salesAssistantTools,
+  discardSaleDraftDeclaration,
   getEventKPIsDeclaration,
   getCashDrawerStatusDeclaration,
   getSellerShiftReportDeclaration,
@@ -17,9 +20,57 @@ import {
   streamChatWithSalesAssistant,
 } from '../../server/services/aiMultimodalService.js';
 
+const MOCK_CATALOG = [
+  {
+    id: 'prod-spiderman-1',
+    sku: 'DV-SPID-01',
+    name: 'Spider-Man Vintage Comic',
+    category: 'CÓMICS',
+    basePrice: 65,
+    imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/spidey.jpg',
+    tags: ['spiderman', 'spider-man', 'marvel'],
+    isActive: true,
+    tenantId: 'tenant-test',
+    sizes: [
+      { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
+      { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
+      { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65, badge: '⭐ Más vendido' },
+      { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+    ],
+  },
+  {
+    id: 'prod-badbunny-1',
+    sku: 'DV-BB-01',
+    name: 'Bad Bunny - Un Verano Sin Ti',
+    category: 'MUSICA',
+    basePrice: 55,
+    imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/badbunny.jpg',
+    tags: ['bad bunny', 'un verano sin ti', 'musica', 'verano'],
+    isActive: true,
+    tenantId: 'tenant-test',
+    sizes: [
+      { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', precio: 55, badge: 'Formato vinilo' },
+    ],
+  },
+];
+
 describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {IA} (M3)', () => {
+  let origFindMany;
   beforeEach(() => {
     ENV.GEMINI_API_KEY = 'test-gemini-key-for-m3-db-tools';
+    invalidateCatalogCache();
+    if (prisma?.product) {
+      origFindMany = prisma.product.findMany;
+      prisma.product.findMany = async () => MOCK_CATALOG;
+    }
+  });
+
+  afterEach(() => {
+    invalidateCatalogCache();
+    if (prisma?.product && origFindMany) {
+      prisma.product.findMany = origFindMany;
+    }
   });
 
   describe('1. Validación de Schemas y Declaraciones con @google/genai (Type Object)', () => {
@@ -66,10 +117,10 @@ describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {
       assert.deepStrictEqual(checkInventoryStockDeclaration.parameters.required, ['query']);
     });
 
-    it('1.6 salesAssistantTools incluye las 7 herramientas oficiales del asistente', () => {
+    it('1.6 salesAssistantTools incluye las 8 herramientas oficiales del asistente', () => {
       assert.ok(Array.isArray(salesAssistantTools));
       const decls = salesAssistantTools[0].functionDeclarations;
-      assert.strictEqual(decls.length, 7);
+      assert.strictEqual(decls.length, 8);
       const names = decls.map(d => d.name);
       assert.ok(names.includes('prepareSaleDraft'));
       assert.ok(names.includes('searchCatalog'));
@@ -78,6 +129,15 @@ describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {
       assert.ok(names.includes('getSellerShiftReport'));
       assert.ok(names.includes('getProductionQueueStatus'));
       assert.ok(names.includes('checkInventoryStock'));
+      assert.ok(names.includes('discardSaleDraft'));
+    });
+
+    it('1.7 discardSaleDraftDeclaration define schema con Type.OBJECT y razón opcional', () => {
+      assert.strictEqual(discardSaleDraftDeclaration.name, 'discardSaleDraft');
+      assert.ok(discardSaleDraftDeclaration.description.includes('Descarta'));
+      assert.strictEqual(discardSaleDraftDeclaration.parameters.type, Type.OBJECT);
+      assert.ok(discardSaleDraftDeclaration.parameters.properties.reason);
+      assert.strictEqual(discardSaleDraftDeclaration.parameters.properties.reason.type, Type.STRING);
     });
   });
 

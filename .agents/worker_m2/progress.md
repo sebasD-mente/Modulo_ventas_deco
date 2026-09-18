@@ -1,29 +1,15 @@
-# Progress — worker_m2
+# Progress Log — Milestone 2 Implementation
 
-Last visited: 2026-09-16T00:13:30Z
+Last visited: 2026-09-18T23:05:00Z
 
 ## Status
-- [x] Read DISPATCH.md, ORIGINAL_REQUEST.md (header 2026-09-15T23:59:14Z), and explorer_survey_3/handoff.md
-- [x] Initialized DISPATCH, BRIEFING, and progress for Milestone Fase 2 (Cirugía 2.3)
-- [x] Verified skills (cirugia-arquitectura-cero-deuda, aislamiento-estricto-proyectos)
-- [x] Inspected existing `src/components/manual-sale/hooks/useCatalogSearch.js` and `src/services/catalogCacheService.js`
-- [x] Implemented Cirugía 2.3 in `src/services/catalogCacheService.js`:
-  - Exported `TIMEOUT_MS = 1500` (reduced from 5000ms).
-  - Implemented polymorphic `searchPostersWithFallback` supporting timeout number, options object `{ signal, timeoutMs }`, or direct `AbortSignal`.
-  - Linked external signal to internal controller; rethrows on external abort without local snapshot fallback.
-  - Implemented deferred `saveCatalogSnapshot` (`setTimeout(persist, 0)`) in browser, synchronous in tests/Node.js.
-  - Final line count: 160 lines (ceiling: <= 200).
-- [x] Implemented Cirugía 2.3 in `src/components/manual-sale/hooks/useCatalogSearch.js`:
-  - Added `activeAbortRef = useRef(null)`.
-  - Aborts in-flight requests immediately on `searchQuery` change before debounce.
-  - Aborts in-flight requests on `clearSearch()` and `selectPoster()`.
-  - Aborts in-flight requests on component unmount cleanup.
-  - Passes `{ signal: controller?.signal }` to `searchPostersWithFallback`.
-  - Handles `AbortError` cleanly without logging error or freezing UI.
-  - Guards `setIsSearching(false)` only for active controller.
-  - Final line count: 102 lines (ceiling: <= 200).
-- [x] Verified with test command: `node --test tests/catalog/catalog-cache-service.test.js` (22/22 pass, 0 fail).
-- [x] Verified with line audit: `npm run audit:monoliths` (both files <= 200 lines: 102 and 160 lines).
-- [x] Verified with build: `npm run build` (vite v5.4.21 exit code 0).
-- [x] Verified full zero-trust harness: `npm run harness:check` (9/9 zero-trust pass, 0 secrets).
-- [ ] Document in handoff.md and report to parent via send_message
+- [x] Read DISPATCH.md and ORIGINAL_REQUEST.md
+- [x] Read Explorer 1, Explorer 2, and Explorer 3 handoff reports
+- [x] Dumped and reviewed skill `cirugia-arquitectura-cero-deuda`
+- [x] Initialized BRIEFING.md and progress.md
+- [x] Step 1: Implement R1 (Strict Dimensional Integrity in webCatalogService.js, aiToolsService.js, aiClosedLoopService.js, aiStreamService.js)
+- [x] Step 2: Implement R2 (Deterministic Cancelation Tool discardSaleDraft in aiToolsService.js, aiPromptService.js, aiClosedLoopService.js, aiStreamService.js, aiChatController.js, useAiChatStream.js)
+- [x] Step 3: Implement R3 (Reactive Auto-Scroll in ChatMessageList.jsx)
+- [x] Step 4: Implement R4 (Ceiling in audit-monoliths.js, update existing test suites db-tools.test.js and m1-challenger2-facade-adversarial.test.js, create tests/ai/milestone2-integrity.test.js)
+- [x] Step 5: Run all test suites and npm run harness:check (passed 100%, exit code 0)
+- [ ] Step 6: Write handoff.md and report to parent orchestrator

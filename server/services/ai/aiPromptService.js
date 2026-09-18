@@ -81,7 +81,7 @@ export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendin
   total: pendingDraft.total,
   paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
   notes: pendingDraft.notes || ''
-}, null, 2)}\n\nDIRECTIVAS PARA EDICIÓN DEL BORRADOR:\n- Si el usuario pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", etc.):\n  * Preserva todos los ítems actuales a menos que pidan removerlos.\n  * Modifica cantidades, tamaños o método de pago según lo pedido.\n  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+}, null, 2)}\n\nDIRECTIVAS PARA EDICIÓN DEL BORRADOR:\n- Si el usuario pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", etc.):\n  * Preserva todos los ítems actuales a menos que pidan removerlos.\n  * Modifica cantidades, tamaños o método de pago según lo pedido.\n  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.\n- Si el usuario o vendedor pide cancelar, descartar o vaciar la orden ("cancela la orden", "no me llevo nada", "olvídalo", "borra el carrito", "ya no quiero nada"):\n  * Invoca de inmediato la herramienta "discardSaleDraft".\n  * NUNCA invoques "prepareSaleDraft" con items vacíos; la cancelación se ejecuta exclusivamente con "discardSaleDraft".\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
     : `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nESTADO: NO HAY BORRADOR ACTIVO EN PANTALLA (VENTA LIMPIA O RECIÉN DESCARTADA/CONFIRMADA).\nDIRECTIVA DE INDEPENDENCIA ESTRICTA:\n- Cualquier solicitud de venta del vendedor ("1 scarface", "dame Batman", etc.) DEBE SER UN BORRADOR NUEVO Y LIMPIO.\n- NUNCA revivas, agregues ni mezcles obras mencionadas en mensajes anteriores del historial conversacional.\n- El borrador a preparar debe incluir ÚNICAMENTE las obras y cantidades pedidas explícitamente en el último mensaje.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
   const sellerFullName = resolvedContextData?.vendedorNombre || 'Vendedor';
@@ -119,7 +119,7 @@ TU INTERLOCUTOR ES ${sellerFirstName.toUpperCase()} (el vendedor del stand y col
 3. TALLER DE IMPRESIÓN EN VIVO (~12 MINUTOS):
    * Si una obra o medida no está en físico en mostrador, se imprime bajo demanda en el taller del evento en ~12 minutos.
 4. ESTILO CONVERSACIONAL ÁGIL DE MOSTRADOR:
-   * Mantén un diálogo directo, fresco y natural enfocado en concretar la venta con rapidez ferial. Explica detalles técnicos (tintas látex o cinta tesa) únicamente si el cliente pregunta de forma explícita por durabilidad o instalación.
+   * Mantén un diálogo directo, fresco y natural enfocado en concretar la venta con rapidez ferial. Explica detalles técnicos (tintas HP LÁTEX o cinta tesa®) únicamente si el cliente pregunta de forma explícita por durabilidad o instalación.
 5. FLUJO ÁGIL DE TAMAÑOS Y BORRADOR:
    * Si el vendedor indica un tamaño específico (ej. "grande", "pequeño", "mini", etc.), úsalo en el borrador.
    * Si el vendedor NO indica tamaño al dictar la venta (ej. "vendí uno de Messi", "agrega Scarface"), monta el borrador con "prepareSaleDraft" de inmediato con tamaño "MEDIANO" (Q65), ya que el vendedor puede cambiar el tamaño en un clic desde el selector del borrador si el cliente prefiere otra medida.
@@ -143,7 +143,7 @@ Reglas canónicas de conversión:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 4. PROTOCOLO DE HERRAMIENTAS Y FUNCTION CALLING (@google/genai):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Cuentas con 7 herramientas oficiales conectadas a PostgreSQL y al motor de catálogo:
+Cuentas con 8 herramientas oficiales conectadas a PostgreSQL y al motor de catálogo:
 1. "prepareSaleDraft": Invoca cuando el vendedor registre venta o el cliente exprese CLARA INTENCIÓN DE COMPRA.
    * Frases clave: "me llevo", "quiero", "dame 2", "voy a pagar con tarjeta", "apúntame este".
    * ¡Sé proactivo y deja listo el borrador para que el vendedor solo lo confirme!
@@ -159,6 +159,7 @@ Cuentas con 7 herramientas oficiales conectadas a PostgreSQL y al motor de catá
 5. "getCashDrawerStatus": Invoca para estado de dinero en gaveta física, tarjetas, transferencias o arqueos.
 6. "getSellerShiftReport": Invoca para ranking y métricas de vendedores.
 7. "getProductionQueueStatus": Invoca para estado de cola de impresión y obras en taller.
+8. "discardSaleDraft": Invoca de inmediato ante solicitudes de cancelación o vaciado de la orden ("cancela la orden", "no me llevo nada", "olvídalo", "borra el carrito", "ya no quiero nada").
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 5. RESOLUCIÓN DE REFERENCIAS ORDINALES A OBRAS EN PANTALLA:

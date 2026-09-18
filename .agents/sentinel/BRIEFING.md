@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-18T21:32:20Z
+# BRIEFING — 2026-09-18T22:45:52Z
 
 ## Mission
-Blindaje de catálogo y cero alucinaciones en STAND {IA} (Deco Vintage Guate / Deko Labs): erradicar falsos positivos y productos inventados en Audio (/api/ai/voice-sale) y Visión (/api/ai/recognize-artwork), garantizando que solo obras verificadas con ID de catálogo oficial ingresen al borrador de venta, con refinamiento inteligente del comparador (cobertura léxica >= 70%, sin coladero de 2 tokens) y arnés de calidad 100% verde.
+Milestone 2 de STAND {IA} (Deco Vintage Guate / Deko Labs): erradicar la inyección complaciente de tamaños estándar no fabricados en webCatalogService y aiToolsService, implementar la herramienta de descarte y cancelación determinista de borradores de venta (discardSaleDraft) en chat y SSE, y asegurar el auto-scroll reactivo en el viewport del cajero (ChatMessageList / UnifiedAiChat), con suite automatizada tests/ai/milestone2-integrity.test.js y compuertas de arnés npm run harness:check 100% verde.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -60,6 +60,8 @@ Blindaje de catálogo y cero alucinaciones en STAND {IA} (Deco Vintage Guate / D
 - Victory Auditor (Optimización Latencia & Resiliencia STAND IA): 7dd31c07-6148-4cca-97d6-ab6de8a66043 (victory_auditor_29, VICTORY CONFIRMED)
 - Orchestrator (Blindaje Catálogo & Cero Alucinaciones): 4b69e24e-ec96-4db1-bb83-90c2279d7f86 (orchestrator_30, completed)
 - Victory Auditor (Blindaje Catálogo & Cero Alucinaciones): 4f98bc6e-f4a2-440c-b2d4-96facfe10b3c (victory_auditor_30, VICTORY CONFIRMED)
+- Orchestrator (Milestone 2: Integridad Dimensional, Cancelación y Scroll): 6d8743f8-fc3c-4fed-86b2-e58e09881d09 (orchestrator_31, completed)
+- Victory Auditor (Milestone 2): b452261d-50d9-4b20-9c7d-0279dda36f0c (victory_auditor_31, VICTORY CONFIRMED)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -122,17 +124,22 @@ Blindaje de catálogo y cero alucinaciones en STAND {IA} (Deco Vintage Guate / D
 - R2 Matcher: Eliminar coladero matchedTokens.length >= 2 de matchPosterEverywhere. Normalización previa (stopwords, acentos, plurales s/es). Cobertura léxica >= 70% en multi-palabra y preservación obligatoria de término clave/franquicia. Búsqueda mono-término solo contra título, franquicia o alias canónico.
 - R3 Visión: Cero forzado de nearest-neighbors; ante matched == null: isArtworkDetected=false, draftSale=null, items=[].
 - R4 Arquitectura y Calidad: Cero micro-fragmentación dogmática; si aiMediaService crece justificadamente hasta ~240 líneas, registrar DOMAIN_CEILINGS max: 260 en scripts/audit-monoliths.js. npm run harness:check 100% verde (9/9 Zero-Trust, 0 secretos, 0 violaciones de techos dinámicos, build producción limpio con código de salida 0).
+- Milestone 2: Integridad Dimensional, Cancelación Determinista y Reactividad de Chat
+- R1: Eliminación inyección STANDARD_SIZES en webCatalogService.js; sizeAvailable=false si sizes existe y tamaño no coincide; selectedSize anclado en formato primario; constructDraftPayload no incluye obras con sizeAvailable=false en enrichedItems.
+- R2: discardSaleDraft en aiToolsService y salesAssistantTools (8 declaraciones oficiales, actualizar db-tools y m1-challenger2); SSE draft_sale: null y resúmenes fallback en aiClosedLoopService; useAiChatStream limpia pendingDraft a null.
+- R3: Auto-scroll reactivo en ChatMessageList.jsx y UnifiedAiChat.jsx disparado ante nuevos mensajes y finalización de streaming sin bloqueo permanente por scroll manual.
+- R4: Techos en scripts/audit-monoliths.js respetados (ajustar techo de aiToolsService si requiere justificación); tests/ai/milestone2-integrity.test.js 100% PASS; npm run harness:check 100% verde.
 
 ## User Context
-- **Last user request**: Blindaje de Catálogo y Cero Alucinaciones en STAND {IA} (R1 audio/alternativas, R2 matcher léxico >= 70%, R3 visión sin nearest-neighbor forzado, R4 arnés y techos de dominio).
+- **Last user request**: Milestone 2: Integridad Dimensional, Cancelación Determinista y Reactividad de Chat (R1 fidelidad dimensional, R2 tool discardSaleDraft, R3 reactividad de auto-scroll, R4 techos y calidad de arnés).
 - **Pending clarifications**: none
-- **Delivered results**: Blindaje de Catálogo y Cero Alucinaciones en STAND {IA} completado, validado y formalmente certificado con veredicto VICTORY CONFIRMED por victory_auditor_30. R1 (frontera dura en audio con rechazo de productId: null, aislamiento de unmatchedItems y suggestedPosters), R2 (comparador de 4 pasos con cobertura léxica >= 70%, erradicación del coladero de 2 tokens y preservación de franquicias), R3 (umbral de certeza en visión con mensaje estándar y cero nearest-neighbors forzados), R4 (DOMAIN_CEILINGS actualizado para aiMediaService.js max: 260 y arnés npm run harness:check 100% verde: Zero-Trust 9/9, 0 secretos, 0 monolitos, build exitoso).
+- **Delivered results**: Milestone 2 (Integridad Dimensional, Cancelación Determinista y Reactividad de Chat) 100% completado, verificado por revisión por pares y formalmente auditado e independientemente certificado con veredicto VICTORY CONFIRMED por victory_auditor_31.
 
 ## Project Status
 - **Phase**: complete
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Active Orchestrator**: orchestrator_30 (4b69e24e-ec96-4db1-bb83-90c2279d7f86, completed)
-- **Active Auditor**: victory_auditor_30 (4f98bc6e-f4a2-440c-b2d4-96facfe10b3c, VICTORY CONFIRMED)
+- **Active Orchestrator**: orchestrator_31 (6d8743f8-fc3c-4fed-86b2-e58e09881d09, completed)
+- **Active Auditor**: victory_auditor_31 (b452261d-50d9-4b20-9c7d-0279dda36f0c, VICTORY CONFIRMED)
 - **Monitoring Crons**: none (cleaned up)
 
 ## Victory Audit Status
@@ -144,16 +151,15 @@ Blindaje de catálogo y cero alucinaciones en STAND {IA} (Deco Vintage Guate / D
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/ORIGINAL_REQUEST.md — Authoritative verbatim user request
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/BRIEFING.md — Sentinel persistent memory
 - c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_30/handoff.md — Orchestrator Fred final handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_30/handoff.md — Victory Auditor final handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/catalog/webCatalogService.js — Refined 4-step catalog comparator
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiMediaService.js — Multimodal audio & vision service with hard boundaries
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/controllers/ai/aiMediaController.js — Media endpoints controller
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/src/components/ai-chat/hooks/useAiChatStream.js — Chat stream hook with suggestedPosters support
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Monolith auditor with domain ceiling
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/ai/voice-hard-catalog-boundary.test.js — Audio boundary test suite
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/adversarial/m3-matcher-vision-challenger2.test.js — Adversarial matcher test suite (27/27 PASS)
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/sentinel/handoff.md — Sentinel master handoff
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiMediaService.js — Multimodal audio & vision service
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/catalog/webCatalogService.js — Catalog search & matching engine
-- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Monolith auditor & domain ceilings
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/orchestrator_31/handoff.md — Orchestrator Fred final handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/victory_auditor_31/handoff.md — Victory Auditor final handoff
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/catalog/webCatalogService.js — Strict dimensional resolver (backdoor removed)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiToolsService.js — Official 8 tools with discardSaleDraft
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/server/services/ai/aiClosedLoopService.js — Tool execution with SSE draft_sale: null
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/src/components/ai-chat/hooks/useAiChatStream.js — Reactive draft null reset hook
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/src/components/ai-chat/ChatMessageList.jsx — Smooth auto-scroll reactive message list
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/scripts/audit-monoliths.js — Monolith ceilings audit
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/tests/ai/milestone2-integrity.test.js — Milestone 2 integrity test suite (9/9 PASS)
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/challenger_m2_2/live_chat_viewport.png — Live UI chat viewport screenshot
+- c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/challenger_m2_2/live_chat_fullpage.png — Live UI full page screenshot
+

@@ -57,6 +57,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     for (const call of functionCalls) {
       const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
       if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message);
+      else if (call.name === 'discardSaleDraft') draftSale = null;
       else if (call.name === 'searchCatalog' && call.args?.query) {
         suggestedPosters = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);
       } else if (call.name === 'getEventKPIs') {
@@ -164,6 +165,11 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       return;
     }
     if (items.length === 0 && unmatched.length > 0) {
+      const unavail = unmatched.find(u => u.unavailableReason);
+      if (unavail?.unavailableReason) {
+        yield { type: 'token', text: `⚠️ ${unavail.unavailableReason}` };
+        return;
+      }
       const missingStr = unmatched.map(u => `'${u.rawName}'`).join(', ');
       const suggestions = formatCandidates(unmatched);
       yield { type: 'token', text: `No encontré la obra ${missingStr} en el catálogo de Deco Vintage.${suggestions} ¿Deseas consultar por otro artista o buscarlo en el catálogo?` };

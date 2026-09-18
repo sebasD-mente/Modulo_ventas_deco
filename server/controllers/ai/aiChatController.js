@@ -56,6 +56,8 @@ export async function handleChatQuery(req, res) {
         const { name, args } = toolCall;
         if (name === 'prepareSaleDraft' && args) {
           draft = await constructDraftPayload(tenantId, args, message.trim());
+        } else if (name === 'discardSaleDraft') {
+          draft = null;
         } else if (name === 'searchCatalog' && args?.query) {
           const resolvedQuery = normalizeArtworkQuery(args.query);
           const matches = await searchWebPosters({
