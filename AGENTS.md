@@ -52,6 +52,24 @@ Este documento define las convenciones, directivas inviolables, arquitectura y a
 * Obras de música (`MUSICA`) son exclusivas en formato `PORTADA_ALBUM` (30×30 cm a Q55.00) y jamás deben emitir un `prepareSaleDraft` con tamaños estándar.
 * Ante cancelaciones del cliente, el closed-loop debe purgar el borrador de forma atómica (`draftSale: null`).
 
+### 👁️ E. Protocolo Coercitivo Post-Despliegue y Auditoría Panóptica 360°
+* **Veto Absoluto de Localhost:** Queda TERMINANTEMENTE PROHIBIDO presentar capturas de `localhost` en reportes post-despliegue. Solo es válida la URL oficial de producción (`https://ventas.decovintage.online`) con sesión autenticada.
+* **Ciclo de Despliegue de 8 Pasos:** El despliegue oficial (`npm run deploy`) no termina al ver HTTP 200 en `/health` de Dokploy; exige completar los pasos adicionales post-despliegue:
+  1. *Paso 1:* Puerta de calidad local (`npm run harness:check`).
+  2. *Paso 2:* Push a `origin/main`.
+  3. *Paso 3:* Disparo de Webhook en Dokploy VPS.
+  4. *Paso 4:* Polling criptográfico de reinicio de contenedor (`gitCommit` y uptime fresco).
+  5. *Paso 5:* Verificación mecánica E2E de salud, sesión JWT, evento activo y catálogo (`npm run verify:prod`).
+  6. *Paso 6:* Navegación en vivo con Chrome DevTools en `https://ventas.decovintage.online` e inyección de auth (`DEVTOOLS_AUTH_SNIPPET`). Interacción real en el canal sin bypasses.
+  7. *Paso 7:* Análisis Forense Panóptico 360° de Evidencias (Sin Sesgo de Confirmación).
+  8. *Paso 8:* Compuerta de Decisión: Certificación de Entrega o Registro de Hallazgo para Fred.
+* **Los 5 Pilares del Análisis Forense 360° de Evidencias:**
+  1. *Montaje Integral vs. "Bien Montado":* No basta con que el componente aparezca; debe estar completamente operativo, con controles táctiles $\ge 44\text{px}$ y botones reactivos respondiendo en vivo.
+  2. *Fidelidad Estricta a la Especificación & Cero Alucinaciones:* Respeto milimétrico al requerimiento pactado (ej. si se acordó Podio Top 3, deben haber estrictamente 3 puestos con sus 3 medallas; un 4to o 5to puesto sin medalla o un texto contradictorio es un defecto inaceptable).
+  3. *Veracidad Contable y Datos Reales (Ground Truth vs. DB):* Las cifras y subtotales en pantalla deben coincidir con la realidad de PostgreSQL, descartando fórmulas sintéticas arbitrarias.
+  4. *Visión Panóptica Sin Sesgo de Confirmación:* Prohibido el sesgo de túnel (mirar solo la métrica y desentenderse del resto). Se audita la cabecera, el chat, el panel de borrador, el layout y las alertas globales.
+  5. *Protocolo de Cero Auto-Encubrimiento y Separación de Roles:* Gary audita con rigor forense e identifica hallazgos; Fred & Engineering Squad ejecutan las cirugías en el código. Si se detecta cualquier falla, Gary **TIENE TERMINANTEMENTE PROHIBIDO** parchar código a escondidas; debe redactar el Hallazgo Forense y despacharlo a Fred.
+
 ---
 
 ## ⚡ 3. COMANDOS CLAVE DE DESARROLLO Y ARNÉS DE CALIDAD
@@ -73,6 +91,9 @@ npm run audit:monoliths
 
 # 5. Compuerta de Calidad Maestra (Debe pasar 100% verde antes de cualquier PR)
 npm run harness:check
+
+# 6. Verificación E2E y Arnés Anti-Pereza en Producción
+npm run verify:prod
 ```
 
 ---

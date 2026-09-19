@@ -11,20 +11,19 @@ export default function TopPostersCard({ data, onAddPoster }) {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
         <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Trophy className="w-3.5 h-3.5" /> Top Pósters Más Vendidos
+          <Trophy className="w-3.5 h-3.5" /> Podio Top 3 - Más Vendidos
         </span>
         <span className="text-[10px] text-neutral-400 truncate max-w-[150px]">
           {eventName || 'Evento Activo'}
         </span>
       </div>
 
-      {/* Top Posters List */}
+      {/* Top 3 Podium List */}
       <div className="space-y-2">
-        {topPosters.slice(0, 5).map((poster) => {
+        {topPosters.slice(0, 3).map((poster) => {
           const isGold = poster.rank === 1;
           const isSilver = poster.rank === 2;
-          const isBronze = poster.rank === 3;
-          const badgeIcon = isGold ? '🥇' : isSilver ? '🥈' : isBronze ? '🥉' : `#${poster.rank}`;
+          const badgeIcon = isGold ? '🥇' : isSilver ? '🥈' : '🥉';
 
           return (
             <div
@@ -69,7 +68,7 @@ export default function TopPostersCard({ data, onAddPoster }) {
                   <span className="text-[10px] text-emerald-400 font-mono font-bold">
                     {poster.unitsSold} {poster.unitsSold === 1 ? 'unidad' : 'unidades'}
                   </span>
-                  <span className="text-[10px] text-neutral-500 font-mono">
+                  <span className="text-[10px] text-neutral-400 font-mono">
                     • Q{Number(poster.totalRevenue || 0).toFixed(2)}
                   </span>
                 </div>

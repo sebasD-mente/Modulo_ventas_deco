@@ -42,7 +42,7 @@ export function buildFallbackSummaries(executedTools) {
       summaries.push(`📈 **Pico de ventas:** ${t.result.peakWindow || 'Horario concurrido'} (Q ${Number(t.result.peakAmount || 0).toFixed(2)} acumulados en ${t.result.peakPercentage || 0}% del volumen).`);
     } else if (t.name === 'getTopSellingPosters' && t.result) {
       const topStr = (t.result.topPosters || []).slice(0, 3).map((p, i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} ${p.title} (${p.unitsSold} uds)`).join(', ');
-      summaries.push(`🏆 **Top pósters más vendidos:** ${topStr || 'Sin registros aún'}.`);
+      summaries.push(`🏆 **Podio Top 3 más vendidos:** ${topStr || 'Sin registros aún'}.`);
     }
   }
   return summaries.length > 0 ? summaries : ['Listo para registrar ventas o consultar catálogo en el stand.'];
@@ -75,7 +75,7 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
       return { event: { type: 'hourly_sales', data: h }, toolRecord: { name: call.name, args: call.args, result: h, id } };
     }
     if (call.name === 'getTopSellingPosters') {
-      const tp = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 5 });
+      const tp = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 3 });
       return { event: { type: 'top_posters', data: tp }, toolRecord: { name: call.name, args: call.args, result: tp, id } };
     }
     if (call.name === 'getCashDrawerStatus') {

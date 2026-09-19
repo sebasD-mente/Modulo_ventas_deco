@@ -65,7 +65,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
       } else if (call.name === 'getHourlySalesAnalytics') {
         hourlySales = await executeGetHourlySalesAnalytics({ tenantId, eventId: effEvId, date: call.args?.date || date });
       } else if (call.name === 'getTopSellingPosters') {
-        topPosters = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 5 });
+        topPosters = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 3 });
       } else if (call.name === 'getCashDrawerStatus') cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, effEvId); else if (call.name === 'getSellerShiftReport') sellerShiftReport = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null); else if (call.name === 'getProductionQueueStatus') productionQueueStatus = await executeGetProductionQueueStatus(tenantId, effEvId);
       else if (call.name === 'checkInventoryStock' && call.args?.query) {
         inventoryStock = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, effEvId);

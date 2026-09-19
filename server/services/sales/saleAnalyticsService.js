@@ -74,10 +74,16 @@ export async function getHourlySalesAnalytics({ tenantId, eventId, date = null }
   }
 }
 
+const cleanPosterTitle = (desc) => (desc || 'Obra Sin Título')
+  .replace(/\s*\((?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante|Portada(?:\s+de)?\s+Álbum|Portada(?:\s+de)?\s+Album|\d+\s*x\s*\d+\s*cm)\)\s*$/i, '')
+  .replace(/\s*-\s*(?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante|Portada(?:\s+de)?\s+Álbum|Portada(?:\s+de)?\s+Album|\d+\s*x\s*\d+\s*cm)\s*$/i, '')
+  .replace(/^Póster\s+(?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante)\s+/i, 'Póster ')
+  .trim();
+
 /**
- * Ranking Top 3 / Top 5 de pósters más vendidos con métricas y carátulas
+ * Podio oficial con los 3 pósters más vendidos con métricas y recaudación contable exacta
  */
-export async function getTopSellingPosters({ tenantId, eventId, date = null, limit = 5 }) {
+export async function getTopSellingPosters({ tenantId, eventId, date = null, limit = 3 } = {}) {
   try {
     const effEventId = await resolveActiveEvent(tenantId, eventId);
     const eventRecord = effEventId ? await prisma.event.findUnique({ where: { id: effEventId }, select: { id: true, name: true } }) : null;
@@ -90,31 +96,65 @@ export async function getTopSellingPosters({ tenantId, eventId, date = null, lim
     const grouped = await prisma.saleItem.groupBy({
       by: ['description', 'productId'],
       where: { sale: saleWhere },
-      _sum: { quantity: true, unitPrice: true },
-      orderBy: { _sum: { quantity: 'desc' } },
-      take: Math.max(1, Math.min(10, limit))
+      _sum: { quantity: true, subtotal: true },
+      orderBy: { _sum: { quantity: 'desc' } }
     });
 
-    const productIds = grouped.map((g) => g.productId).filter(Boolean);
+    const productIds = Array.from(new Set(grouped.map((g) => g.productId).filter(Boolean)));
     const products = productIds.length > 0 ? await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true, imageUrl: true, category: true, basePrice: true } }) : [];
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    const topPosters = grouped.map((g, idx) => {
+    const consolidatedMap = new Map();
+    for (const g of grouped) {
       const prod = g.productId ? productMap.get(g.productId) : null;
-      const unitsSold = g._sum?.quantity || 0;
-      const unitPrice = prod?.basePrice ? Number(prod.basePrice) : 65.0;
-      return {
-        rank: idx + 1,
-        id: g.productId || `top-poster-${idx}`,
-        title: g.description,
-        category: prod?.category || 'ARTE',
-        unitsSold,
-        unitPrice,
-        totalRevenue: Number((unitsSold * unitPrice).toFixed(2)),
-        imageUrl: prod?.imageUrl || null,
-        thumbUrl: prod?.imageUrl || null
-      };
-    });
+      const cleanTitle = prod?.name || cleanPosterTitle(g.description);
+      const key = g.productId ? `p:${g.productId}` : `t:${cleanTitle.toLowerCase()}`;
+      const units = Number(g._sum?.quantity) || 0;
+      const subtotalVal = g._sum?.subtotal != null
+        ? Number(g._sum.subtotal)
+        : units * (prod?.basePrice ? Number(prod.basePrice) : 65.0);
+
+      if (!consolidatedMap.has(key)) {
+        consolidatedMap.set(key, {
+          id: g.productId || `top-poster-${consolidatedMap.size}`,
+          title: cleanTitle,
+          category: prod?.category || 'ARTE',
+          unitsSold: units,
+          totalRevenue: subtotalVal,
+          imageUrl: prod?.imageUrl || null,
+          thumbUrl: prod?.imageUrl || null,
+          basePrice: prod?.basePrice ? Number(prod.basePrice) : null
+        });
+      } else {
+        const item = consolidatedMap.get(key);
+        item.unitsSold += units;
+        item.totalRevenue += subtotalVal;
+        if (!item.imageUrl && prod?.imageUrl) {
+          item.imageUrl = prod.imageUrl;
+          item.thumbUrl = prod.imageUrl;
+        }
+      }
+    }
+
+    const take = 3; // Tope estricto del podio Top 3
+    const topPosters = Array.from(consolidatedMap.values())
+      .sort((a, b) => b.unitsSold - a.unitsSold || b.totalRevenue - a.totalRevenue)
+      .slice(0, take)
+      .map((poster, idx) => {
+        const totalRev = Number(poster.totalRevenue.toFixed(2));
+        const unitPrice = poster.unitsSold > 0 ? Number((totalRev / poster.unitsSold).toFixed(2)) : (poster.basePrice || 65.0);
+        return {
+          rank: idx + 1,
+          id: poster.id,
+          title: poster.title,
+          category: poster.category,
+          unitsSold: poster.unitsSold,
+          unitPrice,
+          totalRevenue: totalRev,
+          imageUrl: poster.imageUrl,
+          thumbUrl: poster.thumbUrl
+        };
+      });
 
     return { eventId: effEventId, eventName: eventRecord?.name || 'Evento Activo', count: topPosters.length, topPosters };
   } catch (err) {
