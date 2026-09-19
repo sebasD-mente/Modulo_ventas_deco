@@ -46,6 +46,7 @@ public/uploads/*
 # Test artifacts and screenshots
 tests/*.png
 *.png
+test_evidence/
 scratch/
 
 
