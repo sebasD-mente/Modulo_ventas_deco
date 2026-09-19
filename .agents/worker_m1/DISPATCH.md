@@ -1,80 +1,75 @@
-# DISPATCH — Worker M1 (Motor de Búsqueda Híbrida y RAG Cero Contaminación)
+## 2026-09-19T21:59:04Z
 
-## Identity & Role
-- Archetype: teamwork_preview_worker
-- Assigned Working Directory: c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\worker_m1
-- Exclusive Write Ownership:
-  * `server/services/semantic/entityAliases.js`
-  * `server/services/embeddingService.js`
-  * `server/services/webCatalogService.js`
+MANDATORY FIRST STEP: Read c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\ORIGINAL_REQUEST.md completely, specifically the latest section under "## Follow-up — 2026-09-19T21:51:50Z". Also read survey_domain1.md.
 
-## Mandatory Reference Documents
-1. `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\ORIGINAL_REQUEST.md` (Read header `2026-09-15T23:59:14Z`)
-2. `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 2)
-3. Explorer 1 Handoff: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_1\handoff.md`
-4. Explorer 2 Handoff: `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_2\handoff.md`
-
-## Mandatory Integrity Warning
+MANDATORY INTEGRITY WARNING:
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
 
-## Detailed Implementation Tasks
+EXCLUSIVE FILE OWNERSHIP:
+You own exclusively:
+- scripts/audit-monoliths.js
+- server/validators/remoteSaleValidators.js
+- server/services/sales/remoteSaleService.js
+- server/controllers/remoteSaleController.js
+- server/routes/apiRoutes.js (mounting Domain 1 routes)
 
-### 1. `server/services/semantic/entityAliases.js`
-- Export `UNIVERSAL_STOP_WORDS` (Set of 50+ counter colloquial terms: `'de', 'la', 'el', 'los', 'las', 'en', 'y', 'un', 'una', 'unos', 'unas', 'con', 'por', 'para', 'cuanto', 'cuánto', 'cuesta', 'cuestan', 'precio', 'precios', 'tienen', 'tienes', 'hay', 'que', 'del', 'al', 'o', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseño', 'diseños', 'hola', 'buenas', 'buenos', 'muestrame', 'mustrame', 'muéstrame', 'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo', 'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'`).
-- Export `KNOWN_SHORT_ENTITIES = new Set(['f1', 'u2', 'r34', 'go', 'up', 'cr7'])`.
-- Add entity `Formula 1 - F1` with category `DEPORTES` or `CARRERAS` and aliases:
-  `['f1', 'formula 1', 'formula uno', 'carreras', 'ferrari f1', 'red bull f1', 'verstappen', 'hamilton', 'senna', 'ayrton senna']`.
-- Add entity `Cristiano Ronaldo - CR7` with category `FUTBOL` and aliases:
-  `['el bicho', 'cr7', 'cristiano ronaldo', 'cristiano', 'ronaldo', 'siuu', 'el comandante']`.
-- Update `resolveEntityAlias`: allow word boundary match for short entities:
-  `if (item.cleanAlias.length >= 3 || KNOWN_SHORT_ENTITIES.has(item.cleanAlias))`.
-- Line count ceiling: `<= 600` lines.
+YOUR MISSION (Milestone 1 — Dominio 1: Ventas de Redes, CRM y Anticipos 50/50):
+1. Update `scripts/audit-monoliths.js`:
+   Incorporate into `DOMAIN_CEILINGS`:
+   - 'server/services/sales/remoteSaleService.js': { max: 350, reason: 'Servicio transaccional cohesivo de ventas de redes, CRM y anticipos 50/50' }
+   - 'server/services/printSheetService.js': { max: 280, reason: 'Gestor cohesivo de pliegos diarios y ciclo de vida de taller' }
+   - 'server/services/commissionService.js': { max: 300, reason: 'Motor financiero transaccional de liquidaciones y cálculo del 20%' }
+   - 'server/controllers/remoteSaleController.js': { max: 250, reason: 'Controlador integral de clientes y ventas remotas' }
+   - 'server/routes/apiRoutes.js': { max: 350, reason: 'Manifiesto central de rutas de la API de STAND {IA}' }
 
-### 2. `server/services/webCatalogService.js`
-- Import `UNIVERSAL_STOP_WORDS` from `./semantic/entityAliases.js` instead of defining local `STOP_WORDS`.
-- Re-export `UNIVERSAL_STOP_WORDS` and `KNOWN_SHORT_ENTITIES` for backwards compatibility.
+2. Create `server/validators/remoteSaleValidators.js`:
+   - `customerSchema` (fullName min 2 max 100 trim, phone regex 8-15 digits, email optional nullable, deliveryAddress min 5 optional nullable, department, municipality, sourceChannel enum ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'OTRO'] default 'WHATSAPP', notes max 500)
+   - `remoteSaleItemSchema` (productId optional uuid nullable, description min 1, quantity positive int default 1, unitPrice non-negative number, isCustom boolean default false, material enum ['PVC_5MM', 'MDF_5_5MM', 'VINILO_SOLO'] optional nullable, customDimensions optional nullable, customImageUrl optional nullable)
+   - `remoteSalePaymentSchema` (method enum ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'OTRO'], amount positive number, reference optional nullable, receiptUrl optional nullable)
+   - `createRemoteSaleSchema` (eventId default 'evt-ventas-redes-online', customerId optional uuid, customer customerSchema optional, deliveryMethod enum ['PUNTO_VENTA', 'ENVIO_COURIER', 'RETIRO_EVENTO'] default 'ENVIO_COURIER', shippingCost non-negative default 0, shippingCourier optional, shippingTrackingNumber optional, pickupEventId optional required if RETIRO_EVENTO, items min 1, payments min 1, discount non-negative default 0, notes max 500, idempotencyKey optional. Refines: customerId or customer must exist, pickupEventId if RETIRO_EVENTO)
+   - `balancePaymentSchema` (payments min 1 of remoteSalePaymentSchema, notes optional)
 
-### 3. `server/services/embeddingService.js`
-- Import `UNIVERSAL_STOP_WORDS`, `KNOWN_SHORT_ENTITIES`, and `resolveEntityAlias` from `./semantic/entityAliases.js`.
-- In `searchHybridPosters`:
-  * Apply `resolveEntityAlias(cleanQuery)` to determine `effectiveQuery = (aliasRes.matched && aliasRes.searchQuery) ? aliasRes.searchQuery : cleanQuery`.
-  * Compute `normQueryTokens` filtering out `UNIVERSAL_STOP_WORDS` and retaining tokens where `(t.length > 2 || KNOWN_SHORT_ENTITIES.has(t))`.
-  * Raise complementary vector similarity threshold from `0.60` to `0.72` (`vecEntry.similarity >= 0.72`).
-  * Replace `.some` with strict coverage `normQueryTokens.length > 0 && normQueryTokens.every((tok) => posterText.includes(tok))`.
-  * Refactor `allSameTitle` gate to root canonical entity gate: if top lexical results share query tokens, retain all posters sharing those tokens (allowing multiple posters of the same character like Messi) while strictly rejecting foreign candidates.
-- Line count ceiling: `<= 200` lines (DO NOT EXCEED).
+3. Create `server/services/sales/remoteSaleService.js`:
+   - `findOrCreateCustomer(tenantId, customerData, tx = prisma)`: lookup by tenantId and phone. If exists, update address/department/etc.; if not, create.
+   - `createCustomer({ tenantId, customerData })`: checks unique phone in tenantId. If exists, throws 409 error. If not, creates.
+   - `getCustomersList({ tenantId, query, phone, page = 1, limit = 20 })`: paginated search by name or phone.
+   - `getCustomerById({ tenantId, customerId })`: returns customer with sales history and metrics: totalOrders, ltv, pendingBalance, lastOrderDate.
+   - `createRemoteSaleTransaction({ tenantId, sellerId, data, idempotencyKey })`:
+     * Event: data.eventId || 'evt-ventas-redes-online'.
+     * Arithmetic: itemsSubtotal = sum(round(quantity * unitPrice, 2)), productsAmount = max(0, round(itemsSubtotal - discount, 2)), totalAmount = round(productsAmount + shippingCost, 2), paymentsTotal = sum(round(p.amount, 2)).
+     * Strict 50% Gate: requiredDeposit = round(totalAmount * 0.50, 2). If paymentsTotal < requiredDeposit - 0.01: throw 400 error ("Anticipo insuficiente: Se requiere al menos el 50% del total de la orden...").
+     * If paymentsTotal >= totalAmount - 0.01: paymentStatus = 'PAGADO_TOTAL', depositAmount = totalAmount, balanceDue = 0.00, status = 'COMPLETADA'.
+     * If totalAmount * 0.50 <= paymentsTotal < totalAmount: paymentStatus = 'ANTICIPO_PAGADO', depositAmount = paymentsTotal, balanceDue = round(totalAmount - paymentsTotal, 2), status = 'PENDIENTE'.
+     * Inside prisma.$transaction:
+       - customer resolution (findOrCreateCustomer if data.customer supplied).
+       - atomic sequential saleNumber via generateSaleNumber(eventId, tx).
+       - atomic create of Sale, SaleItem (with isCustom, material, customDimensions, customImageUrl, productionStatus: 'PENDIENTE'), SalePayment, and auditLog.
+     * Idempotency handling: fast-path lookup if idempotencyKey provided, and catch P2002 for idempotent replay.
+   - `registerBalancePayment({ saleId, tenantId, sellerId, payments, notes, tx })`:
+     * Inside prisma.$transaction:
+       - find sale by id and tenantId. Verify status !== 'ANULADA'.
+       - Verify balanceDue > 0.
+       - newPaymentsTotal = sum(p.amount). Verify Math.abs(newPaymentsTotal - balanceDue) <= 0.05.
+       - create payments in SalePayment.
+       - update Sale to balanceDue = 0.00, depositAmount = totalAmount, paymentStatus = 'PAGADO_TOTAL', status = 'COMPLETADA'.
+       - auditLog record.
 
-## Verification Requirements
-Run the following test commands and report output in `handoff.md`:
-1. `node --test tests/ai/embeddingService.test.js`
-2. `node --test tests/adversarial/m1-embeddings-adversarial.test.js`
-3. Check regression cases:
-   - Query `"muéstrame lo que tenemos de messi"` produces tokens `['messi']`.
-   - Query `"f1"` retains `"f1"` and resolves to Formula 1.
-4. `npm run audit:monoliths`
+4. Create `server/controllers/remoteSaleController.js`:
+   - `getCustomers`, `createCustomer`, `getCustomer360`, `createRemoteSale`, `registerBalancePayment`.
 
-## 2026-09-16T00:09:47Z
-You are Worker M1 (teamwork_preview_worker).
-Your assigned working directory is:
-`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\worker_m1`
+5. Update `server/routes/apiRoutes.js`:
+   - Import validators and controllers.
+   - Mount routes under requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']):
+     * GET /api/customers -> getCustomers
+     * POST /api/customers -> validate(customerSchema), createCustomer
+     * GET /api/customers/:id -> getCustomer360
+     * POST /api/sales/remote -> validate(createRemoteSaleSchema), createRemoteSale
+     * POST /api/sales/:id/balance-payment -> validate(balancePaymentSchema), registerBalancePayment
 
-Read your full dispatch instructions in:
-`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\worker_m1\DISPATCH.md`
-
-Read:
-`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\ORIGINAL_REQUEST.md` (header 2026-09-15T23:59:14Z)
-`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_1\handoff.md`
-`c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\explorer_survey_2\handoff.md`
-
-Your exclusive write ownership is:
-- `server/services/semantic/entityAliases.js` (ceiling <= 600 lines)
-- `server/services/webCatalogService.js` (keep intact, replace STOP_WORDS import)
-- `server/services/embeddingService.js` (ceiling <= 200 lines)
-
-DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A teamwork_preview_auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
-
-Implement Cirugía 2.1 and Cirugía 2.2 following the exact blueprints in the handoffs.
-Run the required tests (`node --test tests/ai/embeddingService.test.js`, `node --test tests/adversarial/m1-embeddings-adversarial.test.js`, `npm run audit:monoliths`).
-Document all commands, line counts, and results in `c:\Users\sebas\Documents\Antigravity Files\Modulo_Ventas\.agents\worker_m1\handoff.md`.
-Notify the parent orchestrator via send_message when complete.
-
+6. VERIFICATION:
+   - Run tests:
+     * npm run test:security
+     * npm run audit:monoliths
+     * npm run build
+   - Document commands and outputs in your handoff.md.
+   - Notify parent orchestrator when complete.

@@ -1,16 +1,14 @@
-# Progress — Worker M1
+# Progress Log - worker_m1
 
-**Last visited**: 2026-09-16T00:19:00Z  
-**Status**: COMPLETED  
+Last visited: 2026-09-19T22:04:30Z
 
-## Steps
-- [x] Step 1: Read DISPATCH.md, ORIGINAL_REQUEST.md, and explorer survey handoffs 1 & 2.
-- [x] Step 2: Initialize BRIEFING.md and local skills.
-- [x] Step 3: Run baseline tests to verify current test state (17/17 embedding, 23/23 adversarial).
-- [x] Step 4: Implement Cirugía 2.1 in `server/services/semantic/entityAliases.js` (UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES, F1 & CR7 entities, resolveEntityAlias word boundary).
-- [x] Step 5: Implement Cirugía 2.1 in `server/services/webCatalogService.js` (replace local STOP_WORDS with import and re-export).
-- [x] Step 6: Implement Cirugía 2.1 & 2.2 in `server/services/embeddingService.js` (imports, effectiveQuery, normQueryTokens, vector threshold >= 0.72, every match, root canonical entity gate).
-- [x] Step 7: Run verification tests (`node --test tests/ai/embeddingService.test.js`, `node --test tests/adversarial/m1-embeddings-adversarial.test.js`, regression checks).
-- [x] Step 8: Verify monolith audit (`npm run audit:monoliths`) and line count limits (`entityAliases.js` 543 <= 600, `embeddingService.js` 189 <= 200).
-- [x] Step 9: Run security harness (`npm run test:security`, `npm run audit:secrets`) and production build (`npm run build`).
-- [x] Step 10: Produce `handoff.md` and notify parent orchestrator via send_message.
+## Status
+Milestone 1 (Dominio 1: Ventas de Redes, CRM y Anticipos 50/50) COMPLETED.
+
+## Completed Items
+1. ✅ Updated `scripts/audit-monoliths.js` with DOMAIN_CEILINGS for remoteSaleService (350), printSheetService (280), commissionService (300), remoteSaleController (250), and apiRoutes (350).
+2. ✅ Created `server/validators/remoteSaleValidators.js` with customerSchema, remoteSaleItemSchema, remoteSalePaymentSchema, createRemoteSaleSchema (with 50% deposit and customer refines), and balancePaymentSchema.
+3. ✅ Created `server/services/sales/remoteSaleService.js` with findOrCreateCustomer, createCustomer (409 on duplicate phone), getCustomersList, getCustomerById (360 LTV & balance metrics), createRemoteSaleTransaction (strict 50% gate, evt-ventas-redes-online fallback, ACID transaction, idempotency replay), and registerBalancePayment.
+4. ✅ Created `server/controllers/remoteSaleController.js` exposing getCustomers, createCustomer, getCustomer360, createRemoteSale, and registerBalancePayment.
+5. ✅ Updated `server/routes/apiRoutes.js` mounting all 5 Domain 1 endpoints under `requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES'])` without `requireEventAccess`.
+6. ✅ Verified with `npm run test:security` (9/9 PASS), `npm run audit:secrets` (0 leaks), `npm run audit:monoliths` (0 violations), `npm run build` (success), and `npm run harness:check` (100% green).

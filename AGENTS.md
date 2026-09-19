@@ -27,15 +27,40 @@ Este documento define las convenciones, directivas inviolables, arquitectura y a
 
 ## 🛡️ 2. PROTOCOLOS INVIOLABLES DE DEKO LABS
 
-### 🚫 A. Prohibición Absoluta del Dogma de las 200 Líneas (Cohesión sobre Espagueti)
-* **Prohibido el micro-despiece ciego:** Queda terminantemente prohibido proponer o forzar la fragmentación de archivos con alta cohesión únicamente por superar 200 líneas.
-* **La Regla de Oro:** Dividir archivos sanos produce "código ravioli" (indirecciones artificiales e infierno de imports) que destruye la mantenibilidad del sistema.
-* **Fuente de Verdad Única:** La única autoridad técnica para validar techos de código es la matriz `DOMAIN_CEILINGS` en [`scripts/audit-monoliths.js`](file:///c:/Users/sebas/Documents/Antigravity%20Files/Modulo_Ventas/scripts/audit-monoliths.js):
-  - `server/services/semantic/entityAliases.js` (Techo: **600 líneas** — Diccionario declarativo de cultura pop).
-  - `server/services/geminiPoolService.js` (Techo: **350 líneas** — Máquina de estados para rotación de API keys).
-  - `server/routes/apiRoutes.js` (Techo: **300 líneas** — Manifiesto central lineal de rutas de la API).
-  - `server/controllers/authController.js` (Techo: **300 líneas** — Flujo lineal Google OAuth y JWT).
-  - `server/services/ai/aiToolsService.js` (Techo: **280 líneas** — Declaraciones de Function Calling).
+### 🚫 A. Prohibición Absoluta del Dogma de las 200 Líneas (Cohesión de Dominio vs. Código Ravioli)
+* **Prohibido el micro-despiece ciego:** Queda terminantemente prohibido proponer o forzar la fragmentación de archivos con alta cohesión de dominio únicamente por superar 200 líneas.
+* **La Regla de Oro Anti-Ravioli:** Dividir archivos de dominio sanos produce "código ravioli" (decenas de micro-archivos de 30-50 líneas, indirecciones artificiales e infierno de imports) que destruye la mantenibilidad del sistema y fragmenta transacciones ACID.
+* **Prohibición de Micro-Archivos Huérfanos (< 80 líneas en servicios):** Queda prohibido crear archivos de servicio o controladores minúsculos que solo envuelvan una función individual (`validateX.js`, `calculateY.js`, `insertZ.js`) para eludir contadores de líneas. Toda lógica de un mismo dominio transaccional debe convivir en una sola unidad cohesiva.
+* **Jerarquía de Decisión Obligatoria de 3 Pasos para Agentes:**
+  1. *Paso 1 (Diseño de Dominio Cohesivo):* Estructura la lógica agrupando todo el ciclo de vida del dominio en un servicio completo (ej. validaciones de anticipo, cálculo matemático, transaccionalidad ACID y mutación de estado).
+  2. *Paso 2 (Evaluación de Deuda Real):* Si el archivo supera 200 líneas, evalúa: ¿mezcla capas incompatibles (ej. consultas de base de datos en vistas React, formato HTML en modelos) o acoplamiento circular? Si **NO** mezcla capas y es puramente lógica de su dominio, **NO ES DEUDA TÉCNICA**.
+  3. *Paso 3 (Ajuste Oficial de Techo):* La acción de ingeniería correcta es registrar formalmente el archivo con su justificación técnica en la matriz `DOMAIN_CEILINGS` de [`scripts/audit-monoliths.js`](file:///c:/Users/sebas/Documents/Antigravity%20Files/Modulo_Ventas/scripts/audit-monoliths.js). **JAMÁS** lo fragments en micro-archivos.
+* **Fuente de Verdad Única (`DOMAIN_CEILINGS` con Holgura de Crecimiento Saludable):**
+  - `server/services/semantic/entityAliases.js` (Techo: **1,000 líneas** — Diccionario declarativo de cultura pop y entidades).
+  - `server/services/sales/remoteSaleService.js` (Techo: **500 líneas** — Servicio transaccional CRM, anticipos 50/50 y saldo).
+  - `server/routes/apiRoutes.js` (Techo: **500 líneas** — Manifiesto central lineal de rutas de la API).
+  - `server/services/geminiPoolService.js` (Techo: **500 líneas** — Máquina de estados para rotación de API keys).
+  - `server/services/commissionService.js` (Techo: **450 líneas** — Motor financiero de liquidaciones y cálculo del 20%).
+  - `server/services/printSheetService.js` (Techo: **450 líneas** — Gestor de pliegos diarios y ciclo de taller).
+  - `server/index.js` (Techo: **450 líneas** — Punto de entrada Express, CORS, middlewares y cron jobs).
+  - `server/controllers/authController.js` (Techo: **400 líneas** — Flujo lineal Google OAuth y JWT).
+  - `server/services/ai/aiToolsService.js` (Techo: **400 líneas** — Declaraciones de Function Calling y validación).
+  - `src/App.jsx` (Techo: **400 líneas** — Router y layout maestro del frontend).
+  - `server/services/semantic/paymentExtractor.js` (Techo: **400 líneas** — Motor cohesivo de regex de pago).
+  - `server/controllers/remoteSaleController.js` (Techo: **350 líneas** — Controlador de clientes y ventas remotas).
+  - `server/services/ai/aiMediaService.js` (Techo: **350 líneas** — Orquestador multimodal de medios).
+  - `server/services/catalog/webCatalogService.js` (Techo: **350 líneas** — Motor de emparejamiento léxico).
+  - `server/services/catalog/liveCatalogSyncService.js` (Techo: **350 líneas** — Sincronizador en vivo de catálogo).
+  - `server/services/embeddingService.js` (Techo: **350 líneas** — Servicio matemático de embeddings).
+  - `server/controllers/printSheetController.js` (Techo: **300 líneas** — Controlador de pliegos de taller).
+  - `server/controllers/commissionController.js` (Techo: **300 líneas** — Controlador de comisiones y liquidaciones).
+* **Techos por Capa por Defecto (`LAYER_DEFAULT_CEILINGS`):**
+  - Servicios de Dominio Backend (`server/services/`): **500 líneas**.
+  - Manifiestos de Rutas (`server/routes/`): **500 líneas**.
+  - Controladores REST (`server/controllers/`): **350 líneas**.
+  - Hooks y Contextos React (`src/**/hooks/`, `src/context/`): **350 líneas**.
+  - Componentes UI React (`src/components/`): **280 líneas**.
+  - Esquemas Zod (`server/validators/`): **250 líneas**.
 * Solo se considera deuda monolítica un archivo que mezcle capas incompatibles (ej. I/O en vistas, formateo HTML en modelos) o que genere condiciones de carrera.
 
 ### 🧱 B. Aislamiento Sagrado e Inviolable de Infraestructura

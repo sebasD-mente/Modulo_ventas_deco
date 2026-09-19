@@ -3,6 +3,23 @@ import { authMiddleware, requireRole, requireEventAccess } from '../middleware/a
 import { validate } from '../middleware/validateMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 import { createSaleSchema, cashClosingSchema, updateSaleSchema } from '../validators/saleValidators.js';
+import { customerSchema, createRemoteSaleSchema, balancePaymentSchema } from '../validators/remoteSaleValidators.js';
+import { createPrintSheetSchema, assignItemsToSheetSchema, updateSheetStatusSchema } from '../validators/printSheetValidators.js';
+import { settleCommissionSchema, paySettlementSchema } from '../validators/commissionValidators.js';
+import {
+  getPendingCommissions,
+  settleCommissions,
+  listSettlements,
+  getSettlement,
+  markPaid,
+} from '../controllers/commissionController.js';
+import {
+  getCustomers,
+  createCustomer,
+  getCustomer360,
+  createRemoteSale,
+  registerBalancePayment,
+} from '../controllers/remoteSaleController.js';
 import {
   handleGoogleLogin,
   getAuthConfig,
@@ -13,6 +30,13 @@ import {
   updateProductionStatus,
   getProductionMetrics,
 } from '../controllers/productionController.js';
+import {
+  listPrintSheets,
+  getPrintSheet,
+  createPrintSheet,
+  assignItems,
+  updateStatus as updatePrintSheetStatus,
+} from '../controllers/printSheetController.js';
 import {
   getUsersList,
   createUser,
@@ -59,6 +83,8 @@ import {
 import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
 
 const router = express.Router();
+const authenticate = authMiddleware;
+const authorize = requireRole;
 
 // ==========================================
 // 1. RUTAS PÚBLICAS (AUTENTICACIÓN Y WEBHOOKS)
@@ -93,6 +119,34 @@ router.get(
   requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
   getProductionMetrics
 );
+router.get(
+  '/production/print-sheets',
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  listPrintSheets
+);
+router.post(
+  '/production/print-sheets',
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  validate(createPrintSheetSchema),
+  createPrintSheet
+);
+router.get(
+  '/production/print-sheets/:id',
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  getPrintSheet
+);
+router.post(
+  '/production/print-sheets/:id/items',
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  validate(assignItemsToSheetSchema),
+  assignItems
+);
+router.patch(
+  '/production/print-sheets/:id/status',
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  validate(updateSheetStatusSchema),
+  updatePrintSheetStatus
+);
 
 // ==========================================
 // 4. RUTAS DE ADMINISTRACIÓN DE USUARIOS (SOLO SUPER_ADMIN)
@@ -121,8 +175,36 @@ router.get('/catalog/web-posters', searchWebPostersCatalog);
 router.post('/catalog/sync', requireRole(['SUPER_ADMIN']), triggerCatalogSync);
 
 // ==========================================
-// 6. RUTAS DE VENTAS Y MÉTRICAS
+// 6. RUTAS DE VENTAS, CRM Y MÉTRICAS
 // ==========================================
+router.get(
+  '/customers',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  getCustomers
+);
+router.post(
+  '/customers',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  validate(customerSchema),
+  createCustomer
+);
+router.get(
+  '/customers/:id',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  getCustomer360
+);
+router.post(
+  '/sales/remote',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  validate(createRemoteSaleSchema),
+  createRemoteSale
+);
+router.post(
+  '/sales/:id/balance-payment',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  validate(balancePaymentSchema),
+  registerBalancePayment
+);
 router.post(
   '/sales',
   requireRole(['SUPER_ADMIN', 'VENDEDOR']),
@@ -178,7 +260,16 @@ router.get(
 );
 
 // ==========================================
-// 8. RUTAS DE INTELIGENCIA ARTIFICIAL MULTIMODAL
+// 8. RUTAS DE LIQUIDACIONES Y COMISIONES (DOMINIO 3)
+// ==========================================
+router.get('/commissions/pending', authenticate, authorize(['SUPER_ADMIN', 'VENDEDOR_REDES']), getPendingCommissions);
+router.post('/commissions/settle', authenticate, authorize(['SUPER_ADMIN']), validate(settleCommissionSchema), settleCommissions);
+router.get('/commissions/settlements', authenticate, authorize(['SUPER_ADMIN', 'VENDEDOR_REDES']), listSettlements);
+router.get('/commissions/settlements/:id', authenticate, authorize(['SUPER_ADMIN', 'VENDEDOR_REDES']), getSettlement);
+router.patch('/commissions/settlements/:id/pay', authenticate, authorize(['SUPER_ADMIN']), validate(paySettlementSchema), markPaid);
+
+// ==========================================
+// 9. RUTAS DE INTELIGENCIA ARTIFICIAL MULTIMODAL
 // ==========================================
 router.post(
   '/ai/voice-sale',
@@ -226,7 +317,7 @@ router.delete(
 );
 
 // ==========================================
-// 9. MANEJADOR DE ERRORES DE SUBIDA (MULTER) Y VALIDACIÓN
+// 10. MANEJADOR DE ERRORES DE SUBIDA (MULTER) Y VALIDACIÓN
 // ==========================================
 router.use((err, req, res, next) => {
   if (err?.name === 'MulterError') {
