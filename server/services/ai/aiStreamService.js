@@ -88,7 +88,8 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
       }
     }
     const finalDraftSale = draftSale?.items?.length ? draftSale : null;
-    return { reply: cleanReply, draftSale: finalDraftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: functionCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
+    const effectiveToolCalls = functionCalls.filter((c) => c.name !== 'prepareSaleDraft' || finalDraftSale !== null);
+    return { reply: cleanReply, draftSale: finalDraftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: effectiveToolCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
   } catch (err) {
     return { reply: `Error consultando IA: ${err.message}`, draftSale: null, suggestedPosters: [], toolCalls: [], functionCalls: [] };
   }

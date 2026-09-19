@@ -72,13 +72,16 @@ export async function handleChatQuery(req, res) {
         }
       }
 
+      const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
+      const effectiveToolCalls = (toolCalls || []).filter((t) => t.name !== 'prepareSaleDraft' || effectiveDraft !== null);
+
       return res.json({
         success: true,
         reply: result.reply,
-        draft,
-        draftSale: draft,
+        draft: effectiveDraft,
+        draftSale: effectiveDraft,
         suggestedPosters,
-        toolCalls,
+        toolCalls: effectiveToolCalls,
       });
     }
 
