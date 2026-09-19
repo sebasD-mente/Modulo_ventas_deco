@@ -59,7 +59,7 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
     if (call.name === 'prepareSaleDraft' && call.args) {
       const draft = await constructDraftPayload(tenantId, call.args, message);
       const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
-      return { event: { type: 'draft_sale', data: effectiveDraft }, toolRecord: { name: call.name, args: call.args, result: effectiveDraft, id } };
+      return { event: { type: 'draft_sale', data: effectiveDraft }, toolRecord: { name: call.name, args: call.args, result: draft, id } };
     }
     if (call.name === 'searchCatalog' && call.args?.query) {
       const matches = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);

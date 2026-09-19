@@ -12,7 +12,7 @@ export default function ChatToolCards({ message, msg, draftSale, pendingDraft, o
   return (
     <>
       {h && <HourlySalesCard data={h} />}
-      {tp && <TopPostersCard data={tp} onAddPoster={addFn} />}
+      {tp && <TopPostersCard data={tp} />}
       {k && (
         <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">

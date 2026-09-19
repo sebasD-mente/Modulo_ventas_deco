@@ -117,10 +117,10 @@ describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {
       assert.deepStrictEqual(checkInventoryStockDeclaration.parameters.required, ['query']);
     });
 
-    it('1.6 salesAssistantTools incluye las 8 herramientas oficiales del asistente', () => {
+    it('1.6 salesAssistantTools incluye las 10 herramientas oficiales del asistente', () => {
       assert.ok(Array.isArray(salesAssistantTools));
       const decls = salesAssistantTools[0].functionDeclarations;
-      assert.strictEqual(decls.length, 8);
+      assert.strictEqual(decls.length, 10);
       const names = decls.map(d => d.name);
       assert.ok(names.includes('prepareSaleDraft'));
       assert.ok(names.includes('searchCatalog'));
@@ -130,6 +130,8 @@ describe('🤖 Suite de Herramientas de Base de Datos y Operaciones para STAND {
       assert.ok(names.includes('getProductionQueueStatus'));
       assert.ok(names.includes('checkInventoryStock'));
       assert.ok(names.includes('discardSaleDraft'));
+      assert.ok(names.includes('getHourlySalesAnalytics'));
+      assert.ok(names.includes('getTopSellingPosters'));
     });
 
     it('1.7 discardSaleDraftDeclaration define schema con Type.OBJECT y razón opcional', () => {

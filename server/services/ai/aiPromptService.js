@@ -10,11 +10,7 @@ export const voiceSaleResponseSchema = {
   properties: {
     transcription: { type: Type.STRING, description: 'Transcripción literal completa.' },
     isSaleDetected: { type: Type.BOOLEAN, description: 'true si el audio contiene dictado de venta; false si es saludo o consulta.' },
-    intent: {
-      type: Type.STRING,
-      enum: ['SALUDO', 'CONSULTA_CATALOGO', 'DICTADO_VENTA', 'RUIDO_NO_VENTA'],
-      description: 'Intención clasificada del usuario.',
-    },
+    intent: { type: Type.STRING, enum: ['SALUDO', 'CONSULTA_CATALOGO', 'DICTADO_VENTA', 'RUIDO_NO_VENTA'], description: 'Intención clasificada del usuario.' },
     greeting: { type: Type.STRING, description: 'Respuesta conversacional breve si es saludo o consulta.' },
     items: {
       type: Type.ARRAY, description: 'Pósters o artículos dictados si isSaleDetected es true.',
@@ -76,16 +72,8 @@ export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendin
 
   const draftContext = (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0)
     ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nBORRADOR ACTIVO EN PANTALLA (EDICIÓN CONVERSACIONAL EN CURSO):\n${JSON.stringify({
-  items: pendingDraft.items.map(it => ({
-    title: it.baseTitle || it.description,
-    size: it.sizeId || 'MEDIANO',
-    quantity: it.quantity,
-    unitPrice: it.unitPrice,
-    subtotal: it.subtotal
-  })),
-  total: pendingDraft.total,
-  paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO',
-  notes: pendingDraft.notes || ''
+  items: pendingDraft.items.map(it => ({ title: it.baseTitle || it.description, size: it.sizeId || 'MEDIANO', quantity: it.quantity, unitPrice: it.unitPrice, subtotal: it.subtotal })),
+  total: pendingDraft.total, paymentMethod: pendingDraft.paymentMethod || 'EFECTIVO', notes: pendingDraft.notes || ''
 }, null, 2)}\n\nDIRECTIVAS PARA EDICIÓN DEL BORRADOR:\n- Si el usuario pide ajustar la venta activa ("cámbialo a grande", "ponle 2", "paga con tarjeta", etc.):\n  * Preserva todos los ítems actuales a menos que pidan removerlos.\n  * Modifica cantidades, tamaños o método de pago según lo pedido.\n  * Invoca de inmediato "prepareSaleDraft" con la totalidad de los ítems actualizados y el nuevo total.\n- Si el usuario o vendedor pide cancelar, descartar o vaciar la orden ("cancela la orden", "no me llevo nada", "olvídalo", "borra el carrito", "ya no quiero nada"):\n  * Invoca de inmediato la herramienta "discardSaleDraft".\n  * NUNCA invoques "prepareSaleDraft" con items vacíos; la cancelación se ejecuta exclusivamente con "discardSaleDraft".\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
     : `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nESTADO: NO HAY BORRADOR ACTIVO EN PANTALLA (VENTA LIMPIA O RECIÉN DESCARTADA/CONFIRMADA).\nDIRECTIVA DE INDEPENDENCIA ESTRICTA:\n- Cualquier solicitud de venta del vendedor ("1 scarface", "dame Batman", etc.) DEBE SER UN BORRADOR NUEVO Y LIMPIO.\n- NUNCA revivas, agregues ni mezcles obras mencionadas en mensajes anteriores del historial conversacional.\n- El borrador a preparar debe incluir ÚNICAMENTE las obras y cantidades pedidas explícitamente en el último mensaje.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
@@ -163,7 +151,11 @@ Cuentas con 10 herramientas oficiales conectadas a PostgreSQL y al motor de cat�
 3. "checkInventoryStock": Invoca para existencias físicas de una obra en el stand o catálogo.
 4. "getEventKPIs": Invoca para métricas globales acumuladas de ventas del evento (total vendido, cantidad de ventas, ticket promedio).
 5. "getHourlySalesAnalytics": Invoca obligatoriamente ante preguntas sobre horas de más venta, horarios de mayor concurrencia o distribución horaria ("¿en qué horas se vende más?", "horas pico", "a qué hora vendemos más"). Renderiza el gráfico interactivo horario.
-6. "getTopSellingPosters": Invoca obligatoriamente ante preguntas sobre los pósters o diseños más vendidos ("¿cuál es el póster más vendido?", "top posters", "lo que más sale", "obras populares"). Retorna el podio oficial con los 3 pósters más vendidos del evento actual. En tu respuesta en lenguaje natural, refiérete siempre al Top 3 o Podio de las 3 obras más vendidas, jamás menciones un "Top 5".
+6. "getTopSellingPosters": Invoca obligatoriamente ante preguntas sobre los pósters o diseños más vendidos ("¿cuál es el póster más vendido?", "top posters", "lo que más sale", "obras populares"). Retorna el podio oficial con los 3 pósters más vendidos del evento actual con su desglose analítico de formatos y tamaños.
+   * REPORTE ANALÍTICO Y GERENCIAL: Este reporte es directivo y de inteligencia de negocio, no una acción de venta en mostrador.
+   * ROTACIÓN DE FORMATOS: Destaca las obras líderes e identifica con precisión qué tamaños o formatos tienen mayor rotación (ej: "El diseño más vendido es Van Gogh con 4 unidades, dominando el tamaño Mediano").
+   * PROHIBICIÓN ESTRICTA DE CIERRES DE VENTA: NUNCA finalices con llamados directos a vender ("¿Montamos alguno en mostrador?", "¿Te preparo una orden?" o "¿Agregamos al borrador?"). Entrega conclusiones gerenciales accionables para reposición de inventario y producción en taller.
+   * Refiérete siempre al Top 3 o Podio de las 3 obras más vendidas, jamás menciones un "Top 5".
 7. "getCashDrawerStatus": Invoca para estado de dinero en gaveta física, tarjetas, transferencias o arqueos.
 8. "getSellerShiftReport": Invoca para ranking y métricas de vendedores.
 9. "getProductionQueueStatus": Invoca para estado de cola de impresión y obras en taller.

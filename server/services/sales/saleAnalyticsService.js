@@ -5,10 +5,7 @@ const formatHour12 = (h) => (h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h ==
 
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
-  const ev = await prisma.event?.findFirst?.({
-    where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) },
-    select: { id: true, name: true }
-  });
+  const ev = await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true, name: true } });
   return ev?.id || null;
 }
 
@@ -19,19 +16,12 @@ export async function getHourlySalesAnalytics({ tenantId, eventId, date = null }
   try {
     const effEventId = await resolveActiveEvent(tenantId, eventId);
     const eventRecord = effEventId ? await prisma.event.findUnique({ where: { id: effEventId }, select: { id: true, name: true, location: true } }) : null;
-
     const baseWhere = { status: { not: 'ANULADA' }, ...(effEventId ? { eventId: effEventId } : {}), ...(tenantId ? { tenantId } : {}) };
     let { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
-    let sales = await prisma.sale.findMany({
-      where: { ...baseWhere, createdAt: { gte: startOfDay, lte: endOfDay } },
-      select: { id: true, totalAmount: true, createdAt: true },
-      orderBy: { createdAt: 'asc' }
-    });
-
+    let sales = await prisma.sale.findMany({ where: { ...baseWhere, createdAt: { gte: startOfDay, lte: endOfDay } }, select: { id: true, totalAmount: true, createdAt: true }, orderBy: { createdAt: 'asc' } });
     if (sales.length === 0 && !date && effEventId) {
       sales = await prisma.sale.findMany({ where: baseWhere, select: { id: true, totalAmount: true, createdAt: true }, orderBy: { createdAt: 'asc' }, take: 300 });
     }
-
     if (sales.length === 0) {
       return { eventId: effEventId, eventName: eventRecord?.name || 'Evento Activo', date: targetDate, totalAmount: 0, totalTransactions: 0, peakWindow: 'Sin registros aún', peakAmount: 0, peakPercentage: 0, hourlyBreakdown: [] };
     }
@@ -39,16 +29,12 @@ export async function getHourlySalesAnalytics({ tenantId, eventId, date = null }
     const hourMap = new Map();
     let grandTotal = 0;
     for (const s of sales) {
-      const d = new Date(s.createdAt);
-      const hour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Guatemala', hour: 'numeric', hour12: false }).format(d), 10);
+      const hour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Guatemala', hour: 'numeric', hour12: false }).format(new Date(s.createdAt)), 10);
       const amt = Number(s.totalAmount) || 0;
       grandTotal += amt;
       const cur = hourMap.get(hour) || { hour, count: 0, amount: 0 };
-      cur.count += 1;
-      cur.amount += amt;
-      hourMap.set(hour, cur);
+      cur.count += 1; cur.amount += amt; hourMap.set(hour, cur);
     }
-
     grandTotal = Number(grandTotal.toFixed(2));
     const hours = Array.from(hourMap.keys()).sort((a, b) => a - b);
     const minHour = Math.min(...hours), maxHour = Math.max(...hours);
@@ -65,7 +51,7 @@ export async function getHourlySalesAnalytics({ tenantId, eventId, date = null }
     const peakNext = peakHour + 1 <= maxHour ? peakHour + 1 : peakHour;
     const peakBlockAmount = (hourMap.get(peakHour)?.amount || 0) + (peakNext !== peakHour ? (hourMap.get(peakNext)?.amount || 0) : 0);
     const peakPercentage = grandTotal > 0 ? Number(((peakBlockAmount / grandTotal) * 100).toFixed(1)) : 0;
-    const peakWindow = peakNext !== peakHour ? `${formatHour12(peakHour)} - ${formatHour12(peakNext + 1)}` : `${formatHour12(peakHour)} - ${formatHour12(peakHour + 1)}`;
+    const peakWindow = `${formatHour12(peakHour)} - ${formatHour12(peakNext + 1)}`;
     hourlyBreakdown.forEach((it) => { it.isPeak = it.hour === peakHour || (peakNext !== peakHour && it.hour === peakNext); });
 
     return { eventId: effEventId, eventName: eventRecord?.name || 'Evento Activo', date: targetDate, totalAmount: grandTotal, totalTransactions: sales.length, peakWindow, peakAmount: Number(peakBlockAmount.toFixed(2)), peakPercentage, hourlyBreakdown };
@@ -75,13 +61,54 @@ export async function getHourlySalesAnalytics({ tenantId, eventId, date = null }
 }
 
 const cleanPosterTitle = (desc) => (desc || 'Obra Sin Título')
-  .replace(/\s*\((?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante|Portada(?:\s+de)?\s+Álbum|Portada(?:\s+de)?\s+Album|\d+\s*x\s*\d+\s*cm)\)\s*$/i, '')
-  .replace(/\s*-\s*(?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante|Portada(?:\s+de)?\s+Álbum|Portada(?:\s+de)?\s+Album|\d+\s*x\s*\d+\s*cm)\s*$/i, '')
-  .replace(/^Póster\s+(?:Mini|Pequeño|Pequeno|Mediano|Grande|Gigante)\s+/i, 'Póster ')
+  .replace(/\s*(?:[\(\[]|-)\s*(?:tamaño\s*:?\s*)?(?:Mini|Peque[ñn][oa]|Mediano|Grande|Gigante|Portada(?:\s+de)?\s+[AÁaá]lbum|[aá]lbum|vinilo|vinil|disco|\d+\s*x\s*\d+(?:\s*cm)?)\s*[\)\]]?\s*$/i, '')
+  .replace(/^Póster\s+(?:Mini|Peque[ñn][oa]|Mediano|Grande|Gigante)\s+/i, 'Póster ')
   .trim();
 
+const SIZES_DEF = [
+  { sizeId: 'MEDIANO', name: 'Mediano', re: /\b(?:mediano|30\s*x\s*45(?:\s*cm)?)\b/i, price: 65 },
+  { sizeId: 'GRANDE', name: 'Grande', re: /\b(?:grande|45\s*x\s*60(?:\s*cm)?)\b/i, price: 125 },
+  { sizeId: 'PORTADA_ALBUM', name: 'Portada de Álbum', re: /\b(?:portada(?:\s+de)?\s+[aá]lbum|[aá]lbum|vinilo|vinil|disco|30\s*x\s*30(?:\s*cm)?)\b/i, price: 55 },
+  { sizeId: 'PEQUENO', name: 'Pequeño', re: /\b(?:peque[ñn][oa]|21\s*x\s*27(?:\s*cm)?)\b/i, price: 35 },
+  { sizeId: 'MINI', name: 'Mini', re: /\b(?:mini|14\s*x\s*21(?:\s*cm)?)\b/i, price: 25 },
+  { sizeId: 'GIGANTE', name: 'Gigante', re: /\b(?:gigante|60\s*x\s*90(?:\s*cm)?)\b/i, price: 180 },
+];
+const CANONICAL_SIZE_ORDER = { MEDIANO: 1, GRANDE: 2, PORTADA_ALBUM: 3, PEQUENO: 4, MINI: 5, GIGANTE: 6 };
+
+function extractPosterSize(desc = '', unitPrice = 65) {
+  const d = String(desc || '').trim();
+  const match = d.match(/[\(\[](?:tamaño\s*:?\s*)?([^\)\]]+)[\)\]]\s*$/i) || d.match(/-\s*(?:tamaño\s*:?\s*)?([^-]+)$/i);
+  if (match) {
+    const found = SIZES_DEF.find((s) => s.re.test(match[1].trim()));
+    if (found) return { sizeId: found.sizeId, name: found.name };
+  }
+  const prefixMatch = d.match(/^Póster\s+(Mini|Peque[ñn][oa]|Mediano|Grande|Gigante)\b/i);
+  if (prefixMatch) {
+    const found = SIZES_DEF.find((s) => s.re.test(prefixMatch[1]));
+    if (found) return { sizeId: found.sizeId, name: found.name };
+  }
+  const price = Number(unitPrice) || 0;
+  if (price > 0) {
+    let best = null, minDiff = Infinity;
+    for (const s of SIZES_DEF) {
+      const diff = Math.abs(price - s.price);
+      const tol = s.price >= 100 ? 20 : 6;
+      if (diff <= tol && (diff < minDiff || (diff === minDiff && (CANONICAL_SIZE_ORDER[s.sizeId] || 99) < (CANONICAL_SIZE_ORDER[best?.sizeId] || 99)))) {
+        minDiff = diff; best = s;
+      }
+    }
+    if (best) return { sizeId: best.sizeId, name: best.name };
+  }
+  const endMatch = d.match(/\b(mini|peque[ñn][oa]|mediano|grande|gigante|portada(?:\s+de)?\s+[aá]lbum|[aá]lbum)\s*$/i);
+  if (endMatch) {
+    const found = SIZES_DEF.find((s) => s.re.test(endMatch[1]));
+    if (found) return { sizeId: found.sizeId, name: found.name };
+  }
+  return { sizeId: 'MEDIANO', name: 'Mediano' };
+}
+
 /**
- * Podio oficial con los 3 pósters más vendidos con métricas y recaudación contable exacta
+ * Podio oficial con los 3 pósters más vendidos con métricas y desglose de formatos
  */
 export async function getTopSellingPosters({ tenantId, eventId, date = null, limit = 3 } = {}) {
   try {
@@ -94,10 +121,8 @@ export async function getTopSellingPosters({ tenantId, eventId, date = null, lim
     }
 
     const grouped = await prisma.saleItem.groupBy({
-      by: ['description', 'productId'],
-      where: { sale: saleWhere },
-      _sum: { quantity: true, subtotal: true },
-      orderBy: { _sum: { quantity: 'desc' } }
+      by: ['description', 'productId'], where: { sale: saleWhere },
+      _sum: { quantity: true, subtotal: true }, orderBy: { _sum: { quantity: 'desc' } }
     });
 
     const productIds = Array.from(new Set(grouped.map((g) => g.productId).filter(Boolean)));
@@ -106,53 +131,57 @@ export async function getTopSellingPosters({ tenantId, eventId, date = null, lim
 
     const consolidatedMap = new Map();
     for (const g of grouped) {
-      const prod = g.productId ? productMap.get(g.productId) : null;
-      const cleanTitle = prod?.name || cleanPosterTitle(g.description);
-      const key = g.productId ? `p:${g.productId}` : `t:${cleanTitle.toLowerCase()}`;
       const units = Number(g._sum?.quantity) || 0;
-      const subtotalVal = g._sum?.subtotal != null
-        ? Number(g._sum.subtotal)
-        : units * (prod?.basePrice ? Number(prod.basePrice) : 65.0);
+      if (units <= 0) continue; // Descartar cantidades no positivas para integridad contable estricta
+
+      const prod = g.productId ? productMap.get(g.productId) : null;
+      const cleanTitle = cleanPosterTitle(prod?.name || g.description);
+      const key = `t:${cleanTitle.toLowerCase()}`;
+      const subtotalVal = g._sum?.subtotal != null ? Number(g._sum.subtotal) : units * (prod?.basePrice ? Number(prod.basePrice) : 65.0);
+      const unitP = units > 0 ? (subtotalVal / units) : (prod?.basePrice ? Number(prod.basePrice) : 65.0);
+      const descForSize = g.description || prod?.name || '';
+      const sizeInfo = extractPosterSize(descForSize, unitP);
 
       if (!consolidatedMap.has(key)) {
         consolidatedMap.set(key, {
-          id: g.productId || `top-poster-${consolidatedMap.size}`,
-          title: cleanTitle,
-          category: prod?.category || 'ARTE',
-          unitsSold: units,
-          totalRevenue: subtotalVal,
-          imageUrl: prod?.imageUrl || null,
-          thumbUrl: prod?.imageUrl || null,
-          basePrice: prod?.basePrice ? Number(prod.basePrice) : null
+          id: prod?.id || g.productId || `top-poster-${consolidatedMap.size}`,
+          title: cleanTitle, category: prod?.category || 'ARTE',
+          unitsSold: units, totalRevenue: subtotalVal,
+          imageUrl: prod?.imageUrl || null, thumbUrl: prod?.imageUrl || null,
+          basePrice: prod?.basePrice ? Number(prod.basePrice) : null,
+          sizeMap: new Map([[sizeInfo.sizeId, { ...sizeInfo, units }]])
         });
       } else {
         const item = consolidatedMap.get(key);
         item.unitsSold += units;
         item.totalRevenue += subtotalVal;
-        if (!item.imageUrl && prod?.imageUrl) {
-          item.imageUrl = prod.imageUrl;
-          item.thumbUrl = prod.imageUrl;
-        }
+        if (prod?.id && (!item.id || item.id.startsWith('top-poster-'))) item.id = prod.id;
+        if (!item.imageUrl && prod?.imageUrl) { item.imageUrl = prod.imageUrl; item.thumbUrl = prod.imageUrl; }
+        if (prod?.category && item.category === 'ARTE') item.category = prod.category;
+        if (prod?.basePrice && !item.basePrice) item.basePrice = Number(prod.basePrice);
+        const cur = item.sizeMap.get(sizeInfo.sizeId) || { ...sizeInfo, units: 0 };
+        cur.units += units; item.sizeMap.set(sizeInfo.sizeId, cur);
       }
     }
 
     const take = 3; // Tope estricto del podio Top 3
     const topPosters = Array.from(consolidatedMap.values())
-      .sort((a, b) => b.unitsSold - a.unitsSold || b.totalRevenue - a.totalRevenue)
+      .filter((p) => p.unitsSold > 0)
+      .sort((a, b) => b.unitsSold - a.unitsSold || b.totalRevenue - a.totalRevenue || a.title.localeCompare(b.title))
       .slice(0, take)
       .map((poster, idx) => {
         const totalRev = Number(poster.totalRevenue.toFixed(2));
         const unitPrice = poster.unitsSold > 0 ? Number((totalRev / poster.unitsSold).toFixed(2)) : (poster.basePrice || 65.0);
+        const sizes = Array.from(poster.sizeMap.values())
+          .sort((a, b) => (b.units - a.units) || ((CANONICAL_SIZE_ORDER[a.sizeId] || 99) - (CANONICAL_SIZE_ORDER[b.sizeId] || 99)))
+          .map((s) => ({
+            sizeId: s.sizeId, name: s.name, units: s.units,
+            percentage: poster.unitsSold > 0 ? Number(((s.units / poster.unitsSold) * 100).toFixed(1)) : 0
+          }));
         return {
-          rank: idx + 1,
-          id: poster.id,
-          title: poster.title,
-          category: poster.category,
-          unitsSold: poster.unitsSold,
-          unitPrice,
-          totalRevenue: totalRev,
-          imageUrl: poster.imageUrl,
-          thumbUrl: poster.thumbUrl
+          rank: idx + 1, id: poster.id, title: poster.title, category: poster.category,
+          unitsSold: poster.unitsSold, unitPrice, totalRevenue: totalRev,
+          imageUrl: poster.imageUrl, thumbUrl: poster.thumbUrl, sizes
         };
       });
 

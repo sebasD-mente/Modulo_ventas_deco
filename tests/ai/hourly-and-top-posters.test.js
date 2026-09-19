@@ -180,6 +180,11 @@ describe('🎯 Suite de Analítica Horaria, Top Pósters y Anti-Colisión (STAND
       assert.strictEqual(p1.totalRevenue, 1275.00);
       assert.strictEqual(p1.category, 'MARVEL');
       assert.strictEqual(p1.imageUrl, 'https://img.deko/spidey.jpg');
+      assert.ok(Array.isArray(p1.sizes), 'p1 debe incluir desglose de tamaños');
+      assert.strictEqual(p1.sizes.length, 2);
+      assert.deepStrictEqual(p1.sizes[0], { sizeId: 'MEDIANO', name: 'Mediano', units: 10, percentage: 66.7 });
+      assert.deepStrictEqual(p1.sizes[1], { sizeId: 'GRANDE', name: 'Grande', units: 5, percentage: 33.3 });
+      assert.strictEqual(p1.sizes.reduce((acc, s) => acc + s.units, 0), p1.unitsSold, 'Suma de unidades de p1 debe coincidir con unitsSold');
 
       // Puesto 2: Batman (8 uds, Q520.00)
       const p2 = res.topPosters[1];
@@ -187,6 +192,10 @@ describe('🎯 Suite de Analítica Horaria, Top Pósters y Anti-Colisión (STAND
       assert.strictEqual(p2.title, 'Batman Detective Comics');
       assert.strictEqual(p2.unitsSold, 8);
       assert.strictEqual(p2.totalRevenue, 520.00);
+      assert.ok(Array.isArray(p2.sizes), 'p2 debe incluir desglose de tamaños');
+      assert.strictEqual(p2.sizes.length, 1);
+      assert.deepStrictEqual(p2.sizes[0], { sizeId: 'MEDIANO', name: 'Mediano', units: 8, percentage: 100 });
+      assert.strictEqual(p2.sizes.reduce((acc, s) => acc + s.units, 0), p2.unitsSold, 'Suma de unidades de p2 debe coincidir con unitsSold');
 
       // Puesto 3: Luffy consolidado por título limpio (6 + 1 = 7 uds, Q390 + Q125 = Q515.00)
       const p3 = res.topPosters[2];
@@ -194,6 +203,11 @@ describe('🎯 Suite de Analítica Horaria, Top Pósters y Anti-Colisión (STAND
       assert.strictEqual(p3.title, 'Luffy Gear 5');
       assert.strictEqual(p3.unitsSold, 7);
       assert.strictEqual(p3.totalRevenue, 515.00);
+      assert.ok(Array.isArray(p3.sizes), 'p3 debe incluir desglose de tamaños');
+      assert.strictEqual(p3.sizes.length, 2);
+      assert.deepStrictEqual(p3.sizes[0], { sizeId: 'MEDIANO', name: 'Mediano', units: 6, percentage: 85.7 });
+      assert.deepStrictEqual(p3.sizes[1], { sizeId: 'GRANDE', name: 'Grande', units: 1, percentage: 14.3 });
+      assert.strictEqual(p3.sizes.reduce((acc, s) => acc + s.units, 0), p3.unitsSold, 'Suma de unidades de p3 debe coincidir con unitsSold');
     } finally {
       if (prisma.event) {
         prisma.event.findUnique = origEventFindUnique;
@@ -233,6 +247,185 @@ describe('🎯 Suite de Analítica Horaria, Top Pósters y Anti-Colisión (STAND
       assert.strictEqual(res.topPosters[0].unitsSold, 20);
       assert.strictEqual(res.topPosters[1].unitsSold, 18);
       assert.strictEqual(res.topPosters[2].unitsSold, 15);
+    } finally {
+      if (prisma.event) prisma.event.findUnique = origEventFindUnique;
+      if (prisma.saleItem) prisma.saleItem.groupBy = origSaleItemGroupBy;
+      if (prisma.product) prisma.product.findMany = origProductFindMany;
+    }
+  });
+
+  it('1.10 getTopSellingPosters maneja títulos con nombres propios (evita falsos positivos de tamaño), corchetes, álbumes y desempates deterministas', async () => {
+    const origEventFindUnique = prisma.event?.findUnique;
+    const origSaleItemGroupBy = prisma.saleItem?.groupBy;
+    const origProductFindMany = prisma.product?.findMany;
+
+    try {
+      if (!prisma.event) prisma.event = {};
+      if (!prisma.saleItem) prisma.saleItem = {};
+      if (!prisma.product) prisma.product = {};
+
+      prisma.event.findUnique = async () => ({ id: 'ev-test-2', name: 'Anime Expo' });
+
+      // Caso 1: "Ariana Grande" vendido a precio estándar Mediano Q65 (no debe clasificarse como Grande)
+      // Caso 2: "Taylor Swift (Álbum)" y "Taylor Swift (Portada Álbum)" deben consolidar bajo la misma obra
+      // Caso 3: "Star Wars [Mediano]" y "Star Wars [Grande]" con corchetes y desempate igualitario (3 y 3)
+      prisma.saleItem.groupBy = async () => [
+        { productId: null, description: 'Ariana Grande', _sum: { quantity: 10, subtotal: 650.00 } },
+        { productId: null, description: 'Taylor Swift (Álbum)', _sum: { quantity: 4, subtotal: 220.00 } },
+        { productId: null, description: 'Taylor Swift (Portada Álbum)', _sum: { quantity: 4, subtotal: 220.00 } },
+        { productId: null, description: 'Star Wars [Mediano]', _sum: { quantity: 3, subtotal: 195.00 } },
+        { productId: null, description: 'Star Wars [Grande]', _sum: { quantity: 3, subtotal: 375.00 } },
+      ];
+      prisma.product.findMany = async () => [];
+
+      const res = await getTopSellingPosters({ tenantId: 'tenant-test', eventId: 'ev-test-2' });
+      assert.strictEqual(res.topPosters.length, 3);
+
+      // Puesto 1: Ariana Grande (10 uds, subtotal Q650, Mediano por precio Q65)
+      const p1 = res.topPosters[0];
+      assert.strictEqual(p1.title, 'Ariana Grande');
+      assert.strictEqual(p1.unitsSold, 10);
+      assert.strictEqual(p1.sizes[0].sizeId, 'MEDIANO', 'Ariana Grande a Q65 debe ser Mediano, NO Grande');
+      assert.strictEqual(p1.sizes[0].percentage, 100);
+
+      // Puesto 2: Taylor Swift consolidado (4 + 4 = 8 uds, Portada de Álbum)
+      const p2 = res.topPosters[1];
+      assert.strictEqual(p2.title, 'Taylor Swift', 'Ambas variantes de álbum deben consolidar a Taylor Swift');
+      assert.strictEqual(p2.unitsSold, 8);
+      assert.strictEqual(p2.sizes[0].sizeId, 'PORTADA_ALBUM');
+      assert.strictEqual(p2.sizes[0].units, 8);
+
+      // Puesto 3: Star Wars (3 Mediano + 3 Grande = 6 uds, corchetes parseados, desempate Mediano antes de Grande)
+      const p3 = res.topPosters[2];
+      assert.strictEqual(p3.title, 'Star Wars');
+      assert.strictEqual(p3.unitsSold, 6);
+      assert.strictEqual(p3.sizes.length, 2);
+      assert.strictEqual(p3.sizes[0].sizeId, 'MEDIANO', 'En empate de 3 uds, Mediano tiene precedencia canónica');
+      assert.strictEqual(p3.sizes[1].sizeId, 'GRANDE');
+      assert.strictEqual(p3.sizes.reduce((acc, s) => acc + s.units, 0), p3.unitsSold);
+    } finally {
+      if (prisma.event) prisma.event.findUnique = origEventFindUnique;
+      if (prisma.saleItem) prisma.saleItem.groupBy = origSaleItemGroupBy;
+      if (prisma.product) prisma.product.findMany = origProductFindMany;
+    }
+  });
+
+  it('1.11 getTopSellingPosters valida deducción por vecino más cercano, prefijos tamaño, consolidación cruzada con catálogo y descarte de unidades cero', async () => {
+    const origEventFindUnique = prisma.event?.findUnique;
+    const origSaleItemGroupBy = prisma.saleItem?.groupBy;
+    const origProductFindMany = prisma.product?.findMany;
+
+    try {
+      if (!prisma.event) prisma.event = {};
+      if (!prisma.saleItem) prisma.saleItem = {};
+      if (!prisma.product) prisma.product = {};
+
+      prisma.event.findUnique = async () => ({ id: 'ev-test-3', name: 'Gamer Con' });
+
+      // Caso A: "Custom Art" a Q61 (debe ser Mediano, más cercano a Q65 que a Q55)
+      // Caso B: "Custom Art" a Q29 (debe ser Mini, más cercano a Q25 que a Q35)
+      // Caso C: "Zelda Breath of Wild" vendido con productId 'prod-zelda' (name: 'Zelda') y manual "Zelda (Tamaño: Mediano)" sin productId -> consolidan juntos
+      // Caso D: Venta con cantidad 0 o negativa (debe descartarse sin corromper la integridad matemática)
+      prisma.saleItem.groupBy = async () => [
+        { productId: null, description: 'Custom Art', _sum: { quantity: 5, subtotal: 305.00 } }, // Q61 c/u -> MEDIANO
+        { productId: null, description: 'Custom Art', _sum: { quantity: 5, subtotal: 145.00 } },  // Q29 c/u -> MINI
+        { productId: 'prod-zelda', description: 'Zelda BotW (Grande)', _sum: { quantity: 4, subtotal: 500.00 } },
+        { productId: null, description: 'Zelda (Tamaño: Mediano)', _sum: { quantity: 4, subtotal: 260.00 } },
+        { productId: null, description: 'Zelda Anulado', _sum: { quantity: 0, subtotal: 0 } }, // Descartado
+        { productId: null, description: 'Devolucion', _sum: { quantity: -2, subtotal: -130.00 } }, // Descartado
+      ];
+
+      prisma.product.findMany = async () => [
+        { id: 'prod-zelda', name: 'Zelda', category: 'NINTENDO', imageUrl: 'https://img.deko/zelda.jpg', basePrice: 65 }
+      ];
+
+      const res = await getTopSellingPosters({ tenantId: 'tenant-test', eventId: 'ev-test-3' });
+      assert.strictEqual(res.topPosters.length, 2, 'Solo deben aparecer posters con unidades vendidas > 0');
+
+      // Puesto 1: Custom Art consolidado (5 Mediano a Q61 + 5 Mini a Q29 = 10 uds)
+      const p1 = res.topPosters[0];
+      assert.strictEqual(p1.unitsSold, 10);
+      assert.strictEqual(p1.sizes.length, 2);
+      assert.strictEqual(p1.sizes[0].sizeId, 'MEDIANO', 'Precio Q61 debe deducirse como Mediano');
+      assert.strictEqual(p1.sizes[0].units, 5);
+      assert.strictEqual(p1.sizes[1].sizeId, 'MINI', 'Precio Q29 debe deducirse como Mini');
+      assert.strictEqual(p1.sizes[1].units, 5);
+      assert.strictEqual(p1.sizes.reduce((acc, s) => acc + s.units, 0), p1.unitsSold);
+
+      // Puesto 2: Zelda consolidado entre productId 'prod-zelda' y manual 'Zelda (Tamaño: Mediano)' (4 + 4 = 8 uds)
+      const p2 = res.topPosters[1];
+      assert.strictEqual(p2.title, 'Zelda');
+      assert.strictEqual(p2.id, 'prod-zelda');
+      assert.strictEqual(p2.category, 'NINTENDO');
+      assert.strictEqual(p2.imageUrl, 'https://img.deko/zelda.jpg');
+      assert.strictEqual(p2.unitsSold, 8);
+      assert.strictEqual(p2.sizes.length, 2);
+      assert.strictEqual(p2.sizes[0].sizeId, 'MEDIANO');
+      assert.strictEqual(p2.sizes[1].sizeId, 'GRANDE');
+      assert.strictEqual(p2.sizes.reduce((acc, s) => acc + s.units, 0), p2.unitsSold);
+    } finally {
+      if (prisma.event) prisma.event.findUnique = origEventFindUnique;
+      if (prisma.saleItem) prisma.saleItem.groupBy = origSaleItemGroupBy;
+      if (prisma.product) prisma.product.findMany = origProductFindMany;
+    }
+  });
+
+  it('1.12 getTopSellingPosters maneja nombres de producto con sufijos de tamaño, descripciones nulas y variaciones de género (Pequeña)', async () => {
+    const origEventFindUnique = prisma.event?.findUnique;
+    const origSaleItemGroupBy = prisma.saleItem?.groupBy;
+    const origProductFindMany = prisma.product?.findMany;
+
+    try {
+      if (!prisma.event) prisma.event = {};
+      if (!prisma.saleItem) prisma.saleItem = {};
+      if (!prisma.product) prisma.product = {};
+
+      prisma.event.findUnique = async () => ({ id: 'ev-test-4', name: 'Art Fair' });
+
+      // Caso 1: prod con name 'Batman (Grande)' y venta manual 'Batman (Mediano)' deben consolidar a 'Batman'
+      // Caso 2: item con description null pero prod.name 'Pink Floyd (Portada de Álbum)'
+      // Caso 3: item con description 'Goku (Pequeña)' con variación femenina 'Pequeña'
+      prisma.saleItem.groupBy = async () => [
+        { productId: 'prod-batman', description: 'Batman (Grande)', _sum: { quantity: 6, subtotal: 750.00 } },
+        { productId: null, description: 'Batman (Mediano)', _sum: { quantity: 4, subtotal: 260.00 } },
+        { productId: 'prod-pink', description: null, _sum: { quantity: 8, subtotal: 440.00 } }, // 8 x Q55
+        { productId: null, description: 'Goku (Pequeña)', _sum: { quantity: 5, subtotal: 175.00 } }, // 5 x Q35
+      ];
+
+      prisma.product.findMany = async () => [
+        { id: 'prod-batman', name: 'Batman (Grande)', category: 'DC', imageUrl: 'https://img.deko/batman.jpg', basePrice: 125 },
+        { id: 'prod-pink', name: 'Pink Floyd (Portada de Álbum)', category: 'MUSICA', imageUrl: 'https://img.deko/pink.jpg', basePrice: 55 }
+      ];
+
+      const res = await getTopSellingPosters({ tenantId: 'tenant-test', eventId: 'ev-test-4' });
+      assert.strictEqual(res.topPosters.length, 3, 'Debe devolver exactamente el Top 3');
+
+      // Puesto 1: Batman consolidado a 'Batman' (6 Grande + 4 Mediano = 10 uds)
+      const p1 = res.topPosters[0];
+      assert.strictEqual(p1.title, 'Batman', 'El título de catálogo debe limpiarse de sufijos de tamaño');
+      assert.strictEqual(p1.unitsSold, 10);
+      assert.strictEqual(p1.sizes.length, 2);
+      assert.strictEqual(p1.sizes[0].sizeId, 'GRANDE');
+      assert.strictEqual(p1.sizes[0].units, 6);
+      assert.strictEqual(p1.sizes[1].sizeId, 'MEDIANO');
+      assert.strictEqual(p1.sizes[1].units, 4);
+      assert.strictEqual(p1.sizes.reduce((acc, s) => acc + s.units, 0), p1.unitsSold);
+
+      // Puesto 2: Pink Floyd con description null (8 uds, Portada de Álbum extraído de prod.name)
+      const p2 = res.topPosters[1];
+      assert.strictEqual(p2.title, 'Pink Floyd');
+      assert.strictEqual(p2.unitsSold, 8);
+      assert.strictEqual(p2.sizes[0].sizeId, 'PORTADA_ALBUM');
+      assert.strictEqual(p2.sizes[0].units, 8);
+      assert.strictEqual(p2.sizes[0].percentage, 100);
+
+      // Puesto 3: Goku (Pequeña) variación femenina (5 uds, PEQUENO)
+      const p3 = res.topPosters[2];
+      assert.strictEqual(p3.title, 'Goku');
+      assert.strictEqual(p3.unitsSold, 5);
+      assert.strictEqual(p3.sizes[0].sizeId, 'PEQUENO');
+      assert.strictEqual(p3.sizes[0].units, 5);
+      assert.strictEqual(p3.sizes[0].percentage, 100);
     } finally {
       if (prisma.event) prisma.event.findUnique = origEventFindUnique;
       if (prisma.saleItem) prisma.saleItem.groupBy = origSaleItemGroupBy;
