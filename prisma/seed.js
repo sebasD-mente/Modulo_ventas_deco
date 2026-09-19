@@ -26,7 +26,24 @@ async function main() {
 
   console.log(`✅ Tenant oficial verificado: ${tenant.name} (${tenant.id})`);
 
-  // 2. Erradicación definitiva de eventos mock (ej. Comic Con Guatemala 2026)
+  // 2. Evento Virtual Permanente: Ventas en Línea y Redes Sociales
+  const virtualEvent = await prisma.event.upsert({
+    where: { id: 'evt-ventas-redes-online' },
+    update: {},
+    create: {
+      id: 'evt-ventas-redes-online',
+      tenantId: tenant.id,
+      name: 'Ventas en Línea y Redes Sociales',
+      location: 'Canal Digital (WhatsApp / IG / FB)',
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2030-12-31'),
+      status: 'ACTIVO',
+    },
+  });
+
+  console.log(`✅ Evento virtual permanente verificado: ${virtualEvent.name} (${virtualEvent.id})`);
+
+  // 3. Erradicación definitiva de eventos mock (ej. Comic Con Guatemala 2026)
   try {
     const deletedMocks = await prisma.event.deleteMany({
       where: {
@@ -43,7 +60,7 @@ async function main() {
     console.warn('⚠️ [Seed] Verificación de eventos mock:', err.message);
   }
 
-  // 3. Catálogo real
+  // 4. Catálogo real
   if (process.env.SKIP_WEB_SYNC === 'true') {
     console.log('⚡ [Seed] SKIP_WEB_SYNC activo: Verificación ligera completada. El catálogo se sincroniza reactivamente en background.');
   } else {

@@ -3,20 +3,25 @@ import { Loader2 } from 'lucide-react';
 import ChatToolCards from './ChatToolCards';
 
 export default function ChatMessageList({
-  messages = [], isLoading = false, processingNote = '', onAddPosterToDraft, onAddPoster,
-  chatContainerRef, isPinnedToBottomRef, chatBottomRef, children
+  messages = [], isLoading = false, processingNote = '', onAddPosterToDraft, onAddPoster, chatContainerRef, isPinnedToBottomRef, chatBottomRef, children
 }) {
-  const isProgrammaticScrollRef = useRef(false);
-  const prevMsgCountRef = useRef(messages.length);
-  const prevLastMsgStreamingRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false), prevMsgCountRef = useRef(messages.length);
+  const prevLastMsgStreamingRef = useRef(false), lastMessageRef = useRef(null);
 
-  const scrollToBottom = (behavior = 'smooth') => {
+  const scrollContainerTo = (top, behavior = 'smooth') => {
     const c = chatContainerRef?.current;
     if (!c) return;
     isProgrammaticScrollRef.current = true;
     if (isPinnedToBottomRef) isPinnedToBottomRef.current = true;
-    if (behavior === 'auto') { c.scrollTop = c.scrollHeight; isProgrammaticScrollRef.current = false; }
-    else { c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }); setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400); }
+    if (behavior === 'auto') { c.scrollTop = top; isProgrammaticScrollRef.current = false; }
+    else { c.scrollTo({ top, behavior: 'smooth' }); setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400); }
+  };
+
+  const scrollToBottom = (b = 'smooth') => { const c = chatContainerRef?.current; if (c) scrollContainerTo(c.scrollHeight, b); };
+  const scrollToMessageStart = (el, b = 'smooth') => {
+    const c = chatContainerRef?.current;
+    if (!c || !el) return;
+    scrollContainerTo(Math.max(0, c.scrollTop + (el.getBoundingClientRect().top - c.getBoundingClientRect().top) - 12), b);
   };
 
   const handleScroll = () => {
@@ -27,49 +32,47 @@ export default function ChatMessageList({
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
-    const isNewMessage = messages.length > prevMsgCountRef.current;
-    const streamJustFinished = prevLastMsgStreamingRef.current && !lastMsg?.isStreaming;
+    const isNew = messages.length > prevMsgCountRef.current;
+    const streamDone = prevLastMsgStreamingRef.current && !lastMsg?.isStreaming;
     const isStreaming = Boolean(lastMsg?.isStreaming);
 
-    if (isNewMessage || streamJustFinished) scrollToBottom('smooth');
-    else if (isStreaming && isPinnedToBottomRef?.current) scrollToBottom('auto');
-
+    if ((isNew || streamDone) && isPinnedToBottomRef?.current !== false) {
+      requestAnimationFrame(() => {
+        const el = lastMessageRef.current, isAi = lastMsg?.sender === 'ai';
+        const hasPodium = Boolean(lastMsg?.topPosters?.length || lastMsg?.toolResult?.posters?.length);
+        const hasManySugg = Boolean(lastMsg?.suggestions?.length >= 3 || lastMsg?.toolResult?.suggestions?.length >= 3);
+        const isTall = isAi && ((el?.offsetHeight || 0) > 400 || hasPodium || hasManySugg);
+        if (isTall && el) scrollToMessageStart(el, 'smooth');
+        else scrollToBottom('smooth');
+      });
+    } else if (isStreaming && isPinnedToBottomRef?.current) {
+      scrollToBottom('auto');
+    }
     prevMsgCountRef.current = messages.length;
     prevLastMsgStreamingRef.current = isStreaming;
   }, [messages]);
 
   const addFn = onAddPosterToDraft || onAddPoster;
 
-  const renderContent = (txt) => {
-    if (!txt) return null;
-    return txt.split('\n').map((line, i) => (
-      <span key={i} className={`block ${line.startsWith('• ') || line.startsWith('- ') ? 'pl-2' : ''}`}>
-        {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-bold text-white">{part.slice(2, -2)}</strong> : part)}
-      </span>
-    ));
-  };
+  const renderContent = (txt) => !txt ? null : txt.split('\n').map((line, i) => (
+    <span key={i} className={`block ${line.startsWith('• ') || line.startsWith('- ') ? 'pl-2' : ''}`}>
+      {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-bold text-white">{part.slice(2, -2)}</strong> : part)}
+    </span>
+  ));
 
   return (
-    <div
-      ref={chatContainerRef}
-      onScroll={handleScroll}
-      className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 no-scrollbar bg-black min-h-[380px] max-h-[460px]"
-    >
+    <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 no-scrollbar bg-black min-h-[380px] max-h-[460px] relative">
       {messages.map((m, idx) => (
-        <div key={m.id ? `${m.id}-${idx}` : idx} className="space-y-2">
+        <div key={m.id ? `${m.id}-${idx}` : idx} ref={idx === messages.length - 1 ? lastMessageRef : null} className="space-y-2">
           <div className={`flex items-start gap-2.5 sm:gap-3 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.sender === 'ai' && (
               <div className="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 mt-0.5 shadow-sm select-none">
                 <img src="/brand/icon-chat-avatar.png" alt="IA" className="w-6 h-6 object-contain" />
               </div>
             )}
-            <div
-              className={`max-w-[85%] sm:max-w-[80%] rounded-[24px] px-4 sm:px-5 py-3 sm:py-3.5 leading-relaxed text-xs sm:text-sm ${
-                m.sender === 'user'
-                  ? 'bg-[#303030] text-white border border-neutral-700 shadow-md'
-                  : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
-              }`}
-            >
+            <div className={`max-w-[85%] sm:max-w-[80%] rounded-[24px] px-4 sm:px-5 py-3 sm:py-3.5 leading-relaxed text-xs sm:text-sm ${
+              m.sender === 'user' ? 'bg-[#303030] text-white border border-neutral-700 shadow-md' : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
+            }`}>
               <div className="whitespace-pre-wrap">
                 {renderContent(m.text)}
                 {m.isStreaming && <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />}

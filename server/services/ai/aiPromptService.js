@@ -80,7 +80,7 @@ export function buildSalesSystemPrompt({ event, resolvedContextData = {}, pendin
   const sellerFullName = resolvedContextData?.vendedorNombre || 'Vendedor';
   const sellerFirstName = sellerFullName.trim().split(' ')[0] || sellerFullName;
 
-  const isOperationalQuery = !message || /caja|dinero|m[eé]tricas|ventas|cu[aá]nto|reporte|turno/i.test(message);
+  const isOperationalQuery = !message || /caja|dinero|m[eé]tricas|ventas|reporte|turno|cu[aá]nto\s+(llevamos|vendimos|hay|tenemos)/i.test(message);
   const operationalContext = isOperationalQuery
     ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nDATOS OPERATIVOS DEL EVENTO EN VIVO (POSTGRESQL):\n${JSON.stringify(resolvedContextData, null, 2)}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
     : '';

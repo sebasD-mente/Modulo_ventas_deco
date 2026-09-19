@@ -26,6 +26,7 @@ model Tenant {
   sales        Sale[]
   cashClosings CashClosing[]
   auditLogs    AuditLog[]
+  customers    Customer[]
 
   @@map("tenants")
 }
@@ -48,10 +49,12 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  sales          Sale[]
-  cashClosings   CashClosing[]
-  auditLogs      AuditLog[]
-  productionLogs ProductionLog[]
+  sales               Sale[]
+  cashClosings        CashClosing[]
+  auditLogs           AuditLog[]
+  productionLogs      ProductionLog[]
+  sellerSettlements   CommissionSettlement[] @relation("SellerSettlements")
+  approvedSettlements CommissionSettlement[] @relation("SettlementApprover")
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -75,7 +78,8 @@ model Event {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  sales           Sale[]
+  sales           Sale[]        @relation("EventSales")
+  pickupSales     Sale[]        @relation("PickupEventSales")
   cashClosings    CashClosing[]
   assignedSellers User[]        @relation("AssignedSeller")
 
@@ -109,23 +113,110 @@ model Product {
   @@map("products")
 }
 
+model Customer {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fullName        String
+  phone           String
+  email           String?
+  deliveryAddress String?  @db.Text
+  department      String?
+  municipality    String?
+  sourceChannel   String   @default("WHATSAPP")
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sales Sale[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, fullName])
+  @@map("customers")
+}
+
+model PrintSheet {
+  id          String    @id @default(uuid())
+  tenantId    String
+  sheetCode   String
+  material    String
+  status      String    @default("ABIERTO")
+  notes       String?   @db.Text
+  createdById String?
+  printedById String?
+  printedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items SaleItem[]
+
+  @@index([tenantId, status])
+  @@index([sheetCode])
+  @@map("print_sheets")
+}
+
+model CommissionSettlement {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  sellerId            String
+  seller              User      @relation("SellerSettlements", fields: [sellerId], references: [id], onDelete: Restrict)
+  settlementNumber    String
+  totalProductsAmount Decimal   @db.Decimal(10, 2)
+  commissionRate      Decimal   @default(0.20) @db.Decimal(5, 4)
+  totalCommission     Decimal   @db.Decimal(10, 2)
+  salesCount          Int       @default(0)
+  periodStart         DateTime
+  periodEnd           DateTime
+  status              String    @default("PENDIENTE_PAGO")
+  approvedById        String?
+  approvedBy          User?     @relation("SettlementApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  paidAt              DateTime?
+  paymentReference    String?
+  notes               String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sales Sale[]
+
+  @@index([tenantId, sellerId])
+  @@index([status])
+  @@map("commission_settlements")
+}
+
 model Sale {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  eventId      String
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  sellerId     String
-  seller       User     @relation(fields: [sellerId], references: [id], onDelete: Restrict)
-  saleNumber   String
-  totalAmount  Decimal  @db.Decimal(10, 2)
-  discount     Decimal  @default(0) @db.Decimal(10, 2)
-  notes        String?  @db.Text
-  status       String   @default("COMPLETADA")
-  inputChannel String   @default("MANUAL_POS")
-  idempotencyKey String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                      String                @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId                 String
+  event                   Event                 @relation("EventSales", fields: [eventId], references: [id], onDelete: Restrict)
+  sellerId                String
+  seller                  User                  @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  saleNumber              String
+  totalAmount             Decimal               @db.Decimal(10, 2)
+  discount                Decimal               @default(0) @db.Decimal(10, 2)
+  notes                   String?               @db.Text
+  status                  String                @default("COMPLETADA")
+  inputChannel            String                @default("MANUAL_POS")
+  idempotencyKey          String?               @unique
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  // Vendedor de Redes & Logística
+  orderType               String                @default("POS_FERIA")
+  deliveryMethod          String                @default("PUNTO_VENTA")
+  shippingCost            Decimal               @default(0) @db.Decimal(10, 2)
+  shippingCourier         String?
+  shippingTrackingNumber  String?
+  pickupEventId           String?
+  pickupEvent             Event?                @relation("PickupEventSales", fields: [pickupEventId], references: [id], onDelete: SetNull)
+  customerId              String?
+  customer                Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  paymentStatus           String                @default("PAGADO_TOTAL")
+  depositAmount           Decimal               @default(0) @db.Decimal(10, 2)
+  balanceDue              Decimal               @default(0) @db.Decimal(10, 2)
+  commissionSettlementId  String?
+  commissionSettlement    CommissionSettlement? @relation(fields: [commissionSettlementId], references: [id], onDelete: SetNull)
+  commissionPaid          Boolean               @default(false)
 
   items       SaleItem[]
   payments    SalePayment[]
@@ -135,6 +226,10 @@ model Sale {
   @@index([tenantId, eventId, createdAt])
   @@index([eventId, status])
   @@index([sellerId])
+  @@index([orderType])
+  @@index([customerId])
+  @@index([paymentStatus])
+  @@index([commissionSettlementId])
   @@map("sales")
 }
 
@@ -149,8 +244,16 @@ model SaleItem {
   unitPrice   Decimal  @db.Decimal(10, 2)
   subtotal    Decimal  @db.Decimal(10, 2)
 
+  // Personalizaciones & Taller
+  isCustom         Boolean     @default(false)
+  customImageUrl   String?
+  customDimensions String?
+  material         String?
+  printSheetId     String?
+  printSheet       PrintSheet? @relation(fields: [printSheetId], references: [id], onDelete: SetNull)
+
   // Ciclo de Vida de Producción
-  productionStatus  String    @default("PENDIENTE") // PENDIENTE | SEPARADO | A_PRODUCCION | IMPRESO
+  productionStatus  String    @default("PENDIENTE")
   productionNotes   String?   @db.Text
   statusChangedAt   DateTime?
   statusChangedById String?
@@ -165,6 +268,8 @@ model SaleItem {
   @@index([saleId])
   @@index([productionStatus])
   @@index([productId])
+  @@index([printSheetId])
+  @@index([isCustom])
   @@map("sale_items")
 }
 
@@ -270,13 +375,13 @@ model AuditLog {
 model AiChatSession {
   id              String   @id @default(uuid())
   sessionId       String   @unique
-  tenantId        String
+  tenantId        String   @default("default-tenant")
   eventId         String?
   sellerName      String?
   pendingDraft    Json?
-  messagesHistory Json     @default("[]")
-  updatedAt       DateTime @updatedAt
+  messagesHistory Json?    @default("[]")
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([tenantId, eventId])
   @@index([tenantId])
@@ -284,4 +389,3 @@ model AiChatSession {
   @@index([updatedAt])
   @@map("ai_chat_sessions")
 }
-

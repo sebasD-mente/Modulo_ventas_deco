@@ -7,22 +7,34 @@ import { prisma } from '../../config/prisma.js';
 
 export async function getOrCreateSession(sessionId, { tenantId = 'default-tenant', eventId = null, sellerName = null } = {}) {
   if (!sessionId) return null;
-  return await prisma.aiChatSession.upsert({
-    where: { sessionId },
-    update: {
-      ...(tenantId ? { tenantId } : {}),
-      ...(eventId !== undefined ? { eventId } : {}),
-      ...(sellerName !== undefined ? { sellerName } : {}),
-    },
-    create: {
+  try {
+    return await prisma.aiChatSession.upsert({
+      where: { sessionId },
+      update: {
+        ...(tenantId ? { tenantId } : {}),
+        ...(eventId !== undefined ? { eventId } : {}),
+        ...(sellerName !== undefined ? { sellerName } : {}),
+      },
+      create: {
+        sessionId,
+        tenantId: tenantId || 'default-tenant',
+        eventId: eventId || null,
+        sellerName: sellerName || null,
+        pendingDraft: null,
+        messagesHistory: [],
+      },
+    });
+  } catch (err) {
+    console.warn(`[aiSessionService] Error persisting session ${sessionId}, falling back to in-memory:`, err?.message || err);
+    return {
       sessionId,
       tenantId: tenantId || 'default-tenant',
       eventId: eventId || null,
       sellerName: sellerName || null,
       pendingDraft: null,
       messagesHistory: [],
-    },
-  });
+    };
+  }
 }
 
 export async function saveSessionState(sessionId, { pendingDraft, history, sellerName, eventId, tenantId } = {}) {
@@ -40,18 +52,30 @@ export async function saveSessionState(sessionId, { pendingDraft, history, selle
   if (eventId !== undefined) updateData.eventId = eventId;
   if (tenantId !== undefined) updateData.tenantId = tenantId;
 
-  return await prisma.aiChatSession.upsert({
-    where: { sessionId },
-    update: updateData,
-    create: {
+  try {
+    return await prisma.aiChatSession.upsert({
+      where: { sessionId },
+      update: updateData,
+      create: {
+        sessionId,
+        tenantId: tenantId || 'default-tenant',
+        eventId: eventId || null,
+        sellerName: sellerName || null,
+        pendingDraft: updateData.pendingDraft !== undefined ? updateData.pendingDraft : null,
+        messagesHistory: updateData.messagesHistory !== undefined ? updateData.messagesHistory : [],
+      },
+    });
+  } catch (err) {
+    console.warn(`[aiSessionService] Error saving state for session ${sessionId}:`, err?.message || err);
+    return {
       sessionId,
       tenantId: tenantId || 'default-tenant',
       eventId: eventId || null,
       sellerName: sellerName || null,
       pendingDraft: updateData.pendingDraft !== undefined ? updateData.pendingDraft : null,
       messagesHistory: updateData.messagesHistory !== undefined ? updateData.messagesHistory : [],
-    },
-  });
+    };
+  }
 }
 
 export async function clearSessionDraft(sessionId) {
@@ -77,7 +101,12 @@ export async function pruneExpiredSessions(hoursOld = 72) {
 
 export async function getSessionState(sessionId, tenantId = null) {
   if (!sessionId) return null;
-  const where = { sessionId };
-  if (tenantId) where.tenantId = tenantId;
-  return await prisma.aiChatSession.findFirst({ where });
+  try {
+    const where = { sessionId };
+    if (tenantId) where.tenantId = tenantId;
+    return await prisma.aiChatSession.findFirst({ where });
+  } catch (err) {
+    console.warn(`[aiSessionService] Error fetching state for session ${sessionId}:`, err?.message || err);
+    return null;
+  }
 }

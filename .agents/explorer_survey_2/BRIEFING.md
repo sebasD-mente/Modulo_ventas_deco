@@ -1,52 +1,58 @@
-# BRIEFING — 2026-09-16T00:05:00Z
+# BRIEFING — 2026-09-19T20:02:00Z
 
 ## Mission
-Survey the codebase for R2 (Cirugía 2.2): Vector calibration (>= 0.72) and root entity gate in server/services/embeddingService.js.
+Investigate migrations, database seeding, environment configuration, and safe schema evolution for VENDEDOR_REDES, ChatSession, and evt-ventas-redes-online.
 
 ## 🔒 My Identity
-- Archetype: explorer
-- Roles: investigation, synthesis
+- Archetype: teamwork_preview_explorer
+- Roles: Explorer, Investigator, Synthesizer
 - Working directory: c:/Users/sebas/Documents/Antigravity Files/Modulo_Ventas/.agents/explorer_survey_2
-- Original parent: 40958512-4854-45d9-bf41-45feacb902c8
-- Milestone: survey_phase_2
-- Current parent: db233a73-dd6b-4945-8057-cdd1e9a20608 (orchestrator_24) | Milestone: R2 (Cirugía 2.2) Vector Calibration & Root Entity Gate
+- Original parent: 5664d29e-cc02-4cd8-bca1-13161c124dd5
+- Milestone: Survey & Migration/Seeding Analysis
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement or modify source code
-- Strict project isolation (aislamiento-estricto-proyectos)
-- Architecture zero debt protocol (cirugia-arquitectura-cero-deuda)
-- Zero assumptions, verified evidence chains
-- Line ceiling constraint: server/services/embeddingService.js <= 200 lines
-- Threshold calibration strictly >= 0.72 for pure vector candidates
-- Strict token matching (every) for entity coverage
-- Root canonical entity gate must preserve all works of the same character/entity
+- Read-only investigation — do NOT implement code changes in production/src/prisma code directly.
+- All proposals must be documented in handoff report.
+- Zero-trust security & zero assumptions.
+- Maintain isolation between projects and databases.
+- Follow AGENTS.md quality gate guidelines.
 
 ## Current Parent
-- Conversation ID: db233a73-dd6b-4945-8057-cdd1e9a20608
-- Updated: 2026-09-16T00:05:00Z
+- Conversation ID: 5664d29e-cc02-4cd8-bca1-13161c124dd5
+- Updated: 2026-09-19T20:02:00Z
 
 ## Investigation State
 - **Explored paths**:
-  - `server/services/embeddingService.js`
-  - `tests/ai/embeddingService.test.js`
-  - `tests/adversarial/m1-embeddings-adversarial.test.js`
-  - `AUDITORIA_360_STAND_IA.md` (Sección 5: Fase 2, Cirugía 2.2)
-  - `ORIGINAL_REQUEST.md` (header 2026-09-15T23:59:14Z)
-  - `server/services/semantic/entityAliases.js`
-  - `server/services/webCatalogService.js`
+  - `prisma/seed.js`: verified seed operations, lack of events, and where `evt-ventas-redes-online` upsert belongs.
+  - `prisma/migrations/`: examined `20260913000000_init_stand_ia`, `20260915210000_add_sale_idempotency_key`, and `migration_lock.toml`.
+  - `prisma/schema.prisma`: audited models, noted `AiChatSession` presence and redundant `@@index([sessionId])`.
+  - `entrypoint.sh` & `Dockerfile`: discovered container startup migration flow (`prisma migrate deploy` -> `SKIP_WEB_SYNC=true node prisma/seed.js`).
+  - `tests/schema/schema-robustness.test.js`: reproduced failing test on duplicate index `ai_chat_sessions:"sessionId"`.
+  - `.agents/explorer_survey_2/check_indexes.js`: validated that eliminating `@@index([sessionId])` produces 45 clean indexes with 0 collisions.
+  - `.agents/explorer_survey_2/proposed_migration.sql`: generated 167-line clean PostgreSQL DDL via `prisma migrate diff`.
+  - `.agents/explorer_survey_2/proposed_test.js`: verified Node test runner execution with all 7 invariant tests passing (100% green).
+  - `server/controllers/eventController.js`: found that `activateEvent` unsets active status of other events; `evt-ventas-redes-online` should be protected from deactivation.
+
 - **Key findings**:
-  1. Threshold `0.60` is located at `server/services/embeddingService.js#L147`. It must be changed to `0.72` to eliminate baseline hypercone noise for non-lexical candidate additions.
-  2. Matching condition `.some` is at line 149 (`normQueryTokens.some((tok) => posterText.includes(tok))`). Refactoring to `normQueryTokens.length > 0 && normQueryTokens.every((tok) => posterText.includes(tok))` prevents spurious partial token matches.
-  3. The `allSameTitle` gate at lines 159-164 (`topEntityTitles.every((t) => t === topEntityTitles[0])`) has a severe flaw: it deletes other legitimate works of the same entity (e.g. "Messi - El Beso de la Gloria" when "Messi - El Beso Eterno" is present), and fails to activate when multiple different titles are found. Refactor to a `sharedTokens` root canonical entity gate.
-  4. Current test suites (`tests/ai/embeddingService.test.js` [17/17 pass], `tests/adversarial/m1-embeddings-adversarial.test.js` [23/23 pass]) pass cleanly. They test `MIN_SIMILARITY_THRESHOLD = 0.45` and do not test `0.60`. New tests are needed to verify `>= 0.72`, `every`, and entity retention.
-  5. `server/services/embeddingService.js` currently has 177 lines. Refactored changes will add ~8 lines, totaling ~185 lines, well below the 200-line limit.
-- **Unexplored areas**: None within R2 scope.
+  1. `AiChatSession` in `prisma/schema.prisma` currently triggers a duplicate index error in `tests/schema/schema-robustness.test.js` because `sessionId` has both `@unique` and `@@index([sessionId])`. Removing `@@index([sessionId])` fixes the test and eliminates redundant indexing in PostgreSQL.
+  2. In local dev, `DATABASE_URL` points to `host-db-dokploy:5432` which is not network-routable from Windows host. Running `prisma migrate dev` fails without DB. However, `prisma migrate diff --from-schema-datamodel ... --to-schema-datamodel ... --script` generates the exact PostgreSQL DDL 100% offline.
+  3. `entrypoint.sh` executes `npx prisma migrate deploy` on every container deployment, which will seamlessly apply `20260919200000_add_vendedor_redes_and_chat_sessions/migration.sql`.
+  4. Adding `evt-ventas-redes-online` in `prisma/seed.js` satisfies R2 and runs automatically via `entrypoint.sh` without requiring web sync.
+
+- **Unexplored areas**: None for survey 2 scope. All assigned investigation questions answered empirically.
 
 ## Key Decisions Made
-- Confirmed that `MIN_SIMILARITY_THRESHOLD = 0.45` on Line 6 remains unchanged (tested baseline); only the pure vector complementary threshold on Line 147 changes from `0.60` to `0.72`.
-- Formulated `sharedTokens` root entity gate matching `normQueryTokens` across lexical items to protect multi-poster entity queries while blocking foreign vector intrusions.
+- Validated offline DDL generation pipeline using `prisma migrate diff`.
+- Verified in-memory SQLite testing pattern for business invariants without external DB dependencies.
+- Verified test suite design for R3 with 100% passing results.
 
 ## Artifact Index
-- handoff.md — Complete 5-component handoff report
-- progress.md — Liveness heartbeat
-- DISPATCH.md — Task history and prompt logs
+- `.agents/explorer_survey_2/DISPATCH.md` — Incoming task dispatch record
+- `.agents/explorer_survey_2/BRIEFING.md` — Persistent working memory
+- `.agents/explorer_survey_2/progress.md` — Liveness heartbeat and milestone tracking
+- `.agents/explorer_survey_2/proposed_schema.prisma` — Validated target Prisma schema
+- `.agents/explorer_survey_2/baseline_schema.prisma` — Baseline schema for diffing
+- `.agents/explorer_survey_2/proposed_migration.sql` — Generated 167-line SQL migration
+- `.agents/explorer_survey_2/check_indexes.js` — Index collision audit script
+- `.agents/explorer_survey_2/proposed_test.js` — Validated R3 test suite
+- `.agents/explorer_survey_2/handoff.md` — Comprehensive handoff report

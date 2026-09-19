@@ -19,7 +19,7 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
     if (isPinnedToBottomRef.current && chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [chatStream.messages, chatStream.pendingDraft, voiceRecorder.isRecording, chatStream.aiError]);
+  }, [voiceRecorder.isRecording, chatStream.aiError]);
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">

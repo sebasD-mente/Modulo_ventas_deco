@@ -103,9 +103,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       return { transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO', greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
     }
     const matchedList = enrichedItems.map((i) => i.baseTitle).filter(Boolean).join(', '), unmatchedList = unmatchedItems.map((i) => i.rawName || i.requestedTitle).join(', ');
-    const sellerMsg = unmatchedItems.length > 0
-      ? `⚠️ Se preparó la venta con ${enrichedItems.length} ítem(s) disponible(s) (${matchedList}). Atención: los siguientes productos no están en el catálogo: ${unmatchedList}.`
-      : 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.';
+    const sellerMsg = unmatchedItems.length > 0 ? `⚠️ Se preparó la venta con ${enrichedItems.length} ítem(s) disponible(s) (${matchedList}). Atención: los siguientes productos no están en el catálogo: ${unmatchedList}.` : 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.';
     return { transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null, items: enrichedItems, total: Number(grandTotal.toFixed(2)), unmatchedItems, suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: sellerMsg, reply: sellerMsg };
   } catch (err) { throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz'); }
 }
@@ -117,15 +115,17 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
     const { result: response } = await executeWithModelFallback({
       models: getActivePool(), actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
-        model, contents: [{ role: 'user', parts: [
-          { text: buildArtworkRecognitionPrompt() },
-          { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }
-        ] }],
+        model, contents: [{ role: 'user', parts: [{ text: buildArtworkRecognitionPrompt() }, { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: artworkRecognitionResponseSchema },
       }),
     });
-    const parsed = JSON.parse(response.text?.trim() || '{}'), confidence = Number(parsed.confidence || 0);
+    let parsed = {};
     const reject = () => ({ isArtworkDetected: false, matchedPoster: null, primaryTitle: parsed.primaryTitle || null, visualAnalysis: parsed.visualAnalysis || null, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null, message: REJECTION_MESSAGE });
+    try {
+      const cleanJson = (response.text?.trim() || '{}').replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      parsed = JSON.parse(cleanJson);
+    } catch (parseErr) { return reject(); }
+    const confidence = Number(parsed.confidence || 0);
     if (confidence < 0.60 || (!parsed.primaryTitle && !parsed.franchiseOrCategory)) return reject();
     if (isNegativeDomainArtwork(parsed.visualAnalysis, parsed.primaryTitle)) return reject();
     const searchQuery = parsed.primaryTitle || parsed.franchiseOrCategory || null;

@@ -96,9 +96,10 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
                   type="button"
                   onClick={logout}
                   title="Cerrar Sesión"
-                  className="p-1 text-neutral-400 hover:text-black rounded-full transition-colors cursor-pointer ml-0.5"
+                  aria-label="Cerrar Sesión"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors p-2 text-neutral-400 hover:text-black cursor-pointer"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -114,10 +115,10 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`min-h-[44px] flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-black text-white px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-sm'
-                    : 'text-black hover:opacity-60 px-2.5 py-1.5 sm:px-3 sm:py-2'
+                    ? 'bg-black text-white shadow-sm'
+                    : 'text-black hover:opacity-60'
                 }`}
               >
                 {tab.label}
