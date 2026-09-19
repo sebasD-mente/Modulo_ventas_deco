@@ -23,6 +23,7 @@ const DOMAIN_CEILINGS = {
   'server/services/semantic/paymentExtractor.js': { max: 280, reason: 'Motor cohesivo de expresiones regulares de pago' },
   'src/App.jsx': { max: 250, reason: 'Router y layout maestro del frontend' },
   'server/services/ai/aiMediaService.js': { max: 260, reason: 'Orquestador multimodal de medios e inferencia' },
+  'server/services/catalog/webCatalogService.js': { max: 240, reason: 'Motor de emparejamiento léxico y resolución de formatos de catálogo' },
 };
 
 const DEFAULT_CEILING = 200;

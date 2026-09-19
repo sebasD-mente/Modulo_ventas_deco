@@ -2,14 +2,41 @@ import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { searchWebPosters, searchHybridPosters, matchPosterEverywhere } from '../webCatalogService.js';
 import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
-import { voiceSaleResponseSchema, buildVoiceSalePrompt, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
-import { resolveEntityAlias, normalizeArtworkQuery, UNIVERSAL_STOP_WORDS } from '../semantic/entityAliases.js';
+import { voiceSaleResponseSchema, buildVoiceSalePrompt, buildArtworkRecognitionPrompt, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
+import { resolveEntityAlias, normalizeArtworkQuery, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from '../semantic/entityAliases.js';
 
 export { matchPosterEverywhere };
 
 const getActivePool = () => [ENV.GEMINI_MODEL && !ENV.GEMINI_MODEL.includes('2.5') ? ENV.GEMINI_MODEL : 'gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', ...MODEL_PRIORITY_POOL].filter((v, i, a) => a.indexOf(v) === i);
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 const throwMediaError = (fn, err, msg) => { console.error(`[${fn}] ❌`, err?.message); const error = new Error(`AI_MEDIA_SERVICE_FAILED: ${err?.message || msg}`); error.code = 'AI_MEDIA_SERVICE_FAILED'; throw error; };
+
+const ARTWORK_SHORT_ENTITIES = new Set([...(KNOWN_SHORT_ENTITIES || []), 'it', 'up', '300', 'el']);
+const NEGATIVE_DOMAIN_REGEX = /\b(ramen|fideos?|noodles?|tacos?|hamburguesas?|burgers?|pizzas?|sushi|comida|platillos?|platos?|gastronom[ií]a|alimentos?|sopas?|caldos?|chashu|tonkotsu|postres?|pasteles?|bebidas?|refrescos?|ensaladas?|mariscos|calzado|zapatos?|zapatillas?|tenis|sneakers?|calcetines?|botas?|sandalias?|ropa|camisas?|camisetas?|pantalones?|vestidos?|animal(es)? vivos?|perros? vivos?|gatos? vivos?|mascotas? vivas?|utensilios? de cocina|cubiertos?|tenedores?|cucharas?|cuchillos?|vajilla|sart[eé]n(es)?|ollas?|mantel(es)?|muebles?|sof[aá]s?|camas?)\b/i;
+const GRAPHIC_ART_SAFEGUARD = /\b(poster|posters|cuadro|cuadros|lamina|laminas|diseno grafico|diseño grafico|ilustracion|impresion artistica|print|wall art)\b/i;
+
+function isNegativeDomainArtwork(visualAnalysis, primaryTitle) {
+  const combined = `${visualAnalysis || ''} ${primaryTitle || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return !GRAPHIC_ART_SAFEGUARD.test(combined) && NEGATIVE_DOMAIN_REGEX.test(combined);
+}
+
+function hasLexicalArtworkRelevance({ primaryTitle, searchQuery, franchiseOrCategory, candidates, matchedTitle, matchedDescription }) {
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const stem = (t) => (t.length > 3 && t.endsWith('s') && !t.endsWith('ss') ? t.slice(0, -1) : t);
+  const getTokens = (str) => norm(str).split(' ').filter((t) => (t.length > 2 || ARTWORK_SHORT_ENTITIES.has(t)) && !UNIVERSAL_STOP_WORDS.has(t));
+  const candidatePool = Array.isArray(candidates) ? candidates.join(' ') : '';
+  const idToks = getTokens([primaryTitle, searchQuery, franchiseOrCategory, candidatePool].filter(Boolean).join(' '));
+  const aliasRes = resolveEntityAlias(primaryTitle || searchQuery);
+  if (aliasRes.matched && (aliasRes.canonicalTitle || aliasRes.searchQuery)) idToks.push(...getTokens([aliasRes.canonicalTitle, aliasRes.searchQuery].join(' ')));
+  const catToks = getTokens([matchedTitle, matchedDescription].filter(Boolean).join(' '));
+  if (idToks.length === 0 || catToks.length === 0) return false;
+  const idStemmed = new Set(idToks.map(stem)), catStemmed = new Set(catToks.map(stem));
+  for (const t of idStemmed) {
+    if (catStemmed.has(t)) return true;
+    for (const c of catStemmed) { if (t.length >= 4 && c.length >= 4 && (t.startsWith(c) || c.startsWith(t))) return true; }
+  }
+  return false;
+}
 
 export function normalizeCatalogSizeId(requestedSize) {
   if (!requestedSize) return 'MEDIANO';
@@ -37,13 +64,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
     const cleanTranscription = (parsed.transcription || '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
     const isSale = Boolean(parsed.isSaleDetected && Array.isArray(parsed.items) && parsed.items.length > 0);
     const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
-    if (!isSale) {
-      return {
-        transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null,
-        items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
-        message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.',
-      };
-    }
+    if (!isSale) return { transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.' };
     const enrichedItems = [], unmatchedItems = [], suggestedPosters = [];
     let grandTotal = 0;
     for (const item of parsed.items) {
@@ -79,23 +100,13 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
     }
     if (enrichedItems.length === 0) {
       const zeroMatchMsg = 'No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.';
-      return {
-        transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO',
-        greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3),
-        paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
-        message: zeroMatchMsg, reply: zeroMatchMsg,
-      };
+      return { transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO', greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
     }
     const matchedList = enrichedItems.map((i) => i.baseTitle).filter(Boolean).join(', '), unmatchedList = unmatchedItems.map((i) => i.rawName || i.requestedTitle).join(', ');
     const sellerMsg = unmatchedItems.length > 0
       ? `⚠️ Se preparó la venta con ${enrichedItems.length} ítem(s) disponible(s) (${matchedList}). Atención: los siguientes productos no están en el catálogo: ${unmatchedList}.`
       : 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.';
-    return {
-      transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null,
-      items: enrichedItems, total: Number(grandTotal.toFixed(2)), unmatchedItems, suggestedPosters: [],
-      paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ',
-      message: sellerMsg, reply: sellerMsg,
-    };
+    return { transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null, items: enrichedItems, total: Number(grandTotal.toFixed(2)), unmatchedItems, suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: sellerMsg, reply: sellerMsg };
   } catch (err) { throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz'); }
 }
 
@@ -107,21 +118,20 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
       models: getActivePool(), actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [
-          { text: 'Reconoce el arte del póster fotografiado con estricta precisión: personajes, título oficial más probable, franquicia y tamaño sugerido.' },
+          { text: buildArtworkRecognitionPrompt() },
           { inlineData: { data: imageBuffer.toString('base64'), mimeType: cleanMime } }
         ] }],
         config: { responseMimeType: 'application/json', responseSchema: artworkRecognitionResponseSchema },
       }),
     });
     const parsed = JSON.parse(response.text?.trim() || '{}'), confidence = Number(parsed.confidence || 0);
-    if (confidence < 0.60 || (!parsed.primaryTitle && !parsed.franchiseOrCategory)) {
-      return { isArtworkDetected: false, matchedPoster: null, primaryTitle: parsed.primaryTitle || null, visualAnalysis: parsed.visualAnalysis || null, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null, message: REJECTION_MESSAGE };
-    }
+    const reject = () => ({ isArtworkDetected: false, matchedPoster: null, primaryTitle: parsed.primaryTitle || null, visualAnalysis: parsed.visualAnalysis || null, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null, message: REJECTION_MESSAGE });
+    if (confidence < 0.60 || (!parsed.primaryTitle && !parsed.franchiseOrCategory)) return reject();
+    if (isNegativeDomainArtwork(parsed.visualAnalysis, parsed.primaryTitle)) return reject();
     const searchQuery = parsed.primaryTitle || parsed.franchiseOrCategory || null;
     const matched = searchQuery ? await matchPosterEverywhere(tenantId, searchQuery, parsed.suggestedSize || 'MEDIANO') : null;
-    if (!matched) {
-      return { isArtworkDetected: false, matchedPoster: null, primaryTitle: parsed.primaryTitle || null, visualAnalysis: parsed.visualAnalysis || null, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null, message: REJECTION_MESSAGE };
-    }
+    if (!matched) return reject();
+    if (!hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) return reject();
     const total = matched.unitPrice || 65.0;
     const item = {
       productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null,

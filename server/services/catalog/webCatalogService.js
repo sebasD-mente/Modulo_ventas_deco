@@ -5,12 +5,9 @@ import { resolveEntityAlias, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from '
 import { getCachedProducts } from './catalogCacheStore.js';
 
 export const STANDARD_SIZES = {
-  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 },
-  PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 },
-  MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
-  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
-  GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
+  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 }, MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
+  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
 };
 
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
@@ -30,10 +27,7 @@ export function stemMatcherToken(tok) {
 }
 
 export const EXTENDED_STOP_WORDS = new Set([
-  ...UNIVERSAL_STOP_WORDS, 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez',
-  'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'en', 'con', 'por', 'para', 'del', 'al',
-  'y', 'o', 'que', 'sobre', 'sin', 'como', 'su', 'sus', 'poster', 'posters', 'cuadro', 'cuadros', 'obra',
-  'obras', 'diseno', 'disenos', 'diseño', 'diseños', 'tamano', 'tamanos', 'tamaño', 'tamaños', 'medida', 'medidas',
+  ...UNIVERSAL_STOP_WORDS, 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'en', 'con', 'por', 'para', 'del', 'al', 'y', 'o', 'que', 'sobre', 'sin', 'como', 'su', 'sus', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseno', 'disenos', 'diseño', 'diseños', 'tamano', 'tamanos', 'tamaño', 'tamaños', 'medida', 'medidas',
 ]);
 
 function normSize(requestedSize) {
@@ -51,11 +45,7 @@ function normSize(requestedSize) {
 function resolvePosterSize(item, requestedSize) {
   const hasOfficialSizes = Array.isArray(item.sizes) && item.sizes.length > 0;
   const sizes = hasOfficialSizes ? item.sizes : Object.values(STANDARD_SIZES);
-  const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize)
-    || sizes.find((s) => s.sizeId === item.primarySize)
-    || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM')
-    || sizes[0]
-    || STANDARD_SIZES.MEDIANO;
+  const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize) || sizes.find((s) => s.sizeId === item.primarySize) || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM') || sizes[0] || STANDARD_SIZES.MEDIANO;
 
   let selectedSize = legitPrimary, sizeAvailable = true, unavailableReason = null;
   if (requestedSize) {
@@ -67,9 +57,7 @@ function resolvePosterSize(item, requestedSize) {
       sizeAvailable = false;
       const title = item.titulo || item.name || 'Póster';
       const availStr = sizes.map((s) => `${s.nombre} (${s.dimensiones || s.sizeId})`).join(', ');
-      unavailableReason = hasOfficialSizes
-        ? `El diseño "${title}" es exclusivo en: ${availStr}. No se fabrica en ${requestedSize}.`
-        : `El diseño "${title}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${availStr}.`;
+      unavailableReason = hasOfficialSizes ? `El diseño "${title}" es exclusivo en: ${availStr}. No se fabrica en ${requestedSize}.` : `El diseño "${title}" no se fabrica en ${requestedSize}. Tamaños disponibles: ${availStr}.`;
       selectedSize = legitPrimary;
     }
   }
@@ -87,18 +75,40 @@ function buildPosterResult(matched, requestedSize) {
   };
 }
 
-async function findLocalMatch(tenantId, clean, requestedSize) {
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export function matchesCatalogWordBoundary(haystack, needle) {
+  if (!haystack || !needle) return false;
+  if (haystack === needle) return true;
+  return new RegExp(`\\b${escapeRegex(needle)}\\b`, 'i').test(haystack);
+}
+
+export async function findLocalMatch(tenantIdOrQuery, cleanOrCatalog, requestedSize = null) {
   try {
-    let local = [];
-    try { local = await getCachedProducts(tenantId); } catch (_) {}
-    if (!local || local.length === 0) {
-      try { local = await prisma.product.findMany({ where: { tenantId, isActive: true } }); } catch (_) {}
+    let local = [], clean = '';
+    if (Array.isArray(cleanOrCatalog)) {
+      clean = String(tenantIdOrQuery || '').trim();
+      local = cleanOrCatalog;
+    } else {
+      clean = String(cleanOrCatalog || '').trim();
+      const tenantId = tenantIdOrQuery;
+      try { local = await getCachedProducts(tenantId); } catch (_) {}
+      if (!local || local.length === 0) {
+        try { local = await prisma.product.findMany({ where: { tenantId, isActive: true } }); } catch (_) {}
+      }
     }
     const cleanNorm = normalizeMatcherString(clean);
+    if (!cleanNorm) return null;
+
     const match = (local || []).find((p) => {
       if ([p.qrCodeData, p.barcode, p.sku, p.id].some((c) => c && c.toLowerCase() === clean.toLowerCase())) return true;
       const pNorm = normalizeMatcherString(p.name || p.titulo || '');
-      return pNorm === cleanNorm || pNorm.includes(cleanNorm) || cleanNorm.includes(pNorm);
+      if (!pNorm) return false;
+      if (pNorm === cleanNorm) return true;
+      if (EXTENDED_STOP_WORDS.has(pNorm) || EXTENDED_STOP_WORDS.has(cleanNorm)) return false;
+      if (pNorm.length < 4) return matchesCatalogWordBoundary(cleanNorm, pNorm);
+      if (cleanNorm.length >= 4) return matchesCatalogWordBoundary(cleanNorm, pNorm) || matchesCatalogWordBoundary(pNorm, cleanNorm);
+      return matchesCatalogWordBoundary(pNorm, cleanNorm);
     });
     if (match) {
       const { selectedSize, sizes, sizeAvailable, unavailableReason } = resolvePosterSize(match, requestedSize);
@@ -110,13 +120,12 @@ async function findLocalMatch(tenantId, clean, requestedSize) {
         sizeAvailable, unavailableReason,
       };
     }
-  } catch (err) { console.warn('[matchPosterEverywhere] ⚠️ Error local:', err.message); }
+  } catch (err) { console.warn('[findLocalMatch] ⚠️ Error local:', err.message); }
   return null;
 }
 
 export async function matchPosterEverywhere(tenantId, query, requestedSize = null) {
-  if (!query) return null;
-  const clean = String(query).trim();
+  const clean = String(query || '').trim();
   if (!clean) return null;
 
   try {
@@ -129,12 +138,10 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (aliasRes.matched && aliasRes.exactMatch && (aliasRes.canonicalTitle || aliasRes.searchQuery)) {
     let webMatches = [];
     const preferredQuery = aliasRes.canonicalTitle || aliasRes.searchQuery;
-    try { webMatches = await searchHybridPosters({ tenantId, query: preferredQuery, limit: 12 }); }
-    catch { webMatches = await searchWebPosters({ tenantId, query: preferredQuery, limit: 12 }); }
+    try { webMatches = await searchHybridPosters({ tenantId, query: preferredQuery, limit: 12 }); } catch { webMatches = await searchWebPosters({ tenantId, query: preferredQuery, limit: 12 }); }
 
     if ((!webMatches || webMatches.length === 0) && aliasRes.searchQuery && aliasRes.searchQuery !== preferredQuery) {
-      try { webMatches = await searchHybridPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); }
-      catch { webMatches = await searchWebPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); }
+      try { webMatches = await searchHybridPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); } catch { webMatches = await searchWebPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); }
     }
 
     if (webMatches && webMatches.length > 0) {

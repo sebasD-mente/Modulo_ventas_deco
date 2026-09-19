@@ -38,6 +38,11 @@ Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
 7. TRANSCRIPCIÓN PURA: En 'transcription' escribe ÚNICAMENTE las palabras habladas por la persona. Está TERMINANTEMENTE PROHIBIDO incluir notas de razonamiento interno, corchetes o anotaciones tipo '[snip: ...]'.`;
 }
 
+export function buildArtworkRecognitionPrompt() {
+  return `Reconoce el arte del póster fotografiado con estricta precisión: personajes, título oficial más probable, franquicia y tamaño sugerido.
+DIRECTIVA NEGATIVA ESTRICTA: Si la fotografía muestra comida o platillos servidos (ramen, hamburguesas, pizzas, tacos), ropa, calzado, animales vivos o muebles de uso doméstico sin relación con arte gráfico o pósters, indícalo explícitamente como objeto fuera de giro en visualAnalysis y primaryTitle, sin asumir que es un póster de catálogo.`;
+}
+
 export const artworkRecognitionResponseSchema = {
   type: Type.OBJECT, description: 'Reconocimiento visual estricto de arte en diseño de póster físico.',
   properties: {
