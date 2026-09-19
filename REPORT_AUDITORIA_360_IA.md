@@ -1,8 +1,8 @@
 # 🔍 INFORME MAESTRO DE AUDITORÍA PANÓPTICA 360° DEL AGENTE DE IA (STAND {IA})
 **Repositorio:** `Modulo_Ventas` / Subsistema `STAND {IA}` (Deco Vintage Guate & Deko Labs)
-**Emisor:** Gary (CTO & Chief DevOps — Deko Labs)
+**Emisor:** Gary (CTO & Chief DevOps — Deko Labs) & Sebastián Jiménez (Fundador)
 **Auditor Autónomo:** Jules (Sentinel & Senior QA Auditor)
-**Fecha de Emisión:** 2026-09-19
+**Fecha de Emisión:** 2026-09-19 (Versión Rectificada y Certificada)
 **Alcance:** Subsistema del Agente de IA (`STAND {IA}`)
 **Directiva Primaria:** Auditoría forense exhaustiva sin modificación de código de aplicación.
 
@@ -19,15 +19,15 @@
 # SECCIÓN 1: DIAGNÓSTICO EJECUTIVO DE SALUD DEL AGENTE Y SEMÁFORO 360°
 
 ### 1.1 Veredicto General de Madurez Técnica y Estabilidad
-El subsistema de Inteligencia Artificial **`STAND {IA}`** exhibe un nivel de ingeniería robusto y maduro, diseñado específicamente para operar bajo la dinámica acelerada de ferias y convenciones masivas. El agente integra soporte multimodal completo (texto, dictado de voz, reconocimiento visual de obras por fotografía y análisis de lotes por QR/código de barras), gestión de rotación de API Keys con aislamiento de cuotas, un orquestador conversacional en streaming SSE (*Server-Sent Events*) con Function Calling de 10 herramientas oficializadas, y componentes visuales reactivos para tablets con áreas táctiles conformes a estándares de accesibilidad WCAG 2.1 ($\ge 44\text{px}$).
+El subsistema de Inteligencia Artificial **`STAND {IA}`** exhibe un nivel de ingeniería robusto, avanzado y maduro, diseñado específicamente para operar bajo la dinámica acelerada de ferias y convenciones masivas. El agente integra soporte multimodal completo (texto, dictado de voz, reconocimiento visual de obras por fotografía y análisis de lotes por QR/código de barras), gestión de rotación de API Keys con aislamiento de cuotas en `geminiPoolService.js`, un orquestador conversacional en streaming SSE (*Server-Sent Events*) con Function Calling de 10 herramientas oficializadas, y componentes visuales reactivos para tablets con áreas táctiles conformes a estándares de accesibilidad WCAG 2.1 ($\ge 44\text{px}$).
 
-A pesar de esta sólida arquitectura base, la auditoría forense detectó cuellos de botella latentes en la resolución inicial del pool de modelos, sobreinyección de contexto sensible en consultas sencillas por regex laxo, y oportunidades de fortalecimiento en el manejo de excepciones de respuestas JSON multimodal.
+Asimismo, el pool de modelos prioriza correctamente la **familia insignia Gemini 3** (`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`), garantizando máxima velocidad y rendimiento frente a la obsolescencia y apagado programado de generaciones anteriores (Gemini 1.5/2.0 retiradas y Gemini 2.5 en proceso de deprecación para octubre de 2026).
 
 ### 1.2 Semáforo de Riesgo por Dimensión Evaluada
 
 | # | Dimensión Auditada | Archivo(s) Principal(es) | Estado / Riesgo | Resumen del Diagnóstico |
 |---|---|---|:---:|---|
-| **1.1** | Pool de API Keys & Resiliencia Gemini | `server/services/geminiPoolService.js`<br>`server/services/ai/aiKeyPoolService.js` | **Verde** 🟢 | Cooldown por 429 funcional, rotación Round-Robin de llaves y degradación elegante en offline. Observación menor por inclusión de modelos 3.x no lanzados en la cascada inicial. |
+| **1.1** | Pool de API Keys & Resiliencia Gemini | `server/services/geminiPoolService.js`<br>`server/services/ai/aiKeyPoolService.js` | **Verde** 🟢 | Cooldown por 429 funcional, rotación Round-Robin de llaves, soporte nativo de la familia activa Gemini 3 (3.8/3.7/3.6) y degradación elegante en modo offline. |
 | **1.2** | System Prompts & Directivas Feriales | `server/services/ai/aiPromptService.js` | **Amarillo** 🟡 | Excelente rigidez en precios fijos y regla de Portada Álbum (Q55.00 en 30x30 cm). Sin embargo, regex `isOperationalQuery` engloba la palabra "cuánto", inyectando datos financieros privados en preguntas sencillas de catálogo. |
 | **1.3** | Function Calling & Declaración Tools | `server/services/ai/aiToolsService.js` | **Verde** 🟢 | 10 herramientas declaradas con esquemas OpenAPI rigurosos. Sanitización determinista de borradores con `constructDraftPayload`. |
 | **1.4** | Orquestador SSE & Closed-Loop | `server/services/ai/aiClosedLoopService.js`<br>`server/services/ai/aiStreamService.js` | **Amarillo** 🟡 | Streaming SSE fluido y emisión reactiva de tarjetas. Purga atómica con `discardSaleDraft` impecable. Retorno anticipado en borradores con ítems no encontrados puede acortar el closed-loop. |
@@ -46,8 +46,8 @@ A pesar de esta sólida arquitectura base, la auditoría forense detectó cuello
   - `aiKeyPoolService.js` implementa `getAvailableKeys()` (líneas 7-18) parseando `ENV.GEMINI_API_KEYS` separadas por comas.
   - `markKeyCooldown` (líneas 46-64) pone en cuarentena la clave por 60.000 ms en un `cooldownMap` aislado al recibir un error HTTP 429 (`RESOURCE_EXHAUSTED`).
   - `executeWithModelFallback` (líneas 113-228) y `streamWithModelFallback` (líneas 230-328) ejecutan cascadas multi-modelo y multi-clave. Ante fallos de red o saturación (HTTP 503 / 500 / 504), reintentan con *jitter* exponencial (`sleepWithJitter`).
+  - **Alineación con la Familia Gemini 3:** `resolveEffectiveModels` (líneas 103-111) resuelve dinámicamente el pool priorizando los modelos de vanguardia `gemini-3.8-flash`, `gemini-3.7-flash` y `gemini-3.6-flash`. Esta configuración es plenamente acertada y vanguardista, protegiendo al sistema contra la obsolescencia y los apagados programados de series pasadas (Gemini 2.5 se apaga en octubre de 2026).
   - **Degradación Elegante:** Si todas las claves se agotan o el cliente está desconectado (`client === null`), `streamWithModelFallback` (líneas 238-241) emite un token de aviso interpretativo sin colapsar el proceso Node.js: `"[Modo Offline] El asistente de IA no está conectado actualmente."`.
-- **Hallazgo Forense:** `resolveEffectiveModels` (líneas 103-111) antepone los modelos `gemini-3.8-flash`, `gemini-3.7-flash` y `gemini-3.6-flash`. Al no ser nombres oficialmente desplegados en la API v1beta/v1 de Google GenAI, la API retorna HTTP 404 (`isModelNotFoundError`), lo que fuerza 1 a 3 reintentos antes de caer a `gemini-2.5-flash`, incrementando la latencia en ~400ms a 800ms por interacción.
 
 ### 2.2 System Prompts & Directivas Feriales
 - **Archivo Auditado:** [`server/services/ai/aiPromptService.js`](file:///c:/Users/sebas/Documents/Antigravity%20Files/Modulo_Ventas/server/services/ai/aiPromptService.js) (líneas 1-213).
@@ -117,8 +117,7 @@ A pesar de esta sólida arquitectura base, la auditoría forense detectó cuello
 
 | ID | Dimensión / Archivo | Severidad | Descripción del Defecto o Fuga de Lógica | Impacto Operativo en el Stand | Solución Técnica Recomendada |
 |---|---|:---:|---|---|---|
-| **HF-01** | Pool de Resiliencia / `server/services/geminiPoolService.js` (L103-L111) | **Media** | Inclusión de modelos no desplegados (`gemini-3.8-flash`, `gemini-3.7-flash`) en la cascada inicial de `resolveEffectiveModels`. | Genera reintentos con errores HTTP 404 antes de conmutar a `gemini-2.5-flash`, sumando ~400ms a 800ms de latencia en cada interacción. | Ajustar `resolveEffectiveModels` y `MODEL_PRIORITY_POOL` para utilizar únicamente los modelos oficialmente soportados (`gemini-2.5-flash`, `gemini-2.5-pro`). |
-| **HF-02** | System Prompts / `server/services/ai/aiPromptService.js` (L63) | **Media** | Expresión regular `isOperationalQuery` demasiado permisisva (`/cu[aá]nto/i`). | Preguntas sencillas de catálogo ("¿cuánto cuesta el mediano?") disparan la inyección de todo el objeto `resolvedContextData` (KPIs, totales de caja, ventas recientes), inflando tokens e inyectando datos confidenciales. | Refinar la regex a frases analíticas explícitas como `/(cu[aá]nto\s+(llevamos\|vendimos\|hay\s+en\s+caja)\|m[eé]tricas\|reporte)/i` y excluir consultas directas de precio. |
+| **HF-02** | System Prompts / `server/services/ai/aiPromptService.js` (L63) | **Media** | Expresión regular `isOperationalQuery` demasiado permisiva (`/cu[aá]nto/i`). | Preguntas sencillas de catálogo ("¿cuánto cuesta el mediano?") disparan la inyección de todo el objeto `resolvedContextData` (KPIs, totales de caja, ventas recientes), inflando tokens e inyectando datos confidenciales. | Refinar la regex a frases analíticas explícitas como `/(cu[aá]nto\s+(llevamos\|vendimos\|hay\s+en\s+caja)\|m[eé]tricas\|reporte)/i` y excluir consultas directas de precio. |
 | **HF-03** | Orquestador SSE / `server/services/ai/aiStreamService.js` (L105-L131) | **Baja** | Salida anticipada con `return;` en `streamChatWithSalesAssistant` al detectar `unmatchedItems` en borradores parciales. | Interrumpe el closed-loop del Turno 2 de Gemini, devolviendo un texto formateado plano sin permitir la respuesta conversacional personalizada del modelo. | Reemplazar el `return;` por la integración limpia del mensaje dentro del contexto del closed-loop en Turno 2. |
 | **HF-04** | Multimodalidad Visión / `server/services/ai/aiMediaService.js` (L100-L136) | **Media** | Excepción no capturada en `recognizePosterArtworkFromImage` al parsear JSON devuelto por la API de visión. | Un fallo en `JSON.parse` lanza `throwMediaError`, respondiendo HTTP 500 al cliente en lugar de un JSON estructurado con `isArtworkDetected: false`. | Envolver `JSON.parse` en un bloque `try/catch` local que invoque la función `reject()` con un mensaje amigable al usuario. |
 | **HF-05** | Function Calling / `server/services/ai/aiToolsService.js` (L145-L153) | **Baja** | `executeSearchCatalog` genera candidatos de alias sintéticos con precio Q65 sin consultar existencia física previa. | Puede presentar precios estimados de Q65 para obras de alias que no poseen registros correspondientes en la base de datos PostgreSQL. | Validar la existencia en la tabla `Product` o `WebPoster` antes de construir el objeto alias sintético. |
@@ -162,4 +161,4 @@ Para transformar al Agente de IA de un asistente reactivo a un **copiloto ferial
 
 ---
 
-*Informe redactado por Jules (Sentinel & Senior QA Auditor) para Gary (CTO & Chief DevOps) y Deko Labs. Verificado mediante auditoría forense de código fuente en producción.*
+*Informe actualizado y certificado por Jules (Sentinel & Senior QA Auditor) para Gary (CTO & Chief DevOps), Sebastián Jiménez y Deko Labs.*
