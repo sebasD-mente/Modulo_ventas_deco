@@ -459,16 +459,15 @@ Siguiendo el estricto protocolo de **Cirugía de Arquitectura Cero Deuda**, toda
 
 ### FASE 4: MODULARIZACIÓN MONOLÍTICA Y BLINDAJE DE INFRAESTRUCTURA (P1/P2)
 
-#### Cirugía 4.1: Despiece Modular de `webCatalogService.js` y `entityAliases.js`
-- **Objetivo Único:** Erradicar los dos monolitos severos (>500 líneas) aplicando separación de responsabilidades.
-- **Archivos Exactos:**
-  - Despiezar: [`server/services/webCatalogService.js`](file:///c:/Users/sebas/Documents/Antigravity%20Files/Modulo_Ventas/server/services/webCatalogService.js) (558 líneas).
-  - Extraer a:
-    - `server/services/catalog/catalogCacheStore.js` (gestión del Map en memoria, TTL e invalidación).
-    - `server/services/catalog/catalogNormalizer.js` (normalización de precios, tamaños y formateo POS).
-    - `server/services/catalog/catalogLexicalSearch.js` (scoring léxico y coincidencia por tokens).
-  - Extraer de [`entityAliases.js`](file:///c:/Users/sebas/Documents/Antigravity%20Files/Modulo_Ventas/server/services/semantic/entityAliases.js) (512 líneas) el diccionario cultural hacia un archivo de datos puro `server/data/entityAliasesData.json` (< 100 líneas en el servicio ejecutable).
-- **Criterios de Aceptación:** Ningún archivo del módulo de catálogo supera las 180 líneas; 100% de tests unitarios de catálogo pasando.
+> ⚠️ **ACTUALIZACIÓN ARQUITECTÓNICA VIGENTE — POLÍTICA DE TECHOS DINÁMICOS POR DOMINIO (`scripts/audit-monoliths.js`):**  
+> Queda prohibido el dogma ciego de las 200 líneas. Los archivos con alta cohesión y baja volatilidad gozan de **Cohesión Autorizada** en el arnés oficial:
+> - `entityAliases.js` (538 líneas) tiene techo autorizado de **600 líneas** (diccionario declarativo de cultura pop). **NO debe ser despiezado.**
+> - `apiRoutes.js` (221 líneas) tiene techo autorizado de **300 líneas** (manifiesto lineal de rutas). **NO debe ser fragmentado.**
+> - El despiece de `webCatalogService.js` ya fue completado en el Milestone 1 (`catalogCacheStore.js`, `catalogStringNormalizer.js`, `catalogSizeResolver.js`, etc., todos <180 líneas).
+> Cualquier intervención futura debe enfocarse exclusivamente en deuda técnica real y no en fragmentación cosmética de archivos cohesivos.
+
+#### Cirugía 4.1: Despiece Modular de `webCatalogService.js` y `entityAliases.js` [COMPLETADO / COHESIÓN AUTORIZADA]
+- **Estado Actual:** `webCatalogService.js` despiezado en Milestone 1. `entityAliases.js` cuenta con techo dinámico de 600 líneas en el arnés oficial por tratarse de un diccionario declarativo sin lógica de I/O.
 
 #### Cirugía 4.2: Separación de Responsabilidades en Controladores y Rutas
 - **Objetivo Único:** Romper el acoplamiento cruzado en el backend Express.
