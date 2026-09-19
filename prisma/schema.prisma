@@ -266,3 +266,22 @@ model AuditLog {
   @@index([tenantId, action])
   @@map("audit_logs")
 }
+
+model AiChatSession {
+  id              String   @id @default(uuid())
+  sessionId       String   @unique
+  tenantId        String
+  eventId         String?
+  sellerName      String?
+  pendingDraft    Json?
+  messagesHistory Json     @default("[]")
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, eventId])
+  @@index([tenantId])
+  @@index([eventId])
+  @@index([updatedAt])
+  @@map("ai_chat_sessions")
+}
+

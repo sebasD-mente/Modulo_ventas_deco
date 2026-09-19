@@ -2,12 +2,15 @@ import { ENV } from '../../config/env.js';
 import { getEventKPIs } from '../saleService.js';
 import { streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings } from './aiPromptService.js';
-import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
+import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock, executeGetHourlySalesAnalytics, executeGetTopSellingPosters } from './aiToolsService.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 
 export function buildFallbackSummaries(executedTools) {
   const summaries = [];
+  const catalogSearches = (executedTools || []).filter(t => t.name === 'searchCatalog');
+  let catalogSummaryAdded = false;
+
   for (const t of executedTools) {
     if (t.name === 'prepareSaleDraft' && t.result) {
       const d = t.result;
@@ -21,9 +24,10 @@ export function buildFallbackSummaries(executedTools) {
       }
     } else if (t.name === 'discardSaleDraft') {
       summaries.push('🗑️ Borrador de venta cancelado y vaciado.');
-    } else if (t.name === 'searchCatalog') {
-      const count = t.result?.matchesCount || (Array.isArray(t.result) ? t.result.length : 0);
-      summaries.push(count > 0 ? `¡Listo! Mostrando ${count} opciones en pantalla (Mediano Q65 más vendido). ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
+    } else if (t.name === 'searchCatalog' && !catalogSummaryAdded) {
+      catalogSummaryAdded = true;
+      const totalMatches = catalogSearches.reduce((acc, s) => acc + (s.result?.matchesCount || (Array.isArray(s.result) ? s.result.length : 0)), 0);
+      summaries.push(totalMatches > 0 ? `¡Listo! Mostrando ${totalMatches} opciones en pantalla (Mediano Q65 más vendido). ¿Cuál anotamos al borrador?` : 'No encontré obras con ese criterio en el catálogo activo.');
     } else if (t.name === 'checkInventoryStock' && t.result?.summary) {
       summaries.push(t.result.summary);
     } else if (t.name === 'getCashDrawerStatus' && t.result?.summaryText) {
@@ -34,6 +38,11 @@ export function buildFallbackSummaries(executedTools) {
       summaries.push(t.result.summary);
     } else if (t.name === 'getEventKPIs' && t.result) {
       summaries.push(`📊 **Ventas en tiempo real:** Q ${t.result.totalAmount?.toFixed(2) || '0.00'} (${t.result.totalTransactions || 0} ventas).`);
+    } else if (t.name === 'getHourlySalesAnalytics' && t.result) {
+      summaries.push(`📈 **Pico de ventas:** ${t.result.peakWindow || 'Horario concurrido'} (Q ${Number(t.result.peakAmount || 0).toFixed(2)} acumulados en ${t.result.peakPercentage || 0}% del volumen).`);
+    } else if (t.name === 'getTopSellingPosters' && t.result) {
+      const topStr = (t.result.topPosters || []).slice(0, 3).map((p, i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} ${p.title} (${p.unitsSold} uds)`).join(', ');
+      summaries.push(`🏆 **Top pósters más vendidos:** ${topStr || 'Sin registros aún'}.`);
     }
   }
   return summaries.length > 0 ? summaries : ['Listo para registrar ventas o consultar catálogo en el stand.'];
@@ -60,6 +69,14 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
       let k = null;
       try { k = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); } catch { k = { event: { name: resolved?.evento || 'Evento' }, totalAmount: 0, totalTransactions: 0, totalUnits: 0, averageTicket: 0, paymentBreakdown: {} }; }
       return { event: k ? { type: 'event_kpis', data: k } : null, toolRecord: { name: call.name, args: call.args, result: k, id } };
+    }
+    if (call.name === 'getHourlySalesAnalytics') {
+      const h = await executeGetHourlySalesAnalytics({ tenantId, eventId: effEvId, date: call.args?.date || date });
+      return { event: { type: 'hourly_sales', data: h }, toolRecord: { name: call.name, args: call.args, result: h, id } };
+    }
+    if (call.name === 'getTopSellingPosters') {
+      const tp = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 5 });
+      return { event: { type: 'top_posters', data: tp }, toolRecord: { name: call.name, args: call.args, result: tp, id } };
     }
     if (call.name === 'getCashDrawerStatus') {
       const s = await executeGetCashDrawerStatus(tenantId, effEvId);
@@ -127,6 +144,10 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
   }
 
   if (followUpTokensCount === 0 && !hadPoolError) {
-    for (const text of buildFallbackSummaries(executedTools)) yield { type: 'token', text };
+    const fallbackTexts = buildFallbackSummaries(executedTools);
+    for (let i = 0; i < fallbackTexts.length; i++) {
+      if (i > 0) yield { type: 'token', text: '\n\n' };
+      yield { type: 'token', text: fallbackTexts[i] };
+    }
   }
 }

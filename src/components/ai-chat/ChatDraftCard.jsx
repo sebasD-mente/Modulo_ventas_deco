@@ -95,7 +95,7 @@ export default function ChatDraftCard({
                 key={m}
                 type="button"
                 onClick={() => updatePayment?.(m)}
-                className={`min-h-[44px] text-xs font-bold px-3 py-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+                className={`min-h-[44px] min-w-[44px] text-xs font-bold px-3 py-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
                   pendingDraft.paymentMethod === m ? 'bg-white text-black border-white shadow-md' : 'bg-black border-neutral-700 text-neutral-400 hover:text-white'
                 }`}
               >

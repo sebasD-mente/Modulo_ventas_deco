@@ -50,6 +50,8 @@ import {
   handleVoiceSale,
   handleBatchPhoto,
   handleChatQuery,
+  handleGetSession,
+  handleClearDraft,
   handleArtworkRecognition,
   handleVideoRecognition,
 } from '../controllers/aiController.js';
@@ -211,6 +213,16 @@ router.post(
   requireRole(['SUPER_ADMIN', 'VENDEDOR']),
   requireEventAccess,
   handleChatQuery
+);
+router.get(
+  '/ai/session/:sessionId',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  handleGetSession
+);
+router.delete(
+  '/ai/session/:sessionId/draft',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  handleClearDraft
 );
 
 // ==========================================

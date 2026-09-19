@@ -5,41 +5,75 @@ import { DEFAULT_EVENT_SIZES, buildOfflineFallbackReply } from '../chatConstants
 import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
 import { compressImage } from '../../../utils/imageCompressor.js';
 
-const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
+const TOOL_EVENT_MAP = { suggested_posters: 'suggestedPosters', event_kpis: 'eventKpis', hourly_sales: 'hourlySales', top_posters: 'topPosters', cash_drawer_status: 'cashDrawerStatus', seller_shift_report: 'sellerShiftReport', production_queue_status: 'productionQueueStatus', inventory_stock: 'inventoryStock' };
 const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+const getSessionKey = (eId) => `stand_ai_session_${eId || 'active'}`;
+const getMsgSessionKey = (eId) => `stand_ia_chat_msg_${eId || 'global'}`;
+const getDraftSessionKey = (eId) => `stand_ia_chat_draft_${eId || 'global'}`;
+const getOrCreateSessionId = (eId) => { try { const k = getSessionKey(eId); let s = sessionStorage.getItem(k); if (!s) { s = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : genId(); sessionStorage.setItem(k, s); } return s; } catch { return genId(); } };
+
 export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm } = {}) {
   const { authFetch, user } = useAuth(), getGreeting = (u) => { const f = u?.fullName?.trim().split(' ')[0] || u?.name; return f ? `¡Hola ${f}! Estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?` : '¡Hola! Soy STAND IA y estoy listo para que hagamos muchas ventas, ¿con qué comenzamos?'; };
-  const [messages, setMessages] = useState(() => [{ id: genId(), sender: 'ai', text: getGreeting(user), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(getMsgSessionKey(eventId));
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (_) {}
+    return [{ id: genId(), sender: 'ai', text: getGreeting(user), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }];
+  });
   useEffect(() => { if (user?.fullName) { const g = getGreeting(user); setMessages((p) => (p.length === 1 && p[0].sender === 'ai' && p[0].text.startsWith('¡Hola') ? [{ ...p[0], text: g }] : p)); } }, [user?.fullName]);
-  const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState(''), [pendingDraft, setPendingDraft] = useState(null), [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false), [aiError, setAiError] = useState(null), clearAiError = () => setAiError(null);
+  useEffect(() => {
+    try { sessionStorage.setItem(getMsgSessionKey(eventId), JSON.stringify(messages.slice(-20))); } catch (_) {}
+  }, [messages, eventId]);
+
+  const [inputText, setInputText] = useState(''), [isLoading, setIsLoading] = useState(false), [processingNote, setProcessingNote] = useState('');
+  const [pendingDraft, setPendingDraft] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(getDraftSessionKey(eventId));
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) return parsed;
+    } catch (_) {}
+    return null;
+  });
+  useEffect(() => {
+    try {
+      const k = getDraftSessionKey(eventId);
+      if (pendingDraft && Array.isArray(pendingDraft.items) && pendingDraft.items.length > 0) sessionStorage.setItem(k, JSON.stringify(pendingDraft));
+      else sessionStorage.removeItem(k);
+    } catch (_) {}
+  }, [pendingDraft, eventId]);
+
+  const [swappingIndex, setSwappingIndex] = useState(null), [swapQuery, setSwapQuery] = useState(''), [swapResults, setSwapResults] = useState([]), [isSearchingSwap, setIsSearchingSwap] = useState(false), [aiError, setAiError] = useState(null), clearAiError = () => setAiError(null);
   const pendingDraftRef = useRef(pendingDraft); pendingDraftRef.current = pendingDraft;
-  const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null), lastAudioBlobRef = useRef(null);
+  const abortControllerRef = useRef(null), rafIdRef = useRef(null), swapDebounceRef = useRef(null), lastAudioBlobRef = useRef(null), sessionIdRef = useRef(getOrCreateSessionId(eventId));
   const getNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), pushAiMsg = (text, extra = {}) => setMessages((p) => [...p, { id: genId(), sender: 'ai', text, timestamp: getNow(), ...extra }]);
   const recalculateTotal = (items) => Number(items.reduce((s, i) => s + (i.subtotal || i.quantity * i.unitPrice), 0).toFixed(2)), cancelRaf = () => { if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; } };
   const getAtts = (p) => Array.isArray(p.attachments) && p.attachments.length ? p.attachments : p.audioUrl ? [{ fileUrl: p.audioUrl, fileType: 'AUDIO_VOZ', transcription: p.transcription || null }] : p.imageUrl ? [{ fileUrl: p.imageUrl, fileType: p.inputChannel === 'IA_IMAGEN_QR' ? 'FOTO_QR' : 'FOTO_ARTE' }] : [];
+  useEffect(() => {
+    sessionIdRef.current = getOrCreateSessionId(eventId); const sid = sessionIdRef.current; if (!sid) return;
+    authFetch(`/api/ai/session/${sid}`).then((r) => r.json()).then((d) => { if (d?.success && d.session?.pendingDraft?.items?.length) { pendingDraftRef.current = d.session.pendingDraft; setPendingDraft(d.session.pendingDraft); } }).catch(() => {});
+  }, [eventId]);
   const updateDraftItemSize = (idx, newSizeId) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((prev) => {
     const cur = prev || pendingDraftRef.current, items = [...cur.items], it = items[idx], sizes = Array.isArray(it.availableSizes) && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === newSizeId) || sizes[0];
     items[idx] = { ...it, sizeId: target.sizeId, unitPrice: Number(target.precio), subtotal: Number((it.quantity * Number(target.precio)).toFixed(2)), description: `${it.baseTitle || it.description.replace(/\s*\([^)]*\)\s*$/, '').trim()} (${target.nombre})`, availableSizes: sizes };
     const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
   }), updateDraftItemQty = (idx, delta) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((prev) => {
     const cur = prev || pendingDraftRef.current, items = [...cur.items], qty = Math.max(1, items[idx].quantity + delta); items[idx] = { ...items[idx], quantity: qty, subtotal: Number((qty * items[idx].unitPrice).toFixed(2)) }; const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; return next;
-  }), removeDraftItem = (idx) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((p) => { const cur = p || pendingDraftRef.current, items = cur.items.filter((_, i) => i !== idx), next = items.length ? { ...cur, items, total: recalculateTotal(items) } : null; pendingDraftRef.current = next; return next; }), updateDraftPaymentMethod = (method) => setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, paymentMethod: method } : null; pendingDraftRef.current = next; return next; }), discardDraft = () => { pendingDraftRef.current = null; setPendingDraft(null); pushAiMsg('🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?'); };
+  }), removeDraftItem = (idx) => pendingDraftRef.current?.items?.[idx] && setPendingDraft((p) => { const cur = p || pendingDraftRef.current, items = cur.items.filter((_, i) => i !== idx), next = items.length ? { ...cur, items, total: recalculateTotal(items) } : null; pendingDraftRef.current = next; return next; }), updateDraftPaymentMethod = (method) => setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, paymentMethod: method } : null; pendingDraftRef.current = next; return next; });
+  const discardDraft = () => { const sid = sessionIdRef.current; if (sid) authFetch(`/api/ai/session/${sid}/draft`, { method: 'DELETE' }).catch(() => {}); try { sessionStorage.removeItem(getDraftSessionKey(eventId)); } catch (_) {} pendingDraftRef.current = null; setPendingDraft(null); pushAiMsg('🗑️ Borrador descartado. ¿Qué otra venta u obra preparamos?'); };
   const addPosterToDraft = (poster) => {
-    const sizes = poster.sizes?.length ? poster.sizes : DEFAULT_EVENT_SIZES, def = sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo, uPrice = Number(def.precio);
-    const item = { productId: poster.id, webPosterId: poster.id, description: `${title} (${def.nombre})`, baseTitle: title, category: poster.categoria, thumbUrl: poster.thumbUrl || poster.imageUrl, imageUrl: poster.imageUrl, quantity: 1, unitPrice: uPrice, subtotal: uPrice, sizeId: def.sizeId, availableSizes: sizes };
+    const sizes = poster.sizes?.length ? poster.sizes : DEFAULT_EVENT_SIZES, def = sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = poster.subtitulo ? `${poster.titulo} - ${poster.subtitulo}` : poster.titulo, uPrice = Number(def.precio), item = { productId: poster.id, webPosterId: poster.id, description: `${title} (${def.nombre})`, baseTitle: title, category: poster.categoria, thumbUrl: poster.thumbUrl || poster.imageUrl, imageUrl: poster.imageUrl, quantity: 1, unitPrice: uPrice, subtotal: uPrice, sizeId: def.sizeId, availableSizes: sizes };
     setPendingDraft((p) => { const cur = p || pendingDraftRef.current, next = cur ? { ...cur, items: [...cur.items, item], total: recalculateTotal([...cur.items, item]) } : { items: [item], total: uPrice, paymentMethod: 'EFECTIVO', inputChannel: 'IA_CHAT_TEXTO', notes: 'Venta iniciada desde catálogo sugerido' }; pendingDraftRef.current = next; return next; });
-  };
-  const fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=30', { signal: sig })).json())?.data || [], '', 30); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx, query = '') => { setSwappingIndex(idx); setSwapQuery(query); setSwapResults([]); if (query) handleSwapSearchChange(query); else fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); };
-  const handleSwapSearchChange = (text) => { setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=30`, { signal: sig })).json())?.data || [], text, 30); setSwapResults(data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150); };
+  }, fetchInitialSwapPosters = async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch('/api/catalog/web-posters?limit=30', { signal: sig })).json())?.data || [], '', 30); setSwapResults(data || []); } catch (e) { console.error(e); } finally { setIsSearchingSwap(false); } }, openSwapModal = (idx, query = '') => { setSwappingIndex(idx); setSwapQuery(query); setSwapResults([]); if (query) handleSwapSearchChange(query); else fetchInitialSwapPosters(); }, closeSwapModal = () => { setSwappingIndex(null); setSwapQuery(''); setSwapResults([]); }, handleSwapSearchChange = (text) => { setSwapQuery(text); if (swapDebounceRef.current) clearTimeout(swapDebounceRef.current); swapDebounceRef.current = setTimeout(async () => { setIsSearchingSwap(true); try { const data = await searchPostersWithFallback(async (sig) => (await (await authFetch(`/api/catalog/web-posters?q=${encodeURIComponent(text.trim())}&limit=30`, { signal: sig })).json())?.data || [], text, 30); setSwapResults(data || []); } catch (err) { console.error(err); } finally { setIsSearchingSwap(false); } }, 150); };
   const selectSwapPoster = (newPoster) => {
     if (swappingIndex === null) return;
-    if (swappingIndex === -1 || swappingIndex === 'new' || !pendingDraftRef.current) {
-      addPosterToDraft(newPoster); closeSwapModal(); pushAiMsg(`➕ Diseño agregado al borrador: "${newPoster.titulo}".`); return;
-    }
+    if (swappingIndex === -1 || swappingIndex === 'new' || !pendingDraftRef.current) { addPosterToDraft(newPoster); closeSwapModal(); pushAiMsg(`➕ Diseño agregado al borrador: "${newPoster.titulo}".`); return; }
     const cur = pendingDraftRef.current, items = [...cur.items], old = items[swappingIndex], sizes = newPoster.sizes?.length ? newPoster.sizes : DEFAULT_EVENT_SIZES, target = sizes.find((s) => s.sizeId === old.sizeId) || sizes.find((s) => s.sizeId === 'MEDIANO') || sizes[0], title = newPoster.subtitulo ? `${newPoster.titulo} - ${newPoster.subtitulo}` : newPoster.titulo, qty = old.quantity || 1, uPrice = Number(target.precio);
     items[swappingIndex] = { productId: newPoster.id, webPosterId: newPoster.id, description: `${title} (${target.nombre})`, baseTitle: title, category: newPoster.categoria, thumbUrl: newPoster.thumbUrl || newPoster.imageUrl, imageUrl: newPoster.imageUrl, quantity: qty, unitPrice: uPrice, subtotal: Number((qty * uPrice).toFixed(2)), sizeId: target.sizeId, availableSizes: sizes };
     const next = { ...cur, items, total: recalculateTotal(items) }; pendingDraftRef.current = next; setPendingDraft(next); closeSwapModal(); pushAiMsg(`🔄 Diseño actualizado en borrador: "${title}" (${target.nombre} - Q${uPrice.toFixed(2)}).`);
   };
+
   const uploadMedia = async (url, form, userText, note, onDone) => {
     setIsLoading(true); setProcessingNote(note); setAiError(null); setMessages((p) => [...p, { id: genId(), sender: 'user', text: userText, timestamp: getNow() }]);
     try {
@@ -49,8 +83,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
       if (data.draftSale && !url.includes('voice')) { pendingDraftRef.current = data.draftSale; setPendingDraft(data.draftSale); }
       onDone(data);
     } catch (err) {
-      const isQuota = /429|cuota|quota|resource_exhausted/i.test(err?.message), isNet = /fetch|network|conexi[oó]n|offline|failed/i.test(err?.message), friendlyMsg = isQuota ? 'Límite de cuota de IA alcanzado. Continúa en modo manual.' : isNet ? 'Problema de conexión con el servicio de IA.' : err?.message?.replace(/^.*AI_MEDIA_SERVICE_FAILED:\s*/, '').trim() || 'No fue posible procesar el archivo.';
-      const isVoice = url.includes('voice');
+      const isQuota = /429|cuota|quota|resource_exhausted/i.test(err?.message), isNet = /fetch|network|conexi[oó]n|offline|failed/i.test(err?.message), friendlyMsg = isQuota ? 'Límite de cuota de IA alcanzado. Continúa en modo manual.' : isNet ? 'Problema de conexión con el servicio de IA.' : err?.message?.replace(/^.*AI_MEDIA_SERVICE_FAILED:\s*/, '').trim() || 'No fue posible procesar el archivo.', isVoice = url.includes('voice');
       setAiError({ title: isVoice ? 'Fallo en dictado de voz' : 'Fallo en foto/visión', message: friendlyMsg, channel: isVoice ? 'IA_VOZ' : 'IA_FOTO_ARTE', canRetry: isVoice && Boolean(lastAudioBlobRef.current), hasAudioRetry: isVoice && Boolean(lastAudioBlobRef.current), onRetryAudio: retryVoiceUpload }); pushAiMsg(`⚠️ ${friendlyMsg}`);
     } finally { setIsLoading(false); setProcessingNote(''); }
   };
@@ -72,16 +105,11 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   };
   const retryVoiceUpload = useCallback(() => { if (lastAudioBlobRef.current) handleVoiceUpload(lastAudioBlobRef.current); }, [handleVoiceUpload]);
   const handleImageUpload = async (e) => {
-    const file = e?.target?.files?.[0]; if (!file) return;
-    if (e.target) e.target.value = '';
-    const blobToUpload = await compressImage(file), form = new FormData();
-    form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
+    const file = e?.target?.files?.[0]; if (!file) return; if (e.target) e.target.value = '';
+    const blobToUpload = await compressImage(file), form = new FormData(); form.append('image', blobToUpload, file.name); form.append('eventId', eventId);
     uploadMedia('/api/ai/recognize-artwork', form, '📷 [Foto de obra enviada]', 'Gemini Vision analizando arte contra catálogo...', (d) => {
-      if (d.isArtworkDetected === false || !d.draftSale) {
-        pushAiMsg(d.message || 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.');
-      } else {
-        pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`);
-      }
+      if (d.isArtworkDetected === false || !d.draftSale) pushAiMsg(d.message || 'No se identificó ningún póster del catálogo en la foto. Intenta con un encuadre más cercano y nítido de la obra.');
+      else pushAiMsg(`Reconocí la obra: "${d.primaryTitle || 'Póster identificado'}". Detalle: ${d.visualAnalysis || ''}`);
     });
   };
   const confirmPendingSale = async () => {
@@ -94,14 +122,20 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
       if (!res.ok || !json.success) throw new Error(json.error || 'Error registrando la venta');
       try { confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 }, colors: ['#F59E0B', '#10B981', '#3B82F6'] }); } catch (_) {}
       pushAiMsg(`🎉 ¡Venta ${json.data.saleNumber} asentada con éxito por Q ${netTotal.toFixed(2)} en PostgreSQL!`);
-      pendingDraftRef.current = null; setPendingDraft(null); if (onSaleRegistered) onSaleRegistered(json.data);
+      pendingDraftRef.current = null; setPendingDraft(null); const sid = sessionIdRef.current;
+      try { sessionStorage.removeItem(getDraftSessionKey(eventId)); } catch (_) {}
+      if (sid) { authFetch(`/api/ai/session/${sid}/draft`, { method: 'DELETE' }).catch(() => {}); try { sessionStorage.removeItem(getSessionKey(eventId)); } catch {} sessionIdRef.current = getOrCreateSessionId(eventId); }
+      if (onSaleRegistered) onSaleRegistered(json.data);
     } catch (err) { console.error(err); alert(`Error confirmando venta: ${err.message}`); } finally { setIsLoading(false); setProcessingNote(''); }
   };
   const transferDraftToManualForm = () => {
     const draft = pendingDraftRef.current; if (!onPopulateManualForm || !draft) return;
     onPopulateManualForm({ ...draft, inputChannel: draft.inputChannel || 'IA_CHAT_TEXTO', attachments: getAtts(draft), items: (draft.items || []).map((it) => ({ ...it, selectedSizeId: it.selectedSizeId || it.sizeId || null, sizeId: it.sizeId || it.selectedSizeId || null })) });
+    const sid = sessionIdRef.current; if (sid) authFetch(`/api/ai/session/${sid}/draft`, { method: 'DELETE' }).catch(() => {});
+    try { sessionStorage.removeItem(getDraftSessionKey(eventId)); } catch (_) {}
     pendingDraftRef.current = null; setPendingDraft(null);
   };
+
   const handleSendText = async (customText = null) => {
     const query = (customText || inputText).trim(); if (!query || isLoading) return;
     setInputText(''); setAiError(null); const userMsgId = genId(), aiMsgId = genId();
@@ -112,7 +146,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
       let res;
       try {
         const history = messages.slice(-20).map((m) => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: `${m.text || ''}${m.sender === 'ai' && m.suggestedPosters?.length ? `\n\n[Contexto de obras:\n${m.suggestedPosters.map((p, i) => `Opción #${i + 1}: ${p.titulo || p.name || 'Póster'}${p.subtitulo ? ` - ${p.subtitulo}` : ''} [ID: ${p.id}] (Precio: Q${p.precioMinimo || 65})`).join('\n')}]` : ''}`.trim() }], text: m.text || '' }));
-        res = await authFetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ message: query, eventId, pendingDraft: pendingDraftRef.current || null, stream: true, history, sellerName: user?.fullName || 'Vendedor' }), signal: controller.signal });
+        res = await authFetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ sessionId: sessionIdRef.current, message: query, eventId, pendingDraft: pendingDraftRef.current || null, stream: true, history, sellerName: user?.fullName || 'Vendedor' }), signal: controller.signal });
       } catch (fetchErr) {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           const off = buildOfflineFallbackReply(query); updateAiMsg((m) => ({ ...m, isStreaming: false, text: off.text }));
@@ -120,35 +154,38 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
         }
         updateAiMsg((m) => ({ ...m, isStreaming: false, text: fetchErr.name === 'AbortError' ? '⚠️ La consulta a Gemini tardó más de 25 segundos. Por favor intenta nuevamente.' : `⚠️ Error consultando IA: ${fetchErr.message}` })); return;
       } finally { clearTimeout(circuitBreakerTimeout); abortControllerRef.current = null; }
-
       if ((res.headers.get('content-type') || '').includes('text/event-stream')) {
-        const reader = res.body.getReader(), decoder = new TextDecoder('utf-8');
-        let buffer = '', accumulatedText = '', rafScheduled = false;
+        const reader = res.body.getReader(), decoder = new TextDecoder('utf-8'); let buffer = '', accumulatedText = '', rafScheduled = false;
         const scheduleTokenUpdate = () => { if (!rafScheduled) { rafScheduled = true; rafIdRef.current = requestAnimationFrame(() => { rafScheduled = false; updateAiMsg((m) => ({ ...m, text: accumulatedText })); }); } };
         while (true) {
           const { done, value } = await reader.read(); if (done) break;
-          buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
-          const blocks = buffer.split('\n\n'); buffer = blocks.pop() || '';
+          buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n'); const blocks = buffer.split('\n\n'); buffer = blocks.pop() || '';
           for (const block of blocks) {
-            const rawBlock = block.trim(); if (!rawBlock) continue;
-            let ev = 'message', dataLines = [];
+            const rawBlock = block.trim(); if (!rawBlock) continue; let ev = 'message', dataLines = [];
             for (const rL of rawBlock.split('\n')) { const l = rL.trim(); if (l.startsWith('event:')) ev = l.replace(/^event:\s*/, '').trim(); else if (l.startsWith('data:')) dataLines.push(l.replace(/^data:\s*/, '')); }
             if (!dataLines.length) continue;
             try {
               const data = JSON.parse(dataLines.join('\n'));
               if (ev === 'token') { accumulatedText += data.text !== undefined ? data.text : data.delta || ''; scheduleTokenUpdate(); }
               else if (ev === 'draft_sale') { const d = data ? (data.draftSale || data) : null; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); } }
-              else if (ev === 'done') { cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (pendingDraftRef.current ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') })); }
+              else if (ev === 'session' && data?.sessionId) { sessionIdRef.current = data.sessionId; try { sessionStorage.setItem(getSessionKey(eventId), data.sessionId); } catch {} }
+              else if (ev === 'done' || ev === 'completed') {
+                cancelRaf();
+                const currentDraft = pendingDraftRef.current;
+                updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro!') }));
+              }
               else if (ev === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
               else if (data && TOOL_EVENT_MAP[ev]) updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[ev]]: ev === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[ev] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
             } catch (parseErr) { console.warn('⚠️ [SSE Parse Error]', parseErr); }
           }
         }
-        cancelRaf(); updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (pendingDraftRef.current ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro con cualquier duda o venta en el stand!') }));
+        cancelRaf();
+        const currentDraft = pendingDraftRef.current;
+        updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro!') }));
       } else {
         const json = await res.json(); if (!res.ok || !json.success) throw new Error(json.error || 'Error al comunicarse con la IA');
         const d = json.draftSale || json.draft; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); }
-        updateAiMsg((m) => ({ ...m, isStreaming: false, text: json.reply, suggestedPosters: json.suggestedPosters || [], eventKpis: json.eventKpis || null, cashDrawerStatus: json.cashDrawerStatus || null, sellerShiftReport: json.sellerShiftReport || null, productionQueueStatus: json.productionQueueStatus || null, inventoryStock: json.inventoryStock || null }));
+        updateAiMsg((m) => ({ ...m, isStreaming: false, text: json.reply, suggestedPosters: json.suggestedPosters || [], eventKpis: json.eventKpis || null, hourlySales: json.hourlySales || null, topPosters: json.topPosters || null, cashDrawerStatus: json.cashDrawerStatus || null, sellerShiftReport: json.sellerShiftReport || null, productionQueueStatus: json.productionQueueStatus || null, inventoryStock: json.inventoryStock || null }));
       }
     } catch (err) { updateAiMsg((m) => ({ ...m, isStreaming: false, text: `⚠️ No pude responder: ${err.message}` })); } finally { setIsLoading(false); setProcessingNote(''); }
   };

@@ -56,6 +56,8 @@ export function saveCatalogSnapshot(posters, options = {}) {
 
       for (const p of posters) {
         if (!p?.id) continue;
+        const isTop = Boolean(p.destacado || p.isTopSeller || p.topVentas);
+        const salesCount = Number(p.totalVentas || p.ventas || p.salesCount || 0);
         const sanitized = {
           id: p.id,
           titulo: p.titulo || p.name || 'Póster',
@@ -65,12 +67,37 @@ export function saveCatalogSnapshot(posters, options = {}) {
           thumbUrl: p.thumbUrl || p.imageUrl || '/brand/logo-origami.webp',
           precioMinimo: Number(p.precioMinimo) || 25,
           sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : CANONICAL_SIZES,
+          destacado: isTop,
+          totalVentas: salesCount,
         };
         existingMap.set(sanitized.id, sanitized);
       }
 
       const merged = Array.from(existingMap.values());
-      const finalItems = merged.length > MAX_LOCAL_CATALOG_ITEMS ? merged.slice(-MAX_LOCAL_CATALOG_ITEMS) : merged;
+      let finalItems = merged;
+      if (merged.length > MAX_LOCAL_CATALOG_ITEMS) {
+        const topPosters = [];
+        const standardPosters = [];
+        for (const item of merged) {
+          if (item.destacado || (item.totalVentas && item.totalVentas > 0)) {
+            topPosters.push(item);
+          } else {
+            standardPosters.push(item);
+          }
+        }
+        if (topPosters.length === 0) {
+          finalItems = merged.slice(-MAX_LOCAL_CATALOG_ITEMS);
+        } else {
+          topPosters.sort((a, b) => (b.totalVentas || 0) - (a.totalVentas || 0));
+          if (topPosters.length >= MAX_LOCAL_CATALOG_ITEMS) {
+            finalItems = topPosters.slice(0, MAX_LOCAL_CATALOG_ITEMS);
+          } else {
+            const remainingSlots = MAX_LOCAL_CATALOG_ITEMS - topPosters.length;
+            const retainedStandard = standardPosters.slice(-remainingSlots);
+            finalItems = [...topPosters, ...retainedStandard];
+          }
+        }
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(finalItems));
     } catch (_) {}
   };

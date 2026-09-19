@@ -7,3 +7,4 @@ export * from './ai/aiPromptService.js';
 export * from './ai/aiToolsService.js';
 export * from './ai/aiMediaService.js';
 export * from './ai/aiStreamService.js';
+export * from './ai/aiSessionService.js';

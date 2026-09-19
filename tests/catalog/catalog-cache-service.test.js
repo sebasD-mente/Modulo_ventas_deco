@@ -152,6 +152,20 @@ describe('Catalog Cache Service & Audio Satellite Suite (M2)', () => {
       assert.equal(catalog[0].id, 'bulk-50');
       assert.equal(catalog[299].id, 'bulk-349');
     });
+
+    it('3.6. saveCatalogSnapshot retiene y prioriza obras destacadas (#CAT-001)', () => {
+      const largeBatch = Array.from({ length: 350 }, (_, i) => ({
+        id: `bulk-${i}`,
+        titulo: `Bulk ${i}`,
+        destacado: i === 0 || i === 5,
+        totalVentas: i === 0 ? 120 : i === 5 ? 80 : 0,
+      }));
+      saveCatalogSnapshot(largeBatch);
+      const catalog = getLocalCatalog();
+      assert.equal(catalog.length, 300);
+      assert.ok(catalog.some((p) => p.id === 'bulk-0'), 'bulk-0 destacado debe ser retenido');
+      assert.ok(catalog.some((p) => p.id === 'bulk-5'), 'bulk-5 destacado debe ser retenido');
+    });
   });
 
   describe('4. Resiliencia de Red y Fallback con Timeout de 2 Segundos', () => {

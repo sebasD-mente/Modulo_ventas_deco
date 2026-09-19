@@ -3,7 +3,7 @@ import { prisma } from '../../config/prisma.js';
 import { getEventKPIs } from '../saleService.js';
 import { executeWithModelFallback, streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
-import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock } from './aiToolsService.js';
+import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock, executeGetHourlySalesAnalytics, executeGetTopSellingPosters } from './aiToolsService.js';
 import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService.js';
 import { getGeminiClient } from '../../config/gemini.js';
 
@@ -52,7 +52,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
       taskFn: async ({ model, client }) => client.models.generateContent({ model, contents: formattedContents, config: { systemInstruction: systemPrompt, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
       models: getActivePool(), actionName: 'AI_CHAT', tenantId, context: { eventId }, client: explicitClient,
     });
-    let draftSale = null, suggestedPosters = [], eventKpis = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
+    let draftSale = null, suggestedPosters = [], eventKpis = null, hourlySales = null, topPosters = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
     const functionCalls = response.functionCalls || [];
     for (const call of functionCalls) {
       const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
@@ -62,6 +62,10 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
         suggestedPosters = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);
       } else if (call.name === 'getEventKPIs') {
         try { eventKpis = await getEventKPIs({ tenantId, eventId: effEvId, date: call.args?.date || date }); } catch (e) { eventKpis = { event: { name: resolved.evento }, totalAmount: 0, totalTransactions: 0, totalUnits: 0, averageTicket: 0, paymentBreakdown: {} }; }
+      } else if (call.name === 'getHourlySalesAnalytics') {
+        hourlySales = await executeGetHourlySalesAnalytics({ tenantId, eventId: effEvId, date: call.args?.date || date });
+      } else if (call.name === 'getTopSellingPosters') {
+        topPosters = await executeGetTopSellingPosters({ tenantId, eventId: effEvId, date: call.args?.date || date, limit: call.args?.limit || 5 });
       } else if (call.name === 'getCashDrawerStatus') cashDrawerStatus = await executeGetCashDrawerStatus(tenantId, effEvId); else if (call.name === 'getSellerShiftReport') sellerShiftReport = await executeGetSellerShiftReport(tenantId, effEvId, call.args?.sellerId || null); else if (call.name === 'getProductionQueueStatus') productionQueueStatus = await executeGetProductionQueueStatus(tenantId, effEvId);
       else if (call.name === 'checkInventoryStock' && call.args?.query) {
         inventoryStock = await executeCheckInventoryStock(tenantId, call.args.query, call.args.sizeId, effEvId);
@@ -89,7 +93,7 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     }
     const finalDraftSale = draftSale?.items?.length ? draftSale : null;
     const effectiveToolCalls = functionCalls.filter((c) => c.name !== 'prepareSaleDraft' || finalDraftSale !== null);
-    return { reply: cleanReply, draftSale: finalDraftSale, suggestedPosters, eventKpis, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: effectiveToolCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
+    return { reply: cleanReply, draftSale: finalDraftSale, suggestedPosters, eventKpis, hourlySales, topPosters, cashDrawerStatus, sellerShiftReport, productionQueueStatus, inventoryStock, toolCalls: effectiveToolCalls, functionCalls, usedModel, fallbackOccurred, initialModel };
   } catch (err) {
     return { reply: `Error consultando IA: ${err.message}`, draftSale: null, suggestedPosters: [], toolCalls: [], functionCalls: [] };
   }
@@ -174,10 +178,6 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       const missingStr = unmatched.map(u => `'${u.rawName}'`).join(', ');
       const suggestions = formatCandidates(unmatched);
       yield { type: 'token', text: `No encontré la obra ${missingStr} en el catálogo de Deco Vintage.${suggestions} ¿Deseas consultar por otro artista o buscarlo en el catálogo?` };
-      return;
-    }
-    if (items.length > 0) {
-      yield { type: 'token', text: `¡Listo, ${sellerName}! Te monté el borrador en pantalla listo para cobrar con ${rawMethod.toLowerCase()}. ¿Confirmamos la venta?` };
       return;
     }
   }

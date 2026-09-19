@@ -1,14 +1,18 @@
 import React from 'react';
 import { BarChart3, Wallet, Users, Printer, Package } from 'lucide-react';
+import HourlySalesCard from './HourlySalesCard.jsx';
+import TopPostersCard from './TopPostersCard.jsx';
 
 export default function ChatToolCards({ message, msg, draftSale, pendingDraft, onAddPosterToDraft, onAddPoster }) {
   const m = message || msg;
   if (!m && !draftSale && !pendingDraft) return null;
   const addFn = onAddPosterToDraft || onAddPoster;
-  const { eventKpis: k, cashDrawerStatus: c, sellerShiftReport: s, productionQueueStatus: q, inventoryStock: inv, suggestedPosters: sps } = m || {};
+  const { eventKpis: k, hourlySales: h, topPosters: tp, cashDrawerStatus: c, sellerShiftReport: s, productionQueueStatus: q, inventoryStock: inv, suggestedPosters: sps } = m || {};
   const draft = m?.draftSale || m?.draft_sale || m?.draft || draftSale || pendingDraft || (m?.items ? m : null);
   return (
     <>
+      {h && <HourlySalesCard data={h} />}
+      {tp && <TopPostersCard data={tp} onAddPoster={addFn} />}
       {k && (
         <div className="mt-3 p-3 rounded-2xl bg-black/90 border border-neutral-700 space-y-2.5">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-1.5">
