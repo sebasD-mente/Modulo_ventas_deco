@@ -13,6 +13,7 @@ const MonitorDashboardView = lazy(() => import('./components/MonitorDashboardVie
 const ProductionManagementView = lazy(() => import('./components/ProductionManagementView'));
 const CashClosingView = lazy(() => import('./components/CashClosingView'));
 const UserManagementView = lazy(() => import('./components/UserManagementView'));
+const CommissionSettlementView = lazy(() => import('./components/CommissionSettlementView'));
 
 // Componente de espera elegante mientras se descarga el chunk
 function ViewLoadingFallback() {
@@ -190,6 +191,11 @@ function SalesTerminalMain() {
           {/* PÁGINA 6: GESTIÓN DE USUARIOS Y ROLES (SUPER ADMIN) */}
           {activeTab === 'usuarios' && isSuperAdmin && (
             <UserManagementView />
+          )}
+
+          {/* PÁGINA 7: COMISIONES Y LIQUIDACIONES (SUPER ADMIN, VENDEDOR REDES) */}
+          {activeTab === 'comisiones' && (isSuperAdmin || isVendedorRedes) && (
+            <CommissionSettlementView />
           )}
         </Suspense>
       </main>

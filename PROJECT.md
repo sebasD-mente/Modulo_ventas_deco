@@ -1,85 +1,90 @@
-# Project: STAND {IA} — Blindaje de Catálogo y Cero Alucinaciones
+# Project: STAND {IA} — Sprint 5: Frontend UI & Módulo Gerencial de Comisiones
 
 ## Architecture
-STAND {IA} (Deko EventSales) para Deco Vintage Guate y Deko Labs. Esta misión erradica los falsos positivos y la invención de productos en los canales de Audio (`/api/ai/voice-sale`) y Visión (`/api/ai/recognize-artwork`), asegurando que solo productos verificados con ID oficial de catálogo ingresen a un borrador de venta.
-
-- **Frontera Dura en Audio (`server/services/ai/aiMediaService.js` y `server/controllers/ai/aiMediaController.js`)**:
-  - Prohibición absoluta de ítems fantasma (`productId: null` y `webPosterId: null`) en `enrichedItems`.
-  - Manejo transparente de dictados mixtos: obras reales entran a `enrichedItems`, obras no catalogadas se aíslan en `unmatchedItems` con advertencia clara:  
-    `"⚠️ Se preparó la venta con {count} ítem(s) disponible(s) ({matchedList}). Atención: los siguientes productos no están en el catálogo: {unmatchedList}."`
-  - Rechazo con sugerencias amigables: ante 0 obras catalogadas, `isSaleDetected = false`, `draftSale = null`, `items = []`, `total = 0`, y sugerencias opcionales en `suggestedPosters` (hasta 3) con mensaje:  
-    `"No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador."`
-  - Compatibilidad frontend en `src/components/ai-chat/hooks/useAiChatStream.js` propagando `data.message` y soportando `suggestedPosters` interactivos en `ChatToolCards.jsx`.
-- **Refinamiento Inteligente del Comparador (`server/services/catalog/webCatalogService.js` & `server/services/webCatalogService.js`)**:
-  - Eliminación total de la condición laxa `matchedTokens.length >= 2`.
-  - Normalización previa determinista: NFD para acentos preservando `ñ`, remoción de puntuación, stopwords feriales y numéricas extendidas (*'dos', 'tres', 'cuatro', 'de', 'la', 'el', 'los', 'un', 'una', 'en', 'con', 'poster', 'posters', 'tamano'*), y lematización simple de plurales en español (`s/es`).
-  - Cobertura léxica estricta $\ge 70\%$ en multi-palabra sobre título primario y subtítulo/franquicia (excluyendo tags secundarios abiertos), con presencia obligatoria de términos clave de franquicia/personaje (Spider-Man, Batman, Taylor Swift, etc.).
-  - Búsqueda de 1 sola palabra restringida exclusivamente a título primario, franquicia o alias registrado (prohibido validar contra tags secundarios o descripciones accesorias).
-  - Validación estricta de alias canónicos: `aliasRes.exactMatch === true` para resolución inmediata en Paso 2; consultas compuestas con subcadenas de alias pasan al Paso 4 para evaluar cobertura completa $\ge 70\%$.
-  - Implementación modular y exportación/re-exportación en `webCatalogService.js` y `aiMediaService.js` para mantener retrocompatibilidad total con la fachada `aiMultimodalService.js`.
-- **Umbral de Certeza en Visión (`server/services/ai/aiMediaService.js` y `server/controllers/ai/aiMediaController.js`)**:
-  - Evaluación de umbral de certeza visual de Gemini (`confidence >= 0.60`).
-  - Cero forzado de nearest-neighbors: búsqueda estricta en catálogo sin inyectar frases descriptivas de `visualAnalysis`.
-  - Si `matched == null`: `isArtworkDetected = false`, `matchedPoster = null`, `draftSale = null`, `items = []`, `total = 0`, con mensaje explícito:  
-    `"La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo."`
-- **Cohesión y Arnés de Calidad**:
-  - Registro de techo de dominio en `scripts/audit-monoliths.js` para `aiMediaService.js` (`max: 260`, "Orquestador multimodal de medios e inferencia").
-  - Verificación `npm run harness:check` 100% en verde (Zero-Trust 9/9, 0 secretos, 0 violaciones de techos, build Vite exitoso con código 0).
-  - Creación de suite de pruebas dedicadas en `tests/ai/` cubriendo los 4 casos límite mandatados.
-
----
+- **Ecosistema**: STAND {IA} (Deco Vintage Guate) — Sistema POS y Venta Ferial con IA Multimodal
+- **Frontend**: React 18 SPA impulsado por Vite y Tailwind CSS (`src/`).
+- **Backend**: Node.js (ESM) con Express (`server/`) y PostgreSQL administrado con Prisma ORM (`prisma/schema.prisma`).
+- **Separación de Vistas por Rol**:
+  - `VENDEDOR_REDES`: Accede a `SellerCommissionDashboard.jsx`, visualiza comisiones acumuladas al 20%, ventas retenidas por saldo pendiente (`balanceDue > 0`), y su historial de pagos.
+  - `SUPER_ADMIN`: Accede a `AdminCommissionPanel.jsx`, audita ventas elegibles por vendedor, genera liquidaciones atómicas `LIQ-YYYYMM-XXX` y registra pagos bancarios (`markPaid`).
+- **Hook Cohesivo de Dominio**: `useCommissionSettlements.js` centraliza el estado reactivo, consumo de `/api/commissions/*`, filtros y mutaciones.
+- **Invariante Financiero**: 20% estricto sobre subtotal neto de productos (`items - discount`), flete (`shippingCost`) 100% excluido con badge neutral, solo liquidables órdenes con `balanceDue === 0.00` y `status === 'COMPLETADA'`.
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | R1.1 Prohibición Total de Borradores Fantasma | En `processVoiceSaleAudio`, si `matched == null`, prohibir fallback a `item.title` y rechazar ítems con ID nulo en `enrichedItems`. | M1 | ORIGINAL_REQUEST §R1.1 |
-| 2 | R1.2 Manejo Transparente de Dictados Mixtos | Obras reales a `enrichedItems`; obras no catalogadas a `unmatchedItems` con advertencia clara. | M1 | ORIGINAL_REQUEST §R1.2 |
-| 3 | R1.3 Rechazo de Audio con Sugerencias Amigables | Si ninguna obra existe en catálogo: `isSaleDetected: false`, `draftSale: null`, `items: []`, y hasta 3 sugerencias en `suggestedPosters`. | M1 | ORIGINAL_REQUEST §R1.3 |
-| 4 | R2.1 Eliminación de Coladero de 2 Tokens | Eliminar la condición `matchedTokens.length >= 2` en `matchPosterEverywhere`. | M1 | ORIGINAL_REQUEST §R2.1 |
-| 5 | R2.2 Normalización Determinista de Tokens | Filtrar stopwords, acentos y plurales simples (`s/es`). | M1 | ORIGINAL_REQUEST §R2.2 |
-| 6 | R2.3 Cobertura Léxica Multi-Palabra (>=70%) | Exigir $\ge 70\%$ de cobertura léxica y presencia obligatoria de franquicias/personajes clave. | M1 | ORIGINAL_REQUEST §R2.3 |
-| 7 | R2.4 Búsqueda Estricta de 1 Sola Palabra | Coincidencia solo contra título primario, franquicia o alias registrado (no tags/descripciones). | M1 | ORIGINAL_REQUEST §R2.4 |
-| 8 | R3.1 Cero Forzado de Nearest-Neighbors en Visión | Prohibir asignación de obra aproximada si la similitud no supera umbral estricto. | M1 | ORIGINAL_REQUEST §R3.1 |
-| 9 | R3.2 Respuesta Limpia ante Obras Desconocidas | Si no hay match con certeza: `isArtworkDetected: false`, `draftSale: null`, `items: []`. | M1 | ORIGINAL_REQUEST §R3.2 |
-| 10 | R4.1 Techos de Dominio en Monolitos | Ajustar `DOMAIN_CEILINGS` en `scripts/audit-monoliths.js` para `aiMediaService.js` (`max: 260`) si excede 200 líneas. | M1 | ORIGINAL_REQUEST §R4.1 |
-| 11 | R4.2 Arnés de Calidad Zero-Trust 100% Verde | `npm run harness:check` pasando con 0 violaciones, 9/9 tests y build exitoso. | M2 | ORIGINAL_REQUEST §R4.2 |
-
----
+| 1 | Domain Hook `useCommissionSettlements.js` | Estado reactivo, consumo con `authFetch` de `/api/commissions/pending`, `/api/commissions/settle`, `/api/commissions/settlements`, `/api/commissions/settlements/:id`, `/api/commissions/settlements/:id/pay`, `/api/users`, filtros por vendedor/fechas/estado, cálculo reactivo de selección. | M1 | Survey / Request §R2, §R3, §R4 |
+| 2 | Componente `CommissionSettlementView.jsx` | Vista contenedora principal lazy-loaded en `App.jsx`, conmuta entre vista de vendedor y panel de admin según rol, tabs secundarios (Resumen / Historial). | M2 | Survey / Request §R1 |
+| 3 | Componente `SellerCommissionDashboard.jsx` | Tablero de comisiones para Vendedor de Redes: tarjetas KPI (20% comisiones listas, base productos, flete administrado, ventas en espera de saldo), banner educativo, tabla de ventas elegibles con badge flete excluido. | M2 | Survey / Request §R2 |
+| 4 | Componente `AdminCommissionPanel.jsx` | Panel gerencial para Super Admin: selector de vendedor, filtros de fecha, lista de ventas con selección múltiple / seleccionar todas, cálculo en vivo de totales a liquidar, botón de emisión $\ge 44\text{px}$. | M2 | Survey / Request §R3 |
+| 5 | Componente `ConfirmSettlementModal.jsx` | Modal de confirmación para emisión de `LIQ-YYYYMM-XXX`, resumen contable, notas opcionales, llamada a `POST /api/commissions/settle`, feedback visual (confetti/toast). | M3 | Survey / Request §R3 |
+| 6 | Componente `MarkSettlementPaidModal.jsx` | Modal para registrar boleta/transferencia bancaria de desembolso (`paymentReference`, notas), llamada a `PATCH /api/commissions/settlements/:id/pay`, mutación a `PAGADO`. | M3 | Survey / Request §R4 |
+| 7 | Componente `SettlementDetailReceiptModal.jsx` | Detalle 360° de liquidación (`GET /api/commissions/settlements/:id`) con encabezado institucional, desglose de ventas y estilos `@media print` para comprobante contable físico en PDF/papel. | M3 | Survey / Request §R5 |
+| 8 | Componente `SettlementHistoryTable.jsx` | Tabla paginada de liquidaciones históricas con badges de estado (`PENDIENTE_PAGO` amber, `PAGADO` emerald), botón de registro de pago (solo admin) y clic para ver recibo. | M3 | Survey / Request §R4, §R5 |
+| 9 | Integración en `Header.jsx` | Inyección de pestaña "Comisiones" (SUPER_ADMIN) / "Mis Comisiones" (VENDEDOR_REDES) con touch target $\ge 44\text{px}$. | M4 | Survey / Request §R1 |
+| 10 | Integración y Montaje en `App.jsx` | `React.lazy()` de `CommissionSettlementView`, ruta activa `activeTab === 'comisiones'` bajo `<Suspense>`, protección de acceso por rol. | M4 | Survey / Request §R1 |
+| 11 | Suite de Pruebas Frontend E2E / Integración | `tests/commissions/commission-frontend.test.js` con Node native test runner verificando techos, touch ergonomics, fórmulas del 20%, exclusión de flete, `@media print`, y Zero-Balance gate. | M5 | Survey / Quality Harness |
+| 12 | Compuerta Maestra de Calidad | Validación de `npm run build`, `npm run audit:monoliths`, `npm run test:security`, `npm run audit:secrets`, `npm run harness:check`. | M5 | Survey / Quality Harness |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M0 | Survey & Technical Exploration | R1, R2, R3, R4 | none | DONE |
-| M1 | Core Implementation: Matcher, Audio & Vision Hard Border | R1.1, R1.2, R1.3, R2.1, R2.2, R2.3, R2.4, R3.1, R3.2, R4.1 | M0 | DONE |
-| M2 | Adversarial Stress Testing, Review & Remediation | R4.2, Tests, Review, Challenges | M1 | DONE |
-| M3 | Forensic Audit & Gate Certification | Full Forensic Audit, Gate Result | M2 | DONE |
-
----
+| M1 | Domain Hook | `src/components/commissions/hooks/useCommissionSettlements.js` (338 líneas) | None | DONE |
+| M2 | Core Views | `CommissionSettlementView.jsx` (201L), `SellerCommissionDashboard.jsx` (202L), `AdminCommissionPanel.jsx` (243L) | M1 | DONE |
+| M3 | Modals & Tables | `ConfirmSettlementModal.jsx` (145L), `MarkSettlementPaidModal.jsx` (164L), `SettlementDetailReceiptModal.jsx` (238L), `SettlementHistoryTable.jsx` (220L) | M1, M2 | DONE |
+| M4 | Navigation & Mount | `src/components/Header.jsx` (139L), `src/App.jsx` (218L) | M2, M3 | DONE |
+| M5 | Test Suite & Quality Gate | `tests/commissions/commission-frontend.test.js` (45/45 pass), `npm run harness:check` (Exit 0) | M1, M2, M3, M4 | DONE |
 
 ## Interface Contracts
 
-### Audio Response Contract (`/api/ai/voice-sale` / `processVoiceSaleAudio`)
-- Case A (Total Match): `{ isSaleDetected: true, draftSale: { items: [...], total, paymentMethod }, unmatchedItems: [], message: "Audio analizado con éxito..." }`
-- Case B (Mixed Match): `{ isSaleDetected: true, draftSale: { items: [...catalogOnly], total }, unmatchedItems: [{ rawName: "...", requestedTitle: "...", quantity: 2, size: "MEDIANO" }], message: "⚠️ Se preparó la venta con 1 ítem(s) disponible(s) (Batman). Atención: los siguientes productos no están en el catálogo: zapatos." }`
-- Case C (No Match): `{ isSaleDetected: false, draftSale: null, items: [], total: 0, suggestedPosters: [...up to 3 closest], message: "No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador." }`
+### `useCommissionSettlements(user, isSuperAdmin, authFetch)`
+- **Input**:
+  - `user`: `{ id, name, email, role, roles }`
+  - `isSuperAdmin`: boolean
+  - `authFetch`: function `(url, options) => Promise<Response>`
+- **Returns**:
+  - `pendingData`: `{ baseProductos, totalComisiones, totalFlete, salesCount, sales, salesWaitingBalance }`
+  - `settlements`: array de liquidaciones históricas
+  - `sellers`: array de vendedores `{ id, name, email }` (para super admin)
+  - `selectedSellerId`: string (seller UUID seleccionado)
+  - `setSelectedSellerId`: function `(id) => void`
+  - `selectedSaleIds`: array de string (IDs de ventas seleccionadas para liquidar)
+  - `toggleSaleSelection`: function `(saleId) => void`
+  - `selectAllSales`: function `() => void`
+  - `clearSaleSelection`: function `() => void`
+  - `isAllSelected`: boolean
+  - `calculatedSelection`: `{ count, baseAmount, commissionAmount }`
+  - `dateRange`: `{ startDate, endDate }`
+  - `setDateRange`: function `({ startDate, endDate }) => void`
+  - `statusFilter`: string (`'ALL'`, `'PENDIENTE_PAGO'`, `'PAGADO'`)
+  - `setStatusFilter`: function `(status) => void`
+  - `loading`: boolean
+  - `error`: string | null
+  - `fetchPendingCommissions`: function `(sellerId?) => Promise<void>`
+  - `fetchSettlements`: function `(filters?) => Promise<void>`
+  - `emitSettlement`: function `({ sellerId, saleIds, notes }) => Promise<{ success, settlement, error }>`
+  - `markSettlementPaid`: function `(settlementId, { paymentReference, notes }) => Promise<{ success, settlement, error }>`
+  - `fetchSettlementDetail`: function `(settlementId) => Promise<object>`
 
-### Vision Response Contract (`/api/ai/recognize-artwork` / `recognizePosterArtworkFromImage`)
-- Case A (Confident Match): `{ isArtworkDetected: true, matchedPoster: { id, title, thumbUrl, imageUrl, unitPrice, sizeId }, draftSale: { items: [...] }, confidence: "high"|"exact", message: "Obra analizada y encontrada en el catálogo web..." }`
-- Case B (Uncertain/Unknown): `{ isArtworkDetected: false, matchedPoster: null, draftSale: null, items: [], total: 0, message: "La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo." }`
-
-### Matcher Contract (`matchPosterEverywhere`)
-- Signature: `matchPosterEverywhere(tenantId, query, requestedSize = null)`
-- Return: Object `{ productId, posterId, baseTitle, description, category, sizeId, unitPrice, thumbUrl, imageUrl, availableSizes }` OR `null`.
-
----
+### Endpoints Consumidos
+- `GET /api/commissions/pending?sellerId=...` -> `{ success, data: { baseProductos, totalComisiones, totalFlete, salesCount, sales } }`
+- `POST /api/commissions/settle` -> body `{ sellerId, saleIds, notes }` -> `{ success, data: settlement }`
+- `GET /api/commissions/settlements?sellerId=...&status=...&page=...&limit=...` -> `{ success, data: { settlements, pagination } }`
+- `GET /api/commissions/settlements/:id` -> `{ success, data: settlementWithSales }`
+- `PATCH /api/commissions/settlements/:id/pay` -> body `{ paymentReference, notes }` -> `{ success, data: updatedSettlement }`
+- `GET /api/users` -> `{ success, data: users }` (filtrar `VENDEDOR_REDES` / `VENDEDOR`)
+- `GET /api/sales/events/:eventId` -> opcional para ventas con `balanceDue > 0`
 
 ## Code Layout
-- `server/services/catalog/webCatalogService.js`: Motor de catálogo, búsqueda y `matchPosterEverywhere`.
-- `server/services/ai/aiMediaService.js`: Orquestador de voz (`processVoiceSaleAudio`), visión (`recognizePosterArtworkFromImage`) y re-export de `matchPosterEverywhere`.
-- `server/controllers/ai/aiMediaController.js`: Manejadores HTTP para voz y visión.
-- `src/components/ai-chat/hooks/useAiChatStream.js`: Hook frontend para consumo de respuestas de audio y visión.
-- `scripts/audit-monoliths.js`: Auditor de techos de código con `DOMAIN_CEILINGS`.
-- `tests/ai/voice-hard-catalog-boundary.test.js`: Suite de pruebas dedicada para frontera dura de audio (4/4 pass).
-- `tests/adversarial/m3-matcher-vision-challenger2.test.js`: Suite de pruebas adversarias del comparador y visión (27/27 pass).
-- `tests/adversarial/voice-sale-audio-adversarial.test.js`: Suite de pruebas adversarias de audio (19/19 pass).
-- `tests/adversarial/m3-voice-search-challenger.test.js`: Suite de regresión del comparador (14/14 pass).
+- `src/components/Header.jsx`: Menú de navegación principal con tab de comisiones (139 líneas).
+- `src/App.jsx`: Enrutamiento y carga diferida con `React.lazy` (218 líneas).
+- `src/components/CommissionSettlementView.jsx`: Vista contenedora principal (201 líneas).
+- `src/components/commissions/hooks/useCommissionSettlements.js`: Hook de dominio financiero (338 líneas).
+- `src/components/commissions/SellerCommissionDashboard.jsx`: Tablero vendedor (202 líneas).
+- `src/components/commissions/AdminCommissionPanel.jsx`: Panel de auditoría admin (243 líneas).
+- `src/components/commissions/SettlementHistoryTable.jsx`: Historial de liquidaciones (220 líneas).
+- `src/components/commissions/ConfirmSettlementModal.jsx`: Modal emisión `LIQ-...` (145 líneas).
+- `src/components/commissions/MarkSettlementPaidModal.jsx`: Modal desembolso bancario (164 líneas).
+- `src/components/commissions/SettlementDetailReceiptModal.jsx`: Recibo imprimible (238 líneas).
+- `tests/commissions/commission-frontend.test.js`: Suite de verificación frontend (45 tests, 233 líneas).
+- `tests/adversarial/sprint5-commission-frontend-challenger.test.js`: Suite adversarial de estrés numérico (16 tests).

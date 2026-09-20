@@ -16,6 +16,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
       { id: 'produccion', label: 'Producción' },
       { id: 'cierre', label: 'Cierre' },
       { id: 'usuarios', label: 'Usuarios' },
+      { id: 'comisiones', label: 'Comisiones' },
     ];
   } else {
     const tabMap = new Map();
@@ -23,6 +24,10 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
     if (isVendedor || isVendedorRedes) {
       tabMap.set('venta', { id: 'venta', label: 'Nueva venta' });
       tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
+    }
+
+    if (isVendedorRedes) {
+      tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
     }
 
     if (isOperario1 && isOperario2) {
