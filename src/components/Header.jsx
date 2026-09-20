@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 
 export default function Header({ activeEvent, activeTab, setActiveTab }) {
-  const { user, logout, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
+  const { user, logout, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
 
   // Configuración de pestañas permitidas por roles aditivos
   let navTabs = [];
@@ -20,7 +20,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
   } else {
     const tabMap = new Map();
 
-    if (isVendedor) {
+    if (isVendedor || isVendedorRedes) {
       tabMap.set('venta', { id: 'venta', label: 'Nueva venta' });
       tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
     }
@@ -48,6 +48,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
     : (user?.roles && user.roles.length > 0 ? user.roles : [user?.role || 'VENDEDOR'])
         .map((r) => {
           if (r === 'VENDEDOR') return '💼 VENDEDOR';
+          if (r === 'VENDEDOR_REDES') return '📱 VENDEDOR REDES';
           if (r === 'OPERARIO_1') return '👷 STOCK';
           if (r === 'OPERARIO_2') return '🖨️ TALLER';
           return r;

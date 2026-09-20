@@ -131,6 +131,7 @@ export function AuthProvider({ children }) {
 
   const isSuperAdmin = useMemo(() => userRoles.includes('SUPER_ADMIN'), [userRoles]);
   const isVendedor = useMemo(() => userRoles.includes('VENDEDOR'), [userRoles]);
+  const isVendedorRedes = useMemo(() => userRoles.includes('VENDEDOR_REDES'), [userRoles]);
   const isOperario1 = useMemo(() => userRoles.includes('OPERARIO_1'), [userRoles]);
   const isOperario2 = useMemo(() => userRoles.includes('OPERARIO_2'), [userRoles]);
   const isProduccion = useMemo(() => isOperario1 || isOperario2 || isSuperAdmin, [isOperario1, isOperario2, isSuperAdmin]);
@@ -152,6 +153,7 @@ export function AuthProvider({ children }) {
     hasRole,
     isSuperAdmin,
     isVendedor,
+    isVendedorRedes,
     isOperario1,
     isOperario2,
     isProduccion,
@@ -168,6 +170,7 @@ export function AuthProvider({ children }) {
     hasRole,
     isSuperAdmin,
     isVendedor,
+    isVendedorRedes,
     isOperario1,
     isOperario2,
     isProduccion,

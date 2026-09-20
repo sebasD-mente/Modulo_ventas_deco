@@ -27,7 +27,7 @@ function ViewLoadingFallback() {
 }
 
 function SalesTerminalMain() {
-  const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isOperario1, isOperario2 } = useAuth();
+  const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
   const [activeTab, setActiveTab] = useState('venta');
   const [activeEvent, setActiveEvent] = useState(() => {
     try {
@@ -47,11 +47,11 @@ function SalesTerminalMain() {
     if (user) {
       if (isOperario1 || isOperario2) {
         setActiveTab('produccion');
-      } else if (isVendedor) {
+      } else if (isVendedor || isVendedorRedes) {
         setActiveTab('venta');
       }
     }
-  }, [user, isOperario1, isOperario2, isVendedor]);
+  }, [user, isOperario1, isOperario2, isVendedor, isVendedorRedes]);
 
   // Cargar datos iniciales del evento activo y métricas
   const loadInitialData = useCallback(async () => {
@@ -130,7 +130,7 @@ function SalesTerminalMain() {
       {/* Contenedor Principal Centrado */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-8">
         {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) */}
-        {activeTab === 'venta' && (isSuperAdmin || isVendedor) && (
+        {activeTab === 'venta' && (isSuperAdmin || isVendedor || isVendedorRedes) && (
           <div className="space-y-6">
             <UnifiedAiChat
               eventId={activeEvent?.id}
@@ -169,7 +169,7 @@ function SalesTerminalMain() {
           )}
 
           {/* PÁGINA 3: MONITOR EN TIEMPO REAL */}
-          {activeTab === 'monitor' && (isSuperAdmin || isVendedor) && (
+          {activeTab === 'monitor' && (isSuperAdmin || isVendedor || isVendedorRedes) && (
             <MonitorDashboardView />
           )}
 
