@@ -139,8 +139,8 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
               <label className="block text-neutral-400 font-semibold mb-1">Precio Acordado (Q) *</label>
               <input
                 type="number"
-                min="1"
-                step="5"
+                min="0"
+                step="1"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(e.target.value)}
                 className="w-full min-h-[44px] px-3.5 py-2.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-amber-400"

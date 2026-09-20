@@ -110,7 +110,7 @@ export default function RemoteQuoterSummary({
           <input
             type="number"
             min="0"
-            step="1"
+            step="any"
             value={depositInput}
             onChange={(e) => setDepositInput(e.target.value)}
             placeholder={`Mínimo Q ${minDeposit.toFixed(2)}`}
