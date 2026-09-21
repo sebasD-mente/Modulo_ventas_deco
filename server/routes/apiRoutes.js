@@ -19,6 +19,7 @@ import {
   getCustomer360,
   createRemoteSale,
   registerBalancePayment,
+  uploadCustomArt,
 } from '../controllers/remoteSaleController.js';
 import {
   handleGoogleLogin,
@@ -192,6 +193,12 @@ router.get(
   '/customers/:id',
   requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   getCustomer360
+);
+router.post(
+  '/sales/upload-art',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  upload.single('image'),
+  uploadCustomArt
 );
 router.post(
   '/sales/remote',
