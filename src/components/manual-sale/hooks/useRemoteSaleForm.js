@@ -39,13 +39,41 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const [pickupEventId, setPickupEventId] = useState(eventId || '');
   const [availablePickupEvents, setAvailablePickupEvents] = useState([]);
 
-  // Anticipo y Pagos
+  // Anticipo, Comprobante y Pagos
   const [depositInput, setDepositInput] = useState('');
   const [depositPaymentMethod, setDepositPaymentMethod] = useState('TRANSFERENCIA');
   const [depositReference, setDepositReference] = useState('');
+  const [depositReceiptUrl, setDepositReceiptUrl] = useState(null);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [receiptUploadError, setReceiptUploadError] = useState(null);
   const [remoteSaleNotes, setRemoteSaleNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  const handleReceiptUpload = async (file) => {
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      setReceiptUploadError('El comprobante supera el límite máximo permitido de 15MB.');
+      return;
+    }
+    setReceiptUploadError(null);
+    setIsUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await authFetch('/api/sales/upload-art', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (res.ok && json.success && json.url) {
+        setDepositReceiptUrl(json.url);
+      } else {
+        setReceiptUploadError(json.error || 'Error al subir el comprobante de pago.');
+      }
+    } catch {
+      setReceiptUploadError('Error de conexión al transferir comprobante a Cloud Storage.');
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
 
   // Post-Venta: Modal WhatsApp
   const [completedSale, setCompletedSale] = useState(null);
@@ -235,6 +263,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
           method: depositPaymentMethod,
           amount: numericDeposit,
           reference: depositReference?.trim() || null,
+          receiptUrl: depositReceiptUrl || null,
         },
       ],
       discount: Number(discount) || 0,
@@ -260,6 +289,8 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       clearSelectedCustomer();
       setDepositInput('');
       setDepositReference('');
+      setDepositReceiptUrl(null);
+      setReceiptUploadError(null);
       setRemoteSaleNotes('');
       if (onSaleRegistered) onSaleRegistered(json.data);
       return json.data;
@@ -282,6 +313,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     productsSubtotal, productsAmount, effectiveShippingCost, totalAmount, minDeposit,
     depositInput, setDepositInput, numericDeposit, balanceDue, isDepositValid,
     depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,
+    depositReceiptUrl, setDepositReceiptUrl, isUploadingReceipt, receiptUploadError, handleReceiptUpload,
     remoteSaleNotes, setRemoteSaleNotes, isSubmitting, submitError, setSubmitError,
     completedSale, showShareModal, setShowShareModal,
     addCustomItem, confirmRemoteSale,

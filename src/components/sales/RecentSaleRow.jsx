@@ -60,7 +60,7 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
         </div>
         <div className="text-[11px] text-slate-300 space-y-1 pt-0.5">
           {(sale.items || []).map((it, idx) => {
-            const img = it.product?.imageUrl || it.imageUrl || it.thumbUrl;
+            const img = it.customImageUrl || it.product?.imageUrl || it.imageUrl || it.thumbUrl;
             return (
               <div key={idx} className="flex items-center justify-between gap-2 text-slate-300">
                 <div className="flex items-center gap-2 min-w-0">

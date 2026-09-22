@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 
-export const VALID_ROLES = ['SUPER_ADMIN', 'VENDEDOR', 'OPERARIO_1', 'OPERARIO_2'];
+export const VALID_ROLES = ['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2'];
 
 export function resolveTargetRoles(roles, role, fallback = null) {
   let targetRoles = [];

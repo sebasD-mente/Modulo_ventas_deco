@@ -197,6 +197,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             setDepositReference={remoteForm.setDepositReference}
             remoteSaleNotes={remoteForm.remoteSaleNotes}
             setRemoteSaleNotes={remoteForm.setRemoteSaleNotes}
+            depositReceiptUrl={remoteForm.depositReceiptUrl}
+            setDepositReceiptUrl={remoteForm.setDepositReceiptUrl}
+            isUploadingReceipt={remoteForm.isUploadingReceipt}
+            receiptUploadError={remoteForm.receiptUploadError}
+            onUploadReceipt={remoteForm.handleReceiptUpload}
             isSubmitting={remoteForm.isSubmitting}
             submitError={remoteForm.submitError}
             onConfirmRemoteSale={remoteForm.confirmRemoteSale}

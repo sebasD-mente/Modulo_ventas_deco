@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, Smartphone, CreditCard, Banknote, AlertTriangle, CheckCircle2, Loader2, DollarSign } from 'lucide-react';
+import { Calculator, Smartphone, CreditCard, Banknote, AlertTriangle, CheckCircle2, Loader2, DollarSign, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 const PAYMENT_METHODS = [
   { id: 'TRANSFERENCIA', label: 'Transferencia', icon: Smartphone },
@@ -8,26 +8,11 @@ const PAYMENT_METHODS = [
 ];
 
 export default function RemoteQuoterSummary({
-  productsSubtotal = 0,
-  productsAmount = 0,
-  discount = 0,
-  effectiveShippingCost = 0,
-  totalAmount = 0,
-  minDeposit = 0,
-  depositInput = '',
-  setDepositInput,
-  numericDeposit = 0,
-  balanceDue = 0,
-  isDepositValid = false,
-  depositPaymentMethod,
-  setDepositPaymentMethod,
-  depositReference,
-  setDepositReference,
-  remoteSaleNotes,
-  setRemoteSaleNotes,
-  isSubmitting,
-  submitError,
-  onConfirmRemoteSale,
+  productsSubtotal = 0, productsAmount = 0, discount = 0, effectiveShippingCost = 0, totalAmount = 0,
+  minDeposit = 0, depositInput = '', setDepositInput, numericDeposit = 0, balanceDue = 0,
+  isDepositValid = false, depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,
+  remoteSaleNotes, setRemoteSaleNotes, depositReceiptUrl = null, setDepositReceiptUrl,
+  isUploadingReceipt = false, receiptUploadError = null, onUploadReceipt, isSubmitting, submitError, onConfirmRemoteSale,
 }) {
   const isInsufficient = totalAmount > 0 && numericDeposit < minDeposit;
   const isPaidTotal = totalAmount > 0 && numericDeposit >= totalAmount;
@@ -192,6 +177,60 @@ export default function RemoteQuoterSummary({
             placeholder="Notas del pedido (opcional)..."
             className="w-full min-h-[44px] px-3.5 py-2 bg-black border border-neutral-800 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
           />
+        </div>
+
+        {/* Comprobante / Voucher de Pago */}
+        <div className="space-y-1.5">
+          {depositReceiptUrl ? (
+            <div className="flex items-center justify-between gap-3 p-2 bg-black border border-emerald-500/40 rounded-xl">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src={depositReceiptUrl}
+                  alt="Comprobante"
+                  className="w-10 h-10 object-cover rounded-lg border border-neutral-700 bg-neutral-900 shrink-0"
+                />
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-emerald-400 block truncate">✓ Comprobante Adjunto</span>
+                  <a
+                    href={depositReceiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-neutral-400 hover:text-white underline truncate block"
+                  >
+                    Ver original
+                  </a>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDepositReceiptUrl && setDepositReceiptUrl(null)}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-400 hover:text-red-400 cursor-pointer rounded-lg hover:bg-neutral-900 transition-colors"
+                title="Quitar comprobante"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <label className="flex-1 min-h-[44px] px-3 py-2 bg-neutral-900 border border-dashed border-neutral-700 hover:border-amber-500/60 rounded-xl text-xs text-neutral-300 font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  disabled={isUploadingReceipt}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && onUploadReceipt) onUploadReceipt(f);
+                  }}
+                />
+                {isUploadingReceipt ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Upload className="w-4 h-4 text-amber-400" />}
+                <span>{isUploadingReceipt ? 'Subiendo voucher a la nube...' : 'Adjuntar Comprobante (Voucher / Foto)'}</span>
+              </label>
+            </div>
+          )}
+          {receiptUploadError && (
+            <span className="text-[11px] text-red-400 block font-semibold">⚠️ {receiptUploadError}</span>
+          )}
         </div>
       </div>
 

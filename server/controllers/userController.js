@@ -39,7 +39,7 @@ export async function updateUserRole(req, res) {
     if (targetRoles.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Debe especificar al menos un rol válido (SUPER_ADMIN, VENDEDOR, OPERARIO_1, OPERARIO_2).',
+        error: 'Debe especificar al menos un rol válido (SUPER_ADMIN, VENDEDOR, VENDEDOR_REDES, OPERARIO_1, OPERARIO_2).',
       });
     }
     const updated = await prisma.user.update({

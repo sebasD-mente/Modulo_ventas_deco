@@ -55,15 +55,17 @@ export default function SaleCartList({
         </div>
       ) : (
         <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-          {cartItems.map((item) => (
-            <div key={item.id} className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs">
-              {item.thumbUrl || item.imageUrl ? (
-                <img src={item.thumbUrl || item.imageUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
-              ) : (
-                <div className="w-9 h-12 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                </div>
-              )}
+          {cartItems.map((item) => {
+            const imgUrl = item.customImageUrl || item.thumbUrl || item.imageUrl;
+            return (
+              <div key={item.id} className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs">
+                {imgUrl ? (
+                  <img src={imgUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
+                ) : (
+                  <div className="w-9 h-12 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                  </div>
+                )}
 
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-white block truncate">{item.description}</span>
@@ -115,7 +117,8 @@ export default function SaleCartList({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
     </div>

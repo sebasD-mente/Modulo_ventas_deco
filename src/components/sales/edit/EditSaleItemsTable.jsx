@@ -9,7 +9,7 @@ export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveIt
       </label>
       <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
         {items.map((it, idx) => {
-          const img = it.product?.imageUrl || it.imageUrl || it.thumbUrl;
+          const img = it.customImageUrl || it.product?.imageUrl || it.imageUrl || it.thumbUrl;
           return (
             <div
               key={it.id || idx}

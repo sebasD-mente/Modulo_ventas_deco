@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 export const ROLE_DEFINITIONS = [
   { key: 'SUPER_ADMIN', label: '👑 Super Admin', activeClass: 'bg-emerald-950 border-emerald-500 text-emerald-300' },
   { key: 'VENDEDOR', label: '💼 Vendedor POS', activeClass: 'bg-white border-white text-black font-black' },
+  { key: 'VENDEDOR_REDES', label: '📱 Vendedor Redes', activeClass: 'bg-purple-950 border-purple-500 text-purple-300 font-bold' },
   { key: 'OPERARIO_1', label: '👷 Op. 1 (Stock)', activeClass: 'bg-amber-950 border-amber-500 text-amber-300' },
   { key: 'OPERARIO_2', label: '🖨️ Op. 2 (Taller)', activeClass: 'bg-cyan-950 border-cyan-500 text-cyan-300' },
 ];

@@ -8,7 +8,8 @@ export default function useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated 
     (sale?.items || []).map((it) => ({
       id: it.id, productId: it.productId || null, description: it.description,
       quantity: Number(it.quantity) || 1, unitPrice: Number(it.unitPrice) || 0, subtotal: Number(it.subtotal) || 0,
-      product: it.product || null, imageUrl: it.imageUrl || it.product?.imageUrl || null, thumbUrl: it.thumbUrl || null,
+      product: it.product || null, imageUrl: it.customImageUrl || it.imageUrl || it.product?.imageUrl || null, thumbUrl: it.thumbUrl || null,
+      customImageUrl: it.customImageUrl || null,
     }))
   );
   const [discount, setDiscount] = useState(Number(sale?.discount || 0));
