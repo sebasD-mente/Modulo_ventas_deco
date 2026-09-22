@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Clock, Printer, CheckCircle2 } from 'lucide-react';
+import { Package, Clock, Printer, CheckCircle2, ExternalLink, Scissors } from 'lucide-react';
 
 const STATUS_BORDER = {
   A_PRODUCCION: 'border-cyan-500/40 bg-cyan-950/10',
@@ -20,13 +20,26 @@ export default function ProductionOrderCard({
   const cardBorder = STATUS_BORDER[status] || 'border-neutral-800';
   const badgeColor = STATUS_BADGE[status] || 'bg-neutral-900 text-neutral-400 border-neutral-800';
   const timeStr = item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const artUrl = item.customImageUrl || item.product?.imageUrl;
+  const isWorkshopCut = item.isCustom || item.customDimensions?.toLowerCase().includes('corte taller') || item.description?.toLowerCase().includes('corte taller');
 
   return (
     <div className={`bg-black border rounded-2xl p-3.5 sm:p-4 transition-all ${cardBorder}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
-          {item.product?.imageUrl ? (
-            <img src={item.product.imageUrl} alt={item.description} className="w-full h-full object-cover" loading="lazy" />
+        <div className="relative group w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
+          {artUrl ? (
+            <>
+              <img src={artUrl} alt={item.description} className="w-full h-full object-cover" loading="lazy" />
+              <a
+                href={artUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir arte original en alta resolución para RIP de taller"
+                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-cyan-300 min-h-[44px] min-w-[44px]"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </>
           ) : (
             <Package className="w-6 h-6 text-neutral-600" />
           )}
@@ -51,10 +64,26 @@ export default function ProductionOrderCard({
               Nota: {item.productionNotes}
             </p>
           )}
-          <div className="pt-1 flex items-center gap-2">
+          <div className="pt-1 flex items-center gap-1.5 flex-wrap">
             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeColor}`}>
               {status.replace('_', ' ')}
             </span>
+            {item.customDimensions && (
+              <span className="text-[10px] font-semibold text-neutral-300 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                📏 {item.customDimensions}
+              </span>
+            )}
+            {item.material && (
+              <span className="bg-neutral-800 text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                {item.material}
+              </span>
+            )}
+            {isWorkshopCut && (
+              <span className="bg-amber-950/80 text-amber-300 border border-amber-700/80 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                <Scissors className="w-3 h-3 text-amber-400" />
+                <span>CORTE TALLER</span>
+              </span>
+            )}
           </div>
         </div>
       </div>

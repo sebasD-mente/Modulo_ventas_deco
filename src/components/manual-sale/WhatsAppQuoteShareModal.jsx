@@ -25,7 +25,13 @@ export default function WhatsAppQuoteShareModal({
     : 'Entrega en Punto de Venta';
 
   const formattedItems = items
-    .map((it) => `• ${it.quantity}x ${it.description} — Q ${Number(it.subtotal || 0).toFixed(2)}`)
+    .map((it) => {
+      let line = `• ${it.quantity}x ${it.description} — Q ${Number(it.subtotal || 0).toFixed(2)}`;
+      if (it.customImageUrl) {
+        line += `\n  🖼️ *Arte / Diseño Aprobado:* ${it.customImageUrl}`;
+      }
+      return line;
+    })
     .join('\n');
 
   const formattedText = `✨ *DECO VINTAGE GUATE — PEDIDO CONFIRMADO* ✨

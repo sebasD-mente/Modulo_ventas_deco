@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Lock, CheckCircle2, AlertCircle, Loader2, Layers, Search, RefreshCw } from 'lucide-react';
+import { X, Lock, CheckCircle2, AlertCircle, Loader2, Layers, Search, RefreshCw, Scissors } from 'lucide-react';
 
 export default function AssignItemsToSheetModal({
   sheet,
@@ -192,7 +192,16 @@ export default function AssignItemsToSheetModal({
                   </div>
                   <div className="w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center text-neutral-500">
                     {item.customImageUrl || item.product?.imageUrl ? (
-                      <img src={item.customImageUrl || item.product?.imageUrl} alt={item.description} className="w-full h-full object-cover" />
+                      <a
+                        href={item.customImageUrl || item.product?.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Abrir imagen en alta resolución"
+                        className="w-full h-full block cursor-pointer"
+                      >
+                        <img src={item.customImageUrl || item.product?.imageUrl} alt={item.description} className="w-full h-full object-cover" />
+                      </a>
                     ) : (
                       <Layers className="w-5 h-5" />
                     )}
@@ -200,9 +209,17 @@ export default function AssignItemsToSheetModal({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-white truncate">{item.description}</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 shrink-0">
-                        {item.material || 'Material estándar'}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {(item.isCustom || item.customDimensions?.toLowerCase().includes('corte taller') || item.description?.toLowerCase().includes('corte taller')) && (
+                          <span className="bg-amber-950/80 text-amber-300 border border-amber-700/80 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            <Scissors className="w-3 h-3 text-amber-400" />
+                            <span>Corte Taller</span>
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">
+                          {item.material || 'Material estándar'}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-[11px] text-neutral-400 mt-0.5">
                       Orden <span className="font-semibold text-neutral-200">#{sale.saleNumber || 'S/N'}</span> • {customerName}
