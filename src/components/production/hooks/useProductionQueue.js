@@ -4,12 +4,15 @@ import { useAuth } from '../../../context/AuthContext';
 export default function useProductionQueue() {
   const { authFetch, isSuperAdmin, isOperario1, isOperario2, isVendedorRedes, isVendedor } = useAuth();
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isVendedor && !isOperario1 && !isOperario2);
+  const isOp1Only = Boolean(isOperario1 && !isOperario2 && !isSuperAdmin);
+  const isOp2Only = Boolean(isOperario2 && !isOperario1 && !isSuperAdmin);
+
   const [sourceTab, setSourceTab] = useState(() => (isVendedorRedesOnly ? 'PEDIDOS' : 'REPOSICIONES'));
   const [items, setItems] = useState([]);
   const [metrics, setMetrics] = useState({ pending: 0, separated: 0, inProduction: 0, printed: 0, total: 0 });
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState(() => (isOp2Only ? 'A_PRODUCCION' : 'ALL'));
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -92,12 +95,13 @@ export default function useProductionQueue() {
     }
   };
 
-  const isOp2Only = Boolean(isOperario2 && !isOperario1 && !isSuperAdmin);
   const sectionBadge = isSuperAdmin
     ? 'SUPER ADMIN'
     : (isOperario1 && isOperario2
         ? 'PRODUCCIÓN TOTAL'
-        : (isOperario2 ? 'TALLER' : (isOperario1 ? 'STOCK & PRODUCCIÓN' : 'OPERADOR')));
+        : (isOp2Only
+            ? 'TALLER DE IMPRESIÓN'
+            : (isOp1Only ? 'STOCK & ALISTAMIENTO' : 'OPERADOR')));
 
   const refresh = useCallback(() => {
     fetchItems();

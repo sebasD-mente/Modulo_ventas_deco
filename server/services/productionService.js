@@ -25,10 +25,11 @@ export async function getProductionItems({
   const skip = (parsedPage - 1) * parsedLimit;
 
   let statusFilter = {};
-  if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
-    statusFilter = { productionStatus: status };
-  } else if (isOperario2 && !isOperario1 && !isSuperAdmin) {
+  if (isOperario2 && !isOperario1 && !isSuperAdmin) {
+    // Operario 2 solo ve en su cola lo que requiere impresión
     statusFilter = { productionStatus: 'A_PRODUCCION' };
+  } else if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
+    statusFilter = { productionStatus: status };
   }
 
   let sourceCondition = {};
@@ -148,9 +149,14 @@ export async function updateItemProductionStatus({
       error.statusCode = 403;
       throw error;
     }
+    if (item.productionStatus !== 'A_PRODUCCION' && !isSuperAdmin) {
+      const error = new Error('Solo se pueden marcar como IMPRESO las obras que están A PRODUCCION.');
+      error.statusCode = 403;
+      throw error;
+    }
   } else if (status === 'A_PRODUCCION') {
-    if (!isOperario1 && !isOperario2) {
-      const error = new Error('No tienes permiso para mover obras a A PRODUCCION.');
+    if (!isOperario1) {
+      const error = new Error('No tienes permiso de Operario 1 para mover obras a A PRODUCCION.');
       error.statusCode = 403;
       throw error;
     }
