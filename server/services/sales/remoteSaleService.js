@@ -173,24 +173,43 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
   const productsAmount = Math.max(0, Number((itemsSubtotal - discount).toFixed(2)));
   const shippingCost = Number(data.shippingCost || 0);
   const totalAmount = Number((productsAmount + shippingCost).toFixed(2));
-  const paymentsTotal = Number(data.payments.reduce((acc, p) => acc + Number(p.amount), 0).toFixed(2));
+  const paymentsList = Array.isArray(data.payments) ? data.payments : [];
+  const paymentsTotal = Number(paymentsList.reduce((acc, p) => acc + Number(p.amount), 0).toFixed(2));
+  const isZeroPayment = paymentsList.length === 0 || paymentsTotal === 0;
 
-  // 2. Compuerta Inquebrantable del 50% de Anticipo
-  const requiredDeposit = Number((totalAmount * 0.50).toFixed(2));
-  if (paymentsTotal < requiredDeposit) {
-    const error = new Error(
-      `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un anticipo de Q ${paymentsTotal.toFixed(2)}.`
-    );
-    error.statusCode = 400;
-    throw error;
+  let paymentStatus;
+  let depositAmount;
+  let balanceDue;
+  let status;
+  let itemProductionStatus;
+
+  if (isZeroPayment) {
+    paymentStatus = 'PENDIENTE_PAGO';
+    depositAmount = 0.0;
+    balanceDue = totalAmount;
+    status = 'PENDIENTE';
+    itemProductionStatus = 'PENDIENTE';
+  } else {
+    // 2. Compuerta Inquebrantable del 50% de Anticipo cuando se incluye pago
+    const requiredDeposit = Number((totalAmount * 0.50).toFixed(2));
+    if (paymentsTotal < requiredDeposit) {
+      const error = new Error(
+        `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un anticipo de Q ${paymentsTotal.toFixed(2)}.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const isFullPayment = paymentsTotal >= totalAmount;
+    paymentStatus = isFullPayment ? 'PAGADO_TOTAL' : 'ANTICIPO_PAGADO';
+    depositAmount = isFullPayment ? totalAmount : paymentsTotal;
+    balanceDue = isFullPayment ? 0.0 : Number((totalAmount - paymentsTotal).toFixed(2));
+    status = isFullPayment ? 'COMPLETADA' : 'PENDIENTE';
+    itemProductionStatus = 'A_PRODUCCION';
   }
 
-  // 3. Determinación de Estados de Pago y Saldos
-  const isFullPayment = paymentsTotal >= totalAmount;
-  const paymentStatus = isFullPayment ? 'PAGADO_TOTAL' : 'ANTICIPO_PAGADO';
-  const depositAmount = isFullPayment ? totalAmount : paymentsTotal;
-  const balanceDue = isFullPayment ? 0.0 : Number((totalAmount - paymentsTotal).toFixed(2));
-  const status = isFullPayment ? 'COMPLETADA' : 'PENDIENTE';
+  // Asignar el estado de producción correspondiente a los ítems
+  itemsData.forEach((it) => { it.productionStatus = itemProductionStatus; });
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -234,7 +253,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
           balanceDue,
           items: { create: itemsData },
           payments: {
-            create: data.payments.map((p) => ({
+            create: paymentsList.map((p) => ({
               method: p.method, amount: p.amount, reference: p.reference || null, receiptUrl: p.receiptUrl || null,
             })),
           },
@@ -298,12 +317,78 @@ export async function registerBalancePayment({ saleId, tenantId, sellerId, payme
     }
 
     const newPaymentsTotal = Number(payments.reduce((acc, p) => acc + Number(p.amount), 0).toFixed(2));
-    if (Number(Math.abs(newPaymentsTotal - currentBalance).toFixed(2)) > 0.05) {
-      const error = new Error(
-        `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
-      );
-      error.statusCode = 400;
-      throw error;
+    const isPendingPayment = sale.paymentStatus === 'PENDIENTE_PAGO';
+    let newPaymentStatus;
+    let newStatus;
+    let newBalanceDue;
+    let newDepositAmount;
+
+    if (isPendingPayment) {
+      const requiredDeposit = Number((Number(sale.totalAmount) * 0.50).toFixed(2));
+      if (newPaymentsTotal < requiredDeposit) {
+        const error = new Error(
+          `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un pago de Q ${newPaymentsTotal.toFixed(2)}.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      if (newPaymentsTotal > currentBalance + 0.05) {
+        const error = new Error(
+          `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) supera el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const isFull = Math.abs(newPaymentsTotal - currentBalance) <= 0.05 || newPaymentsTotal >= currentBalance;
+      if (isFull) {
+        newPaymentStatus = 'PAGADO_TOTAL';
+        newStatus = 'COMPLETADA';
+        newBalanceDue = 0.0;
+        newDepositAmount = Number(sale.totalAmount);
+      } else {
+        newPaymentStatus = 'ANTICIPO_PAGADO';
+        newStatus = 'PENDIENTE';
+        newBalanceDue = Number((Number(sale.totalAmount) - newPaymentsTotal).toFixed(2));
+        newDepositAmount = newPaymentsTotal;
+      }
+
+      // ACTIVACIÓN A TALLER: Actualizar los ítems de la venta a 'A_PRODUCCION'
+      const saleItems = await client.saleItem.findMany({
+        where: { saleId: sale.id },
+        select: { id: true, productionStatus: true },
+      });
+      await client.saleItem.updateMany({
+        where: { saleId: sale.id },
+        data: {
+          productionStatus: 'A_PRODUCCION',
+          statusChangedAt: new Date(),
+          statusChangedById: sellerId || null,
+        },
+      });
+      if (saleItems.length > 0) {
+        await client.productionLog.createMany({
+          data: saleItems.map((it) => ({
+            saleItemId: it.id,
+            previousStatus: it.productionStatus,
+            newStatus: 'A_PRODUCCION',
+            userId: sellerId || null,
+            notes: `Activación a taller por acreditación de depósito (Q ${newPaymentsTotal.toFixed(2)})`,
+          })),
+        });
+      }
+    } else {
+      if (Number(Math.abs(newPaymentsTotal - currentBalance).toFixed(2)) > 0.05) {
+        const error = new Error(
+          `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      newPaymentStatus = 'PAGADO_TOTAL';
+      newStatus = 'COMPLETADA';
+      newBalanceDue = 0.0;
+      newDepositAmount = Number(sale.totalAmount);
     }
 
     await client.salePayment.createMany({
@@ -312,20 +397,37 @@ export async function registerBalancePayment({ saleId, tenantId, sellerId, payme
       })),
     });
 
+    const labelNote = isPendingPayment ? 'Anticipo registrado' : 'Saldo cobrado';
     const updatedNotes = notes
-      ? (sale.notes ? `${sale.notes}\n[Saldo cobrado]: ${notes}` : `[Saldo cobrado]: ${notes}`)
+      ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`)
       : sale.notes;
 
     const updatedSale = await client.sale.update({
       where: { id: sale.id },
-      data: { balanceDue: 0.0, depositAmount: sale.totalAmount, paymentStatus: 'PAGADO_TOTAL', status: 'COMPLETADA', notes: updatedNotes },
+      data: {
+        balanceDue: newBalanceDue,
+        depositAmount: newDepositAmount,
+        paymentStatus: newPaymentStatus,
+        status: newStatus,
+        notes: updatedNotes,
+      },
       include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
     });
 
     await client.auditLog.create({
       data: {
-        tenantId, userId: sellerId, action: 'SALDO_VENTA_COBRADO', entity: 'sale', entityId: sale.id,
-        details: { saleNumber: sale.saleNumber, paidAmount: newPaymentsTotal, previousBalance: currentBalance },
+        tenantId,
+        userId: sellerId,
+        action: isPendingPayment ? 'ANTICIPO_VENTA_REGISTRADO' : 'SALDO_VENTA_COBRADO',
+        entity: 'sale',
+        entityId: sale.id,
+        details: {
+          saleNumber: sale.saleNumber,
+          paidAmount: newPaymentsTotal,
+          previousBalance: currentBalance,
+          newPaymentStatus,
+          activatedToProduction: isPendingPayment,
+        },
       },
     });
 

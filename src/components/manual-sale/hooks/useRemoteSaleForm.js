@@ -40,6 +40,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const [availablePickupEvents, setAvailablePickupEvents] = useState([]);
 
   // Anticipo, Comprobante y Pagos
+  const [isPendingPaymentOnly, setIsPendingPaymentOnly] = useState(false);
   const [depositInput, setDepositInput] = useState('');
   const [depositPaymentMethod, setDepositPaymentMethod] = useState('TRANSFERENCIA');
   const [depositReference, setDepositReference] = useState('');
@@ -136,14 +137,14 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
 
   // Sincronizar anticipo por defecto si el usuario aún no ingresó uno manual
   useEffect(() => {
-    if (totalAmount > 0 && (!depositInput || Number(depositInput) === 0)) {
+    if (!isPendingPaymentOnly && totalAmount > 0 && (!depositInput || Number(depositInput) === 0)) {
       setDepositInput(minDeposit.toString());
     }
-  }, [totalAmount, minDeposit]);
+  }, [totalAmount, minDeposit, isPendingPaymentOnly]);
 
-  const numericDeposit = Number(depositInput) || 0;
+  const numericDeposit = isPendingPaymentOnly ? 0 : (Number(depositInput) || 0);
   const balanceDue = Math.max(0, Number((totalAmount - numericDeposit).toFixed(2)));
-  const isDepositValid = totalAmount > 0 && numericDeposit >= minDeposit;
+  const isDepositValid = totalAmount > 0 && (isPendingPaymentOnly || numericDeposit >= minDeposit);
 
   // Selección de cliente autocompletado
   const selectCustomer = (cust) => {
@@ -221,9 +222,11 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       setSubmitError('Debes seleccionar el evento ferial para retiro en stand.');
       return false;
     }
-    if (numericDeposit < minDeposit) {
-      setSubmitError(`Anticipo insuficiente: Para iniciar producción se requiere un abono mínimo de Q ${minDeposit.toFixed(2)} (50%).`);
-      return false;
+    if (!isPendingPaymentOnly) {
+      if (numericDeposit < minDeposit) {
+        setSubmitError(`Anticipo insuficiente: Para iniciar producción se requiere un abono mínimo de Q ${minDeposit.toFixed(2)} (50%).`);
+        return false;
+      }
     }
 
     setIsSubmitting(true);
@@ -258,14 +261,16 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
         customDimensions: it.customDimensions || null,
         customImageUrl: it.customImageUrl || null,
       })),
-      payments: [
-        {
-          method: depositPaymentMethod,
-          amount: numericDeposit,
-          reference: depositReference?.trim() || null,
-          receiptUrl: depositReceiptUrl || null,
-        },
-      ],
+      payments: isPendingPaymentOnly || numericDeposit === 0
+        ? []
+        : [
+            {
+              method: depositPaymentMethod,
+              amount: numericDeposit,
+              reference: depositReference?.trim() || null,
+              receiptUrl: depositReceiptUrl || null,
+            },
+          ],
       discount: Number(discount) || 0,
       notes: remoteSaleNotes?.trim() || null,
       idempotencyKey: clientUuid,
@@ -287,6 +292,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       setShowShareModal(true);
       clearCart();
       clearSelectedCustomer();
+      setIsPendingPaymentOnly(false);
       setDepositInput('');
       setDepositReference('');
       setDepositReceiptUrl(null);
@@ -312,6 +318,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     pickupEventId, setPickupEventId, availablePickupEvents,
     productsSubtotal, productsAmount, effectiveShippingCost, totalAmount, minDeposit,
     depositInput, setDepositInput, numericDeposit, balanceDue, isDepositValid,
+    isPendingPaymentOnly, setIsPendingPaymentOnly,
     depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,
     depositReceiptUrl, setDepositReceiptUrl, isUploadingReceipt, receiptUploadError, handleReceiptUpload,
     remoteSaleNotes, setRemoteSaleNotes, isSubmitting, submitError, setSubmitError,

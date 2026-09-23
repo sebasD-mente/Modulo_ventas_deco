@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Edit, CreditCard, Smartphone, Banknote, Image as ImageIcon } from 'lucide-react';
+import { Clock, Edit, CreditCard, Smartphone, Banknote, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 
 function isSaleFromToday(dateStr) {
   if (!dateStr) return false;
@@ -36,13 +36,20 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
             <Clock className="w-3 h-3 text-slate-500" />
             {formatSaleTime(sale.createdAt)}
           </span>
-          {getPaymentBadge(sale.payments?.[0]?.method)}
+          {sale.paymentStatus === 'PENDIENTE_PAGO' ? (
+            <span className="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-rose-400" />
+              <span>⚠️ Pendiente de Pago (Q {Number(sale.totalAmount).toFixed(2)})</span>
+            </span>
+          ) : (
+            getPaymentBadge(sale.payments?.[0]?.method)
+          )}
           {sale.orderType === 'REDES_PERSONALIZADO' && (
             <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1">
               📱 Redes
             </span>
           )}
-          {hasBalance && (
+          {hasBalance && sale.paymentStatus !== 'PENDIENTE_PAGO' && (
             <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] flex items-center gap-1">
               ⏳ Saldo: Q {Number(sale.balanceDue).toFixed(2)}
             </span>
@@ -87,17 +94,29 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
           </span>
         </div>
 
-        {/* Botón Cobrar Saldo (Habilitado siempre que haya saldo pendiente) */}
+        {/* Botón Cobrar Saldo / Registrar Anticipo */}
         {hasBalance && onBalancePayment && (
-          <button
-            type="button"
-            onClick={() => onBalancePayment(sale)}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
-            title="Cobrar saldo pendiente de entrega"
-          >
-            <Banknote className="w-4 h-4" />
-            <span>Cobrar Saldo</span>
-          </button>
+          sale.paymentStatus === 'PENDIENTE_PAGO' ? (
+            <button
+              type="button"
+              onClick={() => onBalancePayment(sale)}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:border-amber-500/60 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Registrar anticipo de orden pendiente"
+            >
+              <Banknote className="w-4 h-4 text-amber-400" />
+              <span>💵 Registrar Anticipo</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onBalancePayment(sale)}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Cobrar saldo pendiente de entrega"
+            >
+              <Banknote className="w-4 h-4" />
+              <span>Cobrar Saldo</span>
+            </button>
+          )
         )}
 
         {/* Botón Compartir WhatsApp */}

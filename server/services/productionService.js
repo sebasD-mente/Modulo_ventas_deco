@@ -28,7 +28,14 @@ export async function getProductionItems({
   }
 
   const whereClause = {
-    sale: { tenantId, ...(eventId ? { eventId } : {}) },
+    sale: {
+      tenantId,
+      ...(eventId ? { eventId } : {}),
+      NOT: {
+        orderType: 'REDES_PERSONALIZADO',
+        paymentStatus: 'PENDIENTE_PAGO',
+      },
+    },
     ...statusFilter,
   };
 

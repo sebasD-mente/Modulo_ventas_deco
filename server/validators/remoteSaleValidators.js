@@ -45,7 +45,7 @@ export const createRemoteSaleSchema = z.object({
   shippingTrackingNumber: z.string().trim().max(100).optional().nullable(),
   pickupEventId: z.string().trim().min(1).optional().nullable(),
   items: z.array(remoteSaleItemSchema).min(1, 'La orden debe incluir al menos un producto'),
-  payments: z.array(remoteSalePaymentSchema).min(1, 'Debe registrar al menos un anticipo o pago'),
+  payments: z.array(remoteSalePaymentSchema).default([]),
   discount: z.number().nonnegative('El descuento no puede ser negativo').default(0),
   notes: z.string().max(500).optional().nullable(),
   idempotencyKey: z.string().max(255).optional().nullable(),

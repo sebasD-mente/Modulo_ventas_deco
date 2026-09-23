@@ -202,6 +202,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             isUploadingReceipt={remoteForm.isUploadingReceipt}
             receiptUploadError={remoteForm.receiptUploadError}
             onUploadReceipt={remoteForm.handleReceiptUpload}
+            isPendingPaymentOnly={remoteForm.isPendingPaymentOnly}
+            setIsPendingPaymentOnly={remoteForm.setIsPendingPaymentOnly}
             isSubmitting={remoteForm.isSubmitting}
             submitError={remoteForm.submitError}
             onConfirmRemoteSale={remoteForm.confirmRemoteSale}
