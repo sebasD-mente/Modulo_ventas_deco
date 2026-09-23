@@ -32,14 +32,14 @@ export async function getProductionItems({
   }
 
   let sourceCondition = {};
-  if (source === 'REPOSICIONES') {
-    sourceCondition = {
-      NOT: { orderType: 'REDES_PERSONALIZADO' },
-    };
-  } else if (source === 'PEDIDOS') {
+  if (isVendedorRedesOnly || source === 'PEDIDOS') {
     sourceCondition = {
       orderType: 'REDES_PERSONALIZADO',
       NOT: { paymentStatus: 'PENDIENTE_PAGO' },
+    };
+  } else if (source === 'REPOSICIONES') {
+    sourceCondition = {
+      NOT: { orderType: 'REDES_PERSONALIZADO' },
     };
   } else {
     sourceCondition = {
@@ -209,14 +209,14 @@ export async function getProductionMetrics({ tenantId, eventId, userRoles = [], 
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
 
   let sourceCondition = {};
-  if (source === 'REPOSICIONES') {
-    sourceCondition = {
-      NOT: { orderType: 'REDES_PERSONALIZADO' },
-    };
-  } else if (source === 'PEDIDOS') {
+  if (isVendedorRedesOnly || source === 'PEDIDOS') {
     sourceCondition = {
       orderType: 'REDES_PERSONALIZADO',
       NOT: { paymentStatus: 'PENDIENTE_PAGO' },
+    };
+  } else if (source === 'REPOSICIONES') {
+    sourceCondition = {
+      NOT: { orderType: 'REDES_PERSONALIZADO' },
     };
   } else {
     sourceCondition = {

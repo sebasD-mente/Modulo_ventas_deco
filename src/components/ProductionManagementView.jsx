@@ -14,33 +14,35 @@ export default function ProductionManagementView() {
 
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl text-white max-w-2xl mx-auto space-y-6 select-none">
-      {/* Selector segmented superior de 2 botones: Reposiciones vs Pedidos */}
-      <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
-        <button
-          type="button"
-          onClick={() => q.setSourceTab('REPOSICIONES')}
-          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-            isReposiciones
-              ? 'bg-white text-black shadow-md font-black'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Package className="w-4 h-4 shrink-0" />
-          <span>Reposiciones</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => q.setSourceTab('PEDIDOS')}
-          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-            !isReposiciones
-              ? 'bg-cyan-400 text-black shadow-md font-black'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Smartphone className="w-4 h-4 shrink-0" />
-          <span>Pedidos</span>
-        </button>
-      </div>
+      {/* Selector superior: Solo visible para encargados de producción (Operarios y Super Admin) */}
+      {!isVendedorRedesOnly && (
+        <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
+          <button
+            type="button"
+            onClick={() => q.setSourceTab('REPOSICIONES')}
+            className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isReposiciones
+                ? 'bg-white text-black shadow-md font-black'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Package className="w-4 h-4 shrink-0" />
+            <span>Reposiciones</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => q.setSourceTab('PEDIDOS')}
+            className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              !isReposiciones
+                ? 'bg-cyan-400 text-black shadow-md font-black'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Smartphone className="w-4 h-4 shrink-0" />
+            <span>Pedidos</span>
+          </button>
+        </div>
+      )}
 
       {/* Encabezado contextual dinámico */}
       <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
