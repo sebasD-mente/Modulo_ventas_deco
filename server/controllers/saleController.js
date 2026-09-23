@@ -97,9 +97,26 @@ export async function getEventLiveMetrics(req, res) {
 export async function getMonitorMetrics(req, res) {
   try {
     const tenantId = req.tenantId;
-    const { date } = req.query;
+    const { date, eventId } = req.query;
 
-    const data = await getMonitorDashboardMetrics({ tenantId, date: date || null });
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+    const isVendedor = userRoles.includes('VENDEDOR');
+
+    // Aislamiento Zero-Trust: Vendedor de redes exclusivo solo consulta su canal digital
+    let targetEventId = eventId || null;
+    if (isVendedorRedes && !isSuperAdmin && !isVendedor) {
+      targetEventId = eventId || 'evt-ventas-redes-online';
+    }
+
+    const data = await getMonitorDashboardMetrics({
+      tenantId,
+      date: date || null,
+      eventId: targetEventId,
+    });
     return res.json({ success: true, data });
   } catch (err) {
     console.error('❌ Error obteniendo métricas del monitor:', err);

@@ -1,19 +1,23 @@
 import { prisma } from '../../config/prisma.js';
 import { getGuatemalaDayRange } from './saleKpiService.js';
 
-export async function getMonitorDashboardMetrics({ tenantId, date = null }) {
+export async function getMonitorDashboardMetrics({ tenantId, date = null, eventId = null }) {
+  const eventWhere = { tenantId };
+  if (eventId) eventWhere.id = eventId;
   const events = await prisma.event.findMany({
-    where: { tenantId },
+    where: eventWhere,
     orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
   });
 
   const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
+  const saleWhere = {
+    tenantId,
+    status: 'COMPLETADA',
+    createdAt: { gte: startOfDay, lte: endOfDay },
+  };
+  if (eventId) saleWhere.eventId = eventId;
   const allSales = await prisma.sale.findMany({
-    where: {
-      tenantId,
-      status: 'COMPLETADA',
-      createdAt: { gte: startOfDay, lte: endOfDay },
-    },
+    where: saleWhere,
     include: {
       payments: true,
       items: true,

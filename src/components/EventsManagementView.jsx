@@ -8,6 +8,7 @@ import CreateEventModal from './events/modals/CreateEventModal';
 import ActivateEventModal from './events/modals/ActivateEventModal';
 import EventSalesModal from './events/modals/EventSalesModal';
 import EventActionModals from './events/modals/EventActionModals';
+import DigitalEventMonitorSection from './events/DigitalEventMonitorSection';
 
 export default function EventsManagementView({ onEventActivated }) {
   const { isVendedorRedes, isSuperAdmin } = useAuth();
@@ -38,33 +39,42 @@ export default function EventsManagementView({ onEventActivated }) {
           ) : m.errorMsg ? (
             <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">⚠️ {m.errorMsg}</div>
           ) : (
-            <div className="p-6 rounded-3xl bg-black border border-neutral-800 space-y-5 shadow-inner">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>🟢 Canal Digital Permanente Activo</span>
+            <>
+              <div className="p-6 rounded-3xl bg-black border border-neutral-800 space-y-5 shadow-inner">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>🟢 Canal Digital Permanente Activo</span>
+                    </div>
+                    <h4 className="text-lg font-black text-white">📱 Ventas en Línea y Redes Sociales</h4>
+                    <p className="text-xs text-neutral-400 mt-0.5">Ubicación: <span className="text-neutral-300 font-semibold">Canal Digital (WhatsApp / IG / FB)</span></p>
                   </div>
-                  <h4 className="text-lg font-black text-white">📱 Ventas en Línea y Redes Sociales</h4>
-                  <p className="text-xs text-neutral-400 mt-0.5">Ubicación: <span className="text-neutral-300 font-semibold">Canal Digital (WhatsApp / IG / FB)</span></p>
+                  {digitalEvent?.totalSold !== undefined && (
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl px-4 py-2.5 text-right shrink-0">
+                      <div className="text-[10px] uppercase font-bold text-neutral-400">Total Vendido</div>
+                      <div className="text-base font-black text-amber-400">Q {Number(digitalEvent.totalSold).toFixed(2)}</div>
+                    </div>
+                  )}
                 </div>
-                {digitalEvent?.totalSold !== undefined && (
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl px-4 py-2.5 text-right shrink-0">
-                    <div className="text-[10px] uppercase font-bold text-neutral-400">Total Vendido</div>
-                    <div className="text-base font-black text-amber-400">Q {Number(digitalEvent.totalSold).toFixed(2)}</div>
-                  </div>
-                )}
+
+                <button
+                  type="button"
+                  onClick={() => digitalEvent && m.viewEventSales(digitalEvent)}
+                  className="w-full min-h-[48px] px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-400/10 active:scale-[0.99] cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>📊 Ver Ventas y Métricas de este Punto de Venta</span>
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => digitalEvent && m.viewEventSales(digitalEvent)}
-                className="w-full min-h-[48px] px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-400/10 active:scale-[0.99] cursor-pointer"
-              >
-                <BarChart3 className="w-4 h-4 shrink-0" />
-                <span>📊 Ver Ventas y Métricas de este Punto de Venta</span>
-              </button>
-            </div>
+              {/* MONITOR UNIFICADO DEL EVENTO DIGITAL */}
+              {digitalEvent?.id && (
+                <div className="pt-2 border-t border-neutral-800/80">
+                  <DigitalEventMonitorSection eventId={digitalEvent.id} />
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (

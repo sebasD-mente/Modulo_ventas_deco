@@ -29,7 +29,6 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
         tabMap.set('produccion', { id: 'produccion', label: 'Mis Pedidos' });
       }
       tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
-      tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
       tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
     } else {
       if (isVendedor) {
