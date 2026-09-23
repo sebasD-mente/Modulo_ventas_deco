@@ -29,7 +29,26 @@ function ViewLoadingFallback() {
 
 function SalesTerminalMain() {
   const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
-  const [activeTab, setActiveTab] = useState('venta');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_auth_user') : null;
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        const userRoles = Array.isArray(u?.roles) && u.roles.length > 0
+          ? u.roles
+          : (u?.role ? [u.role] : []);
+        const isSuper = userRoles.includes('SUPER_ADMIN');
+        const isVend = userRoles.includes('VENDEDOR');
+        const isVendRedes = userRoles.includes('VENDEDOR_REDES');
+        const isOp = userRoles.includes('OPERARIO_1') || userRoles.includes('OPERARIO_2');
+
+        if (isOp && !isSuper && !isVend && !isVendRedes) {
+          return 'produccion';
+        }
+      }
+    } catch (_) {}
+    return 'venta';
+  });
   const [activeEvent, setActiveEvent] = useState(() => {
     try {
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_active_event') : null;
@@ -46,33 +65,55 @@ function SalesTerminalMain() {
   // Ajustar pestaña por defecto según rol
   useEffect(() => {
     if (user) {
-      if (isOperario1 || isOperario2) {
+      if ((isOperario1 || isOperario2) && !isSuperAdmin && !isVendedor && !isVendedorRedes) {
         setActiveTab('produccion');
       } else if (isVendedor || isVendedorRedes) {
-        setActiveTab('venta');
+        setActiveTab((prev) => (prev === 'produccion' && !isSuperAdmin ? 'venta' : prev));
       }
     }
-  }, [user, isOperario1, isOperario2, isVendedor, isVendedorRedes]);
+  }, [user, isOperario1, isOperario2, isVendedor, isVendedorRedes, isSuperAdmin]);
 
   // Cargar datos iniciales del evento activo y métricas
   const loadInitialData = useCallback(async () => {
     if (!token) return;
     try {
       setIsLoading(true);
-      // 1. Evento Activo
-      const eventRes = await authFetch('/api/events/active');
-      const eventData = await eventRes.json();
-      if (eventData.success && eventData.data) {
-        setActiveEvent(eventData.data);
+      let selectedEvent = null;
+
+      // Evento activo para VENDEDOR_REDES (si no es vendedor de feria ni super admin)
+      if (isVendedorRedes && !isVendedor && !isSuperAdmin) {
+        const eventsRes = await authFetch('/api/events');
+        const eventsData = await eventsRes.json();
+        if (eventsData.success && Array.isArray(eventsData.data) && eventsData.data.length > 0) {
+          selectedEvent =
+            eventsData.data.find(
+              (e) => e.id === 'evt-ventas-redes-online' || e.name?.toLowerCase().includes('redes')
+            ) || eventsData.data[0];
+        }
+      }
+
+      // Si no es vendedor de redes exclusivo, o si no se encontró evento de redes, consultar evento activo
+      if (!selectedEvent) {
+        const eventRes = await authFetch('/api/events/active');
+        const eventData = await eventRes.json();
+        if (eventData.success && eventData.data) {
+          selectedEvent = eventData.data;
+        }
+      }
+
+      if (selectedEvent) {
+        setActiveEvent(selectedEvent);
         try {
-          localStorage.setItem('deko_active_event', JSON.stringify(eventData.data));
+          localStorage.setItem('deko_active_event', JSON.stringify(selectedEvent));
         } catch (_) {}
 
-        // 2. Métricas en vivo del evento activo
-        const metricsRes = await authFetch(`/api/sales/events/${eventData.data.id}/metrics`);
-        const metricsData = await metricsRes.json();
-        if (metricsData.success) {
-          setLiveMetrics(metricsData.data);
+        // 2. Métricas selectivas: Solo invocar si es SUPER_ADMIN, VENDEDOR o VENDEDOR_REDES
+        if (isSuperAdmin || isVendedor || isVendedorRedes) {
+          const metricsRes = await authFetch(`/api/sales/events/${selectedEvent.id}/metrics`);
+          const metricsData = await metricsRes.json();
+          if (metricsData.success) {
+            setLiveMetrics(metricsData.data);
+          }
         }
       }
     } catch (err) {
@@ -80,10 +121,11 @@ function SalesTerminalMain() {
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, token]);
+  }, [authFetch, token, isVendedorRedes, isVendedor, isSuperAdmin]);
 
-  const refreshMetrics = async () => {
+  const refreshMetrics = useCallback(async () => {
     if (!activeEvent) return;
+    if (!(isSuperAdmin || isVendedor || isVendedorRedes)) return;
     try {
       const metricsRes = await authFetch(`/api/sales/events/${activeEvent.id}/metrics`);
       const metricsData = await metricsRes.json();
@@ -94,7 +136,7 @@ function SalesTerminalMain() {
     } catch (e) {
       console.error('Error refrescando métricas:', e);
     }
-  };
+  }, [activeEvent, authFetch, isSuperAdmin, isVendedor, isVendedorRedes]);
 
   useEffect(() => {
     if (user) {

@@ -113,15 +113,16 @@ app.use('/api', apiRoutes);
 const distPath = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  // SPA fallback para Express 5 (excluyendo /api, /uploads y /health)
+  // SPA fallback para Express 5 (excluyendo /api, /uploads, /assets y /health)
   app.use((req, res) => {
     if (
       req.path.startsWith('/api') ||
       req.path.startsWith('/uploads') ||
+      req.path.startsWith('/assets') ||
       req.path === '/health' ||
       req.path.startsWith('/health/')
     ) {
-      return res.status(404).json({ success: false, error: 'Endpoint no encontrado' });
+      return res.status(404).json({ success: false, error: 'Recurso no encontrado' });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return res.status(404).json({ success: false, error: 'Endpoint no encontrado' });

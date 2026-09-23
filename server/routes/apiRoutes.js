@@ -214,33 +214,33 @@ router.post(
 );
 router.post(
   '/sales',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   requireEventAccess,
   validate(createSaleSchema),
   createSale
 );
 router.patch(
   '/sales/:id',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   requireEventAccess,
   validate(updateSaleSchema),
   updateSale
 );
 router.get(
   '/sales/events/:eventId',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   requireEventAccess,
   getEventSalesList
 );
 router.get(
   '/sales/events/:eventId/metrics',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   requireEventAccess,
   getEventLiveMetrics
 );
 router.get(
   '/sales/monitor',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   getMonitorMetrics
 );
 router.post(
@@ -280,46 +280,46 @@ router.patch('/commissions/settlements/:id/pay', authenticate, authorize(['SUPER
 // ==========================================
 router.post(
   '/ai/voice-sale',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   upload.single('audio'),
   requireEventAccess,
   handleVoiceSale
 );
 router.post(
   '/ai/batch-photo',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   upload.single('image'),
   requireEventAccess,
   handleBatchPhoto
 );
 router.post(
   '/ai/recognize-artwork',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   upload.single('image'),
   requireEventAccess,
   handleArtworkRecognition
 );
 router.post(
   '/ai/recognize-video',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   upload.single('video'),
   requireEventAccess,
   handleVideoRecognition
 );
 router.post(
   '/ai/chat',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   requireEventAccess,
   handleChatQuery
 );
 router.get(
   '/ai/session/:sessionId',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   handleGetSession
 );
 router.delete(
   '/ai/session/:sessionId/draft',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   handleClearDraft
 );
 
