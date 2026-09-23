@@ -49,8 +49,19 @@ export async function getActiveEvent(req, res) {
 
 export async function getEventsList(req, res) {
   try {
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+
+    const whereClause = { tenantId: req.tenantId };
+    if (isVendedorRedes && !isSuperAdmin) {
+      whereClause.id = 'evt-ventas-redes-online';
+    }
+
     const events = await prisma.event.findMany({
-      where: { tenantId: req.tenantId },
+      where: whereClause,
       orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
       include: {
         _count: { select: { sales: true } },

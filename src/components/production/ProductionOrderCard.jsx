@@ -1,20 +1,11 @@
 import React from 'react';
 import { Package, Clock, Printer, CheckCircle2, ExternalLink, Scissors } from 'lucide-react';
 
-const STATUS_BORDER = {
-  A_PRODUCCION: 'border-cyan-500/40 bg-cyan-950/10',
-  SEPARADO: 'border-emerald-500/30',
-  IMPRESO: 'border-neutral-800 opacity-60',
-};
-
-const STATUS_BADGE = {
-  PENDIENTE: 'bg-amber-950 text-amber-300 border-amber-800/80',
-  SEPARADO: 'bg-emerald-950 text-emerald-300 border-emerald-800/80',
-  A_PRODUCCION: 'bg-cyan-950 text-cyan-300 border-cyan-800/80',
-};
+const STATUS_BORDER = { A_PRODUCCION: 'border-cyan-500/40 bg-cyan-950/10', SEPARADO: 'border-emerald-500/30', IMPRESO: 'border-neutral-800 opacity-60' };
+const STATUS_BADGE = { PENDIENTE: 'bg-amber-950 text-amber-300 border-amber-800/80', SEPARADO: 'bg-emerald-950 text-emerald-300 border-emerald-800/80', A_PRODUCCION: 'bg-cyan-950 text-cyan-300 border-cyan-800/80' };
 
 export default function ProductionOrderCard({
-  item, isUpdating = false, isOp2Only = false, isSuperAdmin = false, onStatusChange,
+  item, isUpdating = false, isOp2Only = false, isSuperAdmin = false, isVendedorRedesOnly = false, onStatusChange,
 }) {
   const status = item.productionStatus || 'PENDIENTE';
   const cardBorder = STATUS_BORDER[status] || 'border-neutral-800';
@@ -30,13 +21,7 @@ export default function ProductionOrderCard({
           {artUrl ? (
             <>
               <img src={artUrl} alt={item.description} className="w-full h-full object-cover" loading="lazy" />
-              <a
-                href={artUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Abrir arte original en alta resolución para RIP de taller"
-                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-cyan-300 min-h-[44px] min-w-[44px]"
-              >
+              <a href={artUrl} target="_blank" rel="noopener noreferrer" title="Abrir arte original en alta resolución para RIP de taller" className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-cyan-300 min-h-[44px] min-w-[44px]">
                 <ExternalLink className="w-4 h-4" />
               </a>
             </>
@@ -88,32 +73,34 @@ export default function ProductionOrderCard({
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-neutral-900 flex items-center justify-end gap-2 flex-wrap">
-        {(!isOp2Only || isSuperAdmin) && (
-          <>
-            {status !== 'SEPARADO' && (
-              <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'SEPARADO')} className="bg-emerald-600 hover:bg-emerald-500 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                <Package className="w-3.5 h-3.5" /><span>📦 Separar Stock</span>
-              </button>
-            )}
-            {status !== 'A_PRODUCCION' && status !== 'IMPRESO' && (
-              <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'A_PRODUCCION')} className="bg-white hover:bg-neutral-200 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                <Printer className="w-3.5 h-3.5 text-black" /><span>🖨️ A Producción</span>
-              </button>
-            )}
-            {status !== 'PENDIENTE' && isSuperAdmin && (
-              <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'PENDIENTE')} className="bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white text-xs px-2.5 py-2 rounded-xl border border-neutral-800 transition-all cursor-pointer">
-                Revertir
-              </button>
-            )}
-          </>
-        )}
-        {(isOp2Only || (isSuperAdmin && status === 'A_PRODUCCION')) && (
-          <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'IMPRESO')} className="w-full sm:w-auto bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
-            <CheckCircle2 className="w-4 h-4 text-black" /><span>✅ Marcar como IMPRESO (Archivar)</span>
-          </button>
-        )}
-      </div>
+      {!isVendedorRedesOnly && (
+        <div className="mt-3 pt-3 border-t border-neutral-900 flex items-center justify-end gap-2 flex-wrap">
+          {(!isOp2Only || isSuperAdmin) && (
+            <>
+              {status !== 'SEPARADO' && (
+                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'SEPARADO')} className="bg-emerald-600 hover:bg-emerald-500 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                  <Package className="w-3.5 h-3.5" /><span>📦 Separar Stock</span>
+                </button>
+              )}
+              {status !== 'A_PRODUCCION' && status !== 'IMPRESO' && (
+                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'A_PRODUCCION')} className="bg-white hover:bg-neutral-200 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                  <Printer className="w-3.5 h-3.5 text-black" /><span>🖨️ A Producción</span>
+                </button>
+              )}
+              {status !== 'PENDIENTE' && isSuperAdmin && (
+                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'PENDIENTE')} className="bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white text-xs px-2.5 py-2 rounded-xl border border-neutral-800 transition-all cursor-pointer">
+                  Revertir
+                </button>
+              )}
+            </>
+          )}
+          {(isOp2Only || (isSuperAdmin && status === 'A_PRODUCCION')) && (
+            <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'IMPRESO')} className="w-full sm:w-auto bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+              <CheckCircle2 className="w-4 h-4 text-black" /><span>✅ Marcar como IMPRESO (Archivar)</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

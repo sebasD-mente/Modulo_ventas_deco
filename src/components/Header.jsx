@@ -21,13 +21,23 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
   } else {
     const tabMap = new Map();
 
-    if (isVendedor || isVendedorRedes) {
-      tabMap.set('venta', { id: 'venta', label: 'Nueva venta' });
+    if (isVendedorRedes && !isVendedor) {
+      tabMap.set('venta', { id: 'venta', label: 'Pedidos / Venta' });
+      tabMap.set('eventos', { id: 'eventos', label: 'Punto de Venta' });
+      if (!isOperario1 && !isOperario2) {
+        tabMap.set('produccion', { id: 'produccion', label: 'Mis Pedidos' });
+      }
       tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
-    }
-
-    if (isVendedorRedes) {
       tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
+    } else {
+      if (isVendedor) {
+        tabMap.set('venta', { id: 'venta', label: 'Nueva venta' });
+        tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
+      }
+      if (isVendedorRedes) {
+        tabMap.set('eventos', { id: 'eventos', label: 'Punto de Venta' });
+        tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
+      }
     }
 
     if (isOperario1 && isOperario2) {

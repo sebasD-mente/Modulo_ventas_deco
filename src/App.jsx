@@ -158,8 +158,8 @@ function SalesTerminalMain() {
 
         {/* VISTAS SECUNDARIAS ASÍNCRONAS CON CARGA BAJO DEMANDA */}
         <Suspense fallback={<ViewLoadingFallback />}>
-          {/* PÁGINA 2: GESTIÓN DE EVENTOS (SUPER ADMIN) */}
-          {activeTab === 'eventos' && isSuperAdmin && (
+          {/* PÁGINA 2: GESTIÓN DE EVENTOS (SUPER ADMIN, VENDEDOR REDES) */}
+          {activeTab === 'eventos' && (isSuperAdmin || isVendedorRedes) && (
             <EventsManagementView
               onEventActivated={(activatedEvent) => {
                 setActiveEvent(activatedEvent);
@@ -174,8 +174,8 @@ function SalesTerminalMain() {
             <MonitorDashboardView />
           )}
 
-          {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN) */}
-          {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2) && (
+          {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN, VENDEDOR REDES) */}
+          {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2 || isVendedorRedes) && (
             <ProductionManagementView />
           )}
 

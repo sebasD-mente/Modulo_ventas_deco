@@ -107,7 +107,7 @@ router.get('/auth/me', getMe);
 // ==========================================
 router.get(
   '/production/items',
-  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2', 'VENDEDOR_REDES']),
   getProductionItems
 );
 router.patch(
@@ -117,7 +117,7 @@ router.patch(
 );
 router.get(
   '/production/metrics',
-  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2']),
+  requireRole(['SUPER_ADMIN', 'OPERARIO_1', 'OPERARIO_2', 'VENDEDOR_REDES']),
   getProductionMetrics
 );
 router.get(

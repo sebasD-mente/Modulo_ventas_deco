@@ -20,6 +20,7 @@ export async function getProductionItems(req, res) {
       page,
       limit,
       userRoles,
+      userId: req.user?.id,
     });
 
     return res.status(200).json({
@@ -85,10 +86,16 @@ export async function updateProductionStatus(req, res) {
 
 export async function getProductionMetrics(req, res) {
   try {
+    const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user.role || 'VENDEDOR'];
+
     const { eventId } = req.query;
     const metrics = await fetchProductionMetrics({
       tenantId: req.tenantId,
       eventId,
+      userRoles,
+      userId: req.user?.id,
     });
 
     return res.status(200).json({

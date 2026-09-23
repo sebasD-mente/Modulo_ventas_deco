@@ -11,10 +11,13 @@ export async function getProductionItems({
   page = 1,
   limit = 50,
   userRoles = [],
+  userId,
 }) {
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
   const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
   const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
+  const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+  const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
 
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
   const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
@@ -31,6 +34,7 @@ export async function getProductionItems({
     sale: {
       tenantId,
       ...(eventId ? { eventId } : {}),
+      ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
       NOT: {
         orderType: 'REDES_PERSONALIZADO',
         paymentStatus: 'PENDIENTE_PAGO',
@@ -179,9 +183,23 @@ export async function updateItemProductionStatus({
 /**
  * Obtiene métricas en tiempo real de la cola de producción
  */
-export async function getProductionMetrics({ tenantId, eventId }) {
+export async function getProductionMetrics({ tenantId, eventId, userRoles = [], userId }) {
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+  const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
+  const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
+  const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+  const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
+
   const whereBase = {
-    sale: { tenantId, ...(eventId ? { eventId } : {}) },
+    sale: {
+      tenantId,
+      ...(eventId ? { eventId } : {}),
+      ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
+      NOT: {
+        orderType: 'REDES_PERSONALIZADO',
+        paymentStatus: 'PENDIENTE_PAGO',
+      },
+    },
   };
 
   const [pending, separated, inProduction, printed, total] = await Promise.all([

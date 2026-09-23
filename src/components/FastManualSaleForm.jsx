@@ -17,8 +17,9 @@ import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
   const { isVendedorRedes, isVendedor, isSuperAdmin } = useAuth();
+  const isVendedorRedesOnly = Boolean(isVendedorRedes && !isVendedor && !isSuperAdmin);
   const [saleMode, setSaleMode] = useState(
-    isVendedorRedes && !isVendedor && !isSuperAdmin ? 'REDES_PERSONALIZADO' : 'POS_FERIA'
+    isVendedorRedesOnly ? 'REDES_PERSONALIZADO' : 'POS_FERIA'
   );
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
 
@@ -50,44 +51,57 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-white" />
-              <span>Terminal de Ventas</span>
+              {isVendedorRedesOnly ? (
+                <>
+                  <Smartphone className="w-4 h-4 text-amber-400" />
+                  <span>📱 Gestión de Pedidos de Redes</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="w-4 h-4 text-white" />
+                  <span>Terminal de Ventas</span>
+                </>
+              )}
             </h3>
             <p className="text-xs text-neutral-400">
-              {saleMode === 'POS_FERIA'
-                ? 'Venta rápida y cobro presencial en mostrador'
-                : 'Venta remota con anticipo 50/50, CRM y logística'}
+              {isVendedorRedesOnly
+                ? 'Catálogo general, diseños personalizados, CRM WhatsApp y logística de envíos'
+                : saleMode === 'POS_FERIA'
+                  ? 'Venta rápida y cobro presencial en mostrador'
+                  : 'Venta remota con anticipo 50/50, CRM y logística'}
             </p>
           </div>
         </div>
 
         {/* Toggle Segmented Control (Ergonomía >= 44px) */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
-          <button
-            type="button"
-            onClick={() => setSaleMode('POS_FERIA')}
-            className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              saleMode === 'POS_FERIA'
-                ? 'bg-white text-black shadow-md'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-            }`}
-          >
-            <Store className="w-4 h-4 shrink-0" />
-            <span>Mostrador (Feria 100%)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSaleMode('REDES_PERSONALIZADO')}
-            className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              saleMode === 'REDES_PERSONALIZADO'
-                ? 'bg-amber-400 text-black shadow-md font-black'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-            }`}
-          >
-            <Smartphone className="w-4 h-4 shrink-0" />
-            <span>Redes / 50-50 (WhatsApp)</span>
-          </button>
-        </div>
+        {!isVendedorRedesOnly && (
+          <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
+            <button
+              type="button"
+              onClick={() => setSaleMode('POS_FERIA')}
+              className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                saleMode === 'POS_FERIA'
+                  ? 'bg-white text-black shadow-md'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+              }`}
+            >
+              <Store className="w-4 h-4 shrink-0" />
+              <span>Mostrador (Feria 100%)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSaleMode('REDES_PERSONALIZADO')}
+              className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                saleMode === 'REDES_PERSONALIZADO'
+                  ? 'bg-amber-400 text-black shadow-md font-black'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+              }`}
+            >
+              <Smartphone className="w-4 h-4 shrink-0" />
+              <span>Redes / 50-50 (WhatsApp)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {cart.errorMsg && (
@@ -101,18 +115,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         <div className="space-y-5">
           {/* CRM y Cliente */}
           <CustomerWhatsAppSearch
-            customerQuery={remoteForm.customerQuery}
-            setCustomerQuery={remoteForm.setCustomerQuery}
-            customerResults={remoteForm.customerResults}
-            isSearchingCustomer={remoteForm.isSearchingCustomer}
-            selectedCustomer={remoteForm.selectedCustomer}
-            customerData={remoteForm.customerData}
-            setCustomerData={remoteForm.setCustomerData}
-            isInlineCreation={remoteForm.isInlineCreation}
-            setIsInlineCreation={remoteForm.setIsInlineCreation}
-            selectCustomer={remoteForm.selectCustomer}
-            clearSelectedCustomer={remoteForm.clearSelectedCustomer}
-            departments={remoteForm.departments}
+            customerQuery={remoteForm.customerQuery} setCustomerQuery={remoteForm.setCustomerQuery}
+            customerResults={remoteForm.customerResults} isSearchingCustomer={remoteForm.isSearchingCustomer}
+            selectedCustomer={remoteForm.selectedCustomer} customerData={remoteForm.customerData}
+            setCustomerData={remoteForm.setCustomerData} isInlineCreation={remoteForm.isInlineCreation}
+            setIsInlineCreation={remoteForm.setIsInlineCreation} selectCustomer={remoteForm.selectCustomer}
+            clearSelectedCustomer={remoteForm.clearSelectedCustomer} departments={remoteForm.departments}
           />
 
           {/* Búsqueda Catálogo + Botón Personalizado */}
@@ -168,14 +176,9 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Lista de Pósters en la Orden */}
           <SaleCartList
-            cartItems={cart.cartItems}
-            attachments={cart.attachments}
-            inputChannel={cart.inputChannel}
-            onUnlinkAttachments={cart.unlinkAttachments}
-            onUpdateQty={cart.updateItemQty}
-            onChangeSize={cart.changeItemSize}
-            onRemoveItem={cart.removeItem}
-            onClearCart={cart.clearCart}
+            cartItems={cart.cartItems} attachments={cart.attachments} inputChannel={cart.inputChannel}
+            onUnlinkAttachments={cart.unlinkAttachments} onUpdateQty={cart.updateItemQty}
+            onChangeSize={cart.changeItemSize} onRemoveItem={cart.removeItem} onClearCart={cart.clearCart}
           />
 
           {/* Cotizador 50/50 y Registro de Anticipo */}
@@ -246,27 +249,17 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           )}
 
           <SaleCartList
-            cartItems={cart.cartItems}
-            attachments={cart.attachments}
-            inputChannel={cart.inputChannel}
-            onUnlinkAttachments={cart.unlinkAttachments}
-            onUpdateQty={cart.updateItemQty}
-            onChangeSize={cart.changeItemSize}
-            onRemoveItem={cart.removeItem}
-            onClearCart={cart.clearCart}
+            cartItems={cart.cartItems} attachments={cart.attachments} inputChannel={cart.inputChannel}
+            onUnlinkAttachments={cart.unlinkAttachments} onUpdateQty={cart.updateItemQty}
+            onChangeSize={cart.changeItemSize} onRemoveItem={cart.removeItem} onClearCart={cart.clearCart}
           />
 
           <PaymentSummaryBar
-            paymentMethod={cart.paymentMethod}
-            setPaymentMethod={cart.setPaymentMethod}
-            discount={cart.discount}
-            setDiscount={cart.setDiscount}
-            notes={cart.notes}
-            setNotes={cart.setNotes}
-            grandTotal={cart.grandTotal}
-            isSubmitting={cart.isSubmitting}
-            disabled={cart.cartItems.length === 0}
-            onConfirmSale={cart.confirmSale}
+            paymentMethod={cart.paymentMethod} setPaymentMethod={cart.setPaymentMethod}
+            discount={cart.discount} setDiscount={cart.setDiscount}
+            notes={cart.notes} setNotes={cart.setNotes}
+            grandTotal={cart.grandTotal} isSubmitting={cart.isSubmitting}
+            disabled={cart.cartItems.length === 0} onConfirmSale={cart.confirmSale}
           />
         </div>
       )}
