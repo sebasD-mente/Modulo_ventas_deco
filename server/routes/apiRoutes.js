@@ -55,6 +55,8 @@ import {
   postCashClosing,
   getCashClosingsList,
   purgeEventSales,
+  getOrderTrackingList,
+  updateOrderDelivery,
 } from '../controllers/saleController.js';
 import {
   getActiveEvent,
@@ -211,6 +213,16 @@ router.post(
   requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   validate(balancePaymentSchema),
   registerBalancePayment
+);
+router.get(
+  '/sales/orders/tracking',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  getOrderTrackingList
+);
+router.patch(
+  '/sales/:id/delivery',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  updateOrderDelivery
 );
 router.post(
   '/sales',

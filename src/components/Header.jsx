@@ -14,6 +14,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
       { id: 'eventos', label: 'Eventos' },
       { id: 'monitor', label: 'Monitor' },
       { id: 'produccion', label: 'Producción' },
+      { id: 'seguimiento', label: 'Seguimiento' },
       { id: 'cierre', label: 'Cierre' },
       { id: 'usuarios', label: 'Usuarios' },
       { id: 'comisiones', label: 'Comisiones' },
@@ -27,6 +28,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
       if (!isOperario1 && !isOperario2) {
         tabMap.set('produccion', { id: 'produccion', label: 'Mis Pedidos' });
       }
+      tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
       tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
       tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
     } else {
@@ -36,6 +38,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
       }
       if (isVendedorRedes) {
         tabMap.set('eventos', { id: 'eventos', label: 'Punto de Venta' });
+        tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
         tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
       }
     }

@@ -14,6 +14,7 @@ const ProductionManagementView = lazy(() => import('./components/ProductionManag
 const CashClosingView = lazy(() => import('./components/CashClosingView'));
 const UserManagementView = lazy(() => import('./components/UserManagementView'));
 const CommissionSettlementView = lazy(() => import('./components/CommissionSettlementView'));
+const OrderTrackingView = lazy(() => import('./components/OrderTrackingView'));
 
 // Componente de espera elegante mientras se descarga el chunk
 function ViewLoadingFallback() {
@@ -219,6 +220,11 @@ function SalesTerminalMain() {
           {/* PÁGINA 4: GESTIÓN DE PRODUCCIÓN Y TALLER (OPERARIO 1, OPERARIO 2, SUPER ADMIN, VENDEDOR REDES) */}
           {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2 || isVendedorRedes) && (
             <ProductionManagementView />
+          )}
+
+          {/* PÁGINA: SEGUIMIENTO DE PEDIDOS Y COBRO DE SALDOS (SUPER ADMIN, VENDEDOR REDES) */}
+          {activeTab === 'seguimiento' && (isSuperAdmin || isVendedorRedes) && (
+            <OrderTrackingView />
           )}
 
           {/* PÁGINA 5: CIERRE DE CAJA Y ARQUEO */}

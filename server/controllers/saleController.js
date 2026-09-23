@@ -1,3 +1,4 @@
+import { prisma } from '../config/prisma.js';
 import {
   createSaleTransaction, updateSaleTransaction, getEventKPIs,
   getMonitorDashboardMetrics,
@@ -125,5 +126,220 @@ export async function purgeEventSales(req, res) {
   } catch (err) {
     console.error('❌ Error purgando ventas del evento:', err);
     return res.status(400).json({ success: false, error: err.message || 'Error al purgar ventas.' });
+  }
+}
+
+/**
+ * Listado integral de pedidos de redes para logística y seguimiento
+ */
+export async function getOrderTrackingList(req, res) {
+  try {
+    const tenantId = req.tenantId;
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+
+    const { paymentStatus, search, page, limit } = req.query;
+
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const whereClause = {
+      tenantId,
+      orderType: 'REDES_PERSONALIZADO',
+    };
+
+    if (isVendedorRedes && !isSuperAdmin) {
+      whereClause.sellerId = req.user.id;
+    }
+
+    if (paymentStatus === 'CON_SALDO') {
+      whereClause.balanceDue = { gt: 0 };
+    } else if (paymentStatus === 'PAGADO_TOTAL') {
+      whereClause.balanceDue = { lte: 0 };
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      whereClause.OR = [
+        { saleNumber: { contains: term, mode: 'insensitive' } },
+        { customer: { fullName: { contains: term, mode: 'insensitive' } } },
+        { customer: { phone: { contains: term, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [total, orders] = await Promise.all([
+      prisma.sale.count({ where: whereClause }),
+      prisma.sale.findMany({
+        where: whereClause,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              email: true,
+              deliveryAddress: true,
+              department: true,
+              municipality: true,
+            },
+          },
+          items: {
+            select: {
+              id: true,
+              description: true,
+              quantity: true,
+              unitPrice: true,
+              subtotal: true,
+              material: true,
+              customDimensions: true,
+              customImageUrl: true,
+              productionStatus: true,
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              method: true,
+              reference: true,
+              receiptUrl: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          seller: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+          pickupEvent: {
+            select: {
+              id: true,
+              name: true,
+              location: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parsedLimit,
+      }),
+    ]);
+
+    const metricsBase = {
+      tenantId,
+      orderType: 'REDES_PERSONALIZADO',
+      ...(isVendedorRedes && !isSuperAdmin ? { sellerId: req.user.id } : {}),
+    };
+
+    const [totalCount, pendingBalanceAgg, deliveredCount, inWorkshopCount] = await Promise.all([
+      prisma.sale.count({ where: metricsBase }),
+      prisma.sale.aggregate({
+        where: { ...metricsBase, balanceDue: { gt: 0 } },
+        _sum: { balanceDue: true },
+        _count: { id: true },
+      }),
+      prisma.sale.count({ where: { ...metricsBase, status: 'ENTREGADO' } }),
+      prisma.sale.count({
+        where: {
+          ...metricsBase,
+          status: { not: 'ENTREGADO' },
+          items: {
+            some: {
+              productionStatus: { in: ['PENDIENTE', 'A_PRODUCCION'] },
+            },
+          },
+        },
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        total,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(total / parsedLimit),
+      },
+      metrics: {
+        totalOrders: totalCount,
+        withBalanceCount: pendingBalanceAgg._count.id || 0,
+        totalBalancePending: Number(pendingBalanceAgg._sum.balanceDue || 0),
+        deliveredCount,
+        inWorkshopCount,
+      },
+    });
+  } catch (err) {
+    console.error('❌ Error obteniendo listado de seguimiento de pedidos:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Error consultando seguimiento de pedidos.',
+    });
+  }
+}
+
+/**
+ * Actualiza la información logística (guía, courier, entrega) de un pedido
+ */
+export async function updateOrderDelivery(req, res) {
+  try {
+    const { id } = req.params;
+    const { shippingCourier, shippingTrackingNumber, isDelivered } = req.body;
+    const tenantId = req.tenantId;
+
+    const sale = await prisma.sale.findFirst({
+      where: { id, tenantId, orderType: 'REDES_PERSONALIZADO' },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Pedido de redes no encontrado.' });
+    }
+
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+    if (!isSuperAdmin && sale.sellerId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'No tienes permiso para modificar este pedido.' });
+    }
+
+    const updateData = {};
+    if (shippingCourier !== undefined) updateData.shippingCourier = shippingCourier ? shippingCourier.trim() : null;
+    if (shippingTrackingNumber !== undefined) updateData.shippingTrackingNumber = shippingTrackingNumber ? shippingTrackingNumber.trim() : null;
+    if (isDelivered === true) {
+      updateData.status = 'ENTREGADO';
+    } else if (isDelivered === false && sale.status === 'ENTREGADO') {
+      updateData.status = Number(sale.balanceDue) > 0 ? 'PENDIENTE' : 'COMPLETADA';
+    }
+
+    const updated = await prisma.sale.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: true,
+        items: true,
+        payments: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Logística de entrega actualizada exitosamente.',
+      data: updated,
+    });
+  } catch (err) {
+    console.error('❌ Error actualizando logística del pedido:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Error al actualizar logística de entrega.',
+    });
   }
 }

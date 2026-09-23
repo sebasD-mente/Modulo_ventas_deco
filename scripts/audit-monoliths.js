@@ -34,6 +34,7 @@ const DOMAIN_CEILINGS = {
   'server/controllers/remoteSaleController.js': { max: 350, reason: 'Controlador integral de clientes y ventas remotas' },
   'server/controllers/printSheetController.js': { max: 300, reason: 'Controlador de pliegos de taller y asignación' },
   'server/controllers/commissionController.js': { max: 300, reason: 'Controlador de comisiones y liquidaciones' },
+  'server/controllers/saleController.js': { max: 400, reason: 'Controlador de ventas feriales, arqueos y logística de pedidos' },
 };
 
 // 🛡️ Techos Idiomáticos por Capa Arquitectónica (Erradicación Definitiva del Dogma de las 200 Líneas)
