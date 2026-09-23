@@ -12,6 +12,7 @@ export async function getProductionItems({
   limit = 50,
   userRoles = [],
   userId,
+  source = 'ALL',
 }) {
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
   const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
@@ -24,10 +25,29 @@ export async function getProductionItems({
   const skip = (parsedPage - 1) * parsedLimit;
 
   let statusFilter = {};
-  if (isOperario2 && !isOperario1 && !isSuperAdmin) {
-    statusFilter = { productionStatus: 'A_PRODUCCION' };
-  } else if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
+  if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
     statusFilter = { productionStatus: status };
+  } else if (isOperario2 && !isOperario1 && !isSuperAdmin) {
+    statusFilter = { productionStatus: 'A_PRODUCCION' };
+  }
+
+  let sourceCondition = {};
+  if (source === 'REPOSICIONES') {
+    sourceCondition = {
+      NOT: { orderType: 'REDES_PERSONALIZADO' },
+    };
+  } else if (source === 'PEDIDOS') {
+    sourceCondition = {
+      orderType: 'REDES_PERSONALIZADO',
+      NOT: { paymentStatus: 'PENDIENTE_PAGO' },
+    };
+  } else {
+    sourceCondition = {
+      NOT: {
+        orderType: 'REDES_PERSONALIZADO',
+        paymentStatus: 'PENDIENTE_PAGO',
+      },
+    };
   }
 
   const whereClause = {
@@ -35,10 +55,7 @@ export async function getProductionItems({
       tenantId,
       ...(eventId ? { eventId } : {}),
       ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
-      NOT: {
-        orderType: 'REDES_PERSONALIZADO',
-        paymentStatus: 'PENDIENTE_PAGO',
-      },
+      ...sourceCondition,
     },
     ...statusFilter,
   };
@@ -131,13 +148,14 @@ export async function updateItemProductionStatus({
       error.statusCode = 403;
       throw error;
     }
-    if (item.productionStatus !== 'A_PRODUCCION' && !isSuperAdmin) {
-      const error = new Error('Solo se pueden marcar como IMPRESO las obras que están A PRODUCCION.');
+  } else if (status === 'A_PRODUCCION') {
+    if (!isOperario1 && !isOperario2) {
+      const error = new Error('No tienes permiso para mover obras a A PRODUCCION.');
       error.statusCode = 403;
       throw error;
     }
-  } else if (['SEPARADO', 'A_PRODUCCION', 'PENDIENTE'].includes(status) && !isOperario1) {
-    const error = new Error('No tienes permiso de Operario 1 para cambiar el estado a SEPARADO, A PRODUCCION o PENDIENTE.');
+  } else if (['SEPARADO', 'PENDIENTE'].includes(status) && !isOperario1) {
+    const error = new Error('No tienes permiso de Operario 1 para cambiar el estado a SEPARADO o PENDIENTE.');
     error.statusCode = 403;
     throw error;
   }
@@ -183,22 +201,38 @@ export async function updateItemProductionStatus({
 /**
  * Obtiene métricas en tiempo real de la cola de producción
  */
-export async function getProductionMetrics({ tenantId, eventId, userRoles = [], userId }) {
+export async function getProductionMetrics({ tenantId, eventId, userRoles = [], userId, source = 'ALL' }) {
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
   const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
   const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
   const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
 
+  let sourceCondition = {};
+  if (source === 'REPOSICIONES') {
+    sourceCondition = {
+      NOT: { orderType: 'REDES_PERSONALIZADO' },
+    };
+  } else if (source === 'PEDIDOS') {
+    sourceCondition = {
+      orderType: 'REDES_PERSONALIZADO',
+      NOT: { paymentStatus: 'PENDIENTE_PAGO' },
+    };
+  } else {
+    sourceCondition = {
+      NOT: {
+        orderType: 'REDES_PERSONALIZADO',
+        paymentStatus: 'PENDIENTE_PAGO',
+      },
+    };
+  }
+
   const whereBase = {
     sale: {
       tenantId,
       ...(eventId ? { eventId } : {}),
       ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
-      NOT: {
-        orderType: 'REDES_PERSONALIZADO',
-        paymentStatus: 'PENDIENTE_PAGO',
-      },
+      ...sourceCondition,
     },
   };
 

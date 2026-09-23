@@ -53,6 +53,18 @@ export default function ProductionOrderCard({
             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeColor}`}>
               {status.replace('_', ' ')}
             </span>
+            {artUrl && (
+              <a
+                href={artUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir arte original en alta resolución para RIP de taller"
+                className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-800/80 hover:border-cyan-400 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3 text-cyan-400" />
+                <span>Arte RIP</span>
+              </a>
+            )}
             {item.customDimensions && (
               <span className="text-[10px] font-semibold text-neutral-300 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
                 📏 {item.customDimensions}
@@ -74,31 +86,60 @@ export default function ProductionOrderCard({
       </div>
 
       {!isVendedorRedesOnly && (
-        <div className="mt-3 pt-3 border-t border-neutral-900 flex items-center justify-end gap-2 flex-wrap">
-          {(!isOp2Only || isSuperAdmin) && (
-            <>
-              {status !== 'SEPARADO' && (
-                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'SEPARADO')} className="bg-emerald-600 hover:bg-emerald-500 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                  <Package className="w-3.5 h-3.5" /><span>📦 Separar Stock</span>
-                </button>
-              )}
-              {status !== 'A_PRODUCCION' && status !== 'IMPRESO' && (
-                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'A_PRODUCCION')} className="bg-white hover:bg-neutral-200 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                  <Printer className="w-3.5 h-3.5 text-black" /><span>🖨️ A Producción</span>
-                </button>
-              )}
-              {status !== 'PENDIENTE' && isSuperAdmin && (
-                <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'PENDIENTE')} className="bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white text-xs px-2.5 py-2 rounded-xl border border-neutral-800 transition-all cursor-pointer">
-                  Revertir
-                </button>
-              )}
-            </>
-          )}
-          {(isOp2Only || (isSuperAdmin && status === 'A_PRODUCCION')) && (
-            <button type="button" disabled={isUpdating} onClick={() => onStatusChange(item.id, 'IMPRESO')} className="w-full sm:w-auto bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
-              <CheckCircle2 className="w-4 h-4 text-black" /><span>✅ Marcar como IMPRESO (Archivar)</span>
-            </button>
-          )}
+        <div className="mt-3 pt-3 border-t border-neutral-900 flex items-center justify-between gap-2 flex-wrap">
+          {/* Desplegable reactivo de cambio de estado */}
+          <select
+            value={status}
+            disabled={isUpdating}
+            onChange={(e) => onStatusChange(item.id, e.target.value)}
+            className="min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold cursor-pointer focus:outline-none focus:border-cyan-400"
+          >
+            <option value="A_PRODUCCION">🖨️ A Producción</option>
+            <option value="IMPRESO">✅ Impreso</option>
+            <option value="SEPARADO">📦 Separado (Stock)</option>
+            <option value="PENDIENTE">⏳ Pendiente</option>
+          </select>
+
+          {/* Botones de acción rápida táctil */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {status !== 'IMPRESO' && (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => onStatusChange(item.id, 'IMPRESO')}
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-black text-xs transition-all shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4 text-black" />
+                <span>✅ Marcar como IMPRESO</span>
+              </button>
+            )}
+            {(!isOp2Only || isSuperAdmin) && (
+              <>
+                {status !== 'SEPARADO' && (
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => onStatusChange(item.id, 'SEPARADO')}
+                    className="min-h-[44px] bg-emerald-600 hover:bg-emerald-500 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>📦 Separar Stock</span>
+                  </button>
+                )}
+                {status !== 'A_PRODUCCION' && status !== 'IMPRESO' && (
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => onStatusChange(item.id, 'A_PRODUCCION')}
+                    className="min-h-[44px] bg-white hover:bg-neutral-200 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-black" />
+                    <span>🖨️ A Producción</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

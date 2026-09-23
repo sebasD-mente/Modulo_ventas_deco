@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 
 export default function useProductionQueue() {
-  const { authFetch, isSuperAdmin, isOperario1, isOperario2 } = useAuth();
+  const { authFetch, isSuperAdmin, isOperario1, isOperario2, isVendedorRedes, isVendedor } = useAuth();
+  const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isVendedor && !isOperario1 && !isOperario2);
+  const [sourceTab, setSourceTab] = useState(() => (isVendedorRedesOnly ? 'PEDIDOS' : 'REPOSICIONES'));
   const [items, setItems] = useState([]);
   const [metrics, setMetrics] = useState({ pending: 0, separated: 0, inProduction: 0, printed: 0, total: 0 });
   const [events, setEvents] = useState([]);
@@ -33,14 +35,16 @@ export default function useProductionQueue() {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const url = selectedEventId ? `/api/production/metrics?eventId=${selectedEventId}` : '/api/production/metrics';
-      const res = await authFetch(url);
+      const params = new URLSearchParams();
+      if (selectedEventId) params.append('eventId', selectedEventId);
+      params.append('source', sourceTab);
+      const res = await authFetch(`/api/production/metrics?${params.toString()}`);
       const data = await res.json();
       if (data.success && data.data) setMetrics(data.data);
     } catch (err) {
       console.error('Error cargando métricas de producción:', err);
     }
-  }, [authFetch, selectedEventId]);
+  }, [authFetch, selectedEventId, sourceTab]);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -49,6 +53,7 @@ export default function useProductionQueue() {
       if (selectedEventId) params.append('eventId', selectedEventId);
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (debouncedSearchQuery.trim()) params.append('search', debouncedSearchQuery.trim());
+      params.append('source', sourceTab);
       const res = await authFetch(`/api/production/items?${params.toString()}`);
       const data = await res.json();
       if (data.success && data.data) setItems(data.data);
@@ -57,7 +62,7 @@ export default function useProductionQueue() {
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, selectedEventId, statusFilter, debouncedSearchQuery]);
+  }, [authFetch, selectedEventId, statusFilter, debouncedSearchQuery, sourceTab]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
   useEffect(() => { fetchItems(); fetchMetrics(); }, [fetchItems, fetchMetrics]);
@@ -104,8 +109,9 @@ export default function useProductionQueue() {
     selectedEventId, setSelectedEventId,
     statusFilter, setStatusFilter,
     searchQuery, setSearchQuery, debouncedSearchQuery,
+    sourceTab, setSourceTab,
     isLoading, updatingItemId, actionSuccessMsg,
-    isSuperAdmin, isOperario1, isOperario2, isOp2Only, sectionBadge,
+    isSuperAdmin, isOperario1, isOperario2, isOp2Only, isVendedorRedesOnly, sectionBadge,
     handleStatusChange, refresh,
   };
 }

@@ -10,7 +10,7 @@ export async function getProductionItems(req, res) {
       ? req.user.roles
       : [req.user.role || 'VENDEDOR'];
 
-    const { eventId, status, search, page, limit } = req.query;
+    const { eventId, status, search, page, limit, source } = req.query;
 
     const result = await listProductionItems({
       tenantId: req.tenantId,
@@ -21,6 +21,7 @@ export async function getProductionItems(req, res) {
       limit,
       userRoles,
       userId: req.user?.id,
+      source,
     });
 
     return res.status(200).json({
@@ -90,12 +91,13 @@ export async function getProductionMetrics(req, res) {
       ? req.user.roles
       : [req.user.role || 'VENDEDOR'];
 
-    const { eventId } = req.query;
+    const { eventId, source } = req.query;
     const metrics = await fetchProductionMetrics({
       tenantId: req.tenantId,
       eventId,
       userRoles,
       userId: req.user?.id,
+      source,
     });
 
     return res.status(200).json({
