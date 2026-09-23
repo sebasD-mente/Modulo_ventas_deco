@@ -35,7 +35,7 @@ describe('🏛️ Digital Event Monitor Unification & Zero-Trust Isolation', () 
       'Debe validar condición para vendedor de redes exclusivo'
     );
     assert.ok(
-      content.includes("targetEventId = eventId || 'evt-ventas-redes-online';"),
+      content.includes("targetEventId = 'evt-ventas-redes-online';"),
       'Debe forzar canal digital permanente para vendedor de redes'
     );
     assert.ok(

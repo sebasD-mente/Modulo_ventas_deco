@@ -18,6 +18,8 @@ import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
   const { isVendedorRedes, isVendedor, isSuperAdmin } = useAuth();
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isVendedor && !isSuperAdmin);
+  const isVendedorMostradorOnly = Boolean(isVendedor && !isVendedorRedes && !isSuperAdmin);
+  const canToggleSaleMode = Boolean(isSuperAdmin || (isVendedor && isVendedorRedes));
   const [saleMode, setSaleMode] = useState(
     isVendedorRedesOnly ? 'REDES_PERSONALIZADO' : 'POS_FERIA'
   );
@@ -74,7 +76,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         </div>
 
         {/* Toggle Segmented Control (Ergonomía >= 44px) */}
-        {!isVendedorRedesOnly && (
+        {canToggleSaleMode && (
           <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
             <button
               type="button"

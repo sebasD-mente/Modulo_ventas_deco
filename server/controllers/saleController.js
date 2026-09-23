@@ -98,18 +98,41 @@ export async function getMonitorMetrics(req, res) {
   try {
     const tenantId = req.tenantId;
     const { date, eventId } = req.query;
+    const user = req.user;
 
-    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
-      ? req.user.roles
-      : [req.user?.role || 'VENDEDOR'];
+    const userRoles = Array.isArray(user?.roles) && user.roles.length > 0
+      ? user.roles
+      : [user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
     const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
     const isVendedor = userRoles.includes('VENDEDOR');
 
-    // Aislamiento Zero-Trust: Vendedor de redes exclusivo solo consulta su canal digital
     let targetEventId = eventId || null;
+
+    // 1. Vendedor de redes exclusivo: anclado al canal digital
     if (isVendedorRedes && !isSuperAdmin && !isVendedor) {
-      targetEventId = eventId || 'evt-ventas-redes-online';
+      targetEventId = 'evt-ventas-redes-online';
+    }
+    // 2. Vendedor de mostrador ferial: anclado estrictamente a su evento presencial
+    else if (isVendedor && !isSuperAdmin && !isVendedorRedes) {
+      let sellerEvent = null;
+      if (user?.assignedEventId) {
+        sellerEvent = await prisma.event.findFirst({
+          where: { id: user.assignedEventId, tenantId },
+        });
+      }
+      if (!sellerEvent && user?.email) {
+        sellerEvent = await prisma.event.findFirst({
+          where: { tenantId, status: 'ACTIVO', assignedSellerEmail: user.email },
+        });
+      }
+      if (!sellerEvent) {
+        sellerEvent = await prisma.event.findFirst({
+          where: { tenantId, status: 'ACTIVO', NOT: { id: 'evt-ventas-redes-online' } },
+          orderBy: { startDate: 'desc' },
+        });
+      }
+      targetEventId = sellerEvent?.id || 'none';
     }
 
     const data = await getMonitorDashboardMetrics({

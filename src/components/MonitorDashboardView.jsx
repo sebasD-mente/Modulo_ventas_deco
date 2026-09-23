@@ -1,11 +1,13 @@
 import React from 'react';
 import { RotateCcw, Calendar, Loader2, Tv } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import useMonitorDashboard from './monitor/hooks/useMonitorDashboard';
 import MonitorKpiGrid from './monitor/MonitorKpiGrid';
 import PaymentMethodsBreakdown from './monitor/PaymentMethodsBreakdown';
 import EventsPerformanceList from './monitor/EventsPerformanceList';
 
 export default function MonitorDashboardView() {
+  const { isSuperAdmin } = useAuth();
   const {
     selectedDate, setSelectedDate, monitorData, isLoading,
     isRefreshing, lastSyncTime, expandedEvents, toggleEvent, fetchMonitorData,
@@ -52,12 +54,16 @@ export default function MonitorDashboardView() {
       {/* 3. DETALLE POR EVENTO */}
       <EventsPerformanceList eventDetails={eventDetails} expandedEvents={expandedEvents} onToggleEvent={toggleEvent} selectedDate={selectedDate} />
 
-      {/* 4. RESUMEN GENERAL DE LA JORNADA */}
-      <div className="space-y-4 pt-4 border-t border-neutral-800">
-        <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5"><span>🏆</span> Resumen general de la jornada</label>
-        <MonitorKpiGrid mode="general" transactions={resumenGeneral.totalTransactions} totalSold={resumenGeneral.totalSold} />
-        <PaymentMethodsBreakdown payments={resumenGeneral.payments} chartSize={250} variant="general" />
-      </div>
+      {/* 4. RESUMEN GENERAL DE LA JORNADA (Solo visible para Super Admin o cuando hay múltiples stands) */}
+      {(isSuperAdmin || eventDetails.length > 1) && (
+        <div className="space-y-4 pt-4 border-t border-neutral-800">
+          <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span>🏆</span> Resumen general de la jornada
+          </label>
+          <MonitorKpiGrid mode="general" transactions={resumenGeneral.totalTransactions} totalSold={resumenGeneral.totalSold} />
+          <PaymentMethodsBreakdown payments={resumenGeneral.payments} chartSize={250} variant="general" />
+        </div>
+      )}
     </div>
   );
 }
