@@ -60,17 +60,28 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
     }
   }
 
-  const roleBadgeText = isSuperAdmin
-    ? '👑 SUPER ADMIN'
-    : (user?.roles && user.roles.length > 0 ? user.roles : [user?.role || 'VENDEDOR'])
-        .map((r) => {
-          if (r === 'VENDEDOR') return '💼 VENDEDOR';
-          if (r === 'VENDEDOR_REDES') return '📱 VENDEDOR REDES';
-          if (r === 'OPERARIO_1') return '👷 STOCK';
-          if (r === 'OPERARIO_2') return '🖨️ TALLER';
-          return r;
-        })
-        .join(' + ');
+  const getRoleBadgeConfig = () => {
+    if (isSuperAdmin) {
+      return { label: '👑 Super Admin', className: 'bg-amber-950/80 text-amber-300 border-amber-600/60' };
+    }
+    if (isVendedorRedes && !isVendedor) {
+      return { label: '📱 Ventas Redes', className: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60' };
+    }
+    if (isVendedor) {
+      return { label: '💼 Mostrador', className: 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60' };
+    }
+    if (isOperario1 && isOperario2) {
+      return { label: '👷 Producción Total', className: 'bg-neutral-900 text-neutral-200 border-neutral-700' };
+    }
+    if (isOperario1) {
+      return { label: '📦 Stock Taller', className: 'bg-amber-950/80 text-amber-300 border-amber-700/60' };
+    }
+    if (isOperario2) {
+      return { label: '🖨️ Impresión', className: 'bg-blue-950/80 text-blue-300 border-blue-700/60' };
+    }
+    return { label: user?.role || 'VENDEDOR', className: 'bg-neutral-900 text-neutral-300 border-neutral-700' };
+  };
+  const roleBadge = getRoleBadgeConfig();
 
   return (
     <header className="bg-white border-b border-neutral-200 text-black sticky top-0 z-40 px-3 py-2 sm:py-2.5 sm:px-6 select-none shadow-sm">
@@ -92,30 +103,35 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
           {/* Perfil de Usuario y Logout Discreto */}
           <div className="flex items-center gap-1">
             {user && (
-              <div
-                className="flex items-center gap-1.5 py-1 px-2 rounded-full hover:bg-neutral-100 transition-colors"
-                title={`${user.fullName} (${roleBadgeText})`}
-              >
+              <div className="flex items-center gap-2 py-1 px-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 shadow-xs">
+                {/* Avatar */}
                 {user.avatarUrl ? (
                   <img
                     src={user.avatarUrl}
                     alt={user.fullName}
-                    className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-neutral-200"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shrink-0 ring-1 ring-neutral-300"
                   />
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-black text-white text-[10px] font-bold flex items-center justify-center">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black text-white text-xs font-black flex items-center justify-center shrink-0">
                     {user.fullName?.[0] || 'U'}
                   </div>
                 )}
-                <span className="hidden sm:inline text-xs font-semibold text-neutral-700 truncate max-w-[110px]">
-                  {user.fullName?.trim().split(' ')[0] || user.fullName}
-                </span>
+                {/* Nombre y Badge de Rol */}
+                <div className="flex flex-col items-start leading-none min-w-0">
+                  <span className="text-xs font-bold text-neutral-900 truncate max-w-[100px] sm:max-w-[130px]">
+                    {user.fullName?.trim().split(' ')[0] || user.fullName}
+                  </span>
+                  <span className={`inline-flex items-center mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border shadow-xs ${roleBadge.className}`}>
+                    {roleBadge.label}
+                  </span>
+                </div>
+                {/* Botón Logout */}
                 <button
                   type="button"
                   onClick={logout}
                   title="Cerrar Sesión"
                   aria-label="Cerrar Sesión"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors p-2 text-neutral-400 hover:text-black cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-200 transition-colors p-2 text-neutral-400 hover:text-black cursor-pointer shrink-0 ml-1"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
