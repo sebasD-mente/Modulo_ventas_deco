@@ -62,7 +62,7 @@ export async function deltaSyncRecentPosters(tenantId = null) {
     const baseUrl = rawBase.replace(/\/+$/, '');
     try {
       const controller = new AbortController(), timeoutId = setTimeout(() => controller.abort(), 12000);
-      const res = await fetch(`${baseUrl}/api/catalog/posters?take=100`, { headers: { Accept: 'application/json' }, signal: controller.signal });
+      const res = await fetch(`${baseUrl}/api/catalog/posters?take=100&orderBy=desc&order=desc&sort=desc`, { headers: { Accept: 'application/json' }, signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
         const json = await res.json(), items = json.data || json.posters || [];

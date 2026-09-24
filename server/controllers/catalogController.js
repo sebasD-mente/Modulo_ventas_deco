@@ -19,21 +19,32 @@ export async function getProducts(req, res) {
 
 export async function searchWebPostersCatalog(req, res) {
   try {
-    const { q, category, limit } = req.query;
+    const { q, category, limit, hybrid } = req.query;
+    const parsedLimit = limit ? parseInt(limit, 10) : 24;
     let results = [];
-    try {
-      results = await searchHybridPosters({
-        tenantId: req.tenantId,
-        query: q || '',
-        category: category || null,
-        limit: limit ? parseInt(limit, 10) : 24,
-      });
-    } catch {
+
+    if (hybrid === 'true') {
+      try {
+        results = await searchHybridPosters({
+          tenantId: req.tenantId,
+          query: q || '',
+          category: category || null,
+          limit: parsedLimit,
+        });
+      } catch {
+        results = await searchWebPosters({
+          tenantId: req.tenantId,
+          query: q || '',
+          category: category || null,
+          limit: parsedLimit,
+        });
+      }
+    } else {
       results = await searchWebPosters({
         tenantId: req.tenantId,
         query: q || '',
         category: category || null,
-        limit: limit ? parseInt(limit, 10) : 24,
+        limit: parsedLimit,
       });
     }
 

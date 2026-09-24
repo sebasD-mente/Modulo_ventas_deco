@@ -61,25 +61,35 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
   }
 
   const getRoleBadgeConfig = () => {
+    const badgeClassName =
+      'bg-black text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-neutral-800 leading-none flex items-center justify-center shrink-0';
+
     if (isSuperAdmin) {
-      return { label: '👑 Super Admin', className: 'bg-amber-950/80 text-amber-300 border-amber-600/60' };
+      return { label: 'SUPER ADMIN', className: badgeClassName };
     }
-    if (isVendedorRedes && !isVendedor) {
-      return { label: '📱 Ventas Redes', className: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60' };
-    }
+
+    const rolesArray = [];
     if (isVendedor) {
-      return { label: '💼 Mostrador', className: 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60' };
+      rolesArray.push('MOSTRADOR');
     }
-    if (isOperario1 && isOperario2) {
-      return { label: '👷 Producción Total', className: 'bg-neutral-900 text-neutral-200 border-neutral-700' };
+    if (isVendedorRedes) {
+      rolesArray.push('REDES');
     }
     if (isOperario1) {
-      return { label: '📦 Stock Taller', className: 'bg-amber-950/80 text-amber-300 border-amber-700/60' };
+      rolesArray.push('STOCK');
     }
     if (isOperario2) {
-      return { label: '🖨️ Impresión', className: 'bg-blue-950/80 text-blue-300 border-blue-700/60' };
+      rolesArray.push('IMPRESIÓN');
     }
-    return { label: user?.role || 'VENDEDOR', className: 'bg-neutral-900 text-neutral-300 border-neutral-700' };
+
+    if (rolesArray.length === 0) {
+      rolesArray.push(user?.role || 'VENDEDOR');
+    }
+
+    return {
+      label: rolesArray.join(' • '),
+      className: badgeClassName,
+    };
   };
   const roleBadge = getRoleBadgeConfig();
 
@@ -121,7 +131,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab }) {
                   <span className="text-xs font-bold text-neutral-900 truncate max-w-[100px] sm:max-w-[130px]">
                     {user.fullName?.trim().split(' ')[0] || user.fullName}
                   </span>
-                  <span className={`inline-flex items-center mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border shadow-xs ${roleBadge.className}`}>
+                  <span className={`mt-1 ${roleBadge.className}`}>
                     {roleBadge.label}
                   </span>
                 </div>

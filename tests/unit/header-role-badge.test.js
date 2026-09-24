@@ -13,28 +13,32 @@ describe('🏛️ Header Role Badge Visibility & Visual Identity', () => {
       'Debe definir la función getRoleBadgeConfig'
     );
     assert.ok(
-      content.includes("'👑 Super Admin'"),
+      content.includes("'SUPER ADMIN'"),
       'Debe incluir etiqueta para Super Admin'
     );
     assert.ok(
-      content.includes("'📱 Ventas Redes'"),
-      'Debe incluir etiqueta para Ventas Redes'
+      content.includes("'REDES'"),
+      'Debe incluir etiqueta para Redes'
     );
     assert.ok(
-      content.includes("'💼 Mostrador'"),
+      content.includes("'MOSTRADOR'"),
       'Debe incluir etiqueta para Mostrador'
     );
     assert.ok(
-      content.includes("'👷 Producción Total'"),
-      'Debe incluir etiqueta para Producción Total'
+      content.includes("'STOCK'"),
+      'Debe incluir etiqueta para Stock'
     );
     assert.ok(
-      content.includes("'📦 Stock Taller'"),
-      'Debe incluir etiqueta para Stock Taller'
-    );
-    assert.ok(
-      content.includes("'🖨️ Impresión'"),
+      content.includes("'IMPRESIÓN'"),
       'Debe incluir etiqueta para Impresión'
+    );
+    assert.ok(
+      content.includes("rolesArray.join(' • ')"),
+      'Debe concatenar roles con punto medio'
+    );
+    assert.ok(
+      !content.includes('👑') && !content.includes('💼') && !content.includes('📱') && !content.includes('🖨️') && !content.includes('📦'),
+      'No debe incluir emojis en el badge'
     );
   });
 

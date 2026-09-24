@@ -165,9 +165,9 @@ const server = app.listen(ENV.PORT, () => {
   // Siempre sincronizar al arrancar — captura cualquier producto nuevo en la tienda web
   runCatalogSync('startup');
 
-  // Sync automático cada 6 horas para auditoría y reconciliación profunda
-  const CATALOG_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 horas
-  setInterval(() => runCatalogSync('scheduled-6h'), CATALOG_SYNC_INTERVAL_MS).unref();
+  // Sync automático cada 15 minutos para auditoría y reconciliación continua
+  const CATALOG_SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos
+  setInterval(() => runCatalogSync('scheduled-15m'), CATALOG_SYNC_INTERVAL_MS).unref();
 
   // ⚡ Delta-sync periódico rápido (cada 60s) para capturar al instante nuevos pósters de la web
   const FAST_DELTA_INTERVAL_MS = 60 * 1000; // 60 segundos
