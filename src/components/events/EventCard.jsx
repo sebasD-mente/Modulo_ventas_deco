@@ -1,7 +1,72 @@
 import React from 'react';
-import { MapPin, User, Mail, Play, Eye, Archive, RotateCcw, Trash2 } from 'lucide-react';
+import { MapPin, User, Mail, Play, Eye, Archive, RotateCcw, Trash2, Pencil, Users } from 'lucide-react';
 
-export default function EventCard({ event, statusType, onActivate, onViewSales, onArchive, onUnarchive, onDelete }) {
+function SellersSection({ event }) {
+  const sellers = event.assignedSellers || [];
+  if (sellers.length > 0) {
+    return (
+      <div className="p-2.5 rounded-xl bg-[#181818] border border-neutral-800 space-y-1.5 text-xs">
+        <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+          <Users className="w-3 h-3 text-amber-400" />
+          <span>Vendedores asignados ({sellers.length}):</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+          {sellers.map((s) => (
+            <div
+              key={s.id}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black border border-neutral-800 text-[11px] font-semibold text-neutral-200"
+              title={`${s.fullName} (${s.email})`}
+            >
+              {s.avatarUrl ? (
+                <img src={s.avatarUrl} alt={s.fullName} className="w-4 h-4 rounded-full object-cover shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-neutral-800 text-[9px] font-black text-white flex items-center justify-center shrink-0">
+                  {s.fullName?.[0] || 'U'}
+                </span>
+              )}
+              <span className="truncate max-w-[120px]">{s.fullName?.split(' ')[0] || s.fullName}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (event.assignedSellerName || event.assignedSellerEmail) {
+    return (
+      <div className="p-2.5 rounded-xl bg-[#181818] border border-neutral-800 space-y-1 text-xs">
+        <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Encargado del evento:</div>
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-neutral-200 flex items-center gap-1.5 truncate">
+            <User className="w-3.5 h-3.5 text-white shrink-0" />
+            <span className="truncate">{event.assignedSellerName || 'Vendedor Stand'}</span>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-neutral-400 font-mono truncate">
+            <Mail className="w-3 h-3 text-neutral-500 shrink-0" />
+            <span className="truncate">{event.assignedSellerEmail}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-2 rounded-xl bg-[#181818] border border-neutral-800 text-[11px] text-neutral-500 italic">
+      Sin vendedores asignados
+    </div>
+  );
+}
+
+export default function EventCard({
+  event,
+  statusType,
+  onActivate,
+  onViewSales,
+  onArchive,
+  onUnarchive,
+  onDelete,
+  onEdit,
+}) {
   const type = statusType || event.status;
 
   if (type === 'ACTIVO') {
@@ -22,17 +87,7 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
               <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" /> <span className="truncate">{event.location}</span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-[#181818] border border-neutral-800 space-y-1 text-xs">
-            <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Encargado del evento:</div>
-            <div className="flex items-center justify-between">
-              <div className="font-semibold text-neutral-200 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-white" /> <span>{event.assignedSellerName || 'Vendedor Stand'}</span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-neutral-300 font-mono">
-                <Mail className="w-3 h-3 text-neutral-400" /> <span>{event.assignedSellerEmail || 'Sin correo asignado'}</span>
-              </div>
-            </div>
-          </div>
+          <SellersSection event={event} />
           <div className="grid grid-cols-2 gap-2 pt-1 text-center">
             <div className="p-2.5 rounded-xl bg-[#181818] border border-neutral-800">
               <span className="text-[10px] text-neutral-400 block font-semibold uppercase">Total Vendido</span>
@@ -45,14 +100,19 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
           </div>
         </div>
         <div className="pt-2 flex items-center gap-2">
-          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md">
+          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md min-h-[44px]">
             <Eye className="w-4 h-4" /> <span>Ver ventas ({event.salesCount || 0})</span>
           </button>
-          <button type="button" onClick={() => onArchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer" title="Archivar evento cuando concluya">
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Editar evento y vendedores">
+              <Pencil className="w-3.5 h-3.5 text-amber-400" /> <span className="hidden sm:inline">Editar</span>
+            </button>
+          )}
+          <button type="button" onClick={() => onArchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Archivar evento cuando concluya">
             <Archive className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Archivar</span>
           </button>
           {onDelete && (
-            <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer transition-colors" title="Eliminar evento (creado por error o cancelado)">
+            <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar evento">
               <Trash2 className="w-4 h-4" />
             </button>
           )}
@@ -77,6 +137,7 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
           <p className="text-xs text-neutral-400 flex items-center gap-1">
             <MapPin className="w-3 h-3 text-neutral-500 shrink-0" /> <span className="truncate">{event.location}</span>
           </p>
+          <SellersSection event={event} />
           <div className="grid grid-cols-2 gap-2 pt-1 text-center">
             <div className="p-2 rounded-xl bg-[#161616] border border-neutral-800">
               <span className="text-[9px] text-neutral-500 block font-semibold uppercase">Total Facturado</span>
@@ -89,13 +150,16 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
           </div>
         </div>
         <div className="pt-2 border-t border-neutral-800/80 flex items-center gap-2">
-          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer">
+          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer min-h-[40px]">
             <Eye className="w-3.5 h-3.5" /> <span>Ver ventas ({event.salesCount || 0})</span>
           </button>
-          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer" title="Restaurar evento a lista de confirmados">
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center" title="Editar evento"><Pencil className="w-3.5 h-3.5 text-amber-400" /></button>
+          )}
+          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[40px]" title="Restaurar evento a confirmados">
             <RotateCcw className="w-3.5 h-3.5" /> <span>Restaurar</span>
           </button>
-          <button type="button" onClick={() => onDelete?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer" title={event.salesCount > 0 ? 'No se puede eliminar: tiene ventas registradas' : 'Eliminar evento'}><Trash2 className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={() => onDelete?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center" title={event.salesCount > 0 ? 'Tiene ventas registradas' : 'Eliminar'}><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
     );
@@ -114,20 +178,20 @@ export default function EventCard({ event, statusType, onActivate, onViewSales, 
         <p className="text-xs text-neutral-400 flex items-center gap-1">
           <MapPin className="w-3 h-3 text-neutral-400 shrink-0" /> <span className="truncate">{event.location}</span>
         </p>
-        <div className="text-xs text-neutral-400 pt-2 border-t border-neutral-800/80 flex items-center justify-between">
-          <span className="text-[10px] text-neutral-500 uppercase font-semibold">Encargado:</span>
-          <span className="font-semibold text-neutral-300 text-[11px] truncate max-w-[200px]">
-            {event.assignedSellerEmail || 'Sin asignar'}
-          </span>
-        </div>
+        <SellersSection event={event} />
       </div>
       <div className="pt-2 border-t border-neutral-800/80 flex items-center gap-2">
-        <button type="button" onClick={() => onActivate?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer">
+        <button type="button" onClick={() => onActivate?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer min-h-[44px]">
           <Play className="w-3.5 h-3.5 fill-current" /> <span>Activar / En curso</span>
         </button>
-        <button type="button" onClick={() => onViewSales?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:text-white cursor-pointer" title="Ver historial de ventas"><Eye className="w-3.5 h-3.5" /></button>
-        <button type="button" onClick={() => onArchive?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 border border-neutral-800 cursor-pointer" title="Archivar evento"><Archive className="w-3.5 h-3.5" /></button>
-        <button type="button" onClick={() => onDelete?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer" title="Eliminar evento (creado por error o cancelado)"><Trash2 className="w-3.5 h-3.5" /></button>
+        {onEdit && (
+          <button type="button" onClick={() => onEdit(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors" title="Editar evento y vendedores">
+            <Pencil className="w-3.5 h-3.5 text-amber-400" />
+          </button>
+        )}
+        <button type="button" onClick={() => onViewSales?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:text-white cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Ver historial de ventas"><Eye className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => onArchive?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Archivar evento"><Archive className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar evento"><Trash2 className="w-3.5 h-3.5" /></button>
       </div>
     </div>
   );

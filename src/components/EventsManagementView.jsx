@@ -5,6 +5,7 @@ import useEventsManager from './events/hooks/useEventsManager';
 import EventsFilterBar from './events/EventsFilterBar';
 import EventCard from './events/EventCard';
 import CreateEventModal from './events/modals/CreateEventModal';
+import EditEventModal from './events/modals/EditEventModal';
 import ActivateEventModal from './events/modals/ActivateEventModal';
 import EventSalesModal from './events/modals/EventSalesModal';
 import EventActionModals from './events/modals/EventActionModals';
@@ -97,13 +98,13 @@ export default function EventsManagementView({ onEventActivated }) {
                 {m.activeEvents.length === 0 ? (
                   <div className="p-6 rounded-2xl bg-black border border-neutral-800 text-center text-xs text-neutral-500">No hay ningún evento activo en curso en este momento. Activa uno de los eventos confirmados abajo.</div>
                 ) : m.activeEvents.map((ev) => (
-                  <EventCard key={ev.id} event={ev} statusType="ACTIVO" onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} onDelete={() => m.openDeleteModal(ev)} />
+                  <EventCard key={ev.id} event={ev} statusType="ACTIVO" onEdit={() => m.setEventToEdit(ev)} onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} onDelete={() => m.openDeleteModal(ev)} />
                 ))}
               </div>
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-300">Eventos confirmados / Próximos ({m.confirmedEvents.length})</h4>
                 {m.confirmedEvents.map((ev) => (
-                  <EventCard key={ev.id} event={ev} statusType="CONFIRMADO" onActivate={() => m.openActivationModal(ev)} onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} onDelete={() => m.openDeleteModal(ev)} />
+                  <EventCard key={ev.id} event={ev} statusType="CONFIRMADO" onEdit={() => m.setEventToEdit(ev)} onActivate={() => m.openActivationModal(ev)} onViewSales={() => m.viewEventSales(ev)} onArchive={() => m.setEventToArchive(ev)} onDelete={() => m.openDeleteModal(ev)} />
                 ))}
               </div>
               <div className="space-y-3 pt-4 border-t border-neutral-800/90">
@@ -116,14 +117,15 @@ export default function EventsManagementView({ onEventActivated }) {
                 {m.showArchivedSection && (
                   <div className="space-y-3">
                     {m.filteredArchivedEvents.map((ev) => (
-                      <EventCard key={ev.id} event={ev} statusType="ARCHIVADO" onViewSales={() => m.viewEventSales(ev)} onUnarchive={() => m.handleUnarchiveEvent(ev)} onDelete={() => m.openDeleteModal(ev)} />
+                      <EventCard key={ev.id} event={ev} statusType="ARCHIVADO" onEdit={() => m.setEventToEdit(ev)} onViewSales={() => m.viewEventSales(ev)} onUnarchive={() => m.handleUnarchiveEvent(ev)} onDelete={() => m.openDeleteModal(ev)} />
                     ))}
                   </div>
                 )}
               </div>
             </div>
           )}
-          <CreateEventModal isOpen={m.isCreatingEvent} onClose={() => m.setIsCreatingEvent(false)} newEventData={m.newEventData} setNewEventData={m.setNewEventData} onSubmit={m.handleCreateEvent} />
+          <CreateEventModal isOpen={m.isCreatingEvent} onClose={() => m.setIsCreatingEvent(false)} newEventData={m.newEventData} setNewEventData={m.setNewEventData} onSubmit={m.handleCreateEvent} usersList={m.usersList} />
+          <EditEventModal isOpen={Boolean(m.eventToEdit)} onClose={() => m.setEventToEdit(null)} event={m.eventToEdit} usersList={m.usersList} onUpdate={m.handleUpdateEvent} isSubmitting={m.isSubmittingUpdate} />
           <ActivateEventModal event={m.activatingEvent} onClose={() => m.setActivatingEvent(null)} sellerGoogleEmail={m.sellerGoogleEmail} setSellerGoogleEmail={m.setSellerGoogleEmail} sellerName={m.sellerName} setSellerName={m.setSellerName} onConfirm={m.handleConfirmActivation} isSubmitting={m.isSubmittingActivation} />
           <EventActionModals eventToArchive={m.eventToArchive} onCloseArchive={() => m.setEventToArchive(null)} onConfirmArchive={m.handleConfirmArchive} isSubmittingArchive={m.isSubmittingArchive} eventToDelete={m.eventToDelete} onCloseDelete={() => { m.setEventToDelete(null); m.setDeleteErrorMsg(null); }} onConfirmDelete={m.handleConfirmDelete} isSubmittingDelete={m.isSubmittingDelete} deleteErrorMsg={m.deleteErrorMsg} />
         </>

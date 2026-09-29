@@ -1,16 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 
-const INITIAL_EVENT_DATA = { name: '', location: '', startDate: '', endDate: '', salesTarget: 15000, assignedSellerEmail: '', assignedSellerName: '' };
+const INITIAL_EVENT_DATA = {
+  name: '', location: '', startDate: '', endDate: '', salesTarget: 15000,
+  assignedSellerEmail: '', assignedSellerName: '', assignedUserIds: [],
+};
 
 export function useEventsManager({ onEventActivated } = {}) {
-  const { authFetch } = useAuth();
+  const { authFetch, isSuperAdmin } = useAuth();
   const [events, setEvents] = useState([]), [isLoading, setIsLoading] = useState(true), [errorMsg, setErrorMsg] = useState(null);
+  const [usersList, setUsersList] = useState([]);
   const [selectedEventForSales, setSelectedEventForSales] = useState(null), [eventSalesList, setEventSalesList] = useState([]), [eventClosingsList, setEventClosingsList] = useState([]), [isLoadingSales, setIsLoadingSales] = useState(false);
   const [activatingEvent, setActivatingEvent] = useState(null), [sellerGoogleEmail, setSellerGoogleEmail] = useState(''), [sellerName, setSellerName] = useState(''), [isSubmittingActivation, setIsSubmittingActivation] = useState(false);
   const [eventToArchive, setEventToArchive] = useState(null), [isSubmittingArchive, setIsSubmittingArchive] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null), [isSubmittingDelete, setIsSubmittingDelete] = useState(false), [deleteErrorMsg, setDeleteErrorMsg] = useState(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false), [newEventData, setNewEventData] = useState(INITIAL_EVENT_DATA);
+  const [eventToEdit, setEventToEdit] = useState(null), [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const [archivedSearchQuery, setArchivedSearchQuery] = useState(''), [archivedDateFilter, setArchivedDateFilter] = useState(''), [showArchivedSection, setShowArchivedSection] = useState(true);
 
   const loadEvents = async () => {
@@ -23,7 +28,22 @@ export function useEventsManager({ onEventActivated } = {}) {
     } catch (err) { setErrorMsg(err.message); }
     finally { setIsLoading(false); }
   };
-  useEffect(() => { loadEvents(); }, []);
+
+  const loadUsers = async () => {
+    if (!isSuperAdmin) return;
+    try {
+      const res = await authFetch('/api/users');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) setUsersList(json.data);
+    } catch (err) {
+      console.error('Error cargando usuarios del tenant:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+    loadUsers();
+  }, [isSuperAdmin]);
 
   const viewEventSales = async (event) => {
     setSelectedEventForSales(event); setIsLoadingSales(true);
@@ -104,14 +124,39 @@ export function useEventsManager({ onEventActivated } = {}) {
     e.preventDefault();
     if (!newEventData.name || !newEventData.location) { alert('Nombre y ubicación son obligatorios.'); return; }
     try {
+      const payload = {
+        ...newEventData,
+        assignedUserIds: newEventData.assignedUserIds || [],
+      };
       const res = await authFetch('/api/events', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEventData),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error creando evento');
       setIsCreatingEvent(false); setNewEventData(INITIAL_EVENT_DATA); await loadEvents();
     } catch (err) { alert(err.message); }
+  };
+
+  const handleUpdateEvent = async (eventId, updateData) => {
+    setIsSubmittingUpdate(true);
+    try {
+      const res = await authFetch(`/api/events/${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Error al actualizar el evento');
+      setEventToEdit(null);
+      await loadEvents();
+      return json.data;
+    } catch (err) {
+      alert(err.message);
+      throw err;
+    } finally {
+      setIsSubmittingUpdate(false);
+    }
   };
 
   const activeEvents = events.filter((e) => e.status === 'ACTIVO');
@@ -137,6 +182,7 @@ export function useEventsManager({ onEventActivated } = {}) {
 
   return {
     events, isLoading, errorMsg, loadEvents, activeEvents, confirmedEvents, archivedEvents,
+    usersList, loadUsers,
     archivedSearchQuery, setArchivedSearchQuery, archivedDateFilter, setArchivedDateFilter,
     showArchivedSection, setShowArchivedSection, filteredArchivedEvents,
     selectedEventForSales, setSelectedEventForSales, eventSalesList, eventClosingsList, isLoadingSales, viewEventSales,
@@ -145,6 +191,7 @@ export function useEventsManager({ onEventActivated } = {}) {
     eventToArchive, setEventToArchive, isSubmittingArchive, handleConfirmArchive, handleUnarchiveEvent,
     eventToDelete, setEventToDelete, openDeleteModal, isSubmittingDelete, deleteErrorMsg, setDeleteErrorMsg, handleConfirmDelete,
     isCreatingEvent, setIsCreatingEvent, newEventData, setNewEventData, handleCreateEvent,
+    eventToEdit, setEventToEdit, isSubmittingUpdate, handleUpdateEvent,
   };
 }
 

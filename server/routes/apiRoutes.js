@@ -63,6 +63,7 @@ import {
   getEventsList,
   activateEvent,
   createEvent,
+  updateEvent,
   archiveEvent,
   unarchiveEvent,
   deleteEvent,
@@ -168,6 +169,7 @@ router.patch('/users/:id/toggle-status', requireRole(['SUPER_ADMIN']), toggleUse
 router.get('/events/active', getActiveEvent);
 router.get('/events', getEventsList);
 router.post('/events', requireRole(['SUPER_ADMIN']), createEvent);
+router.patch('/events/:id', requireRole(['SUPER_ADMIN']), updateEvent);
 router.patch('/events/:id/activate', requireRole(['SUPER_ADMIN']), activateEvent);
 router.patch('/events/:id/archive', requireRole(['SUPER_ADMIN']), archiveEvent);
 router.patch('/events/:id/unarchive', requireRole(['SUPER_ADMIN']), unarchiveEvent);
