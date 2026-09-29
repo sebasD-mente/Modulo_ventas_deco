@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Menu, X, ShoppingBag, Calendar, Activity,
-  Package, Clock, Wallet, Users, Percent, ChevronRight, AlertCircle,
+  Package, Clock, Wallet, Users, Percent, ChevronRight,
+  AlertCircle, Mail,
 } from 'lucide-react';
 
 const TAB_ICONS = {
@@ -12,20 +13,20 @@ const TAB_ICONS = {
 
 export default function Header({ activeEvent, activeTab, setActiveTab, liveMetrics }) {
   const { user, logout, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Bloquear scroll de la página y escuchar tecla Escape al abrir drawer
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+    document.body.style.overflow = isMenuOpen ? 'hidden' : '';
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+      if (e.key === 'Escape') setIsMenuOpen(false);
     };
-    if (isMobileMenuOpen) window.addEventListener('keydown', handleKeyDown);
+    if (isMenuOpen) window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isMobileMenuOpen]);
+  }, [isMenuOpen]);
 
   // Configuración de pestañas permitidas por roles aditivos
   let navTabs = [];
@@ -69,22 +70,17 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
     if (navTabs.length === 0) navTabs = [{ id: 'venta', label: 'Terminal de Ventas' }];
   }
 
-  const getRoleBadgeConfig = () => {
-    const badgeClassName =
-      'bg-black text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-neutral-800 leading-none flex items-center justify-center shrink-0';
-    if (isSuperAdmin) return { label: 'SUPER ADMIN', className: badgeClassName };
-
-    const roles = [];
-    if (isVendedor) roles.push('MOSTRADOR');
-    if (isVendedorRedes) roles.push('REDES');
-    if (isOperario1) roles.push('STOCK');
-    if (isOperario2) roles.push('IMPRESIÓN');
-    if (roles.length === 0) roles.push(user?.role || 'VENDEDOR');
-
-    return { label: roles.join(' • '), className: badgeClassName };
+  const getRoleBadges = () => {
+    if (isSuperAdmin) return ['SUPER ADMIN'];
+    const list = [];
+    if (isVendedor) list.push('MOSTRADOR');
+    if (isVendedorRedes) list.push('REDES');
+    if (isOperario1) list.push('STOCK');
+    if (isOperario2) list.push('IMPRESIÓN');
+    if (list.length === 0) list.push(user?.role || 'VENDEDOR');
+    return list;
   };
 
-  const roleBadge = getRoleBadgeConfig();
   const currentTab = navTabs.find((t) => t.id === activeTab) || { label: activeTab };
 
   const renderAvatar = (size = 'w-8 h-8', textSize = 'text-xs') => (
@@ -99,96 +95,68 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
 
   return (
     <header className="bg-white border-b border-neutral-200 text-black sticky top-0 z-40 px-3 py-2 sm:py-2.5 sm:px-6 select-none shadow-sm">
-      <div className="max-w-4xl mx-auto flex flex-col gap-1.5 sm:gap-2">
-        {/* Barra Superior */}
+      <div className="max-w-4xl mx-auto">
+        {/* Barra Superior Unificada (Todas las Pantallas) */}
         <div className="flex items-center justify-between">
-          {/* Izquierda: Hamburguesa en Mobile (< md), Espaciador en Desktop (>= md) */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-              aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black cursor-pointer transition-colors"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-            <div className="w-16 sm:w-28 hidden md:block" />
-          </div>
+          {/* Izquierda: Botón de Menú Hamburguesa Universal */}
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black cursor-pointer transition-colors"
+          >
+            {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
 
-          {/* Centro: Logotipo STAND {IA} y Micro-indicador en móvil */}
-          <div className="flex flex-col items-center justify-center flex-1 md:flex-initial">
+          {/* Centro: Logotipo STAND {IA} y Micro-indicador de pestaña activa */}
+          <div className="flex flex-col items-center justify-center">
             <img src="/brand/logo-header.png" alt="STAND {IA}" className="h-6 sm:h-7 object-contain" />
-            <span className="md:hidden text-[10px] font-bold text-neutral-500 uppercase tracking-wider leading-tight mt-0.5">
+            <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest leading-tight mt-0.5">
               {currentTab.label}
             </span>
           </div>
 
-          {/* Derecha: Perfil Compacto (Móvil) / Extendido (Desktop) */}
-          <div className="flex items-center">
-            {user && (
-              <div className="flex items-center gap-1.5 sm:gap-2 py-1 px-1.5 sm:px-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 shadow-xs">
-                {renderAvatar('w-8 h-8', 'text-xs')}
-                <div className="hidden md:flex flex-col items-start leading-none min-w-0">
-                  <span className="text-xs font-bold text-neutral-900 truncate max-w-[130px]">
-                    {user.fullName?.trim().split(' ')[0] || user.fullName}
-                  </span>
-                  <span className={`mt-1 ${roleBadge.className}`}>{roleBadge.label}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={logout}
-                  title="Cerrar Sesión"
-                  aria-label="Cerrar Sesión"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-200 transition-colors p-2 text-neutral-400 hover:text-black cursor-pointer shrink-0"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Fila de Navegación Horizontal en Desktop (erradica CSS Centering Scroll Trap) */}
-        <nav className="hidden md:flex items-center justify-start md:justify-center gap-1.5 overflow-x-auto no-scrollbar max-w-full px-2">
-          {navTabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
+          {/* Derecha: Perfil Compacto Idéntico en Todas las Pantallas */}
+          {user ? (
+            <div className="flex items-center gap-1.5 py-1 px-1.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 shadow-xs">
+              {renderAvatar('w-8 h-8', 'text-xs')}
               <button
-                key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`min-h-[44px] flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                  isActive ? 'bg-black text-white shadow-sm' : 'text-black hover:opacity-60'
-                }`}
+                onClick={logout}
+                title="Cerrar Sesión"
+                aria-label="Cerrar Sesión"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-200 transition-colors p-2 text-neutral-400 hover:text-black cursor-pointer shrink-0"
               >
-                {tab.label}
+                <LogOut className="w-4 h-4" />
               </button>
-            );
-          })}
-        </nav>
+            </div>
+          ) : (
+            <div className="min-w-[44px] min-h-[44px]" />
+          )}
+        </div>
       </div>
 
-      {/* Drawer Lateral Móvil (md:hidden) */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden">
-          {/* Backdrop con desenfoque suave */}
+      {/* Drawer Lateral Desplegable (Universal: Móvil, Tablet y Desktop) */}
+      {isMenuOpen && (
+        <div>
+          {/* Backdrop con desenfoque */}
           <div
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={() => setIsMenuOpen(false)}
             aria-hidden="true"
           />
 
           {/* Panel Lateral Deslizable */}
           <aside
             aria-label="Menú de navegación"
-            className="fixed inset-y-0 left-0 z-50 w-full max-w-xs bg-white text-black shadow-2xl flex flex-col p-4 animate-in slide-in-from-left duration-200"
+            className="fixed inset-y-0 left-0 z-50 w-full max-w-xs sm:max-w-sm bg-white text-black shadow-2xl flex flex-col p-4 animate-in slide-in-from-left duration-200"
           >
             {/* Cabecera del Drawer */}
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 shrink-0">
               <img src="/brand/logo-header.png" alt="STAND {IA}" className="h-6 object-contain" />
               <button
                 type="button"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => setIsMenuOpen(false)}
                 aria-label="Cerrar menú"
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-neutral-100 text-neutral-600 hover:text-black cursor-pointer transition-colors"
               >
@@ -197,7 +165,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
             </div>
 
             {/* Tarjeta de Estado de Evento */}
-            <div className="my-3">
+            <div className="my-3 shrink-0">
               {activeEvent ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-900">
                   <span className="shrink-0 text-sm">📍</span>
@@ -211,7 +179,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setActiveTab('eventos'); setIsMobileMenuOpen(false); }}
+                    onClick={() => { setActiveTab('eventos'); setIsMenuOpen(false); }}
                     className="min-h-[36px] px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs cursor-pointer transition-colors flex items-center justify-center"
                   >
                     Activar
@@ -229,7 +197,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }}
+                    onClick={() => { setActiveTab(tab.id); setIsMenuOpen(false); }}
                     className={`min-h-[48px] w-full rounded-xl flex items-center justify-between px-3 text-sm font-bold transition-all cursor-pointer ${
                       isActive ? 'bg-black text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-100'
                     }`}
@@ -244,19 +212,38 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
               })}
             </div>
 
-            {/* Pie del Drawer con Usuario y Logout */}
+            {/* Pie del Drawer con Detalle de Usuario y Roles */}
             {user && (
-              <div className="pt-3 border-t border-neutral-200 mt-auto space-y-3">
+              <div className="pt-3 border-t border-neutral-200 mt-auto space-y-3 shrink-0">
                 <div className="flex items-center gap-3">
                   {renderAvatar('w-10 h-10', 'text-sm')}
                   <div className="flex flex-col items-start leading-tight min-w-0">
-                    <span className="text-sm font-bold text-neutral-900 truncate max-w-[170px]">{user.fullName}</span>
-                    <span className={`mt-1 ${roleBadge.className}`}>{roleBadge.label}</span>
+                    <span className="text-sm font-bold text-neutral-900 truncate max-w-[200px]">
+                      {user.fullName}
+                    </span>
+                    <span className="text-[11px] text-neutral-500 font-mono truncate max-w-[200px] mt-0.5 flex items-center gap-1">
+                      <Mail className="w-3 h-3 text-neutral-400 shrink-0" />
+                      {user.email}
+                    </span>
                   </div>
                 </div>
+
+                {/* Badges de Roles Asignados */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {getRoleBadges().map((roleLabel) => (
+                    <span
+                      key={roleLabel}
+                      className="bg-black text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-neutral-800 leading-none"
+                    >
+                      {roleLabel}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Botón Logout */}
                 <button
                   type="button"
-                  onClick={() => { setIsMobileMenuOpen(false); logout(); }}
+                  onClick={() => { setIsMenuOpen(false); logout(); }}
                   className="min-h-[44px] w-full flex items-center justify-center gap-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
