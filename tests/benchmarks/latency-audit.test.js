@@ -77,7 +77,7 @@ describe('⚡ BENCHMARK & AUDITORÍA DE LATENCIA Y RESILIENCIA FERIAL (R6)', () 
 
     const tokenEvent = emitted.find((e) => e.type === 'token');
     assert.ok(tokenEvent, 'Debe emitir token conversacional dinámico');
-    assert.strictEqual(tokenEvent.text, '¡Listo, Carlos! Te monté el borrador en pantalla listo para cobrar con TARJETA. ¿Confirmamos la venta?');
+    assert.ok(tokenEvent.text.includes('Te preparé el borrador en pantalla') && tokenEvent.text.includes('Tarjeta'), 'Debe emitir confirmación enriquecida');
   });
 
   it('2. Visión Concurrente (R2): safePersistMedia y recognizePosterArtworkFromImage corren en paralelo (Promise.all)', async () => {

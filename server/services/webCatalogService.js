@@ -30,7 +30,7 @@ export function isFuzzyTokenMatch(queryToken, targetToken) {
   return prev[tLen] <= maxDistance;
 }
 
-export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24 }) {
+export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24, skipLiveParachute = false }) {
   const cleanQuery = String(query ?? '').trim().toLowerCase();
   const rawProducts = await getCachedProducts(tenantId);
   let filtered = rawProducts.filter(p => p.imageUrl !== null && p.imageUrl !== '');
@@ -174,7 +174,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
     });
 
     const isTest = process.env.NODE_ENV === 'test' || process.execArgv.includes('--test') || Boolean(process.env.NODE_TEST_CONTEXT);
-    if (!isTest && (deduplicated.length === 0 || hasMissingTokens) && cleanQuery.length >= 3) {
+    if (!skipLiveParachute && !isTest && (deduplicated.length === 0 || hasMissingTokens) && cleanQuery.length >= 3) {
       try {
         const { searchLiveWebParachute } = await import('./catalog/liveCatalogSyncService.js');
         const liveResults = await searchLiveWebParachute(cleanQuery, tenantId);

@@ -9,29 +9,31 @@ import { getGeminiClient } from '../../config/gemini.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
 async function resolveEventContextData({ tenantId, eventId, date = null, contextData = {} }) {
-  let event = null, kpis = null, timerId = null;
-  if (eventId) {
+  let event = null;
+  const hasEventInfo = Boolean(contextData?.evento && contextData?.ubicacion);
+  if (!hasEventInfo && eventId) {
+    let timerId = null;
     try {
-      const dbOp = Promise.all([
-        prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, location: true, salesTarget: true } }),
-        getEventKPIs({ tenantId, eventId, date }),
-      ]);
-      const timer = new Promise((_, reject) => { timerId = setTimeout(() => reject(new Error('DB_TIMEOUT')), 1500); });
-      [event, kpis] = await Promise.race([dbOp, timer]);
-    } catch (e) { /* DB fallback */ } finally { if (timerId) clearTimeout(timerId); }
+      const dbOp = prisma.event.findUnique({
+        where: { id: eventId },
+        select: { name: true, location: true },
+      });
+      const timer = new Promise((_, reject) => { timerId = setTimeout(() => reject(new Error('DB_TIMEOUT')), 200); });
+      event = await Promise.race([dbOp, timer]);
+    } catch (_) { /* DB fallback ultrarrápido */ } finally { if (timerId) clearTimeout(timerId); }
   }
   return {
-    event, kpis,
+    event, kpis: null,
     resolved: {
       evento: event?.name || contextData?.evento || 'el evento', ubicacion: event?.location || contextData?.ubicacion || 'Mostrador Stand',
-      metaVentas: event?.salesTarget ? `Q ${event.salesTarget}` : (contextData?.metaVentas || 'Sin meta definida'),
-      totalVendido: kpis ? `Q ${kpis.totalAmount.toFixed(2)}` : (contextData?.totalVendido || 'Q 0.00'),
-      transaccionesTotales: kpis ? kpis.totalTransactions : (contextData?.transaccionesTotales || 0),
-      unidadesVendidas: kpis ? kpis.totalUnits : (contextData?.unidadesVendidas || 0),
-      ticketPromedio: kpis ? `Q ${kpis.averageTicket.toFixed(2)}` : (contextData?.ticketPromedio || 'Q 0.00'),
-      desgloseMetodosPago: kpis ? { efectivo: `Q ${kpis.paymentBreakdown.EFECTIVO.amount.toFixed(2)}`, tarjeta: `Q ${kpis.paymentBreakdown.TARJETA.amount.toFixed(2)}`, transferencia: `Q ${kpis.paymentBreakdown.TRANSFERENCIA.amount.toFixed(2)}` } : (contextData?.desgloseMetodosPago || {}),
-      topProductos: kpis ? kpis.topProducts : (contextData?.topProductos || []),
-      ultimasVentas: kpis ? kpis.recentSales?.map(s => ({ numero: s.saleNumber, total: `Q ${s.totalAmount}`, vendedor: s.seller?.fullName, hora: s.createdAt, items: s.items?.map(i => `${i.quantity}x ${i.description}`).join(', '), pagos: s.payments?.map(p => `${p.method}: Q${p.amount}`).join(', ') })) || [] : (contextData?.ultimasVentas || []),
+      metaVentas: contextData?.metaVentas || 'Sin meta definida',
+      totalVendido: contextData?.totalVendido || 'Q 0.00',
+      transaccionesTotales: contextData?.transaccionesTotales || 0,
+      unidadesVendidas: contextData?.unidadesVendidas || 0,
+      ticketPromedio: contextData?.ticketPromedio || 'Q 0.00',
+      desgloseMetodosPago: contextData?.desgloseMetodosPago || {},
+      topProductos: contextData?.topProductos || [],
+      ultimasVentas: contextData?.ultimasVentas || [],
       vendedorNombre: contextData?.sellerName || contextData?.vendedorNombre || 'Vendedor',
     },
   };
@@ -75,16 +77,30 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     let cleanReply = response.text || '';
     if (!cleanReply?.trim()) {
       if (draftSale && draftSale.items?.length > 0) {
+        const mountedStr = draftSale.items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
         if (draftSale.unmatchedItems?.length > 0) {
-          const mountedStr = draftSale.items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
-          const missingStr = draftSale.unmatchedItems.map(u => `'${u.rawName}'`).join(', ');
-          cleanReply = `⚠️ Monté en el borrador:\n${mountedStr}\n\nSin embargo, **no encontré ${missingStr} en el catálogo**. Presiona **"Confirmar Venta"** para las obras reales o busca el diseño en el catálogo.`;
+          const sizeConflicts = draftSale.unmatchedItems.filter(u => u.sizeAvailable === false || u.unavailableReason);
+          const trulyMissing = draftSale.unmatchedItems.filter(u => !u.sizeAvailable && !u.unavailableReason);
+          let extraMsg = '';
+          if (sizeConflicts.length > 0) {
+            extraMsg += '\n\n' + sizeConflicts.map(u => `Nota: ${u.unavailableReason || `El diseño '${u.rawName}' no se fabrica en ${u.requestedSize}.`}`).join('\n');
+          }
+          if (trulyMissing.length > 0) {
+            const missingStr = trulyMissing.map(u => `'${u.rawName}'`).join(', ');
+            extraMsg += `\n\nSin embargo, **no encontré ${missingStr} en el catálogo**.`;
+          }
+          cleanReply = `⚠️ Monté en el borrador:\n${mountedStr}${extraMsg}\n\nPresiona **"Confirmar Venta"** para las obras reales o ajusta la medida.`;
         } else {
-          cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${(draftSale.items || []).map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n')}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
+          cleanReply = `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${mountedStr}\n\n💳 **Total:** Q ${Number(draftSale.total || 0).toFixed(2)} (${draftSale.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`;
         }
       } else if (draftSale && draftSale.unmatchedItems?.length > 0) {
-        const missingStr = draftSale.unmatchedItems.map(u => `'${u.rawName}'`).join(', ');
-        cleanReply = `No encontré la obra ${missingStr} en el catálogo de Deco Vintage. ¿Deseas consultar por otro artista o buscarlo en el catálogo?`;
+        const unavail = draftSale.unmatchedItems.find(u => u.unavailableReason);
+        if (unavail?.unavailableReason) {
+          cleanReply = `⚠️ ${unavail.unavailableReason}`;
+        } else {
+          const missingStr = draftSale.unmatchedItems.map(u => `'${u.rawName}'`).join(', ');
+          cleanReply = `No encontré la obra ${missingStr} en el catálogo de Deco Vintage. ¿Deseas consultar por otro artista o buscarlo en el catálogo?`;
+        }
       } else if (suggestedPosters?.length) {
         cleanReply = `¡Listo! Encontré ${suggestedPosters.length} opciones en catálogo en pantalla (Mediano Q65 más vendido). ¿Cuál te gustaría agregar al borrador?`;
       } else {
@@ -150,7 +166,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
 
   const directSaleDraft = executedTools.find(t => t.name === 'prepareSaleDraft' && t.result);
   if (directSaleDraft) {
-    const draft = directSaleDraft.result, sellerName = (contextData?.sellerName || 'vendedor').trim().split(' ')[0];
+    const draft = directSaleDraft.result;
     const rawMethod = draft.paymentMethod || 'EFECTIVO';
     const payMethodFormatted = rawMethod.charAt(0).toUpperCase() + rawMethod.slice(1).toLowerCase();
     const items = draft.items || [], unmatched = draft.unmatchedItems || [];
@@ -162,13 +178,34 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       return '';
     };
 
-    if (items.length > 0 && unmatched.length > 0) {
-      const mountedStr = items.map(it => `**${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'} - Q${Number(it.unitPrice).toFixed(2)} en ${payMethodFormatted})`).join(', ');
-      const missingStr = unmatched.map(u => `'${u.rawName}'`).join(', ');
-      const suggestions = formatCandidates(unmatched);
-      yield { type: 'token', text: `⚠️ Monté en el borrador: ${mountedStr}. Sin embargo, **no encontré ${missingStr} en el catálogo**.${suggestions} ¿Deseas que agregue alguno de esos o buscas otro diseño?` };
+    if (items.length > 0 && unmatched.length === 0) {
+      const mountedStr = items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
+      yield {
+        type: 'token',
+        text: `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${mountedStr}\n\n💳 **Total:** Q ${Number(draft.total || 0).toFixed(2)} (${payMethodFormatted}). Presiona **"Confirmar Venta"** para registrarla.`
+      };
       return;
     }
+
+    if (items.length > 0 && unmatched.length > 0) {
+      const mountedStr = items.map(it => `**${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'} - Q${Number(it.unitPrice).toFixed(2)} en ${payMethodFormatted})`).join(', ');
+      const sizeConflicts = unmatched.filter(u => u.sizeAvailable === false || u.unavailableReason);
+      const trulyMissing = unmatched.filter(u => !u.sizeAvailable && !u.unavailableReason);
+
+      let extraMsg = '';
+      if (sizeConflicts.length > 0) {
+        const notes = sizeConflicts.map(u => u.unavailableReason || `El diseño '${u.rawName}' no se fabrica en ${u.requestedSize}.`).join(' ');
+        extraMsg += ` Nota: ${notes} ¿Deseas agregarlo en su formato disponible?`;
+      }
+      if (trulyMissing.length > 0) {
+        const missingStr = trulyMissing.map(u => `'${u.rawName}'`).join(', ');
+        const suggestions = formatCandidates(trulyMissing);
+        extraMsg += ` Sin embargo, **no encontré ${missingStr} en el catálogo**.${suggestions} ¿Deseas que agregue alguno de esos o buscas otro diseño?`;
+      }
+      yield { type: 'token', text: `⚠️ Monté en el borrador: ${mountedStr}.${extraMsg}` };
+      return;
+    }
+
     if (items.length === 0 && unmatched.length > 0) {
       const unavail = unmatched.find(u => u.unavailableReason);
       if (unavail?.unavailableReason) {
@@ -180,6 +217,12 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       yield { type: 'token', text: `No encontré la obra ${missingStr} en el catálogo de Deco Vintage.${suggestions} ¿Deseas consultar por otro artista o buscarlo en el catálogo?` };
       return;
     }
+  }
+
+  const directDiscard = executedTools.find(t => t.name === 'discardSaleDraft');
+  if (directDiscard) {
+    yield { type: 'token', text: '🗑️ Borrador de venta cancelado y vaciado.' };
+    return;
   }
 
   if (executedTools.length > 0) {

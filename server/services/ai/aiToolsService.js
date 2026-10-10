@@ -71,44 +71,72 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     }
 
     const explicitSize = it.size ? normalizeCatalogSizeId(it.size) : null;
-    const requestedSize = explicitSize || nameExtractedSize || globalMsgSize || 'MEDIANO';
+    const userSpecifiedSize = explicitSize || nameExtractedSize || globalMsgSize || null;
+    const isExplicitUserSize = Boolean(userSpecifiedSize);
 
-    let matched = await matchPosterEverywhere(tenantId, rawName, requestedSize);
-    let aliasRes = { matched: false };
-    if (!matched) {
-      aliasRes = resolveEntityAlias(rawName);
-      if (aliasRes.matched && aliasRes.searchQuery) {
-        matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, requestedSize || aliasRes.defaultSizeId);
-      }
+    let aliasRes = resolveEntityAlias(rawName);
+    const initialRequestedSize = userSpecifiedSize || aliasRes.defaultSizeId || null;
+
+    let matched = await matchPosterEverywhere(tenantId, rawName, initialRequestedSize, { skipLiveParachute: true });
+    if (!matched && aliasRes.matched && aliasRes.searchQuery) {
+      matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, initialRequestedSize, { skipLiveParachute: true });
     }
 
     const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
-    const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
 
     if (matched) {
-      if (matched.sizeAvailable === false) {
+      const isMusicCategory = matched.category === 'MUSICA' || aliasRes.category === 'MUSICA';
+      const onlyHasAlbumSize = Array.isArray(matched.availableSizes) && matched.availableSizes.length === 1 && matched.availableSizes[0]?.sizeId === 'PORTADA_ALBUM';
+      const hasAlbumAsPrimary = matched.sizeId === 'PORTADA_ALBUM' || aliasRes.defaultSizeId === 'PORTADA_ALBUM';
+
+      if (!isExplicitUserSize) {
+        if (isMusicCategory || onlyHasAlbumSize || hasAlbumAsPrimary) {
+          matched.sizeId = 'PORTADA_ALBUM';
+          matched.sizeName = 'Portada de Álbum';
+          matched.unitPrice = 55.0;
+        } else if (matched.sizeAvailable === false) {
+          const fallbackSize = matched.availableSizes?.[0] || { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65.0 };
+          matched.sizeId = fallbackSize.sizeId || 'MEDIANO';
+          matched.sizeName = fallbackSize.nombre || 'Mediano';
+          matched.unitPrice = Number(fallbackSize.precio || 65.0);
+        } else {
+          matched.sizeId = matched.sizeId || 'MEDIANO';
+          matched.unitPrice = Number(matched.unitPrice || 65.0);
+        }
+        matched.sizeAvailable = true;
+        matched.unavailableReason = null;
+      }
+
+      if (matched.sizeAvailable === false && isExplicitUserSize) {
+        const title = matched.baseTitle || rawName;
+        const availList = (matched.availableSizes || []).map(s => `${s.nombre || s.sizeId} (${s.dimensiones || (s.sizeId === 'PORTADA_ALBUM' ? '30×30 cm a Q55.00' : 'estándar')})`).join(', ');
+        const customUnavailable = isMusicCategory
+          ? `El diseño "${title}" es exclusivo en Portada de Álbum (30×30 cm a Q55.00). No se fabrica en ${userSpecifiedSize}.`
+          : (matched.unavailableReason || `El diseño "${title}" no se fabrica en ${userSpecifiedSize}. Tamaños disponibles: ${availList}.`);
+
         unmatchedItems.push({
           rawName,
-          requestedSize: normSize,
+          requestedSize: userSpecifiedSize,
           quantity: qty,
           sizeAvailable: false,
-          unavailableReason: matched.unavailableReason,
+          unavailableReason: customUnavailable,
           availableSizes: matched.availableSizes || [],
           candidates: [{
             id: matched.posterId || matched.productId,
-            titulo: matched.baseTitle || rawName,
-            subtitulo: matched.unavailableReason,
+            titulo: title,
+            subtitulo: customUnavailable,
             categoria: matched.category,
           }],
         });
       } else {
-        const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
+        const finalNormSize = normalizeCatalogSizeId(matched.sizeId || 'MEDIANO');
+        const unitPrice = finalNormSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
         const subtotal = Number((qty * unitPrice).toFixed(2));
         grandTotal += subtotal;
         enrichedItems.push({
           productId: isUuid(matched?.productId) ? matched.productId : null,
           webPosterId: matched.posterId || null,
-          description: matched.description,
+          description: matched.description || `${matched.baseTitle || rawName} (${matched.sizeName || finalNormSize})`,
           baseTitle: matched.baseTitle || rawName,
           category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
           thumbUrl: matched.thumbUrl || null,
@@ -116,7 +144,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
           quantity: qty,
           unitPrice,
           subtotal,
-          sizeId: matched.sizeId || normSize,
+          sizeId: finalNormSize,
           availableSizes: matched.availableSizes || [],
           sizeAvailable: true,
           unavailableReason: null,
@@ -126,13 +154,13 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
       let candidates = [];
       try {
         const queryTerm = rawName.split(/\s+/)[0] || rawName;
-        candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3 });
+        candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3, skipLiveParachute: true });
       } catch (err) {
         console.warn('[constructDraftPayload] Error buscando candidatos para obra no encontrada:', err.message);
       }
       unmatchedItems.push({
         rawName,
-        requestedSize: normSize,
+        requestedSize: userSpecifiedSize || 'MEDIANO',
         quantity: qty,
         candidates: (candidates || []).map((c) => ({
           id: c.id,
@@ -173,10 +201,22 @@ export { getHourlySalesAnalytics as executeGetHourlySalesAnalytics, getTopSellin
 export async function executeSearchCatalog(tenantId, query, category = null, limit = 12) {
   if (!query || typeof query !== 'string' || !query.trim()) return [];
   const clean = query.trim(), norm = normalizeArtworkQuery(clean);
-  let matches = await searchHybridPosters({ tenantId, query: norm, category, limit });
+  let matches = [];
+  try {
+    matches = await searchWebPosters({ tenantId, query: norm, category, limit, skipLiveParachute: true });
+  } catch (_) {
+    matches = [];
+  }
   if (!matches?.length) {
     const alias = resolveEntityAlias(clean);
-    if (alias.matched) matches = [{ id: `alias-${alias.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${alias.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: alias.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: alias.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: alias.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
+    if (alias.matched) {
+      try {
+        matches = await searchWebPosters({ tenantId, query: alias.searchQuery || alias.canonicalTitle, category: category || alias.category, limit, skipLiveParachute: true });
+      } catch (_) {}
+      if (!matches?.length) {
+        matches = [{ id: `alias-${alias.canonicalTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, sku: `DV-${alias.canonicalTitle.substring(0, 4).toUpperCase()}`, titulo: alias.canonicalTitle, subtitulo: 'Catálogo Oficial Deco Vintage', categoria: alias.category || 'ARTE', imageUrl: null, thumbUrl: null, precioMinimo: alias.defaultSizeId === 'PORTADA_ALBUM' ? 55 : 65 }];
+      }
+    }
   }
   return matches || [];
 }

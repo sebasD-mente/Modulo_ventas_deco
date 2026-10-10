@@ -45,7 +45,14 @@ function normSize(requestedSize) {
 function resolvePosterSize(item, requestedSize) {
   const hasOfficialSizes = Array.isArray(item.sizes) && item.sizes.length > 0;
   const sizes = hasOfficialSizes ? item.sizes : Object.values(STANDARD_SIZES);
-  const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize) || sizes.find((s) => s.sizeId === item.primarySize) || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM') || sizes[0] || STANDARD_SIZES.MEDIANO;
+  const isMusic = (item.categoria || item.category) === 'MUSICA';
+  const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize)
+    || sizes.find((s) => s.sizeId === item.primarySize)
+    || (isMusic ? sizes.find((s) => s.sizeId === 'PORTADA_ALBUM') : null)
+    || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM')
+    || (isMusic ? null : sizes.find((s) => s.sizeId === 'MEDIANO'))
+    || sizes[0]
+    || STANDARD_SIZES.MEDIANO;
 
   let selectedSize = legitPrimary, sizeAvailable = true, unavailableReason = null;
   if (requestedSize) {
@@ -124,9 +131,10 @@ export async function findLocalMatch(tenantIdOrQuery, cleanOrCatalog, requestedS
   return null;
 }
 
-export async function matchPosterEverywhere(tenantId, query, requestedSize = null) {
+export async function matchPosterEverywhere(tenantId, query, requestedSize = null, options = {}) {
   const clean = String(query || '').trim();
   if (!clean) return null;
+  const skipLiveParachute = options.skipLiveParachute ?? true;
 
   try {
     const local = await getCachedProducts(tenantId);
@@ -138,10 +146,18 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (aliasRes.matched && aliasRes.exactMatch && (aliasRes.canonicalTitle || aliasRes.searchQuery)) {
     let webMatches = [];
     const preferredQuery = aliasRes.canonicalTitle || aliasRes.searchQuery;
-    try { webMatches = await searchHybridPosters({ tenantId, query: preferredQuery, limit: 12 }); } catch { webMatches = await searchWebPosters({ tenantId, query: preferredQuery, limit: 12 }); }
+    try {
+      webMatches = await searchWebPosters({ tenantId, query: preferredQuery, limit: 12, skipLiveParachute });
+    } catch {
+      webMatches = [];
+    }
 
     if ((!webMatches || webMatches.length === 0) && aliasRes.searchQuery && aliasRes.searchQuery !== preferredQuery) {
-      try { webMatches = await searchHybridPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); } catch { webMatches = await searchWebPosters({ tenantId, query: aliasRes.searchQuery, limit: 12 }); }
+      try {
+        webMatches = await searchWebPosters({ tenantId, query: aliasRes.searchQuery, limit: 12, skipLiveParachute });
+      } catch {
+        webMatches = [];
+      }
     }
 
     if (webMatches && webMatches.length > 0) {
@@ -161,8 +177,8 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   if (significantTokens.length === 0) return null;
 
   let candidates = [];
-  try { candidates = await searchHybridPosters({ tenantId, query: clean, limit: 12 }); }
-  catch { candidates = await searchWebPosters({ tenantId, query: clean, limit: 12 }); }
+  try { candidates = await searchWebPosters({ tenantId, query: clean, limit: 12, skipLiveParachute }); }
+  catch { candidates = []; }
   if (!candidates || candidates.length === 0) return findLocalMatch(tenantId, clean, requestedSize);
 
   if (significantTokens.length === 1) {

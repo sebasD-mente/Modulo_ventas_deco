@@ -69,6 +69,16 @@ export const STAND_ENTITY_ALIASES = [
     ]
   },
   {
+    canonicalTitle: 'Olivia Rodrigo - GUTS / SOUR',
+    searchQuery: 'Olivia Rodrigo GUTS',
+    category: 'MUSICA',
+    defaultSizeId: 'PORTADA_ALBUM',
+    aliases: [
+      'olivia rodrigo', 'olivia', 'la olivia', 'guts', 'sour', 'olivia uña',
+      'olivia mordiendo uña', 'olivia rodrigo guts', 'vampire', 'bad idea right'
+    ]
+  },
+  {
     canonicalTitle: 'The Beatles - Abbey Road',
     searchQuery: 'The Beatles Abbey Road',
     category: 'MUSICA',
