@@ -10,7 +10,8 @@ export const UNIVERSAL_STOP_WORDS = new Set([
   'noche', 'noches', 'favor', 'gracias',
   'muestrame', 'mustrame', 'muéstrame',
   'mostrar', 'muestra', 'tenemos', 'disponible', 'disponibles', 'catalogo',
-  'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar'
+  'catálogo', 'ver', 'mira', 'dame', 'quiero', 'busca', 'buscar',
+  'the', 'a', 'an', 'of', 'and'
 ]);
 
 export const KNOWN_SHORT_ENTITIES = new Set(['f1', 'u2', 'r34', 'go', 'up', 'cr7']);

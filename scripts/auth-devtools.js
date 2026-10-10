@@ -5,7 +5,7 @@
  */
 
 export const DEVTOOLS_AUTH_SNIPPET = `(() => {
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6IlNlYmFzdGlhbiBKaW1lbmV6Iiwicm9sZSI6IlNVUEVSX0FETUlOIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXSwidGVuYW50SWQiOiI1OGI4MjlhNC0xMDA2LTQxYzItOGU5MC1iMDYxMDIzMGMyNWYiLCJhc3NpZ25lZEV2ZW50SWQiOm51bGwsImF2YXRhclVybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k3VndtYzUwNUozOEN6VXpaZk1XOGRMaVZNVy1HS25WRUtsRjBaeGV6Zk5BQ29aZlNieUE9czk2LWMiLCJpYXQiOjE3OTA2OTAwODQsImV4cCI6MTc5MTI5NDg4NH0.0bXYOeyvNNO6nxGPlet8mKRnuxaM69Jfn75fi9KInek";
+  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6IlNlYmFzdGlhbiBKaW1lbmV6Iiwicm9sZSI6IlNVUEVSX0FETUlOIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXSwidGVuYW50SWQiOiI1OGI4MjlhNC0xMDA2LTQxYzItOGU5MC1iMDYxMDIzMGMyNWYiLCJhc3NpZ25lZEV2ZW50SWQiOm51bGwsImF2YXRhclVybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k3VndtYzUwNUozOEN6VXpaZk1XOGRMaVZNVy1HS25WRUtsRjBaeGV6Zk5BQ29aZlNieUE9czk2LWMiLCJpYXQiOjE3OTE1OTQwNDUsImV4cCI6MTc5MjE5ODg0NX0.P3q2jxmhbObNQiqLrhx0Mr9jpBkxDvQUVRYV_qEzWto";
   
   const user = {
     id: "30bb4712-f551-418e-bb03-5eeb60015f68",
@@ -18,10 +18,10 @@ export const DEVTOOLS_AUTH_SNIPPET = `(() => {
     avatarUrl: "https://lh3.googleusercontent.com/a/ACg8ocI7Vwmc505J38CzUzZfMW8dLiVMW-GKnVEKlF0ZxezfNACoZfSbyA=s96-c"
   };
   const activeEvent = {
-    id: "4426d955-39bc-438e-a5eb-529e4b9277e2",
+    id: "evt-ventas-redes-online",
     tenantId: "58b829a4-1006-41c2-8e90-b0610230c25f",
-    name: "Feria de Emprendedores",
-    location: "Cayalá Plaza Central",
+    name: "Ventas en Línea y Redes Sociales",
+    location: "Canal Digital (WhatsApp / IG / FB)",
     status: "ACTIVO"
   };
   localStorage.setItem('token', token);

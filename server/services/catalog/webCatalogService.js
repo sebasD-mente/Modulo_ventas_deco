@@ -143,29 +143,31 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   } catch (_) {}
 
   const aliasRes = resolveEntityAlias(clean);
-  if (aliasRes.matched && aliasRes.exactMatch && (aliasRes.canonicalTitle || aliasRes.searchQuery)) {
+  if (aliasRes.matched && aliasRes.exactMatch && (aliasRes.searchQuery || aliasRes.canonicalTitle)) {
     let webMatches = [];
-    const preferredQuery = aliasRes.canonicalTitle || aliasRes.searchQuery;
+    const preferredQuery = aliasRes.searchQuery || aliasRes.canonicalTitle;
     try {
       webMatches = await searchWebPosters({ tenantId, query: preferredQuery, limit: 12, skipLiveParachute });
     } catch {
       webMatches = [];
     }
 
-    if ((!webMatches || webMatches.length === 0) && aliasRes.searchQuery && aliasRes.searchQuery !== preferredQuery) {
+    if ((!webMatches || webMatches.length === 0) && aliasRes.canonicalTitle && aliasRes.canonicalTitle !== preferredQuery) {
       try {
-        webMatches = await searchWebPosters({ tenantId, query: aliasRes.searchQuery, limit: 12, skipLiveParachute });
+        webMatches = await searchWebPosters({ tenantId, query: aliasRes.canonicalTitle, limit: 12, skipLiveParachute });
       } catch {
         webMatches = [];
       }
     }
 
     if (webMatches && webMatches.length > 0) {
-      const canonicalTerms = normalizeMatcherString(aliasRes.canonicalTitle || aliasRes.searchQuery).split(/\s+/).filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
+      const canonicalTerms = normalizeMatcherString(aliasRes.searchQuery || aliasRes.canonicalTitle)
+        .split(/\s+/)
+        .filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
       const candidate = webMatches.find((p) => {
         const full = normalizeMatcherString(`${p.titulo || ''} ${p.subtitulo || ''} ${(p.tags || []).join(' ')}`);
-        return canonicalTerms.length === 0 || canonicalTerms.some((ct) => new RegExp(`\\b${ct}\\b`, 'i').test(full));
-      });
+        return canonicalTerms.length === 0 || canonicalTerms.every((ct) => new RegExp(`\\b${ct}\\b`, 'i').test(full));
+      }) || webMatches[0];
       if (candidate) return buildPosterResult(candidate, requestedSize || aliasRes.defaultSizeId);
     }
     return findLocalMatch(tenantId, clean, requestedSize);
