@@ -258,8 +258,6 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           <PaymentSummaryBar
             paymentMethod={cart.paymentMethod} setPaymentMethod={cart.setPaymentMethod}
-            discount={cart.discount} setDiscount={cart.setDiscount}
-            notes={cart.notes} setNotes={cart.setNotes}
             grandTotal={cart.grandTotal} isSubmitting={cart.isSubmitting}
             disabled={cart.cartItems.length === 0} onConfirmSale={cart.confirmSale}
           />

@@ -1,10 +1,9 @@
 import React from 'react';
-import { Banknote, CreditCard, Smartphone, Tag, CheckCircle2, Loader2 } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function PaymentSummaryBar({
-  paymentMethod, setPaymentMethod, discount, setDiscount,
-  notes, setNotes, grandTotal = 0, isSubmitting = false,
-  disabled = false, onConfirmSale,
+  paymentMethod, setPaymentMethod, grandTotal = 0,
+  isSubmitting = false, disabled = false, onConfirmSale,
 }) {
   const methods = [
     { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote },
@@ -34,36 +33,6 @@ export default function PaymentSummaryBar({
               <span>{label}</span>
             </button>
           ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-800">
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Tag className="w-3 h-3" />
-            <span>Descuento Opcional (Q)</span>
-          </label>
-          <input
-            type="number"
-            min="0"
-            placeholder="0.00"
-            value={discount || ''}
-            onChange={(e) => setDiscount && setDiscount(Number(e.target.value))}
-            className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white"
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
-            Nota / Cliente
-          </label>
-          <input
-            type="text"
-            placeholder="Ej. Cliente frecuente..."
-            value={notes || ''}
-            onChange={(e) => setNotes && setNotes(e.target.value)}
-            className="w-full bg-black border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white"
-          />
         </div>
       </div>
 
