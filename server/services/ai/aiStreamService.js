@@ -179,30 +179,31 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     };
 
     if (items.length > 0 && unmatched.length === 0) {
-      const mountedStr = items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
       yield {
         type: 'token',
-        text: `🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${mountedStr}\n\n💳 **Total:** Q ${Number(draft.total || 0).toFixed(2)} (${payMethodFormatted}). Presiona **"Confirmar Venta"** para registrarla.`
+        text: `🎉 ¡Listo! Te preparé el borrador en pantalla por **Q ${Number(draft.total || 0).toFixed(2)}** (${payMethodFormatted}). Presiona **"Confirmar Venta"** para registrarla.`
       };
       return;
     }
 
     if (items.length > 0 && unmatched.length > 0) {
-      const mountedStr = items.map(it => `**${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'} - Q${Number(it.unitPrice).toFixed(2)} en ${payMethodFormatted})`).join(', ');
-      const sizeConflicts = unmatched.filter(u => u.sizeAvailable === false || u.unavailableReason);
-      const trulyMissing = unmatched.filter(u => !u.sizeAvailable && !u.unavailableReason);
+      const sizeConflicts = unmatched.filter(u => u.sizeAvailable === false || u.unavailableReason || u.sizeConflict);
+      const trulyMissing = unmatched.filter(u => !u.sizeAvailable && !u.unavailableReason && !u.sizeConflict);
 
       let extraMsg = '';
       if (sizeConflicts.length > 0) {
         const notes = sizeConflicts.map(u => u.unavailableReason || `El diseño '${u.rawName}' no se fabrica en ${u.requestedSize}.`).join(' ');
-        extraMsg += ` Nota: ${notes} ¿Deseas agregarlo en su formato disponible?`;
+        extraMsg += ` Nota: ${notes}`;
       }
       if (trulyMissing.length > 0) {
         const missingStr = trulyMissing.map(u => `'${u.rawName}'`).join(', ');
         const suggestions = formatCandidates(trulyMissing);
-        extraMsg += ` Sin embargo, **no encontré ${missingStr} en el catálogo**.${suggestions} ¿Deseas que agregue alguno de esos o buscas otro diseño?`;
+        extraMsg += ` No encontré ${missingStr} en el catálogo.${suggestions}`;
       }
-      yield { type: 'token', text: `⚠️ Monté en el borrador: ${mountedStr}.${extraMsg}` };
+      yield {
+        type: 'token',
+        text: `⚠️ Monté tu orden en el borrador por **Q ${Number(draft.total || 0).toFixed(2)}** (${payMethodFormatted}).${extraMsg} Presiona **"Confirmar Venta"** o ajusta el diseño.`
+      };
       return;
     }
 

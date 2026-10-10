@@ -53,7 +53,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     return null;
   };
 
-  const globalMsgSize = extractSizeFromText(userMessage);
+  const globalMsgSize = rawItems.length === 1 ? extractSizeFromText(userMessage) : null;
 
   for (const it of rawItems) {
     let rawName = String(it.productName || it.title || it.description || 'Póster').trim();
@@ -70,12 +70,23 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
         .trim();
     }
 
+    const itemExplicitTextSize = nameExtractedSize || globalMsgSize || null;
     const explicitSize = it.size ? normalizeCatalogSizeId(it.size) : null;
-    const userSpecifiedSize = explicitSize || nameExtractedSize || globalMsgSize || null;
-    const isExplicitUserSize = Boolean(userSpecifiedSize);
+    const userSpecifiedSize = itemExplicitTextSize || explicitSize || null;
 
     let aliasRes = resolveEntityAlias(rawName);
-    const initialRequestedSize = userSpecifiedSize || aliasRes.defaultSizeId || null;
+    const isMusicAlias = aliasRes.category === 'MUSICA' || aliasRes.defaultSizeId === 'PORTADA_ALBUM';
+
+    let initialRequestedSize = itemExplicitTextSize;
+    if (!initialRequestedSize) {
+      if (isMusicAlias) {
+        initialRequestedSize = 'PORTADA_ALBUM';
+      } else if (explicitSize) {
+        initialRequestedSize = explicitSize;
+      } else {
+        initialRequestedSize = aliasRes.defaultSizeId || null;
+      }
+    }
 
     let matched = await matchPosterEverywhere(tenantId, rawName, initialRequestedSize, { skipLiveParachute: true });
     if (!matched && aliasRes.matched && aliasRes.searchQuery) {
@@ -88,13 +99,21 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
       const isMusicCategory = matched.category === 'MUSICA' || aliasRes.category === 'MUSICA';
       const onlyHasAlbumSize = Array.isArray(matched.availableSizes) && matched.availableSizes.length === 1 && matched.availableSizes[0]?.sizeId === 'PORTADA_ALBUM';
       const hasAlbumAsPrimary = matched.sizeId === 'PORTADA_ALBUM' || aliasRes.defaultSizeId === 'PORTADA_ALBUM';
+      const isMusicArtwork = isMusicCategory || onlyHasAlbumSize || hasAlbumAsPrimary;
 
-      if (!isExplicitUserSize) {
-        if (isMusicCategory || onlyHasAlbumSize || hasAlbumAsPrimary) {
-          matched.sizeId = 'PORTADA_ALBUM';
-          matched.sizeName = 'Portada de Álbum';
-          matched.unitPrice = 55.0;
-        } else if (matched.sizeAvailable === false) {
+      const hasIncompatibleTextSize = itemExplicitTextSize && (
+        (isMusicArtwork && itemExplicitTextSize !== 'PORTADA_ALBUM') ||
+        (!isMusicArtwork && itemExplicitTextSize === 'PORTADA_ALBUM')
+      );
+
+      if (isMusicArtwork && !hasIncompatibleTextSize) {
+        matched.sizeId = 'PORTADA_ALBUM';
+        matched.sizeName = 'Portada de Álbum';
+        matched.unitPrice = 55.0;
+        matched.sizeAvailable = true;
+        matched.unavailableReason = null;
+      } else if (!hasIncompatibleTextSize) {
+        if (matched.sizeAvailable === false) {
           const fallbackSize = matched.availableSizes?.[0] || { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65.0 };
           matched.sizeId = fallbackSize.sizeId || 'MEDIANO';
           matched.sizeName = fallbackSize.nombre || 'Mediano';
@@ -107,18 +126,20 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
         matched.unavailableReason = null;
       }
 
-      if (matched.sizeAvailable === false && isExplicitUserSize) {
+      if (matched.sizeAvailable === false || hasIncompatibleTextSize) {
         const title = matched.baseTitle || rawName;
+        const requestedSizeToReport = itemExplicitTextSize || userSpecifiedSize || 'MEDIANO';
         const availList = (matched.availableSizes || []).map(s => `${s.nombre || s.sizeId} (${s.dimensiones || (s.sizeId === 'PORTADA_ALBUM' ? '30×30 cm a Q55.00' : 'estándar')})`).join(', ');
-        const customUnavailable = isMusicCategory
-          ? `El diseño "${title}" es exclusivo en Portada de Álbum (30×30 cm a Q55.00). No se fabrica en ${userSpecifiedSize}.`
-          : (matched.unavailableReason || `El diseño "${title}" no se fabrica en ${userSpecifiedSize}. Tamaños disponibles: ${availList}.`);
+        const customUnavailable = isMusicArtwork
+          ? `El diseño "${title}" es exclusivo en Portada de Álbum (30×30 cm a Q55.00). No se fabrica en ${requestedSizeToReport}.`
+          : (matched.unavailableReason || `El diseño "${title}" no se fabrica en ${requestedSizeToReport}. Tamaños disponibles: ${availList}.`);
 
         unmatchedItems.push({
           rawName,
-          requestedSize: userSpecifiedSize,
+          requestedSize: requestedSizeToReport,
           quantity: qty,
           sizeAvailable: false,
+          sizeConflict: true,
           unavailableReason: customUnavailable,
           availableSizes: matched.availableSizes || [],
           candidates: [{
