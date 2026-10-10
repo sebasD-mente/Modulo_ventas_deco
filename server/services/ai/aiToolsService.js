@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { prisma } from '../../config/prisma.js';
-import { searchWebPosters, searchHybridPosters } from '../webCatalogService.js';
+import { searchWebPosters, searchHybridPosters, UNIVERSAL_STOP_WORDS } from '../webCatalogService.js';
 import { extractPaymentMethod, resolveEntityAlias, normalizeArtworkQuery } from '../semanticParserService.js';
 import { normalizeCatalogSizeId, matchPosterEverywhere } from './aiMediaService.js';
 
@@ -153,8 +153,30 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
     } else {
       let candidates = [];
       try {
-        const queryTerm = rawName.split(/\s+/)[0] || rawName;
-        candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3, skipLiveParachute: true });
+        const cleanQuery = rawName
+          .replace(/[?!¿¡,.:;()_—\-\/\\"'`~*#]/g, ' ')
+          .replace(/\b\d+\s*(?:pzs?|piezas?|unidades?|u\b|posters?|cuadros?)\b/gi, ' ')
+          .replace(/^\s*\d+\s+/, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const candidateAlias = resolveEntityAlias(cleanQuery || rawName);
+        const resolvedQuery = (candidateAlias?.matched && (candidateAlias.searchQuery || candidateAlias.canonicalTitle))
+          ? (candidateAlias.searchQuery || candidateAlias.canonicalTitle)
+          : (cleanQuery || rawName);
+
+        candidates = await searchWebPosters({ tenantId, query: resolvedQuery, limit: 5, skipLiveParachute: true });
+
+        if ((!candidates || candidates.length === 0) && cleanQuery) {
+          const tokens = cleanQuery.toLowerCase().split(/\s+/).filter((t) => t.length > 1 && !UNIVERSAL_STOP_WORDS.has(t));
+          if (tokens.length >= 2) {
+            const sortedByLen = [...tokens].sort((a, b) => b.length - a.length);
+            const fallbackQuery = sortedByLen.slice(0, 2).join(' ');
+            candidates = await searchWebPosters({ tenantId, query: fallbackQuery, limit: 5, skipLiveParachute: true });
+          } else if (tokens.length === 1) {
+            candidates = await searchWebPosters({ tenantId, query: tokens[0], limit: 5, skipLiveParachute: true });
+          }
+        }
       } catch (err) {
         console.warn('[constructDraftPayload] Error buscando candidatos para obra no encontrada:', err.message);
       }

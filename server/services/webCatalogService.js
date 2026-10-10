@@ -33,7 +33,18 @@ export function isFuzzyTokenMatch(queryToken, targetToken) {
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24, skipLiveParachute = false }) {
   const cleanQuery = String(query ?? '').trim().toLowerCase();
   const rawProducts = await getCachedProducts(tenantId);
-  let filtered = rawProducts.filter(p => p.imageUrl !== null && p.imageUrl !== '');
+  let filtered = rawProducts.map((p) => {
+    const hasImage = Boolean(p.imageUrl && String(p.imageUrl).trim() !== '');
+    if (!hasImage) {
+      return {
+        ...p,
+        imageUrl: '/placeholder-poster.png',
+        thumbUrl: p.thumbUrl || '/placeholder-poster.png',
+        imageSlug: p.imageSlug || `no-img-${p.id || p.sku || 'item'}`,
+      };
+    }
+    return p;
+  });
   if (category && String(category).trim()) {
     filtered = filtered.filter((p) => p.categoria === String(category).trim().toUpperCase());
   }
@@ -151,10 +162,11 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         if (!matchesTitle && !hasAliasMatch && !hasExactTitle && !hasFuzzyMatch) score = 0;
       } else if (meaningfulTokens.length >= 2) {
         const matchedMeaningful = meaningfulTokens.filter((t) => isTitleTokenMatch(t) || isTokenMatch(t));
-        const hasAliasMatch = Boolean(aliasRes.exactMatch && aliasCondensed.length >= 3 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
+        const hasAliasMatch = Boolean((aliasRes.exactMatch || aliasRes.matched) && aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasFullPhrase = normFullText.includes(normQuery) || (queryCondensed.length >= 3 && normFullText.includes(queryCondensed));
-        const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.6;
-        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio && !hasFuzzyMatch) score = 0;
+        const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.5;
+        const hasPrimaryTitleWordMatch = matchedMeaningful.some((t) => (t.length >= 4 || KNOWN_SHORT_ENTITIES.has(t)) && (titleTokensSet.has(t) || titleStemmedSet.has(stem(t))));
+        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio && !hasFuzzyMatch && !hasPrimaryTitleWordMatch) score = 0;
       }
 
       return { p, score };
