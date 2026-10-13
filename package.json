@@ -12,17 +12,19 @@
     "start": "node server/index.js",
     "test": "node --test tests/security/zero-trust.test.js",
     "test:security": "node --test tests/security/zero-trust.test.js",
+    "test:unit": "node --test tests/catalog/deduplication.test.js tests/catalog/fuzzy-typo-tolerance.test.js tests/sales/idempotency.test.js tests/sales/sale-sequences.test.js tests/schema/schema-robustness.test.js",
     "test:voice": "node --test tests/ai/voice-lexical-priming-hesitation.test.js tests/ai/voice-vad-reengineering.test.js tests/adversarial/m1-voice-priming-hesitation-stress.test.js",
     "test:latency": "node --test tests/benchmarks/latency-audit.test.js",
     "audit:secrets": "node scripts/audit-secrets.js",
     "audit:monoliths": "node scripts/audit-monoliths.js",
-    "harness:check": "npm run test:security && npm run audit:secrets && npm run audit:monoliths && npm run build",
+    "harness:check": "node scripts/audit-harness.js",
     "deploy": "node scripts/deploy-dokploy.js",
     "verify:prod": "node scripts/verify-production-live.js",
     "devtools:auth": "node scripts/auth-devtools.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node prisma/seed.js",
+    "audit:syntax": "node scripts/audit-syntax.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",

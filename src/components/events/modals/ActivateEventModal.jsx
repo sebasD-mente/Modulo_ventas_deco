@@ -36,7 +36,7 @@ export default function ActivateEventModal({
             <div className="relative">
               <Mail className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="email" required placeholder="ej. vendedor@gmail.com o @decovintage.gt"
+                type="email" required placeholder="ej. vendedor@decovintage.gt"
                 value={sellerGoogleEmail}
                 onChange={(e) => setSellerGoogleEmail(e.target.value)}
                 className="w-full bg-black border border-neutral-700/90 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"

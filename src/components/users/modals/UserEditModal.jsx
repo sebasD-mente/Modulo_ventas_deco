@@ -55,7 +55,7 @@ export default function UserEditModal({
             <span>Correo Electrónico de Google (Gmail / Workspace):</span>
           </label>
           <input
-            type="email" placeholder="Ej: empleado@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required
+            type="email" placeholder="Ej: empleado@decovintage.gt" value={email} onChange={(e) => setEmail(e.target.value)} required
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
           />
           <p className="text-[10px] text-neutral-500">Solo este correo podrá iniciar sesión con Google OAuth 2.0.</p>
