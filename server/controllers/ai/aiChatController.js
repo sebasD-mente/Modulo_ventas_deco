@@ -41,20 +41,29 @@ export async function handleChatQuery(req, res) {
         pendingDraft: effectivePendingDraft, contextData: { sellerName, sessionId },
       });
       recordLlmInteraction({
-        tenantId, userId: req.userId || null, action: 'AI_CHAT', model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
-        tokensIn: null, tokensOut: result.reply ? Math.ceil(result.reply.length / 4) : null, latencyMs: Date.now() - t0Chat,
+        tenantId, userId: req.userId || null, action: 'AI_CHAT',
+        model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+        modelUsed: result.usedModel || 'gemini-3.8-flash',
+        initialModel: result.initialModel || 'gemini-3.8-flash',
+        fallbackActivated: Boolean(result.fallbackOccurred),
+        tokensIn: null, tokensOut: result.reply ? Math.ceil(result.reply.length / 4) : null,
+        latencyMs: Date.now() - t0Chat,
         ipAddress: req.ip, details: { eventId, toolCalls: (result.toolCalls || []).map((t) => t.name) },
       });
 
-      let draft = result.draftSale || null, suggestedPosters = result.suggestedPosters || [];
+      let draft = result.draftSale ?? null;
+      let suggestedPosters = Array.isArray(result.suggestedPosters) ? result.suggestedPosters : [];
       const toolCalls = result.toolCalls || result.functionCalls || [];
-      for (const toolCall of toolCalls) {
-        const { name, args } = toolCall;
-        if (name === 'prepareSaleDraft' && args) draft = await constructDraftPayload(tenantId, args, message.trim());
-        else if (name === 'discardSaleDraft') draft = null;
-        else if (name === 'searchCatalog' && args?.query) {
-          const matches = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(args.query), category: args.category, limit: 12 });
-          if (matches?.length > 0) suggestedPosters = matches;
+
+      if (!draft && result.draftAction !== 'DISCARDED' && Array.isArray(toolCalls)) {
+        for (const toolCall of toolCalls) {
+          const { name, args } = toolCall;
+          if (name === 'prepareSaleDraft' && args) draft = await constructDraftPayload(tenantId, args, message.trim(), effectivePendingDraft);
+          else if (name === 'discardSaleDraft') draft = null;
+          else if (name === 'searchCatalog' && args?.query && suggestedPosters.length === 0) {
+            const matches = await searchWebPosters({ tenantId, query: normalizeArtworkQuery(args.query), category: args.category, limit: 12 });
+            if (matches?.length > 0) suggestedPosters = matches;
+          }
         }
       }
 
@@ -106,8 +115,13 @@ export async function handleChatQuery(req, res) {
       await saveSessionState(sessionId, { pendingDraft: currentDraft, history: finalHistory, sellerName, eventId, tenantId });
 
       recordLlmInteraction({
-        tenantId, userId: req.userId || null, action: 'AI_CHAT_STREAM', model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
-        tokensIn: null, tokensOut: fullText ? Math.ceil(fullText.length / 4) : null, latencyMs: Date.now() - t0Stream,
+        tenantId, userId: req.userId || null, action: 'AI_CHAT_STREAM',
+        model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+        modelUsed: 'gemini-3.8-flash',
+        initialModel: 'gemini-3.8-flash',
+        fallbackActivated: false,
+        tokensIn: null, tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
+        latencyMs: Date.now() - t0Stream,
         ipAddress: req.ip, details: { eventId },
       });
 

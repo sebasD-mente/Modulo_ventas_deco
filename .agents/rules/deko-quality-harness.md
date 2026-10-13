@@ -1,16 +1,23 @@
+---
+trigger: always_on
+description: "Arnés de calidad DeKo Labs para STAND {IA} (Modulo_Ventas): Doctrina Anti-Ravioli (DOMAIN_CEILINGS), Zero-Leak Guard, aislamiento Zero-Trust y compuerta npm run harness:check."
+---
+
 # 🛡️ ARNÉS DE CALIDAD DEKO LABS (OBLIGATORIO PARA FRED Y SUBAGENTES)
 
 Este documento rige estrictamente para todo desarrollo, refactorización o corrección en STAND {IA} (Modulo_Ventas).
 
 ---
 
-## 1. 🚫 Regla Antimonolito Estricta
-* **Límite Absoluto para Archivos Nuevos o Refactorizados:** NINGÚN archivo nuevo o refactorizado puede superar las **200 líneas de código**.
-* **Límite de Componentes:** NINGÚN componente nuevo puede superar las **50-60 líneas**.
-* **Plan de Reducción de Deuda:** Los archivos legados existentes (`aiMultimodalService.js`, `UnifiedAiChat.jsx`, `EventsManagementView.jsx`) deben ser descompuestos en submódulos pequeños y NUNCA se les debe añadir más código monolítico.
-* Si una funcionalidad crece:
-  1. Extraer la lógica a hooks o submódulos en `src/hooks/` o `src/components/features/`.
-  2. Extraer herramientas y prompts a `server/services/ai/`.
+## 1. 🍝 Doctrina Anti-Ravioli y Techos Dinámicos por Dominio (`DOMAIN_CEILINGS`)
+* **Prohibición Expresa del Dogma de las 200 Líneas:** Queda TERMINANTEMENTE PROHIBIDO fragmentar archivos con alta cohesión de dominio únicamente por superar 200 líneas o crear micro-archivos huérfanos (< 80 líneas) para evadir linters.
+* **Techos por Capa Autorizados (`LAYER_DEFAULT_CEILINGS` y `DOMAIN_CEILINGS` en `scripts/audit-monoliths.js`):**
+  - Diccionarios semánticos y cultura pop (`server/services/semantic/`): **800 a 1,000 líneas**.
+  - Servicios de dominio transaccional (`server/services/`): **500 líneas**.
+  - Manifiestos de rutas e infraestructura (`server/routes/`, `server/index.js`, `src/App.jsx`): **450 a 500 líneas**.
+  - Controladores REST (`server/controllers/`) y Hooks/Contextos (`src/**/hooks/`, `src/context/`): **350 líneas**.
+  - Componentes UI React (`src/components/`): **280 líneas**.
+* Solo se descompone un archivo cuando mezcla capas incompatibles (ej. consultas SQL/Prisma dentro de vistas React).
 
 ---
 

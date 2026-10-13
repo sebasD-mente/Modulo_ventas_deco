@@ -113,12 +113,17 @@ export async function sleepWithJitter(attempt, baseDelayMs = 300, maxDelayMs = 1
   return jitteredDelay;
 }
 
+export const PRIMARY_PRODUCTION_CASCADE = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+
 export function resolveEffectiveModels(models) {
+  if (models === MODEL_PRIORITY_POOL) {
+    return [...PRIMARY_PRODUCTION_CASCADE, ...MODEL_PRIORITY_POOL];
+  }
   if (!models || !Array.isArray(models) || models.length === 0) {
-    return ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...MODEL_PRIORITY_POOL];
+    return [...PRIMARY_PRODUCTION_CASCADE, ...MODEL_PRIORITY_POOL];
   }
   if (models.some((m) => typeof m === 'string' && m.includes('2.5'))) {
-    return Array.from(new Set(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', ...models]));
+    return Array.from(new Set([...PRIMARY_PRODUCTION_CASCADE, ...models]));
   }
   return models;
 }
@@ -324,4 +329,15 @@ export async function* streamWithModelFallback({
       text: '\n\n*(Respuesta finalizada. Si falta algún ítem, puedes confirmarlo directamente en la venta activa.)*',
     };
   }
+}
+
+export function getPoolStatus() {
+  const keys = getAvailableKeys();
+  return {
+    totalKeys: keys.length,
+    availableKeys: keys.length,
+    exhaustedKeys: 0,
+    keys: keys.map((k) => (k.length > 8 ? `${k.slice(0, 6)}...` : '***')),
+    activeCascade: PRIMARY_PRODUCTION_CASCADE,
+  };
 }

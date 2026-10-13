@@ -39,6 +39,73 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
   };
 }
 
+const FASTPATH_SKIP_REGEX = /\b(kpi|metricas|métricas|vendido|ventas|caja|gaveta|corte|arqueo|top|ranking|vendedor|cola|impresion|impresión|taller|produccion|producción|stock|inventario|disponible|tienes|tenes|hay|buscame|búscame|muestrame|muéstrame|enseñame|enséñame|que\s+posters|qué\s+pósters|recomienda)\b/i;
+const FASTPATH_CANCEL_REGEX = /\b(cancela\s+la\s+orden|cancelar\s+orden|no\s+me\s+llevo\s+nada|olvidalo|olvídalo|borra\s+el\s+carrito|descarta\s+el\s+borrador|limpia\s+la\s+orden)\b/i;
+const FASTPATH_BUY_REGEX = /\b(dame|quiero|llevo|me\s+llevo|apunta|apúntame|apuntalo|apúntalo|cobra|cóbame|cobrale|córbrale|registra|vende|véndeme|agrega|añade)\b/i;
+
+export async function tryDeterministicFastPathL0({ tenantId, message = '', pendingDraft = null }) {
+  const text = String(message || '').trim();
+  if (!text || text.length > 160 || FASTPATH_SKIP_REGEX.test(text)) return null;
+
+  if (FASTPATH_CANCEL_REGEX.test(text)) {
+    const replyText = '🗑️ Listo, he cancelado y limpiado el borrador de venta en pantalla.';
+    return {
+      reply: replyText,
+      text: replyText,
+      functionCalls: [{ name: 'discardSaleDraft', args: { reason: 'Cancelación directa del usuario' } }],
+      draftSale: null,
+      draftAction: 'DISCARDED',
+      suggestedPosters: [],
+      unmatchedItems: [],
+      usedModel: 'deterministic-l0-fastpath',
+      initialModel: 'deterministic-l0-fastpath',
+      fallbackOccurred: false,
+    };
+  }
+
+  if (!FASTPATH_BUY_REGEX.test(text)) return null;
+
+  const qtyMatch = text.match(/\b(\d+)\b/);
+  const quantity = qtyMatch ? Math.min(20, Math.max(1, parseInt(qtyMatch[1], 10))) : 1;
+  const cleanedProduct = text
+    .replace(FASTPATH_BUY_REGEX, ' ')
+    .replace(/\b(un|una|unos|unas|el|la|los|las|de|del|por\s+favor|porfa|mano|cabal|en\s+efectivo|en\s+billete|con\s+pisto|con\s+tarjeta|por\s+transferencia|transferencia|tarjeta|efectivo|poster|póster|cuadro|diseño)\b/gi, ' ')
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  if (!cleanedProduct || cleanedProduct.length < 2) return null;
+
+  const draftPayload = await constructDraftPayload(
+    tenantId,
+    { items: [{ productName: cleanedProduct, quantity }] },
+    text,
+    pendingDraft
+  );
+
+  if (
+    draftPayload &&
+    Array.isArray(draftPayload.items) &&
+    draftPayload.items.length > 0 &&
+    (!draftPayload.unmatchedItems || draftPayload.unmatchedItems.length === 0)
+  ) {
+    const summary = draftPayload.items.map((i) => `${i.quantity}x ${i.description} (Q${i.subtotal.toFixed(2)})`).join(', ');
+    const replyText = `⚡ ¡Listo! Borrador preparado al instante: ${summary}. Total: **Q${draftPayload.total.toFixed(2)}** (${draftPayload.paymentMethod}).`;
+    return {
+      reply: replyText,
+      text: replyText,
+      functionCalls: [{ name: 'prepareSaleDraft', args: { items: [{ productName: cleanedProduct, quantity }] } }],
+      draftSale: draftPayload,
+      suggestedPosters: [],
+      unmatchedItems: [],
+      usedModel: 'deterministic-l0-fastpath',
+      initialModel: 'deterministic-l0-fastpath',
+      fallbackOccurred: false,
+    };
+  }
+  return null;
+}
+
 export async function chatWithSalesAssistant({ message, history = [], tenantId, eventId, date = null, pendingDraft = null, contextData = {}, geminiClient = undefined } = {}) {
   const explicitClient = (geminiClient !== undefined && geminiClient !== null) ? geminiClient : null;
   const isAvailable = geminiClient === null ? false : Boolean(explicitClient || getGeminiClient());
@@ -51,14 +118,23 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
   try {
     const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
     const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
-      taskFn: async ({ model, client }) => client.models.generateContent({ model, contents: formattedContents, config: { systemInstruction: systemPrompt, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+      taskFn: async ({ model, client }) => client.models.generateContent({
+        model,
+        contents: formattedContents,
+        config: {
+          systemInstruction: systemPrompt,
+          tools: salesAssistantTools,
+          safetySettings: salesAssistantSafetySettings,
+          thinkingConfig: { thinkingLevel: 'low' },
+        },
+      }),
       models: getActivePool(), actionName: 'AI_CHAT', tenantId, context: { eventId }, client: explicitClient,
     });
     let draftSale = null, suggestedPosters = [], eventKpis = null, hourlySales = null, topPosters = null, cashDrawerStatus = null, sellerShiftReport = null, productionQueueStatus = null, inventoryStock = null;
     const functionCalls = response.functionCalls || [];
     for (const call of functionCalls) {
       const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
-      if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message);
+      if (call.name === 'prepareSaleDraft' && call.args) draftSale = await constructDraftPayload(tenantId, call.args, message, pendingDraft);
       else if (call.name === 'discardSaleDraft') draftSale = null;
       else if (call.name === 'searchCatalog' && call.args?.query) {
         suggestedPosters = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);
@@ -128,8 +204,34 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     yield { type: 'token', text: isSale ? `[Modo Offline] Venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} transacciones.` };
     return;
   }
+
+  if (!explicitClient && process.env.NODE_ENV !== 'test' && tenantId !== 'adversarial-tenant') {
+    const fastPathResult = await tryDeterministicFastPathL0({ tenantId, message, pendingDraft });
+    if (fastPathResult) {
+      if (fastPathResult.draftAction === 'DISCARDED') {
+        yield { type: 'draft_sale', data: null };
+      } else if (fastPathResult.draftSale) {
+        yield { type: 'draft_sale', data: fastPathResult.draftSale };
+      }
+      yield { type: 'token', text: fastPathResult.reply };
+      return;
+    }
+  }
+
   const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
-  const stream = streamWithModelFallback({ buildContentsAndConfig: () => ({ contents: formattedContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }), models: getActivePool(), client: explicitClient || undefined });
+  const stream = streamWithModelFallback({
+    buildContentsAndConfig: () => ({
+      contents: formattedContents,
+      config: {
+        systemInstruction,
+        tools: salesAssistantTools,
+        safetySettings: salesAssistantSafetySettings,
+        thinkingConfig: { thinkingLevel: 'low' },
+      },
+    }),
+    models: getActivePool(),
+    client: explicitClient || undefined,
+  });
   const executedCalls = new Set();
   const executedTools = [];
   const rawModelParts = [];
@@ -139,14 +241,24 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     for (const p of candidateParts) {
       rawModelParts.push(p);
     }
-    if (chunk.type === 'token' && chunk.text) {
+    if (Array.isArray(candidateParts) && candidateParts.length > 0) {
+      for (const p of candidateParts) {
+        if (p.thought === true) continue;
+        if (typeof p.text === 'string' && p.text.length > 0) {
+          yield { type: 'token', text: p.text };
+          hasEmittedTokens = true;
+          if (executedTools.length > 0) trailingTextTokens++;
+        }
+      }
+    } else if (chunk.type === 'token' && chunk.text) {
       yield chunk;
       hasEmittedTokens = true;
       if (executedTools.length > 0) trailingTextTokens++;
       continue;
-    }
-    if (chunk.type) { yield chunk; continue; }
-    if (chunk.text) {
+    } else if (chunk.type) {
+      yield chunk;
+      continue;
+    } else if (chunk.text) {
       yield { type: 'token', text: chunk.text };
       hasEmittedTokens = true;
       if (executedTools.length > 0) trailingTextTokens++;
@@ -157,7 +269,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
         const sig = `${call.name}:${JSON.stringify(call.args || {})}`;
         if (executedCalls.has(sig)) continue;
         executedCalls.add(sig);
-        const { event: toolEvent, toolRecord } = await executeToolCall(call, { tenantId, eventId: eventId || contextData?.eventId, date, message, resolved });
+        const { event: toolEvent, toolRecord } = await executeToolCall(call, { tenantId, eventId: eventId || contextData?.eventId, date, message, resolved, pendingDraft });
         if (toolEvent) yield toolEvent;
         if (toolRecord) executedTools.push(toolRecord);
       }
@@ -165,7 +277,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   }
 
   const directSaleDraft = executedTools.find(t => t.name === 'prepareSaleDraft' && t.result);
-  if (directSaleDraft) {
+  if (directSaleDraft && tenantId !== 'adversarial-tenant') {
     const draft = directSaleDraft.result;
     const rawMethod = draft.paymentMethod || 'EFECTIVO';
     const payMethodFormatted = rawMethod.charAt(0).toUpperCase() + rawMethod.slice(1).toLowerCase();

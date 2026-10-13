@@ -4,7 +4,7 @@ import { searchWebPosters, searchHybridPosters, UNIVERSAL_STOP_WORDS } from '../
 import { extractPaymentMethod, resolveEntityAlias, normalizeArtworkQuery } from '../semanticParserService.js';
 import { normalizeCatalogSizeId, matchPosterEverywhere } from './aiMediaService.js';
 
-export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, discount: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
+export const prepareSaleDraftDeclaration = { name: 'prepareSaleDraft', description: 'Prepara o actualiza de inmediato el borrador de venta en el mostrador ante cualquier solicitud de compra, dictado, confirmación ("dame uno", "quiero uno", "apúntalo", "lo llevo", "1 mediano en efectivo", "cobrale un mediano") o modificación de la orden.', parameters: { type: Type.OBJECT, properties: { items: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { productName: { type: Type.STRING }, quantity: { type: Type.INTEGER }, unitPrice: { type: Type.NUMBER }, size: { type: Type.STRING } }, required: ['productName', 'quantity'] } }, total: { type: Type.NUMBER }, discount: { type: Type.NUMBER }, paymentMethod: { type: Type.STRING, enum: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'] }, notes: { type: Type.STRING }, customerName: { type: Type.STRING } }, required: ['items'] } };
 export const searchCatalogDeclaration = { name: 'searchCatalog', description: 'Busca obras y pósters en el catálogo oficial de Deco Vintage por palabras clave, personaje, franquicia o artista.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: 'Término de búsqueda, personaje o franquicia a buscar.' }, category: { type: Type.STRING, description: 'Categoría opcional del catálogo (ej. CÓMICS, MUSICA, ANIME).' } }, required: ['query'] } };
 export const getEventKPIsDeclaration = { name: 'getEventKPIs', description: 'Obtiene las métricas y KPIs en tiempo real del evento activo en PostgreSQL: total vendido, transacciones, etc.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, date: { type: Type.STRING } } } };
 export const getHourlySalesAnalyticsDeclaration = { name: 'getHourlySalesAnalytics', description: 'Obtiene el análisis de ventas por horario del evento en tiempo real: horas pico de venta, horarios de mayor recaudación y gráfico de distribución horaria.', parameters: { type: Type.OBJECT, properties: { eventId: { type: Type.STRING }, date: { type: Type.STRING } } } };
@@ -33,13 +33,13 @@ async function resolveActiveEvent(tenantId, eventId) {
   return (await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true } }))?.id || null;
 }
 
-export async function constructDraftPayload(tenantId, args, userMessage = '') {
+export async function constructDraftPayload(tenantId, args, userMessage = '', pendingDraft = null) {
   const rawItems = Array.isArray(args?.items) ? args.items.filter((it) => it && typeof it === 'object') : [];
   const enrichedItems = [];
   const unmatchedItems = [];
   let grandTotal = 0;
   const textToScan = [userMessage, args?.notes].filter(Boolean).join(' ');
-  const finalPayment = extractPaymentMethod(textToScan) || args?.paymentMethod || 'EFECTIVO';
+  const finalPayment = extractPaymentMethod(textToScan) || args?.paymentMethod || pendingDraft?.paymentMethod || 'EFECTIVO';
 
   const extractSizeFromText = (text) => {
     if (!text || typeof text !== 'string') return null;
@@ -212,6 +212,18 @@ export async function constructDraftPayload(tenantId, args, userMessage = '') {
           categoria: c.categoria,
         })),
       });
+    }
+  }
+  const isAdditiveIntent = /\b(agrega|añade|suma|tambien|también|ademas|además|otro|otra|mas|más)\b/i.test(userMessage);
+  if (isAdditiveIntent && Array.isArray(pendingDraft?.items) && pendingDraft.items.length > 0 && enrichedItems.length > 0) {
+    const existingKeys = new Set(enrichedItems.map((item) => `${item.webPosterId || item.productId || item.baseTitle}::${item.sizeId}`));
+    for (const prevItem of pendingDraft.items) {
+      const key = `${prevItem.webPosterId || prevItem.productId || prevItem.baseTitle}::${prevItem.sizeId}`;
+      if (!existingKeys.has(key)) {
+        enrichedItems.unshift(prevItem);
+        grandTotal += Number(prevItem.subtotal || (prevItem.unitPrice * prevItem.quantity) || 0);
+        existingKeys.add(key);
+      }
     }
   }
   return { items: enrichedItems, unmatchedItems, total: Number(grandTotal.toFixed(2)), discount: Number(args?.discount || 0), paymentMethod: finalPayment, inputChannel: 'IA_CHAT_TEXTO', notes: args?.notes || 'Venta dictada por STAND IA Chat', customerName: args?.customerName || null, transcription: userMessage };

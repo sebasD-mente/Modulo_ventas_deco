@@ -48,7 +48,7 @@ export function buildFallbackSummaries(executedTools) {
   return summaries.length > 0 ? summaries : ['Listo para registrar ventas o consultar catálogo en el stand.'];
 }
 
-export async function executeToolCall(call, { tenantId, eventId, date, message, resolved }) {
+export async function executeToolCall(call, { tenantId, eventId, date, message, resolved, pendingDraft = null }) {
   const effEvId = (call.args?.eventId && !['current', 'activo'].includes(call.args.eventId)) ? call.args.eventId : eventId;
   const id = call.id || null;
   try {
@@ -57,7 +57,7 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
       return { event: { type: 'draft_sale', data: null }, toolRecord: { name: call.name, args: call.args || {}, result, id } };
     }
     if (call.name === 'prepareSaleDraft' && call.args) {
-      const draft = await constructDraftPayload(tenantId, call.args, message);
+      const draft = await constructDraftPayload(tenantId, call.args, message, pendingDraft);
       const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
       return { event: { type: 'draft_sale', data: effectiveDraft }, toolRecord: { name: call.name, args: call.args, result: draft, id } };
     }
@@ -127,17 +127,36 @@ export async function* streamClosedLoopFollowUp({ executedTools, formattedConten
   let hadPoolError = false;
   try {
     const followUpStream = streamWithModelFallback({
-      buildContentsAndConfig: () => ({ contents: closedLoopContents, config: { systemInstruction, tools: salesAssistantTools, safetySettings: salesAssistantSafetySettings } }),
+      buildContentsAndConfig: () => ({
+        contents: closedLoopContents,
+        config: {
+          systemInstruction,
+          tools: salesAssistantTools,
+          safetySettings: salesAssistantSafetySettings,
+          thinkingConfig: { thinkingLevel: 'low' },
+        },
+      }),
       models: getActivePool(),
       client: (client !== null && client !== undefined) ? client : undefined,
     });
     for await (const chunk of followUpStream) {
-      const text = chunk.text || '';
-      const isBreak = text.includes('Respuesta finalizada');
-      const isPoolCrash = text.includes('Conexión con IA intermitente') || text.includes('volumen alto');
-      if (isPoolCrash) hadPoolError = true;
-      if (chunk.type === 'token' && text) { yield chunk; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
-      else if (text) { yield { type: 'token', text }; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
+      const parts = chunk?.candidates?.[0]?.content?.parts;
+      if (Array.isArray(parts) && parts.length > 0) {
+        for (const part of parts) {
+          if (part.thought === true) continue;
+          if (typeof part.text === 'string' && part.text.length > 0) {
+            yield { type: 'token', text: part.text };
+            followUpTokensCount++;
+          }
+        }
+      } else {
+        const text = chunk.text || '';
+        const isBreak = text.includes('Respuesta finalizada');
+        const isPoolCrash = text.includes('Conexión con IA intermitente') || text.includes('volumen alto');
+        if (isPoolCrash) hadPoolError = true;
+        if (chunk.type === 'token' && text) { yield chunk; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
+        else if (text) { yield { type: 'token', text }; if (!isBreak && !isPoolCrash) followUpTokensCount++; }
+      }
     }
   } catch (err) {
     console.warn('[aiClosedLoopService] ⚠️ Error en closed-loop follow-up:', err.message);

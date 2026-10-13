@@ -1,3 +1,8 @@
+---
+trigger: always_on
+description: "Protocolo de aislamiento inviolable entre proyectos y cuarentena de secretos Zero-Trust para STAND {IA}."
+---
+
 # 🔒 PROTOCOLO DE AISLAMIENTO INVIOLABLE Y CUARENTENA DE SECRETOS (ZERO-TRUST)
 
 Este protocolo es de cumplimiento obligatorio para todo agente o subagente en STAND {IA}.
