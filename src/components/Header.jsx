@@ -198,7 +198,7 @@ export default function Header({ activeEvent, activeTab, setActiveTab, liveMetri
                     key={tab.id}
                     type="button"
                     onClick={() => { setActiveTab(tab.id); setIsMenuOpen(false); }}
-                    className={`min-h-[48px] w-full rounded-xl flex items-center justify-between px-3 text-sm font-bold transition-all cursor-pointer ${
+                    className={`min-h-[44px] w-full rounded-xl flex items-center justify-between px-3 text-sm font-bold transition-all cursor-pointer ${
                       isActive ? 'bg-black text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-100'
                     }`}
                   >

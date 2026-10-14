@@ -7,7 +7,8 @@ export default function ChatDraftCard({
   pendingDraft, onUpdateSize, updateDraftItemSize, onUpdateQty, updateDraftItemQty,
   onRemoveItem, removeDraftItem, onUpdatePaymentMethod, updateDraftPaymentMethod,
   onDiscard, discardDraft, onConfirmSale, confirmPendingSale,
-  onPopulateManualForm, transferDraftToManualForm, onOpenSwapModal, openSwapModal, isLoading
+  onPopulateManualForm, transferDraftToManualForm, onOpenSwapModal, openSwapModal,
+  onSelectVariant, isLoading
 }) {
   if (!pendingDraft) return null;
   const updateSize = onUpdateSize || updateDraftItemSize;
@@ -40,7 +41,7 @@ export default function ChatDraftCard({
         </span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-neutral-400">Canal: <strong className="text-white">{pendingDraft.inputChannel || 'IA_CHAT_TEXTO'}</strong></span>
-          <button type="button" onClick={discard} className="text-neutral-400 hover:text-red-400 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg transition-colors cursor-pointer" title="Descartar borrador">
+          <button type="button" onClick={discard} className="text-neutral-400 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors cursor-pointer" title="Descartar borrador">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -83,7 +84,7 @@ export default function ChatDraftCard({
                   const query = pendingDraft.unmatchedItems[0]?.rawName || '';
                   if (openSwap) openSwap(-1, query);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 🔍 Buscar diseño en catálogo
               </button>
@@ -102,6 +103,7 @@ export default function ChatDraftCard({
             onUpdateQty={updateQty}
             onRemoveItem={removeItem}
             onOpenSwap={openSwap}
+            onSelectVariant={onSelectVariant}
             availableSizes={getSizes(it)}
           />
         ))}

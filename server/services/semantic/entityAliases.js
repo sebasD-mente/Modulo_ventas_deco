@@ -75,7 +75,7 @@ export const STAND_ENTITY_ALIASES = [
     category: 'MUSICA',
     defaultSizeId: 'PORTADA_ALBUM',
     aliases: [
-      'olivia rodrigo', 'olivia', 'la olivia', 'guts', 'sour', 'olivia uña',
+      'olivia rodrigo', 'olivia', 'la olivia', 'guts', 'sour',
       'olivia mordiendo uña', 'olivia rodrigo guts', 'vampire', 'bad idea right'
     ]
   },

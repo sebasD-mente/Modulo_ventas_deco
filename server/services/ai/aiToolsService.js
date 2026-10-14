@@ -89,7 +89,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
     }
 
     let matched = await matchPosterEverywhere(tenantId, rawName, initialRequestedSize, { skipLiveParachute: true });
-    if (!matched && aliasRes.matched && aliasRes.searchQuery) {
+    if (!matched && aliasRes.matched && aliasRes.exactMatch && aliasRes.searchQuery) {
       matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, initialRequestedSize, { skipLiveParachute: true });
     }
 
@@ -167,6 +167,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
           subtotal,
           sizeId: finalNormSize,
           availableSizes: matched.availableSizes || [],
+          alternatives: Array.isArray(matched.alternatives) ? matched.alternatives : [],
           sizeAvailable: true,
           unavailableReason: null,
         });

@@ -310,11 +310,12 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
       if (trulyMissing.length > 0) {
         const missingStr = trulyMissing.map(u => `'${u.rawName}'`).join(', ');
         const suggestions = formatCandidates(trulyMissing);
-        extraMsg += ` No encontré ${missingStr} en el catálogo.${suggestions}`;
+        extraMsg += ` no encontré ${missingStr} en el catálogo.${suggestions}`;
       }
+      const mountedStr = items.map(it => `**${it.quantity}x ${it.description}**`).join(', ');
       yield {
         type: 'token',
-        text: `⚠️ Monté tu orden en el borrador por **Q ${Number(draft.total || 0).toFixed(2)}** (${payMethodFormatted}).${extraMsg} Presiona **"Confirmar Venta"** o ajusta el diseño.`
+        text: `⚠️ Monté en el borrador: ${mountedStr} por **Q ${Number(draft.total || 0).toFixed(2)}** (${payMethodFormatted}).${extraMsg} Presiona **"Confirmar Venta"** o ajusta el diseño.`
       };
       return;
     }

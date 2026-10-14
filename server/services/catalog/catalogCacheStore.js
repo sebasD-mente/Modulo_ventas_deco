@@ -8,19 +8,31 @@ import { invalidateVectorCache } from '../embeddingService.js';
 import { formatProductForPos } from './catalogStringNormalizer.js';
 
 export const productCache = new Map();
-export const CACHE_TTL_MS = 30 * 1000;
+export const CACHE_TTL_MS = 5 * 60 * 1000;
 export const DEFAULT_TENANT_KEY = '__GLOBAL__';
+const refreshingTenants = new Set();
 
 export function invalidateCatalogCache(tenantId = null) {
   if (tenantId) {
     productCache.delete(tenantId);
     productCache.delete(DEFAULT_TENANT_KEY);
+    refreshingTenants.delete(tenantId);
   } else {
     productCache.clear();
+    refreshingTenants.clear();
   }
   try {
     invalidateVectorCache(tenantId);
   } catch {}
+}
+
+async function fetchAndCacheProducts(tenantId, key) {
+  const where = { isActive: true };
+  if (tenantId) where.tenantId = tenantId;
+  const products = await prisma.product.findMany({ where, orderBy: { name: 'asc' } });
+  const formatted = products.map(formatProductForPos);
+  productCache.set(key, { products: formatted, timestamp: Date.now() });
+  return formatted;
 }
 
 export async function getCachedProducts(tenantId) {
@@ -28,22 +40,23 @@ export async function getCachedProducts(tenantId) {
   const now = Date.now();
   const cachedEntry = productCache.get(key);
 
-  if (cachedEntry && now - cachedEntry.timestamp < CACHE_TTL_MS) {
-    return cachedEntry.products;
+  if (cachedEntry) {
+    if (now - cachedEntry.timestamp < CACHE_TTL_MS) {
+      return cachedEntry.products;
+    }
+    if (Array.isArray(cachedEntry.products) && cachedEntry.products.length > 0) {
+      if (!refreshingTenants.has(key)) {
+        refreshingTenants.add(key);
+        fetchAndCacheProducts(tenantId, key)
+          .catch((err) => console.warn('[WebCatalog SWR] ⚠️ Refresco background falló:', err.message))
+          .finally(() => refreshingTenants.delete(key));
+      }
+      return cachedEntry.products;
+    }
   }
 
-  const where = { isActive: true };
-  if (tenantId) where.tenantId = tenantId;
-
   try {
-    const products = await prisma.product.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
-
-    const formatted = products.map(formatProductForPos);
-    productCache.set(key, { products: formatted, timestamp: now });
-    return formatted;
+    return await fetchAndCacheProducts(tenantId, key);
   } catch (err) {
     console.warn('[WebCatalog Warning] ⚠️ No se pudo consultar prisma.product:', err.message);
     if (cachedEntry && cachedEntry.products?.length > 0) return cachedEntry.products;

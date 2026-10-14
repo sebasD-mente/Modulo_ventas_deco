@@ -71,14 +71,28 @@ function resolvePosterSize(item, requestedSize) {
   return { selectedSize, sizes, sizeAvailable, unavailableReason };
 }
 
-function buildPosterResult(matched, requestedSize) {
+function buildPosterResult(matched, requestedSize, siblingCandidates = []) {
   const { selectedSize, sizeAvailable, unavailableReason } = resolvePosterSize(matched, requestedSize);
   const displayTitle = matched.subtitulo ? `${matched.titulo} - ${matched.subtitulo}` : (matched.titulo || matched.name || 'Póster');
+  const alternatives = (Array.isArray(siblingCandidates) ? siblingCandidates : [])
+    .filter((c) => c && c.id && c.id !== matched.id)
+    .slice(0, 4)
+    .map((c) => ({
+      id: c.id,
+      posterId: c.id,
+      productId: isUuid(c.id) ? c.id : null,
+      titulo: c.titulo || c.name || 'Póster',
+      subtitulo: c.subtitulo || '',
+      categoria: c.categoria || c.category || 'ARTE',
+      thumbUrl: c.thumbUrl || c.imageUrl || null,
+      imageUrl: c.imageUrl || c.thumbUrl || null,
+      sizes: Array.isArray(c.sizes) && c.sizes.length > 0 ? c.sizes : Object.values(STANDARD_SIZES),
+    }));
   return {
     type: 'WEB_POSTER', productId: isUuid(matched.id) ? matched.id : null, posterId: matched.id, description: `${displayTitle} (${selectedSize.nombre})`,
     baseTitle: displayTitle, category: matched.categoria || matched.category || 'ARTE', thumbUrl: matched.thumbUrl || matched.imageUrl, imageUrl: matched.imageUrl,
     unitPrice: Number(selectedSize.precio), sizeId: selectedSize.sizeId, sizeName: selectedSize.nombre, availableSizes: matched.sizes || Object.values(STANDARD_SIZES),
-    sizeAvailable, unavailableReason,
+    sizeAvailable, unavailableReason, alternatives,
   };
 }
 
@@ -168,7 +182,7 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
         const full = normalizeMatcherString(`${p.titulo || ''} ${p.subtitulo || ''} ${(p.tags || []).join(' ')}`);
         return canonicalTerms.length === 0 || canonicalTerms.every((ct) => new RegExp(`\\b${ct}\\b`, 'i').test(full));
       }) || webMatches[0];
-      if (candidate) return buildPosterResult(candidate, requestedSize || aliasRes.defaultSizeId);
+      if (candidate) return buildPosterResult(candidate, requestedSize || aliasRes.defaultSizeId, webMatches);
     }
     const isTest = process.env.NODE_ENV === 'test' || process.execArgv.includes('--test') || Boolean(process.env.NODE_TEST_CONTEXT);
     if (isTest && (!webMatches || webMatches.length === 0)) {
@@ -191,9 +205,14 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
   const significantTokens = rawTokens.filter((t) => !EXTENDED_STOP_WORDS.has(t) && (t.length > 1 || KNOWN_SHORT_ENTITIES.has(t)));
   if (significantTokens.length === 0) return null;
 
+  const isTest = process.env.NODE_ENV === 'test' || process.execArgv.includes('--test') || Boolean(process.env.NODE_TEST_CONTEXT);
   let candidates = [];
   try { candidates = await searchWebPosters({ tenantId, query: clean, limit: 12, skipLiveParachute }); }
   catch { candidates = []; }
+  if ((!candidates || candidates.length === 0) && !isTest && significantTokens.length >= 2) {
+    try { candidates = await searchHybridPosters({ tenantId, query: clean, limit: 8 }); }
+    catch { candidates = []; }
+  }
   if (!candidates || candidates.length === 0) return findLocalMatch(tenantId, clean, requestedSize);
 
   if (significantTokens.length === 1) {
@@ -202,14 +221,13 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       const primaryTitleNorm = normalizeMatcherString(`${candidate.titulo || ''} ${candidate.subtitulo || ''}`);
       const titleTokens = primaryTitleNorm.split(/\s+/).filter(Boolean), titleStemmed = titleTokens.map(stemMatcherToken);
       const matchesTitle = titleTokens.includes(singleToken) || titleStemmed.includes(stemmedToken) || titleTokens.some((w) => w.startsWith(singleToken)) || new RegExp(`\\b${singleToken}\\b|\\b${stemmedToken}\\b`, 'i').test(primaryTitleNorm) || (stemmedToken.length >= 4 && primaryTitleNorm.replace(/\s+/g, '').includes(stemmedToken));
-      if (matchesTitle) return buildPosterResult(candidate, requestedSize);
+      if (matchesTitle) return buildPosterResult(candidate, requestedSize, candidates);
     }
     return findLocalMatch(tenantId, clean, requestedSize);
   }
 
   for (const candidate of candidates) {
     const primaryTitleNorm = normalizeMatcherString(`${candidate.titulo || ''} ${candidate.subtitulo || ''}`);
-    const candidateFullNorm = normalizeMatcherString(`${candidate.titulo || ''} ${candidate.subtitulo || ''} ${(candidate.tags || []).join(' ')}`);
     const primaryWords = primaryTitleNorm.split(/\s+/).filter(Boolean);
     const stemmedWords = primaryWords.map(stemMatcherToken);
 
@@ -225,45 +243,15 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       const tokenAlias = resolveEntityAlias(t);
       if (tokenAlias.matched) {
         const canonicalKey = normalizeMatcherString(tokenAlias.canonicalTitle || tokenAlias.searchQuery);
-        if (!new RegExp(`\\b${t}\\b|\\b${canonicalKey}\\b`, 'i').test(candidateFullNorm) && !(t.length >= 4 && candidateFullNorm.replace(/\s+/g, '').includes(t))) {
+        if (!new RegExp(`\\b${t}\\b|\\b${canonicalKey}\\b`, 'i').test(primaryTitleNorm) && !(t.length >= 4 && primaryTitleNorm.replace(/\s+/g, '').includes(t))) {
           franchiseCheckPassed = false;
           break;
         }
       }
     }
 
-    if (!franchiseCheckPassed) continue;
-
-    // 1. Cobertura directa >= 70%
-    if (coverage >= 0.70) return buildPosterResult(candidate, requestedSize);
-
-    // 2. Emparejamiento ponderado con score decay
-    const nonGenericMatched = matchedTokens.filter((t) => t.length >= 3 && !EXTENDED_STOP_WORDS.has(t));
-    const hasKeyEntityMatch = matchedTokens.some((t) => {
-      const tAlias = resolveEntityAlias(t);
-      const isEntity = tAlias.matched && Boolean(tAlias.canonicalTitle || tAlias.searchQuery);
-      const tStem = stemMatcherToken(t);
-      const matchesTitleExactWord = new RegExp(`\\b${t}\\b|\\b${tStem}\\b`, 'i').test(primaryTitleNorm);
-      return (isEntity || t.length >= 4) && matchesTitleExactWord;
-    });
-
-    // Caso A: significantTokens.length === 2 y coincide 1 token clave con match en título principal
-    if (significantTokens.length === 2 && nonGenericMatched.length >= 1 && hasKeyEntityMatch) {
-      return buildPosterResult(candidate, requestedSize);
-    }
-
-    // Caso B: significantTokens.length >= 3 y coinciden >= 2 tokens clave (o cobertura >= 0.50 con coincidencia en título)
-    if (significantTokens.length >= 3 && matchedTokens.length >= 2 && (coverage >= 0.50 || nonGenericMatched.length >= 2)) {
-      return buildPosterResult(candidate, requestedSize);
-    }
-
-    // Caso C: Coincidencia en título principal y soporte de tokens en texto completo
-    const matchedFullTokens = significantTokens.filter((t) => {
-      const st = stemMatcherToken(t);
-      return candidateFullNorm.includes(t) || candidateFullNorm.includes(st);
-    });
-    if (matchedTokens.length >= 1 && matchedFullTokens.length >= 2 && hasKeyEntityMatch) {
-      return buildPosterResult(candidate, requestedSize);
+    if (coverage >= 0.70 && franchiseCheckPassed) {
+      return buildPosterResult(candidate, requestedSize, candidates);
     }
   }
 
