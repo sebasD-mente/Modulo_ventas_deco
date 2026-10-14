@@ -4,14 +4,12 @@ import {
 } from '../../services/aiMultimodalService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
+import { getSessionState, saveSessionState } from '../../services/ai/aiSessionService.js';
 import { ENV } from '../../config/env.js';
 
 async function safePersistMedia(file, defaultName, defaultMime, folder) {
   try {
-    const uploadRes = await uploadBufferToStorage({
-      buffer: file.buffer, originalname: file.originalname || defaultName,
-      mimetype: file.mimetype || defaultMime, folder,
-    });
+    const uploadRes = await uploadBufferToStorage({ buffer: file.buffer, originalname: file.originalname || defaultName, mimetype: file.mimetype || defaultMime, folder });
     return uploadRes?.url || null;
   } catch (gcsErr) {
     console.warn(`⚠️ [GCS Warning] No se pudo persistir en ${folder}:`, gcsErr.message);
@@ -19,22 +17,37 @@ async function safePersistMedia(file, defaultName, defaultMime, folder) {
   }
 }
 
+function parseDraftInput(rawDraft) {
+  if (!rawDraft) return null;
+  if (typeof rawDraft === 'object' && Array.isArray(rawDraft.items)) return rawDraft;
+  if (typeof rawDraft === 'string' && rawDraft.trim().startsWith('{')) {
+    try { const parsed = JSON.parse(rawDraft); return Array.isArray(parsed?.items) ? parsed : null; } catch { return null; }
+  }
+  return null;
+}
+
 export async function handleVoiceSale(req, res) {
   try {
-    const { file, body: { eventId }, tenantId } = req;
+    const { file, body: { eventId, sessionId, pendingDraft: rawDraft } = {}, tenantId } = req;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún archivo de audio.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
+
+    let activeDraft = parseDraftInput(rawDraft);
+    if (!activeDraft && sessionId) {
+      const stored = await getSessionState(sessionId, tenantId);
+      if (stored?.pendingDraft?.items?.length) activeDraft = stored.pendingDraft;
+    }
 
     const t0Voice = Date.now();
     const [audioUrl, draft] = await Promise.all([
       safePersistMedia(file, 'voice-sale.webm', 'audio/webm', 'audio_sales'),
       processVoiceSaleAudio({
-        audioBuffer: file.buffer, mimeType: file.mimetype || 'audio/webm', tenantId, eventId,
+        audioBuffer: file.buffer, mimeType: file.mimetype || 'audio/webm', tenantId, eventId, pendingDraft: activeDraft,
       }),
     ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_VOICE_SALE',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: draft.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Voice, ipAddress: req.ip,
       details: { eventId, confidence: draft.confidence },
     });
@@ -50,9 +63,12 @@ export async function handleVoiceSale(req, res) {
       });
     }
 
+    const finalDraftSale = { ...draft, audioUrl, inputChannel: 'IA_VOZ' };
+    if (sessionId) await saveSessionState(sessionId, { pendingDraft: finalDraftSale, eventId, tenantId });
+
     return res.json({
       success: true,
-      draftSale: { ...draft, audioUrl, inputChannel: 'IA_VOZ' },
+      draftSale: finalDraftSale,
       requiresConfirmation: true,
       unmatchedItems: draft.unmatchedItems || [],
       suggestedPosters: draft.suggestedPosters || [],

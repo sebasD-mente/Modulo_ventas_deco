@@ -15,10 +15,10 @@ const ARTWORK_SHORT_ENTITIES = new Set([...(KNOWN_SHORT_ENTITIES || []), 'it', '
 const NEGATIVE_DOMAIN_REGEX = /\b(ramen|fideos?|noodles?|tacos?|hamburguesas?|burgers?|pizzas?|sushi|comida|platillos?|platos?|gastronom[ií]a|alimentos?|sopas?|caldos?|chashu|tonkotsu|postres?|pasteles?|bebidas?|refrescos?|ensaladas?|mariscos|calzado|zapatos?|zapatillas?|tenis|sneakers?|calcetines?|botas?|sandalias?|ropa|camisas?|camisetas?|pantalones?|vestidos?|animal(es)? vivos?|perros? vivos?|gatos? vivos?|mascotas? vivas?|utensilios? de cocina|cubiertos?|tenedores?|cucharas?|cuchillos?|vajilla|sart[eé]n(es)?|ollas?|mantel(es)?|muebles?|sof[aá]s?|camas?)\b/i;
 const GRAPHIC_ART_SAFEGUARD = /\b(poster|posters|cuadro|cuadros|lamina|laminas|diseno grafico|diseño grafico|ilustracion|impresion artistica|print|wall art)\b/i;
 
-function isNegativeDomainArtwork(visualAnalysis, primaryTitle) {
+const isNegativeDomainArtwork = (visualAnalysis, primaryTitle) => {
   const combined = `${visualAnalysis || ''} ${primaryTitle || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return !GRAPHIC_ART_SAFEGUARD.test(combined) && NEGATIVE_DOMAIN_REGEX.test(combined);
-}
+};
 
 function hasLexicalArtworkRelevance({ primaryTitle, searchQuery, franchiseOrCategory, candidates, matchedTitle, matchedDescription }) {
   const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -50,10 +50,10 @@ export function normalizeCatalogSizeId(requestedSize) {
   return raw.toUpperCase();
 }
 
-export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId }) {
+export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId, pendingDraft = null }) {
   const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
   try {
-    const { result: response } = await executeWithModelFallback({
+    const { result: response, model: usedModel } = await executeWithModelFallback({
       models: getActivePool(), actionName: 'DIRECT_VOICE_SALE_INFERENCE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: buildVoiceSalePrompt() }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
@@ -64,7 +64,12 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
     const cleanTranscription = (parsed.transcription || '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
     const isSale = Boolean(parsed.isSaleDetected && Array.isArray(parsed.items) && parsed.items.length > 0);
     const intent = parsed.intent || (isSale ? 'DICTADO_VENTA' : (cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'SALUDO'));
-    if (!isSale) return { transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.' };
+    if (!isSale && pendingDraft?.items?.length > 0 && /\b(tarjeta|pos|visa|mastercard|transferencia|deposito|dep[oó]sito|efectivo|billete|pisto)\b/i.test(cleanTranscription)) {
+      const nextMethod = /\b(tarjeta|pos|visa|mastercard)\b/i.test(cleanTranscription) ? 'TARJETA' : /\b(transferencia|deposito|dep[oó]sito)\b/i.test(cleanTranscription) ? 'TRANSFERENCIA' : 'EFECTIVO';
+      const total = Number(pendingDraft.items.reduce((s, i) => s + Number(i.subtotal || i.unitPrice * i.quantity || 0), 0).toFixed(2));
+      return { ...pendingDraft, transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', items: pendingDraft.items, total, paymentMethod: nextMethod, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: `Método de pago actualizado a ${nextMethod} por voz.`, reply: `Método de pago actualizado a ${nextMethod} por voz.` };
+    }
+    if (!isSale) return { transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.' };
     const enrichedItems = [], unmatchedItems = [], suggestedPosters = [];
     let grandTotal = 0;
     for (const item of parsed.items) {
@@ -72,9 +77,7 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       let matched = await matchPosterEverywhere(tenantId, rawTitle, requestedSize);
       if (!matched) {
         const aliasRes = resolveEntityAlias(rawTitle);
-        if (aliasRes.matched && aliasRes.searchQuery) {
-          matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, requestedSize || aliasRes.defaultSizeId);
-        }
+        if (aliasRes.matched && aliasRes.searchQuery) matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, requestedSize || aliasRes.defaultSizeId);
       }
       const qty = Math.max(1, Math.round(Number(item.quantity) || 1)), normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
       if (matched && (matched.productId || matched.posterId)) {
@@ -84,33 +87,37 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
           productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null,
           description: matched.description || `${matched.baseTitle || rawTitle} (${normSize})`, baseTitle: matched.baseTitle || rawTitle,
           category: matched.category || 'ARTE', thumbUrl: matched.thumbUrl || null, imageUrl: matched.imageUrl || null,
-          quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [],
+          quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [], alternatives: matched.alternatives || [],
         });
       } else {
         unmatchedItems.push({ rawName: rawTitle, requestedTitle: rawTitle, quantity: qty, size: normSize });
         try {
           const queryTerm = rawTitle.split(/\s+/)[0] || rawTitle, candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3 });
           for (const c of candidates || []) {
-            if (!suggestedPosters.some((p) => p.id === c.id) && suggestedPosters.length < 3) {
-              suggestedPosters.push({ id: c.id, titulo: c.titulo, subtitulo: c.subtitulo, categoria: c.categoria, thumbUrl: c.thumbUrl || c.imageUrl, imageUrl: c.imageUrl, sizes: c.sizes || [], precioMinimo: c.precioMinimo || 65 });
-            }
+            if (!suggestedPosters.some((p) => p.id === c.id) && suggestedPosters.length < 3) suggestedPosters.push({ id: c.id, titulo: c.titulo, subtitulo: c.subtitulo, categoria: c.categoria, thumbUrl: c.thumbUrl || c.imageUrl, imageUrl: c.imageUrl, sizes: c.sizes || [], precioMinimo: c.precioMinimo || 65 });
           }
         } catch (_) {}
       }
     }
     if (enrichedItems.length === 0) {
       const zeroMatchMsg = 'No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.';
-      return { transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO', greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
+      return { transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO', greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
+    }
+    if (pendingDraft?.items?.length > 0 && /\b(agrega|añade|suma|tambien|también|ademas|además|otro|otra|mas|más|ponme|dame)\b/i.test(cleanTranscription)) {
+      const existingKeys = new Set(enrichedItems.map((i) => `${i.webPosterId || i.productId || i.baseTitle}::${i.sizeId}`));
+      for (const prev of [...pendingDraft.items].reverse()) {
+        const k = `${prev.webPosterId || prev.productId || prev.baseTitle}::${prev.sizeId}`;
+        if (!existingKeys.has(k)) { enrichedItems.unshift(prev); grandTotal += Number(prev.subtotal || prev.unitPrice * prev.quantity || 0); existingKeys.add(k); }
+      }
     }
     const matchedList = enrichedItems.map((i) => i.baseTitle).filter(Boolean).join(', '), unmatchedList = unmatchedItems.map((i) => i.rawName || i.requestedTitle).join(', ');
     const sellerMsg = unmatchedItems.length > 0 ? `⚠️ Se preparó la venta con ${enrichedItems.length} ítem(s) disponible(s) (${matchedList}). Atención: los siguientes productos no están en el catálogo: ${unmatchedList}.` : 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.';
-    return { transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null, items: enrichedItems, total: Number(grandTotal.toFixed(2)), unmatchedItems, suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, inputChannel: 'IA_VOZ', message: sellerMsg, reply: sellerMsg };
+    return { transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', greeting: parsed.greeting || null, items: enrichedItems, total: Number(grandTotal.toFixed(2)), unmatchedItems, suggestedPosters: [], paymentMethod: parsed.paymentMethod || pendingDraft?.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: sellerMsg, reply: sellerMsg };
   } catch (err) { throwMediaError('processVoiceSaleAudio', err, 'Error al procesar dictado de voz'); }
 }
 
 export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 'image/jpeg', tenantId }) {
-  const cleanMime = (mimeType || 'image/jpeg').split(';')[0].trim().toLowerCase();
-  const REJECTION_MESSAGE = 'La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo.';
+  const cleanMime = (mimeType || 'image/jpeg').split(';')[0].trim().toLowerCase(), REJECTION_MESSAGE = 'La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo.';
   try {
     const { result: response } = await executeWithModelFallback({
       models: getActivePool(), actionName: 'RECOGNIZE_ARTWORK_IMAGE', tenantId,
@@ -122,22 +129,16 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
     let parsed = {};
     const reject = () => ({ isArtworkDetected: false, matchedPoster: null, primaryTitle: parsed.primaryTitle || null, visualAnalysis: parsed.visualAnalysis || null, candidates: parsed.candidates || [], items: [], total: 0, draftSale: null, message: REJECTION_MESSAGE });
     try {
-      const cleanJson = (response.text?.trim() || '{}').replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
-      parsed = JSON.parse(cleanJson);
-    } catch (parseErr) { return reject(); }
+      parsed = JSON.parse((response.text?.trim() || '{}').replace(/^```json\s*/i, '').replace(/\s*```$/i, ''));
+    } catch { return reject(); }
     const confidence = Number(parsed.confidence || 0);
     if (confidence < 0.60 || (!parsed.primaryTitle && !parsed.franchiseOrCategory)) return reject();
     if (isNegativeDomainArtwork(parsed.visualAnalysis, parsed.primaryTitle)) return reject();
     const searchQuery = parsed.primaryTitle || parsed.franchiseOrCategory || null;
     const matched = searchQuery ? await matchPosterEverywhere(tenantId, searchQuery, parsed.suggestedSize || 'MEDIANO') : null;
-    if (!matched) return reject();
-    if (!hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) return reject();
+    if (!matched || !hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) return reject();
     const total = matched.unitPrice || 65.0;
-    const item = {
-      productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null,
-      description: matched.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', baseTitle: matched.baseTitle || parsed.primaryTitle || 'Póster',
-      sizeId: matched.sizeId || 'MEDIANO', thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched.availableSizes,
-    };
+    const item = { productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null, description: matched.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', baseTitle: matched.baseTitle || parsed.primaryTitle || 'Póster', sizeId: matched.sizeId || 'MEDIANO', thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched.availableSizes, alternatives: matched.alternatives || [] };
     const draftSale = { items: [item], total, paymentMethod: 'EFECTIVO', inputChannel: 'IA_FOTO_ARTE', notes: `Reconocimiento visual: ${matched.baseTitle || parsed.primaryTitle || 'Detectado'}` };
     return {
       isArtworkDetected: true, matchedPoster: { id: matched.posterId || matched.productId, title: matched.baseTitle, category: matched.category, thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, unitPrice: total, sizeId: matched.sizeId },
@@ -187,10 +188,7 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
     let grandTotal = 0;
     for (const item of parsed.items || []) {
       const matched = await matchPosterEverywhere(tenantId, item.matchedCode || item.sku || item.description);
-      if (matched) {
-        item.description = matched.description; item.unitPrice = matched.unitPrice; item.thumbUrl = matched.thumbUrl; item.imageUrl = matched.imageUrl;
-        item.subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
-      }
+      if (matched) { item.description = matched.description; item.unitPrice = matched.unitPrice; item.thumbUrl = matched.thumbUrl; item.imageUrl = matched.imageUrl; item.subtotal = Number((item.quantity * item.unitPrice).toFixed(2)); }
       grandTotal += item.subtotal || 0;
     }
     parsed.totalCalculated = Number(grandTotal.toFixed(2));

@@ -4,7 +4,6 @@ export { getMonitorDashboardMetrics } from './monitorKpiService.js';
 
 /**
  * Retorna el rango civil exacto de inicio y fin de un día en la zona horaria oficial America/Guatemala (UTC-6).
- * Si no se provee dateStr (formato YYYY-MM-DD), calcula automáticamente el día civil actual en Guatemala.
  */
 export function getGuatemalaDayRange(dateStr = null) {
   const targetDate = dateStr
@@ -20,9 +19,7 @@ export function getGuatemalaDayRange(dateStr = null) {
  * Obtiene métricas y KPIs en tiempo real de un evento utilizando agregaciones nativas de PostgreSQL en O(1)
  */
 export async function getEventKPIs(params, fallbackTenantId = null) {
-  let tenantId = null;
-  let eventId = null;
-  let date = null;
+  let tenantId = null, eventId = null, date = null;
 
   if (typeof params === 'string') {
     eventId = params;
@@ -33,56 +30,39 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     date = params.date || null;
   }
 
+  const isAlias = !eventId || ['current', 'activo', 'active', 'hoy'].includes(String(eventId).trim().toLowerCase());
+  if (isAlias && prisma.event?.findFirst) {
+    try {
+      const activeEvt = await prisma.event.findFirst({
+        where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) },
+        orderBy: { startDate: 'desc' },
+        select: { id: true },
+      });
+      eventId = activeEvt?.id || null;
+    } catch (_) {
+      eventId = null;
+    }
+  }
+
   const saleWhere = { status: { not: 'ANULADA' } };
   if (eventId) saleWhere.eventId = eventId;
   if (tenantId) saleWhere.tenantId = tenantId;
 
   if (date) {
     const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
-    saleWhere.createdAt = { gte: startOfDay, lte: endOfDay };
+    if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
+      saleWhere.createdAt = { gte: startOfDay, lte: endOfDay };
+    }
   }
 
-  const [
-    salesAggregate,
-    unitsAggregate,
-    paymentsGroup,
-    topProductsGroup,
-    recentSales,
-    eventRecord,
-  ] = await Promise.all([
-    prisma.sale.aggregate({
-      where: saleWhere,
-      _sum: { totalAmount: true },
-      _count: { id: true },
-    }),
-    prisma.saleItem.aggregate({
-      where: { sale: saleWhere },
-      _sum: { quantity: true },
-    }),
-    prisma.salePayment.groupBy({
-      by: ['method'],
-      where: { sale: saleWhere },
-      _count: { id: true },
-      _sum: { amount: true },
-    }),
-    prisma.saleItem.groupBy({
-      by: ['description'],
-      where: { sale: saleWhere },
-      _sum: { quantity: true },
-      orderBy: { _sum: { quantity: 'desc' } },
-      take: 10,
-    }),
-    prisma.sale.findMany({
-      where: saleWhere,
-      take: 15,
-      orderBy: { createdAt: 'desc' },
-      include: { seller: true, payments: true, items: true },
-    }),
+  const [salesAggregate, unitsAggregate, paymentsGroup, topProductsGroup, recentSales, eventRecord] = await Promise.all([
+    prisma.sale.aggregate({ where: saleWhere, _sum: { totalAmount: true }, _count: { id: true } }),
+    prisma.saleItem.aggregate({ where: { sale: saleWhere }, _sum: { quantity: true } }),
+    prisma.salePayment.groupBy({ by: ['method'], where: { sale: saleWhere }, _count: { id: true }, _sum: { amount: true } }),
+    prisma.saleItem.groupBy({ by: ['description'], where: { sale: saleWhere }, _sum: { quantity: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 10 }),
+    prisma.sale.findMany({ where: saleWhere, take: 15, orderBy: { createdAt: 'desc' }, include: { seller: true, payments: true, items: true } }),
     eventId
-      ? prisma.event.findUnique({
-          where: { id: eventId },
-          select: { id: true, name: true, location: true, status: true, startDate: true, endDate: true },
-        })
+      ? prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, location: true, status: true, startDate: true, endDate: true } })
       : Promise.resolve(null),
   ]);
 
@@ -102,14 +82,9 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     const method = group.method;
     const count = group._count?.id || 0;
     const amount = Number(Number(group._sum?.amount || 0).toFixed(2));
-
-    if (paymentBreakdown[method]) {
-      paymentBreakdown[method].count += count;
-      paymentBreakdown[method].amount = Number((paymentBreakdown[method].amount + amount).toFixed(2));
-    } else {
-      paymentBreakdown.OTRO.count += count;
-      paymentBreakdown.OTRO.amount = Number((paymentBreakdown.OTRO.amount + amount).toFixed(2));
-    }
+    const bucket = paymentBreakdown[method] || paymentBreakdown.OTRO;
+    bucket.count += count;
+    bucket.amount = Number((bucket.amount + amount).toFixed(2));
   });
 
   const topProducts = topProductsGroup.map((item) => ({
@@ -137,13 +112,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
 /**
  * Lista las ventas de un evento con paginación y filtros nativos
  */
-export async function getEventSalesList({
-  tenantId,
-  eventId,
-  date = null,
-  page = 1,
-  limit = 50,
-}) {
+export async function getEventSalesList({ tenantId, eventId, date = null, page = 1, limit = 50 }) {
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
   const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
@@ -153,7 +122,9 @@ export async function getEventSalesList({
 
   if (date) {
     const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
-    where.createdAt = { gte: startOfDay, lte: endOfDay };
+    if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
+      where.createdAt = { gte: startOfDay, lte: endOfDay };
+    }
   }
 
   const [total, sales] = await Promise.all([
@@ -161,11 +132,7 @@ export async function getEventSalesList({
     prisma.sale.findMany({
       where,
       include: {
-        items: {
-          include: {
-            product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } },
-          },
-        },
+        items: { include: { product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } } } },
         payments: true,
         seller: { select: { fullName: true, email: true } },
       },
