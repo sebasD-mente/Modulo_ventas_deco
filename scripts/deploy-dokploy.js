@@ -16,7 +16,7 @@ if (!DOKPLOY_WEBHOOK_URL) {
 }
 const HEALTH_URL = process.env.PROD_HEALTH_URL || 'https://ventas.decovintage.online/health';
 const POLLING_INTERVAL_MS = 4000;
-const MAX_WAIT_MS = 300000; // 5 minutos (holgura para compilación limpia de imagen Docker en VPS)
+const MAX_WAIT_MS = 420000; // 7 minutos (holgura para compilación limpia de imagen Docker en VPS)
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
