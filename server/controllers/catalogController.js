@@ -32,7 +32,29 @@ export async function getProducts(req, res) {
       findOptions.skip = (parsedPage - 1) * parsedLimit;
     }
 
-    const products = await prisma.product.findMany(findOptions);
+    let products = [];
+    try {
+      products = await prisma.product.findMany(findOptions);
+    } catch (dbErr) {
+      console.warn('⚠️ [getProducts Fallback] Fallback a caché web de catálogo:', dbErr.message);
+      const posters = await searchWebPosters({
+        tenantId,
+        query: search || '',
+        category: category || null,
+        limit: limit ? parseInt(limit, 10) : 50,
+      });
+      products = (posters || []).map(p => ({
+        id: p.id,
+        tenantId,
+        name: p.name || p.title,
+        sku: p.sku || p.code,
+        category: p.category,
+        basePrice: p.basePrice || 65.0,
+        imageUrl: p.imageUrl,
+        sizes: p.sizes || [],
+        isActive: true,
+      }));
+    }
 
     return res.json({ success: true, data: products, count: products.length });
   } catch (err) {
