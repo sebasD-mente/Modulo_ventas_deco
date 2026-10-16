@@ -230,23 +230,23 @@ describe('⚔️ Desafío Empírico de Ventas, Reconciliación y Taller (Milesto
         });
         assert.ok(resExact);
 
-        // Caso tolerancia superior: Q100.04
+        // Caso tolerancia superior: Q100.01
         const resUpper = await createSaleTransaction({
           tenantId: 'tenant-1',
           sellerId: 'seller-1',
           eventId: 'event-1',
           items: [{ quantity: 1, unitPrice: 100, description: 'Póster' }],
-          payments: [{ method: 'EFECTIVO', amount: 100.04 }],
+          payments: [{ method: 'EFECTIVO', amount: 100.01 }],
         });
         assert.ok(resUpper);
 
-        // Caso tolerancia inferior: Q99.96
+        // Caso tolerancia inferior: Q99.99
         const resLower = await createSaleTransaction({
           tenantId: 'tenant-1',
           sellerId: 'seller-1',
           eventId: 'event-1',
           items: [{ quantity: 1, unitPrice: 100, description: 'Póster' }],
-          payments: [{ method: 'EFECTIVO', amount: 99.96 }],
+          payments: [{ method: 'EFECTIVO', amount: 99.99 }],
         });
         assert.ok(resLower);
 

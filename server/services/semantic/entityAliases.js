@@ -247,12 +247,13 @@ export const STAND_ENTITY_ALIASES = [
     ]
   },
   {
-    canonicalTitle: 'Chainsaw Man - Denji & Pochita',
-    searchQuery: 'Chainsaw Man Denji Pochita',
+    canonicalTitle: 'Chainsaw Man',
+    searchQuery: 'chainsaw man hombre motosierra denji pochita',
     category: 'ANIME',
     aliases: [
-      'chainsaw man', 'chainsawman', 'el pibe motosierra', 'el vato motosierra',
-      'motosierra', 'denji', 'pochita', 'makima', 'power chainsaw'
+      'chainsaw man', 'chainsawman', 'hombre motosierra', 'el hombre motosierra',
+      'el pibe motosierra', 'el vato motosierra', 'motosierra', 'denji', 'pochita',
+      'makima', 'power anime', 'power chainsaw'
     ]
   },
   {
@@ -530,10 +531,16 @@ export function resolveEntityAlias(query) {
       const escaped = item.cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const wordBoundaryRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
       if (wordBoundaryRegex.test(clean)) {
-        // En consultas compuestas NO descartamos discriminadores (ej: "spiderman debut" -> "Spider-Man debut")
-        const compositeQuery = clean.replace(wordBoundaryRegex, (match, p1, p2) => {
+        // En consultas compuestas NO descartamos discriminadores (ej: "spiderman debut" -> "Spider-Man debut"),
+        // pero purgamos distractores acústicos conocidos (ej: "pastel", "postre" que confunden a VAD/Whisper con "póster")
+        let compositeQuery = clean.replace(wordBoundaryRegex, (match, p1, p2) => {
           return `${p1 || ''}${item.entity.searchQuery}${p2 || ''}`;
-        }).replace(/\s{2,}/g, ' ').trim();
+        });
+        compositeQuery = compositeQuery
+          .replace(/\b(pastel|pasteles|postre)\b/gi, '')
+          .replace(/^\s*(un|una|el|la)\s+(de\s+)?/i, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
 
         return {
           matched: true,

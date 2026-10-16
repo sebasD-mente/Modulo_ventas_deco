@@ -48,6 +48,20 @@ COPY public ./public/
 # Compile optimized production SPA bundle into dist/
 RUN npm run build
 
+# Extract short commit hash into /app/.git-commit without leaking .git into runner
+ARG GIT_COMMIT=""
+COPY .git/HEAD ./.git-head
+COPY .git/refs ./.git-refs
+RUN if [ -n "$GIT_COMMIT" ]; then echo "$GIT_COMMIT" | cut -c1-7 > /app/.git-commit; \
+    elif grep -q "^ref: " .git-head 2>/dev/null; then \
+      REF_FILE=".git-refs/$(sed 's|^ref: refs/||' .git-head)"; \
+      if [ -f "$REF_FILE" ]; then cut -c1-7 "$REF_FILE" > /app/.git-commit; else echo "unknown" > /app/.git-commit; fi; \
+    else cut -c1-7 .git-head > /app/.git-commit 2>/dev/null || echo "unknown" > /app/.git-commit; fi && \
+    rm -rf .git-head .git-refs
+
+# Prune devDependencies while retaining @prisma/client and prisma CLI in dependencies
+RUN npm prune --omit=dev
+
 # -----------------------------------------------------------------------------
 # Stage 3: Production Runner
 # -----------------------------------------------------------------------------
@@ -58,6 +72,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV TZ=America/Guatemala
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 
 # Install runtime OpenSSL and CA certificates for Prisma Engine in Debian Bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -65,17 +80,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy runtime node_modules and Prisma artifacts with node:node ownership
-COPY --chown=node:node --from=deps /app/node_modules ./node_modules
+# Copy pruned runtime node_modules and Prisma artifacts with node:node ownership
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=deps /app/prisma ./prisma
 COPY --chown=node:node package*.json ./
 
-# Copy compiled frontend distribution from builder stage
+# Copy compiled frontend distribution and commit hash from builder stage
 COPY --chown=node:node --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/.git-commit ./.git-commit
 
-# Copy backend server source and git metadata
+# Copy backend server source (no .git directory copied to runner)
 COPY --chown=node:node server ./server
-COPY --chown=node:node .git ./.git
 
 # Copy static assets
 COPY --chown=node:node public ./public
@@ -92,7 +107,7 @@ USER node
 EXPOSE 3001
 
 # Container Healthcheck using Node 22 native fetch
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD node -e 'fetch("http://localhost:3001/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))'
 
 # Define container entrypoint and default command

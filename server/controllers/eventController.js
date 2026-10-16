@@ -69,16 +69,21 @@ export async function getEventsList(req, res) {
       where: whereClause,
       orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
       include: {
-        _count: { select: { sales: true } },
-        sales: { select: { totalAmount: true } },
+        sales: {
+          where: { status: { not: 'ANULADA' } },
+          select: { totalAmount: true },
+        },
         assignedSellers: { select: SELLER_SELECT },
       },
     });
-    const formatted = events.map(({ sales, _count, ...rest }) => ({
-      ...rest,
-      totalSold: sales.reduce((acc, s) => acc + Number(s.totalAmount), 0),
-      salesCount: _count.sales,
-    }));
+    const formatted = events.map(({ sales, _count, ...rest }) => {
+      const activeSales = Array.isArray(sales) ? sales : [];
+      return {
+        ...rest,
+        totalSold: Number(activeSales.reduce((acc, s) => acc + Number(s.totalAmount || 0), 0).toFixed(2)),
+        salesCount: activeSales.length,
+      };
+    });
     return res.json({ success: true, data: formatted });
   } catch (err) {
     console.error('❌ Error obteniendo lista de eventos:', err);
@@ -94,19 +99,24 @@ export async function activateEvent(req, res) {
     if (!assignedSellerEmail?.trim()) {
       return res.status(400).json({ success: false, error: 'El correo de Google del vendedor es obligatorio.' });
     }
-    await prisma.event.updateMany({
-      where: { tenantId, status: 'ACTIVO', id: { not: id } },
-      data: { status: 'CONFIRMADO' },
-    });
-    const updated = await prisma.event.update({
-      where: { id },
-      data: {
-        status: 'ACTIVO',
-        assignedSellerEmail: assignedSellerEmail.trim(),
-        assignedSellerName: (assignedSellerName || assignedSellerEmail.split('@')[0]).trim(),
-      },
-      include: { assignedSellers: { select: SELLER_SELECT } },
-    });
+    const runActivate = async (tx) => {
+      await tx.event.updateMany({
+        where: { tenantId, status: 'ACTIVO', id: { not: id } },
+        data: { status: 'CONFIRMADO' },
+      });
+      return await tx.event.update({
+        where: { id },
+        data: {
+          status: 'ACTIVO',
+          assignedSellerEmail: assignedSellerEmail.trim(),
+          assignedSellerName: (assignedSellerName || assignedSellerEmail.split('@')[0]).trim(),
+        },
+        include: { assignedSellers: { select: SELLER_SELECT } },
+      });
+    };
+    const updated = typeof prisma.$transaction === 'function'
+      ? await prisma.$transaction(runActivate)
+      : await runActivate(prisma);
     return res.json({
       success: true,
       data: updated,
@@ -130,49 +140,57 @@ export async function createEvent(req, res) {
       return res.status(400).json({ success: false, error: 'Nombre y ubicación son obligatorios.' });
     }
 
-    let finalSellerEmail = assignedSellerEmail?.trim() || null;
-    let finalSellerName = assignedSellerName?.trim() || null;
+    const runCreate = async (tx) => {
+      let finalSellerEmail = assignedSellerEmail?.trim() || null;
+      let finalSellerName = assignedSellerName?.trim() || null;
 
-    if (Array.isArray(assignedUserIds) && assignedUserIds.length > 0) {
-      const users = await prisma.user.findMany({
-        where: { id: { in: assignedUserIds }, tenantId },
-        select: { id: true, fullName: true, email: true },
-      });
-      if (!finalSellerEmail && users.length > 0) {
-        finalSellerEmail = users.map((u) => u.email).join(', ');
-        finalSellerName = users.map((u) => u.fullName).join(', ');
+      if (Array.isArray(assignedUserIds) && assignedUserIds.length > 0) {
+        const users = await tx.user.findMany({
+          where: { id: { in: assignedUserIds }, tenantId },
+          select: { id: true, fullName: true, email: true },
+        });
+        if (!finalSellerEmail && users.length > 0) {
+          finalSellerEmail = users.map((u) => u.email).join(', ');
+          finalSellerName = users.map((u) => u.fullName).join(', ');
+        }
       }
-    }
 
-    const newEvent = await prisma.event.create({
-      data: {
-        tenantId,
-        name: name.trim(),
-        location: location.trim(),
-        startDate: startDate ? new Date(startDate) : new Date(),
-        endDate: endDate ? new Date(endDate) : new Date(Date.now() + 3 * 86400000),
-        status: 'CONFIRMADO',
-        salesTarget: salesTarget ? Number(salesTarget) : 15000,
-        assignedSellerEmail: finalSellerEmail,
-        assignedSellerName: finalSellerName,
-      },
-    });
-
-    if (Array.isArray(assignedUserIds) && assignedUserIds.length > 0) {
-      await prisma.user.updateMany({
-        where: { id: { in: assignedUserIds }, tenantId },
-        data: { assignedEventId: newEvent.id },
+      const newEvent = await tx.event.create({
+        data: {
+          tenantId,
+          name: name.trim(),
+          location: location.trim(),
+          startDate: startDate ? new Date(startDate) : new Date(),
+          endDate: endDate ? new Date(endDate) : new Date(Date.now() + 3 * 86400000),
+          status: 'CONFIRMADO',
+          salesTarget: salesTarget ? Number(salesTarget) : 15000,
+          assignedSellerEmail: finalSellerEmail,
+          assignedSellerName: finalSellerName,
+        },
       });
-    }
 
-    const eventWithSellers = await prisma.event.findUnique({
-      where: { id: newEvent.id },
-      include: { assignedSellers: { select: SELLER_SELECT } },
-    });
+      if (Array.isArray(assignedUserIds) && assignedUserIds.length > 0) {
+        await tx.user.updateMany({
+          where: { id: { in: assignedUserIds }, tenantId },
+          data: { assignedEventId: newEvent.id },
+        });
+      }
+
+      const eventWithSellers = await tx.event.findUnique({
+        where: { id: newEvent.id },
+        include: { assignedSellers: { select: SELLER_SELECT } },
+      });
+
+      return eventWithSellers || newEvent;
+    };
+
+    const resultEvent = typeof prisma.$transaction === 'function'
+      ? await prisma.$transaction(runCreate)
+      : await runCreate(prisma);
 
     return res.status(201).json({
       success: true,
-      data: eventWithSellers || newEvent,
+      data: resultEvent,
       message: 'Evento confirmado registrado exitosamente.',
     });
   } catch (err) {
@@ -190,51 +208,55 @@ export async function updateEvent(req, res) {
     const event = await prisma.event.findFirst({ where: { id, tenantId } });
     if (!event) return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
 
-    const updateData = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (location !== undefined) updateData.location = location.trim();
-    if (startDate !== undefined) updateData.startDate = new Date(startDate);
-    if (endDate !== undefined) updateData.endDate = new Date(endDate);
-    if (salesTarget !== undefined) updateData.salesTarget = Number(salesTarget);
+    const runUpdate = async (tx) => {
+      const updateData = {};
+      if (name !== undefined) updateData.name = name.trim();
+      if (location !== undefined) updateData.location = location.trim();
+      if (startDate !== undefined) updateData.startDate = new Date(startDate);
+      if (endDate !== undefined) updateData.endDate = new Date(endDate);
+      if (salesTarget !== undefined) updateData.salesTarget = Number(salesTarget);
 
-    if (Array.isArray(assignedUserIds)) {
-      // 1. Desasignar usuarios previos que ya no están en la lista
-      await prisma.user.updateMany({
-        where: { assignedEventId: id, id: { notIn: assignedUserIds }, tenantId },
-        data: { assignedEventId: null },
+      if (Array.isArray(assignedUserIds)) {
+        await tx.user.updateMany({
+          where: { assignedEventId: id, id: { notIn: assignedUserIds }, tenantId },
+          data: { assignedEventId: null },
+        });
+
+        if (assignedUserIds.length > 0) {
+          await tx.user.updateMany({
+            where: { id: { in: assignedUserIds }, tenantId },
+            data: { assignedEventId: id },
+          });
+          const users = await tx.user.findMany({
+            where: { id: { in: assignedUserIds }, tenantId },
+            select: { fullName: true, email: true },
+          });
+          updateData.assignedSellerEmail = users.map((u) => u.email).join(', ');
+          updateData.assignedSellerName = users.map((u) => u.fullName).join(', ');
+        } else {
+          updateData.assignedSellerEmail = null;
+          updateData.assignedSellerName = null;
+        }
+      }
+
+      await tx.event.update({
+        where: { id },
+        data: updateData,
       });
 
-      // 2. Asignar los nuevos usuarios seleccionados
-      if (assignedUserIds.length > 0) {
-        await prisma.user.updateMany({
-          where: { id: { in: assignedUserIds }, tenantId },
-          data: { assignedEventId: id },
-        });
-        const users = await prisma.user.findMany({
-          where: { id: { in: assignedUserIds }, tenantId },
-          select: { fullName: true, email: true },
-        });
-        updateData.assignedSellerEmail = users.map((u) => u.email).join(', ');
-        updateData.assignedSellerName = users.map((u) => u.fullName).join(', ');
-      } else {
-        updateData.assignedSellerEmail = null;
-        updateData.assignedSellerName = null;
-      }
-    }
+      return await tx.event.findUnique({
+        where: { id },
+        include: {
+          assignedSellers: { select: SELLER_SELECT },
+          _count: { select: { sales: true } },
+          sales: { select: { totalAmount: true } },
+        },
+      });
+    };
 
-    await prisma.event.update({
-      where: { id },
-      data: updateData,
-    });
-
-    const updated = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        assignedSellers: { select: SELLER_SELECT },
-        _count: { select: { sales: true } },
-        sales: { select: { totalAmount: true } },
-      },
-    });
+    const updated = typeof prisma.$transaction === 'function'
+      ? await prisma.$transaction(runUpdate)
+      : await runUpdate(prisma);
 
     const formatted = {
       ...updated,

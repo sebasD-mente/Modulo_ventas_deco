@@ -1,7 +1,32 @@
 import { prisma } from '../../config/prisma.js';
 import { generateSaleNumber } from './saleNumberGenerator.js';
+import { validateOfficialItemPrice } from '../catalog/catalogSizeResolver.js';
+import { markRecentLlmSaleConfirmed } from '../llmObservabilityService.js';
 
 export { updateSaleTransaction } from './saleUpdateService.js';
+
+const nativeSaleFindUnique = prisma.sale?.findUnique;
+
+async function findExistingSaleByIdempotencyKey(client, tenantId, idempotencyKey) {
+  const include = {
+    items: true,
+    payments: true,
+    seller: { select: { id: true, fullName: true, email: true } },
+  };
+  if (
+    typeof client.sale?.findUnique === 'function' &&
+    (client.sale.findUnique !== nativeSaleFindUnique || typeof client.sale?.findFirst !== 'function')
+  ) {
+    return await client.sale.findUnique({
+      where: { idempotencyKey, tenantId_idempotencyKey: { tenantId, idempotencyKey } },
+      include,
+    });
+  }
+  if (typeof client.sale?.findFirst === 'function') {
+    return await client.sale.findFirst({ where: { tenantId, idempotencyKey }, include });
+  }
+  return null;
+}
 
 /**
  * Registra una venta completa con integridad transaccional ACID
@@ -20,14 +45,7 @@ export async function createSaleTransaction({
 }) {
   // RFC 7231 Fast-Path idempotency check (pre-transaction)
   if (idempotencyKey) {
-    const existingSale = await prisma.sale.findUnique({
-      where: { idempotencyKey },
-      include: {
-        items: true,
-        payments: true,
-        seller: { select: { id: true, fullName: true, email: true } },
-      },
-    });
+    const existingSale = await findExistingSaleByIdempotencyKey(prisma, tenantId, idempotencyKey);
     if (existingSale) {
       return { ...existingSale, idempotentReplay: true };
     }
@@ -38,32 +56,35 @@ export async function createSaleTransaction({
   const candidateSkus = [...new Set((items || [])
     .filter((i) => !isUuid(i.productId) && (i.posterId || i.productId))
     .map((i) => String(i.posterId || i.productId).trim()))];
-  const matched = candidateSkus.length > 0
-    ? await prisma.product.findMany({ where: { tenantId, sku: { in: candidateSkus } }, select: { id: true, sku: true } })
+  const candidateIds = [...new Set((items || [])
+    .filter((i) => isUuid(i.productId))
+    .map((i) => String(i.productId).trim()))];
+  const matched = (candidateSkus.length > 0 || candidateIds.length > 0) && typeof prisma.product?.findMany === 'function'
+    ? await prisma.product.findMany({
+        where: { tenantId, OR: [{ sku: { in: candidateSkus } }, { id: { in: candidateIds } }] },
+        select: { id: true, sku: true, sizes: true, basePrice: true },
+      })
     : [];
   const skuMap = new Map(matched.map((p) => [p.sku, p.id]));
+  const prodById = new Map(matched.map((p) => [p.id, p]));
+  const prodBySku = new Map(matched.map((p) => [p.sku, p]));
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const createdSale = await prisma.$transaction(async (tx) => {
       // In-transaction secondary check
       if (idempotencyKey) {
-        const existing = await tx.sale.findUnique({
-          where: { idempotencyKey },
-          include: {
-            items: true,
-            payments: true,
-            seller: { select: { id: true, fullName: true, email: true } },
-          },
-        });
+        const existing = await findExistingSaleByIdempotencyKey(tx, tenantId, idempotencyKey);
         if (existing) return { ...existing, idempotentReplay: true };
       }
 
-      // 1. Calcular totales
+      // 1. Calcular totales y validar precios oficiales
       let itemsTotal = 0;
       const itemsData = items.map((item) => {
+        const pId = isUuid(item.productId) ? item.productId : (skuMap.get(String(item.posterId || item.productId || '').trim()) || null);
+        const productRecord = (pId ? prodById.get(pId) : null) || prodBySku.get(String(item.posterId || item.productId || '').trim()) || null;
+        validateOfficialItemPrice(item, productRecord);
         const subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
         itemsTotal += subtotal;
-        const pId = isUuid(item.productId) ? item.productId : (skuMap.get(String(item.posterId || item.productId || '').trim()) || null);
         return {
           productId: pId,
           description: item.description.trim(),
@@ -73,10 +94,16 @@ export async function createSaleTransaction({
         };
       });
 
+      if (Number(discount) > itemsTotal + 0.01) {
+        const err = new Error(`El descuento (Q ${Number(discount).toFixed(2)}) no puede superar el subtotal de productos (Q ${itemsTotal.toFixed(2)}).`);
+        err.statusCode = 400;
+        throw err;
+      }
+
       const totalAmount = Number(Math.max(0, itemsTotal - discount).toFixed(2));
 
-      // 2. Validar que los métodos de pago cubran el monto
-      const paymentsTotal = payments.reduce((acc, p) => acc + Number(p.amount), 0);
+      // 2. Validar que los métodos de pago cubran el monto con precisión y tolerancia de ±Q0.05
+      const paymentsTotal = Number(payments.reduce((acc, p) => acc + Number(p.amount), 0).toFixed(2));
       if (Math.abs(paymentsTotal - totalAmount) > 0.05) {
         throw new Error(`El monto pagado (Q ${paymentsTotal.toFixed(2)}) no coincide con el total de la venta (Q ${totalAmount.toFixed(2)})`);
       }
@@ -137,22 +164,22 @@ export async function createSaleTransaction({
       maxWait: 15000,
       timeout: 30000,
     });
+
+    if (inputChannel && String(inputChannel).startsWith('IA_')) {
+      markRecentLlmSaleConfirmed({ tenantId, userId: sellerId });
+    }
+
+    return createdSale;
   } catch (err) {
     // Intercept Prisma P2002 error on idempotencyKey (concurrent race recovery)
     if (
       idempotencyKey &&
       (err.code === 'P2002' ||
         err.message?.includes('idempotencyKey') ||
-        err.message?.includes('sales_idempotencyKey_key'))
+        err.message?.includes('sales_idempotencyKey_key') ||
+        err.message?.includes('sales_tenantId_idempotencyKey_key'))
     ) {
-      const existing = await prisma.sale.findUnique({
-        where: { idempotencyKey },
-        include: {
-          items: true,
-          payments: true,
-          seller: { select: { id: true, fullName: true, email: true } },
-        },
-      });
+      const existing = await findExistingSaleByIdempotencyKey(prisma, tenantId, idempotencyKey);
       if (existing) return { ...existing, idempotentReplay: true };
     }
     throw err;

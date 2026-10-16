@@ -11,6 +11,7 @@ import {
   Scissors,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { compressImage } from '../../utils/imageCompression';
 import {
   OFFICIAL_SIZES,
   CUSTOM_CM2_RATE,
@@ -83,13 +84,16 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
     setIsUploading(true);
 
     try {
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        try { fileToUpload = await compressImage(file, 1920, 0.85); } catch { fileToUpload = file; }
+      }
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', fileToUpload);
       const res = await authFetch('/api/sales/upload-art', { method: 'POST', body: formData });
       const json = await res.json();
       if (res.ok && json.success && json.url) {
-        setCustomImageUrl(json.url);
-        setUploadSuccess(true);
+        setCustomImageUrl(json.url); setUploadSuccess(true);
       } else {
         setUploadError(json.error || 'Fallo al subir a Google Storage.');
       }
@@ -217,7 +221,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="block text-neutral-400 font-semibold mb-1">Precio Acordado (Q) *</label>
-              <input type="number" min="1" step="0.5" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-amber-400 focus:outline-none" />
+              <input type="number" min="1" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-amber-400 focus:outline-none" />
             </div>
             <div>
               <label className="block text-neutral-400 font-semibold mb-1">Cantidad</label>

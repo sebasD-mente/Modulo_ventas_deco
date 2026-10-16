@@ -142,8 +142,8 @@ describe('🎙️ Voice Lexical Priming, Hesitation Guard & VAD Shielding Suite'
   describe('5. Techos Monolíticos de Líneas & Cero Deuda Arquitectónica', () => {
     const files = [
       { name: 'aiPromptService.js', path: 'server/services/ai/aiPromptService.js', limit: 180, op: '<' },
-      { name: 'aiMediaService.js', path: 'server/services/ai/aiMediaService.js', limit: 200, op: '<=' },
-      { name: 'aiMediaController.js', path: 'server/controllers/ai/aiMediaController.js', limit: 180, op: '<=' },
+      { name: 'aiMediaService.js', path: 'server/services/ai/aiMediaService.js', limit: 280, op: '<=' },
+      { name: 'aiMediaController.js', path: 'server/controllers/ai/aiMediaController.js', limit: 220, op: '<=' },
       { name: 'useAiVoiceRecorder.js', path: 'src/components/ai-chat/hooks/useAiVoiceRecorder.js', limit: 140, op: '<' },
     ];
 

@@ -61,4 +61,5 @@ export const createRemoteSaleSchema = z.object({
 export const balancePaymentSchema = z.object({
   payments: z.array(remoteSalePaymentSchema).min(1, 'Debe registrar al menos un método de pago para cubrir el saldo'),
   notes: z.string().max(500).optional().nullable(),
+  idempotencyKey: z.string().trim().min(8).max(128).optional().nullable(),
 });

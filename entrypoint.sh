@@ -50,20 +50,37 @@ fi
 echo "🔄 [Entrypoint] Synchronizing database schema with Prisma..."
 if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
   echo "📦 [Entrypoint] Migrations directory detected. Executing 'prisma migrate deploy'..."
-  npx prisma migrate deploy || {
+  npx --no-install prisma migrate deploy || {
     echo "⚠️ [Entrypoint] Migration deploy encountered conflict. Resolving baseline..."
-    npx prisma migrate resolve --applied 20260913000000_init_stand_ia || true
-    npx prisma migrate deploy || npx prisma db push --skip-generate
+    npx --no-install prisma migrate resolve --applied 20260913000000_init_stand_ia || true
+    npx --no-install prisma migrate deploy || npx --no-install prisma db push --skip-generate
   }
 else
   echo "📦 [Entrypoint] No migrations directory detected. Executing safe 'prisma db push --skip-generate'..."
-  npx prisma db push --skip-generate
+  npx --no-install prisma db push --skip-generate
 fi
 echo "✅ [Entrypoint] Database schema synchronized successfully."
 
-# 3. Master Data Verification (Lightweight Boot Seed, Non-blocking)
+# 3. Master Data Verification (Fast Check + Non-blocking Seed)
 echo "🌱 [Entrypoint] Checking master data (tenant and active event)..."
-SKIP_WEB_SYNC=true node prisma/seed.js
+if node --input-type=module -e '
+  import { PrismaClient } from "@prisma/client";
+  const prisma = new PrismaClient();
+  try {
+    const t = await prisma.tenant.findUnique({ where: { slug: "deco-vintage-guate" }, select: { id: true } });
+    const e = await prisma.event.findUnique({ where: { id: "evt-ventas-redes-online" }, select: { id: true } });
+    await prisma.$disconnect();
+    process.exit(t && e ? 0 : 1);
+  } catch {
+    await prisma.$disconnect().catch(() => {});
+    process.exit(1);
+  }
+' > /dev/null 2>&1; then
+  echo "⚡ [Entrypoint] Master data already initialized. Running lightweight background verification..."
+  SKIP_WEB_SYNC=true node prisma/seed.js &
+else
+  SKIP_WEB_SYNC=true node prisma/seed.js
+fi
 echo "✅ [Entrypoint] Master data check completed."
 
 # 4. Pass PID 1 execution to Node application

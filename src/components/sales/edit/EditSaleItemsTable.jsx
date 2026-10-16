@@ -32,28 +32,28 @@ export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveIt
               </div>
 
             {/* Stepper de cantidad */}
-            <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-800 shrink-0">
+            <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-neutral-800 shrink-0">
               <button
                 type="button"
                 onClick={() => onUpdateQuantity(idx, -1)}
-                className="text-neutral-400 hover:text-white cursor-pointer"
+                className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
                 title="Disminuir cantidad"
               >
-                <Minus className="w-3.5 h-3.5" />
+                <Minus className="w-4 h-4" />
               </button>
-              <span className="w-4 text-center font-bold text-white">{it.quantity}</span>
+              <span className="w-6 text-center font-bold text-sm text-white">{it.quantity}</span>
               <button
                 type="button"
                 onClick={() => onUpdateQuantity(idx, 1)}
-                className="text-neutral-400 hover:text-white cursor-pointer"
+                className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
                 title="Aumentar cantidad"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
               </button>
             </div>
 
             <div className="text-right shrink-0 min-w-[65px]">
-              <span className="font-mono font-bold text-emerald-400 block">
+              <span className="font-mono font-bold text-emerald-400 block text-xs">
                 Q {(it.quantity * it.unitPrice).toFixed(2)}
               </span>
             </div>
@@ -61,7 +61,7 @@ export default function EditSaleItemsTable({ items, onUpdateQuantity, onRemoveIt
             <button
               type="button"
               onClick={() => onRemoveItem(idx)}
-              className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer shrink-0"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
               title="Eliminar este ítem"
             >
               <Trash2 className="w-4 h-4" />

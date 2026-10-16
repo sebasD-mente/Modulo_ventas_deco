@@ -153,7 +153,9 @@ export async function registerBalancePayment(req, res) {
     const sellerId = req.user?.id;
     const tenantId = req.tenantId;
     const { id } = req.params;
-    const { payments, notes } = req.body;
+    const { payments, notes, idempotencyKey: bodyKey } = req.body || {};
+    const rawKey = req.headers?.['idempotency-key'] || req.headers?.['x-idempotency-key'] || bodyKey || null;
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() !== '' ? rawKey.trim() : null;
 
     if (!sellerId || !tenantId) {
       return res.status(400).json({ success: false, error: 'Contexto de usuario o empresa no válido.' });
@@ -165,7 +167,25 @@ export async function registerBalancePayment(req, res) {
       sellerId,
       payments,
       notes,
+      idempotencyKey,
+      userRole: req.user?.role || null,
+      userRoles: req.user?.roles || null,
+      assignedEventId: req.user?.assignedEventId || null,
     });
+
+    if (sale?.idempotentReplay) {
+      if (typeof res.setHeader === 'function') {
+        res.setHeader('X-Idempotent-Replay', 'true');
+      } else if (typeof res.set === 'function') {
+        res.set('X-Idempotent-Replay', 'true');
+      }
+      return res.status(200).json({
+        success: true,
+        idempotentReplay: true,
+        message: 'Pago de saldo previamente registrado (Idempotent Replay).',
+        data: sale,
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -180,6 +200,8 @@ export async function registerBalancePayment(req, res) {
     });
   }
 }
+
+export const payOrderBalance = registerBalancePayment;
 
 /**
  * Validador estricto de magic bytes para imágenes auténticas JPEG, PNG o WebP.

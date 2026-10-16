@@ -4,22 +4,46 @@
  * Bypass total del escudo antibot de Google OAuth en navegadores remotos.
  */
 
+import 'dotenv/config';
+import jwt from 'jsonwebtoken';
+
+function resolveDevToolsToken() {
+  if (process.env.PROD_VERIFY_JWT) return process.env.PROD_VERIFY_JWT;
+  if (process.env.JWT_SECRET) {
+    return jwt.sign(
+      {
+        id: process.env.PROD_ADMIN_ID || '30bb4712-f551-418e-bb03-5eeb60015f68',
+        role: 'SUPER_ADMIN',
+        roles: ['SUPER_ADMIN'],
+        tenantId: process.env.PROD_TENANT_ID || '58b829a4-1006-41c2-8e90-b0610230c25f',
+        assignedEventId: null,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+  }
+  return '<SET_PROD_VERIFY_JWT_OR_JWT_SECRET_IN_ENV>';
+}
+
+const resolvedToken = resolveDevToolsToken();
+const resolvedEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@decovintage.online';
+
 export const DEVTOOLS_AUTH_SNIPPET = `(() => {
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6IlNlYmFzdGlhbiBKaW1lbmV6Iiwicm9sZSI6IlNVUEVSX0FETUlOIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXSwidGVuYW50SWQiOiI1OGI4MjlhNC0xMDA2LTQxYzItOGU5MC1iMDYxMDIzMGMyNWYiLCJhc3NpZ25lZEV2ZW50SWQiOm51bGwsImF2YXRhclVybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k3VndtYzUwNUozOEN6VXpaZk1XOGRMaVZNVy1HS25WRUtsRjBaeGV6Zk5BQ29aZlNieUE9czk2LWMiLCJpYXQiOjE3OTE1OTQwNDUsImV4cCI6MTc5MjE5ODg0NX0.P3q2jxmhbObNQiqLrhx0Mr9jpBkxDvQUVRYV_qEzWto";
+  const token = "${resolvedToken}";
   
   const user = {
-    id: "30bb4712-f551-418e-bb03-5eeb60015f68",
-    email: "sebasjimenez0330@gmail.com",
+    id: "${process.env.PROD_ADMIN_ID || '30bb4712-f551-418e-bb03-5eeb60015f68'}",
+    email: "${resolvedEmail}",
     fullName: "Sebastian Jimenez",
     role: "SUPER_ADMIN",
     roles: ["SUPER_ADMIN"],
-    tenantId: "58b829a4-1006-41c2-8e90-b0610230c25f",
+    tenantId: "${process.env.PROD_TENANT_ID || '58b829a4-1006-41c2-8e90-b0610230c25f'}",
     assignedEventId: null,
-    avatarUrl: "https://lh3.googleusercontent.com/a/ACg8ocI7Vwmc505J38CzUzZfMW8dLiVMW-GKnVEKlF0ZxezfNACoZfSbyA=s96-c"
+    avatarUrl: ""
   };
   const activeEvent = {
     id: "evt-ventas-redes-online",
-    tenantId: "58b829a4-1006-41c2-8e90-b0610230c25f",
+    tenantId: "${process.env.PROD_TENANT_ID || '58b829a4-1006-41c2-8e90-b0610230c25f'}",
     name: "Ventas en Línea y Redes Sociales",
     location: "Canal Digital (WhatsApp / IG / FB)",
     status: "ACTIVO"

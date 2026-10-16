@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { chatWithSalesAssistant, streamChatWithSalesAssistant, constructDraftPayload } from '../../services/aiMultimodalService.js';
-import { getOrCreateSession, saveSessionState, clearSessionDraft, getSessionState } from '../../services/ai/aiSessionService.js';
+import { getOrCreateSession, saveSessionState, clearSessionDraft, getSessionById } from '../../services/ai/aiSessionService.js';
 import { searchWebPosters } from '../../services/webCatalogService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
 import { normalizeArtworkQuery } from '../../services/semanticParserService.js';
@@ -29,6 +29,9 @@ export async function handleChatQuery(req, res) {
         }
       }
     } catch (sessErr) {
+      if (sessErr?.statusCode === 403) {
+        return res.status(403).json({ success: false, error: sessErr.message });
+      }
       console.warn(`[aiChatController] Sesión ${sessionId}:`, sessErr.message);
     }
 
@@ -68,7 +71,7 @@ export async function handleChatQuery(req, res) {
       }
 
       const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
-      if (!effectiveDraft) await clearSessionDraft(sessionId);
+      if (!effectiveDraft) await clearSessionDraft(sessionId, tenantId);
 
       const updatedHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: result.reply || '' }].slice(-20);
       await saveSessionState(sessionId, { pendingDraft: effectiveDraft, history: updatedHistory, sellerName, eventId, tenantId });
@@ -78,9 +81,18 @@ export async function handleChatQuery(req, res) {
     }
 
     // Modo Streaming con Server-Sent Events (SSE) y Gemini 3.8 Flash
+    req.socket?.setNoDelay?.(true);
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.flushHeaders?.();
-    res.write(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`);
+
+    const writeSse = (payload) => {
+      if (!isClientClosed && !res.writableEnded && !res.destroyed) {
+        res.write(payload);
+        res.flush?.();
+      }
+    };
+
+    writeSse(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`);
 
     let fullText = '', isClientClosed = false, currentDraft = effectivePendingDraft;
     req.on('close', () => { isClientClosed = true; });
@@ -96,23 +108,23 @@ export async function handleChatQuery(req, res) {
         if (isClientClosed || res.writableEnded || res.destroyed) break;
         if (chunk.type === 'token') {
           fullText += chunk.text;
-          res.write(`event: token\ndata: ${JSON.stringify({ text: chunk.text, delta: chunk.text })}\n\n`);
+          writeSse(`event: token\ndata: ${JSON.stringify({ text: chunk.text, delta: chunk.text })}\n\n`);
         } else if (chunk.type && chunk.data !== undefined) {
           if (chunk.type === 'draft_sale') {
             currentDraft = chunk.data || null;
             if (!currentDraft?.items?.length) {
-              await clearSessionDraft(sessionId);
               currentDraft = null;
-            } else {
-              await saveSessionState(sessionId, { pendingDraft: currentDraft, sellerName, eventId, tenantId });
             }
           }
-          res.write(`event: ${chunk.type}\ndata: ${JSON.stringify(chunk.data)}\n\n`);
+          writeSse(`event: ${chunk.type}\ndata: ${JSON.stringify(chunk.data)}\n\n`);
         }
       }
 
       const finalHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: fullText || '¡Con gusto te asesoro!' }].slice(-20);
-      await saveSessionState(sessionId, { pendingDraft: currentDraft, history: finalHistory, sellerName, eventId, tenantId });
+
+      const estimatedTokensIn = Math.ceil(
+        (String(message || '').length + JSON.stringify(effectiveHistory || []).length) / 4
+      );
 
       recordLlmInteraction({
         tenantId, userId: req.userId || null, action: 'AI_CHAT_STREAM',
@@ -120,19 +132,21 @@ export async function handleChatQuery(req, res) {
         modelUsed: 'gemini-3.8-flash',
         initialModel: 'gemini-3.8-flash',
         fallbackActivated: false,
-        tokensIn: null, tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
+        tokensIn: estimatedTokensIn, tokensOut: fullText ? Math.ceil(fullText.length / 4) : null,
         latencyMs: Date.now() - t0Stream,
         ipAddress: req.ip, details: { eventId },
       });
 
       if (!isClientClosed && !res.writableEnded && !res.destroyed) {
-        res.write(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!', sessionId, draftSale: currentDraft })}\n\n`);
+        writeSse(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!', sessionId, draftSale: currentDraft })}\n\n`);
         res.end();
       }
+
+      await saveSessionState(sessionId, { pendingDraft: currentDraft, history: finalHistory, sellerName, eventId, tenantId });
     } catch (streamErr) {
       console.error('❌ Error durante el streaming SSE:', streamErr);
       if (!isClientClosed && !res.writableEnded && !res.destroyed) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: streamErr.message })}\n\n`);
+        writeSse(`event: error\ndata: ${JSON.stringify({ error: streamErr.message })}\n\n`);
         res.end();
       }
     }
@@ -150,20 +164,52 @@ export async function handleChatQuery(req, res) {
 export async function handleGetSession(req, res) {
   try {
     const { sessionId } = req.params;
-    const session = await getSessionState(sessionId, req.tenantId);
-    if (!session) return res.status(404).json({ success: false, error: 'Sesión no encontrada o expirada.' });
-    return res.json({ success: true, session });
+    const session = await getSessionById(sessionId, req.tenantId);
+    if (!session) {
+      return res.json({
+        status: 'ok',
+        success: true,
+        session: null,
+        data: { sessionId, history: [], pendingDraft: null, exists: false },
+      });
+    }
+    return res.json({ status: 'ok', success: true, session, data: session });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 }
 
 export async function handleClearDraft(req, res) {
   try {
     const { sessionId } = req.params;
-    await clearSessionDraft(sessionId);
+    const cleared = await clearSessionDraft(sessionId, req.tenantId);
+    if (!cleared && req.tenantId) {
+      return res.status(404).json({ success: false, error: 'Sesión no encontrada o no pertenece a esta organización.' });
+    }
     return res.json({ success: true, message: 'Borrador de sesión descartado exitosamente.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 }
+
+export async function handleUpdateSessionDraft(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const { pendingDraft, eventId } = req.body || {};
+    const tenantId = req.tenantId || req.user?.tenantId || 'default-tenant';
+    const sellerName = req.user?.fullName || req.user?.name || 'Vendedor';
+    await saveSessionState(sessionId, {
+      pendingDraft: pendingDraft ?? null,
+      tenantId,
+      eventId,
+      sellerName,
+    });
+    return res.json({ status: 'ok', success: true, data: { sessionId, pendingDraft: pendingDraft ?? null } });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
+  }
+}
+
+export const handleAiChat = handleChatQuery;
+export const getSessionDraft = handleGetSession;
+export const deleteSessionDraft = handleClearDraft;

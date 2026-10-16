@@ -74,24 +74,26 @@ export default function PosterConfigurator({
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-neutral-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-neutral-800">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-neutral-400">Cantidad:</span>
-          <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-700">
+          <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-neutral-700">
             <button
               type="button"
               onClick={() => setItemQuantity && setItemQuantity(Math.max(1, itemQuantity - 1))}
-              className="text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+              className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+              title="Disminuir cantidad"
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-4 h-4" />
             </button>
-            <span className="w-6 text-center font-bold text-sm text-white">{itemQuantity}</span>
+            <span className="w-8 text-center font-bold text-base text-white">{itemQuantity}</span>
             <button
               type="button"
               onClick={() => setItemQuantity && setItemQuantity(itemQuantity + 1)}
-              className="text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+              className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+              title="Aumentar cantidad"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -99,7 +101,7 @@ export default function PosterConfigurator({
         <button
           type="button"
           onClick={onAddToCart}
-          className="px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-transform active:scale-95"
+          className="min-h-[44px] px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-transform active:scale-95"
         >
           <Plus className="w-4 h-4" />
           <span>Agregar al Ticket (Q {(itemQuantity * (selectedSize?.precio || 0)).toFixed(2)})</span>

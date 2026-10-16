@@ -41,12 +41,15 @@ export async function createSale(req, res) {
 export async function updateSale(req, res) {
   try {
     const { id } = req.params;
-    const { items, payments, discount, notes } = req.body;
+    const { items, payments, discount, notes, status } = req.body;
     const userId = req.user?.id;
     const tenantId = req.tenantId;
+    const userRole = req.user?.role;
+    const userRoles = req.user?.roles;
+    const assignedEventId = req.user?.assignedEventId;
 
     const updatedSale = await updateSaleTransaction({
-      saleId: id, tenantId, userId, items, payments, discount, notes,
+      saleId: id, tenantId, userId, userRole, userRoles, assignedEventId, items, payments, discount, notes, status,
     });
 
     return res.json({ success: true, message: 'Venta actualizada exitosamente.', data: updatedSale });
@@ -190,10 +193,18 @@ export async function getOrderTrackingList(req, res) {
     const whereClause = {
       tenantId,
       orderType: 'REDES_PERSONALIZADO',
+      status: { not: 'ANULADA' },
     };
 
-    if (isVendedorRedes && !isSuperAdmin) {
-      whereClause.sellerId = req.user.id;
+    const scopeConditions = [];
+    if (!isSuperAdmin) {
+      if (req.user?.assignedEventId) {
+        scopeConditions.push({
+          OR: [{ sellerId: req.user.id }, { pickupEventId: req.user.assignedEventId }],
+        });
+      } else if (isVendedorRedes) {
+        whereClause.sellerId = req.user.id;
+      }
     }
 
     if (paymentStatus === 'CON_SALDO') {
@@ -204,11 +215,19 @@ export async function getOrderTrackingList(req, res) {
 
     if (search && search.trim()) {
       const term = search.trim();
-      whereClause.OR = [
-        { saleNumber: { contains: term, mode: 'insensitive' } },
-        { customer: { fullName: { contains: term, mode: 'insensitive' } } },
-        { customer: { phone: { contains: term, mode: 'insensitive' } } },
-      ];
+      scopeConditions.push({
+        OR: [
+          { saleNumber: { contains: term, mode: 'insensitive' } },
+          { customer: { fullName: { contains: term, mode: 'insensitive' } } },
+          { customer: { phone: { contains: term, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (scopeConditions.length === 1 && scopeConditions[0].OR) {
+      whereClause.OR = scopeConditions[0].OR;
+    } else if (scopeConditions.length > 1) {
+      whereClause.AND = scopeConditions;
     }
 
     const [total, orders] = await Promise.all([
@@ -275,7 +294,14 @@ export async function getOrderTrackingList(req, res) {
     const metricsBase = {
       tenantId,
       orderType: 'REDES_PERSONALIZADO',
-      ...(isVendedorRedes && !isSuperAdmin ? { sellerId: req.user.id } : {}),
+      status: { not: 'ANULADA' },
+      ...(!isSuperAdmin
+        ? req.user?.assignedEventId
+          ? { OR: [{ sellerId: req.user.id }, { pickupEventId: req.user.assignedEventId }] }
+          : isVendedorRedes
+            ? { sellerId: req.user.id }
+            : {}
+        : {}),
     };
 
     const [totalCount, pendingBalanceAgg, deliveredCount, inWorkshopCount] = await Promise.all([
@@ -346,9 +372,17 @@ export async function updateOrderDelivery(req, res) {
       ? req.user.roles
       : [req.user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isAllowedPickupSeller = Boolean(req.user?.assignedEventId && sale.pickupEventId === req.user.assignedEventId);
 
-    if (!isSuperAdmin && sale.sellerId !== req.user.id) {
+    if (!isSuperAdmin && sale.sellerId !== req.user.id && !isAllowedPickupSeller) {
       return res.status(403).json({ success: false, error: 'No tienes permiso para modificar este pedido.' });
+    }
+
+    if (isDelivered === true && Number(sale.balanceDue || 0) > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `No se puede marcar como ENTREGADO el pedido #${sale.saleNumber} porque aún tiene un saldo pendiente de Q ${Number(sale.balanceDue).toFixed(2)}. Registra primero el cobro del saldo.`,
+      });
     }
 
     const updateData = {};

@@ -6,6 +6,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 [Seed Zero-Trust] Verificando datos maestros oficiales...');
 
+  if (process.env.SKIP_WEB_SYNC === 'true') {
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { slug: 'deco-vintage-guate' },
+      select: { id: true, name: true },
+    });
+    const existingEvent = existingTenant
+      ? await prisma.event.findUnique({
+          where: { id: 'evt-ventas-redes-online' },
+          select: { id: true, name: true },
+        })
+      : null;
+
+    if (existingTenant && existingEvent) {
+      console.log(`⚡ [Seed Fast-Path] Tenant (${existingTenant.id}) y Evento Virtual (${existingEvent.id}) ya existen.`);
+      return;
+    }
+  }
+
   // 1. Tenant Oficial: Deco Vintage Guate
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'deco-vintage-guate' },

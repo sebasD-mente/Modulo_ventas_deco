@@ -16,6 +16,28 @@ export async function purgeEventSalesTransaction({ tenantId, eventId, userId }) 
       throw new Error('Evento no encontrado o no pertenece a esta organización.');
     }
 
+    if (eventId === 'evt-ventas-redes-online') {
+      const err = new Error('No está permitido purgar el canal permanente de Ventas en Línea / Redes.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    if (typeof tx.sale?.findFirst === 'function') {
+      const settledSale = await tx.sale.findFirst({
+        where: {
+          tenantId,
+          eventId,
+          OR: [{ commissionPaid: true }, { commissionSettlementId: { not: null } }],
+        },
+        select: { id: true },
+      });
+      if (settledSale) {
+        const err = new Error('No se pueden purgar las ventas de un evento que posee comisiones liquidadas.');
+        err.statusCode = 409;
+        throw err;
+      }
+    }
+
     // 2. Contar ventas existentes
     const salesCount = await tx.sale.count({
       where: { tenantId, eventId },
@@ -30,6 +52,26 @@ export async function purgeEventSalesTransaction({ tenantId, eventId, userId }) 
     await tx.cashClosing.deleteMany({
       where: { tenantId, eventId },
     });
+
+    // 4.1 Limpiar pliegos de taller sin ítems (huérfanos tras borrar ventas)
+    if (typeof tx.printSheet?.deleteMany === 'function') {
+      await tx.printSheet.deleteMany({
+        where: {
+          tenantId,
+          items: { none: {} },
+        },
+      });
+    }
+
+    // 4.2 Limpiar liquidaciones huérfanas sin ventas asociadas
+    if (typeof tx.commissionSettlement?.deleteMany === 'function') {
+      await tx.commissionSettlement.deleteMany({
+        where: {
+          tenantId,
+          sales: { none: {} },
+        },
+      });
+    }
 
     // 5. Resetear la secuencia de ventas del evento a 0 para que arranque desde FERI-0001
     await tx.event.update({

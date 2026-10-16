@@ -11,28 +11,51 @@
  * 5. Existan capturas de pantalla de producción fechadas y listas para la Auditoría 360°.
  */
 
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 
-const PROD_BASE_URL = 'https://ventas.decovintage.online';
+const PROD_BASE_URL = process.env.PROD_BASE_URL || 'https://ventas.decovintage.online';
 const HEALTH_URL = `${PROD_BASE_URL}/health`;
+const HEALTH_AI_URL = `${PROD_BASE_URL}/health/ai`;
 const ME_URL = `${PROD_BASE_URL}/api/auth/me`;
 const ACTIVE_EVENT_URL = `${PROD_BASE_URL}/api/events/active`;
 
-const PROD_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwYmI0NzEyLWY1NTEtNDE4ZS1iYjAzLTVlZWI2MDAxNWY2OCIsImVtYWlsIjoic2ViYXNqaW1lbmV6MDMzMEBnbWFpbC5jb20iLCJmdWxsTmFtZSI6IlNlYmFzdGlhbiBKaW1lbmV6Iiwicm9sZSI6IlNVUEVSX0FETUlOIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXSwidGVuYW50SWQiOiI1OGI4MjlhNC0xMDA2LTQxYzItOGU5MC1iMDYxMDIzMGMyNWYiLCJhc3NpZ25lZEV2ZW50SWQiOm51bGwsImF2YXRhclVybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k3VndtYzUwNUozOEN6VXpaZk1XOGRMaVZNVy1HS25WRUtsRjBaeGV6Zk5BQ29aZlNieUE9czk2LWMiLCJpYXQiOjE3OTE1OTQwNDUsImV4cCI6MTc5MjE5ODg0NX0.P3q2jxmhbObNQiqLrhx0Mr9jpBkxDvQUVRYV_qEzWto';
+function getVerificationToken() {
+  if (process.env.PROD_VERIFY_JWT) return process.env.PROD_VERIFY_JWT;
+  if (process.env.JWT_SECRET) {
+    return jwt.sign(
+      {
+        id: process.env.PROD_ADMIN_ID || '30bb4712-f551-418e-bb03-5eeb60015f68',
+        role: 'SUPER_ADMIN',
+        roles: ['SUPER_ADMIN'],
+        tenantId: process.env.PROD_TENANT_ID || '58b829a4-1006-41c2-8e90-b0610230c25f',
+        assignedEventId: null,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+  }
+  console.error('❌ [ABORTADO] Falta PROD_VERIFY_JWT o JWT_SECRET en el entorno para autenticar la verificación.');
+  process.exit(1);
+}
 
 async function verifyEndpoint(url, options = {}) {
+  const t0 = Date.now();
   const res = await fetch(url, { ...options, cache: 'no-store' });
   const text = await res.text();
+  const latencyMs = Date.now() - t0;
   let json = null;
   try {
     json = JSON.parse(text);
   } catch (_) {}
-  return { ok: res.ok, status: res.status, json, text };
+  return { ok: res.ok, status: res.status, json, text, latencyMs };
 }
 
 async function runProductionAudit() {
+  const PROD_TOKEN = getVerificationToken();
+
   console.log('======================================================================');
   console.log('🔍 [ARNÉS ANTI-PEREZA] Auditoría Mecánica E2E en Producción');
   console.log(`🌐 Destino: ${PROD_BASE_URL}`);
@@ -41,6 +64,7 @@ async function runProductionAudit() {
   const auditReport = {
     startedAt: new Date().toISOString(),
     steps: {},
+    checks: {},
     evidenceFound: [],
     pass: false
   };
@@ -53,8 +77,29 @@ async function runProductionAudit() {
     console.error('Detalle /health:', health.text);
     process.exit(1);
   }
-  console.log(`✅ OK (commit: ${health.json.gitCommit}, uptime: ${Math.round(health.json.uptime)}s)`);
-  auditReport.steps.health = { ok: true, gitCommit: health.json.gitCommit, uptime: health.json.uptime };
+  console.log(`✅ OK (commit: ${health.json.gitCommit}, uptime: ${Math.round(health.json.uptime)}s, ${health.latencyMs}ms)`);
+  auditReport.steps.health = { ok: true, gitCommit: health.json.gitCommit, uptime: health.json.uptime, latencyMs: health.latencyMs };
+  auditReport.checks.health = { ok: true, latencyMs: health.latencyMs };
+
+  // 1b. Healthcheck de IA (/health/ai)
+  process.stdout.write('1b. Verificando /health/ai y disponibilidad del pool de Gemini... ');
+  const aiHealth = await verifyEndpoint(HEALTH_AI_URL);
+  const aiData = aiHealth.json || {};
+  const hasAiKeys = (aiData.totalKeys > 0) || (aiData.availableKeys > 0) || Boolean(aiData.configured);
+  if (!aiHealth.ok || aiData.status !== 'ok' || !hasAiKeys) {
+    console.log('❌ FALLÓ');
+    console.error('❌ Fallo en /health/ai: Pool de Gemini sin llaves disponibles o degradado:', aiHealth.text);
+    process.exit(1);
+  }
+  console.log(`✅ OK (modelo: ${aiData.model}, llaves disponibles: ${aiData.availableKeys ?? 1}/${aiData.totalKeys ?? 1}, ${aiHealth.latencyMs}ms)`);
+  auditReport.steps.healthAi = {
+    ok: true,
+    model: aiData.model,
+    totalKeys: aiData.totalKeys ?? 1,
+    availableKeys: aiData.availableKeys ?? 1,
+    latencyMs: aiHealth.latencyMs
+  };
+  auditReport.checks.healthAi = { ok: true, latencyMs: aiHealth.latencyMs };
 
   // 2. Sesión de Producción Autenticada
   process.stdout.write('2. Validando autenticación con JWT de producción en /api/auth/me... ');
@@ -66,8 +111,9 @@ async function runProductionAudit() {
     console.error('El token de producción fue rechazado:', auth.text);
     process.exit(1);
   }
-  console.log(`✅ OK (Usuario: ${auth.json.user.fullName}, Rol: ${auth.json.user.role})`);
-  auditReport.steps.auth = { ok: true, user: auth.json.user.email, role: auth.json.user.role };
+  console.log(`✅ OK (Usuario: ${auth.json.user.fullName}, Rol: ${auth.json.user.role}, ${auth.latencyMs}ms)`);
+  auditReport.steps.auth = { ok: true, user: auth.json.user.email, role: auth.json.user.role, latencyMs: auth.latencyMs };
+  auditReport.checks.auth = { ok: true, latencyMs: auth.latencyMs };
 
   // 3. Evento Activo
   process.stdout.write('3. Consultando evento activo ferial en /api/events/active... ');
@@ -80,8 +126,9 @@ async function runProductionAudit() {
     process.exit(1);
   }
   const activeEvent = event.json.data;
-  console.log(`✅ OK (${activeEvent.name} — ${activeEvent.location})`);
-  auditReport.steps.activeEvent = { ok: true, id: activeEvent.id, name: activeEvent.name };
+  console.log(`✅ OK (${activeEvent.name} — ${activeEvent.location}, ${event.latencyMs}ms)`);
+  auditReport.steps.activeEvent = { ok: true, id: activeEvent.id, name: activeEvent.name, latencyMs: event.latencyMs };
+  auditReport.checks.activeEvent = { ok: true, latencyMs: event.latencyMs };
 
   // 4. Catálogo y Conexión de Datos de Productos
   process.stdout.write('4. Verificando consulta de catálogo en /api/products... ');
@@ -95,8 +142,9 @@ async function runProductionAudit() {
     process.exit(1);
   }
   const productCount = productsRes.json.data.length;
-  console.log(`✅ OK (${productCount} obras cargadas desde PostgreSQL)`);
-  auditReport.steps.products = { ok: true, count: productCount };
+  console.log(`✅ OK (${productCount} obras cargadas desde PostgreSQL, ${productsRes.latencyMs}ms)`);
+  auditReport.steps.products = { ok: true, count: productCount, latencyMs: productsRes.latencyMs };
+  auditReport.checks.products = { ok: true, count: productCount, latencyMs: productsRes.latencyMs };
 
   // 5. Verificación de Evidencia Visual en test_evidence/
   process.stdout.write('5. Verificando capturas de pantalla de producción en test_evidence/... ');

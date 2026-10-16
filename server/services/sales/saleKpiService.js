@@ -6,9 +6,24 @@ export { getMonitorDashboardMetrics } from './monitorKpiService.js';
  * Retorna el rango civil exacto de inicio y fin de un día en la zona horaria oficial America/Guatemala (UTC-6).
  */
 export function getGuatemalaDayRange(dateStr = null) {
-  const targetDate = dateStr
-    ? String(dateStr).trim().split('T')[0]
-    : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+  let targetDate;
+  if (!dateStr) {
+    targetDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+  } else if (dateStr instanceof Date) {
+    targetDate = !Number.isNaN(dateStr.getTime())
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(dateStr)
+      : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+  } else {
+    const raw = String(dateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      targetDate = raw.slice(0, 10);
+    } else {
+      const parsed = new Date(raw);
+      targetDate = !Number.isNaN(parsed.getTime())
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(parsed)
+        : raw.split('T')[0];
+    }
+  }
 
   const startOfDay = new Date(`${targetDate}T00:00:00.000-06:00`);
   const endOfDay = new Date(`${targetDate}T23:59:59.999-06:00`);
@@ -48,17 +63,26 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
   if (eventId) saleWhere.eventId = eventId;
   if (tenantId) saleWhere.tenantId = tenantId;
 
+  const paymentWhere = {
+    sale: {
+      status: { not: 'ANULADA' },
+      ...(eventId ? { eventId } : {}),
+      ...(tenantId ? { tenantId } : {}),
+    },
+  };
+
   if (date) {
     const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
     if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
       saleWhere.createdAt = { gte: startOfDay, lte: endOfDay };
+      paymentWhere.createdAt = { gte: startOfDay, lte: endOfDay };
     }
   }
 
   const [salesAggregate, unitsAggregate, paymentsGroup, topProductsGroup, recentSales, eventRecord] = await Promise.all([
     prisma.sale.aggregate({ where: saleWhere, _sum: { totalAmount: true }, _count: { id: true } }),
     prisma.saleItem.aggregate({ where: { sale: saleWhere }, _sum: { quantity: true } }),
-    prisma.salePayment.groupBy({ by: ['method'], where: { sale: saleWhere }, _count: { id: true }, _sum: { amount: true } }),
+    prisma.salePayment.groupBy({ by: ['method'], where: paymentWhere, _count: { id: true }, _sum: { amount: true } }),
     prisma.saleItem.groupBy({ by: ['description'], where: { sale: saleWhere }, _sum: { quantity: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 10 }),
     prisma.sale.findMany({ where: saleWhere, take: 15, orderBy: { createdAt: 'desc' }, include: { seller: true, payments: true, items: true } }),
     eventId
@@ -93,6 +117,9 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     quantity: item._sum?.quantity || 0,
   }));
 
+  const totalCollected = Number(Object.values(paymentBreakdown).reduce((acc, b) => acc + (b.amount || 0), 0).toFixed(2));
+  const pendingBalanceTotal = Number(Math.max(0, totalAmount - totalCollected).toFixed(2));
+
   return {
     eventId,
     event: eventRecord || (eventId ? { id: eventId } : null),
@@ -100,6 +127,8 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     totalTransactions,
     totalAmount,
     totalRevenue: totalAmount,
+    totalCollected,
+    pendingBalanceTotal,
     totalUnits,
     totalItemsSold: totalUnits,
     averageTicket,
@@ -114,7 +143,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
  */
 export async function getEventSalesList({ tenantId, eventId, date = null, page = 1, limit = 50 }) {
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
-  const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+  const parsedLimit = Math.min(500, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
 
   const where = { eventId };

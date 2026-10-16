@@ -9,7 +9,7 @@ const METHODS = [{ id: 'EFECTIVO', label: 'Efectivo', icon: Banknote }, { id: 'T
 export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated }) {
   if (!sale) return null;
   const { paymentMethod, setPaymentMethod, items, discount, setDiscount, notes, setNotes,
-    isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleRemoveItem, handleSaveChanges } = useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated });
+    isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleRemoveItem, handleSaveChanges, handleCancelSale } = useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -52,6 +52,7 @@ export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated })
           <div className="pt-3 border-t border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div><span className="text-[10px] text-neutral-400 block">Total Recalculado:</span><span className="text-2xl font-black text-emerald-400 font-mono">Q {grandTotal.toFixed(2)}</span></div>
             <div className="flex items-center gap-2">
+              {sale.status !== 'ANULADA' && <button type="button" onClick={handleCancelSale} disabled={isSaving} className="px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 cursor-pointer">Anular Venta</button>}
               <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2.5 rounded-xl border border-neutral-800 text-neutral-400 text-xs font-bold hover:text-white hover:border-neutral-700 cursor-pointer">Cancelar</button>
               <button type="submit" disabled={isSaving || items.length === 0} className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer transition-transform active:scale-95">
                 {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Guardando...</span></> : <><CheckCircle2 className="w-4 h-4" /><span>Guardar cambios</span></>}

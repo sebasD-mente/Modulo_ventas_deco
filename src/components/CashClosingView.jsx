@@ -36,24 +36,20 @@ export default function CashClosingView({ liveMetrics, activeEvent, eventId, onC
         {closing.errorMsg && <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4" /><span>{closing.errorMsg}</span></div>}
 
         <form onSubmit={handleOpenConfirmation} className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            <div><label className="text-[10px] font-bold text-neutral-400 block mb-1">Fondo Inicial (Q)</label><input type="number" step="0.01" min="0" placeholder="0.00" value={closing.openingCashFloat} onChange={(e) => closing.setOpeningCashFloat(e.target.value)} className="w-full bg-black border border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-mono text-white" /></div>
+            <div><label className="text-[10px] font-bold text-neutral-400 block mb-1">Gastos Caja (Q)</label><input type="number" step="0.01" min="0" placeholder="0.00" value={closing.pettyCashExpenses} onChange={(e) => closing.setPettyCashExpenses(e.target.value)} className="w-full bg-black border border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-mono text-amber-400" /></div>
+            <div><label className="text-[10px] font-bold text-neutral-400 block mb-1">Retiros (Q)</label><input type="number" step="0.01" min="0" placeholder="0.00" value={closing.cashDrops} onChange={(e) => closing.setCashDrops(e.target.value)} className="w-full bg-black border border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-mono text-sky-400" /></div>
+          </div>
           <CashDenominationGrid counts={closing.counts} updateCount={closing.updateCount} resetCounts={closing.resetCounts} denomTotal={closing.denomTotal} />
           {closing.denomTotal === 0 && (
-            <div>
-              <label className="text-xs font-bold text-neutral-300 block mb-1">Efectivo Físico Directo (Q)</label>
-              <input type="number" step="0.01" min="0" placeholder="0.00" value={closing.manualCash} onChange={(e) => closing.setManualCash(e.target.value)} className="w-full bg-black border border-neutral-700 rounded-2xl px-4 py-2 text-lg font-black text-emerald-400 text-center font-mono" />
-            </div>
+            <div><label className="text-xs font-bold text-neutral-300 block mb-1">Efectivo Físico Directo (Q)</label><input type="number" step="0.01" min="0" placeholder="0.00" value={closing.manualCash} onChange={(e) => closing.setManualCash(e.target.value)} className="w-full bg-black border border-neutral-700 rounded-2xl px-4 py-2 text-lg font-black text-emerald-400 text-center font-mono" /></div>
           )}
           <CashClosingSummary showConfirmModal={showConfirmModal} setShowConfirmModal={setShowConfirmModal} calculatedCash={closing.calculatedCash} numReported={closing.numReported} difference={closing.difference} discrepancy={closing.discrepancy} totalGross={closing.totalGross} observations={closing.observations} isSubmitting={closing.isSubmitting} handleConfirmClosing={handleConfirmClosing} onClick={handleConfirmClosing} />
-          <div>
-            <label className="text-xs font-bold text-neutral-300 block mb-1">Observaciones</label>
-            <textarea rows="2" placeholder="Incidencias..." value={closing.observations} onChange={(e) => closing.setObservations(e.target.value)} className="w-full bg-black border border-neutral-700 rounded-2xl px-4 py-2 text-xs text-white" />
-          </div>
-          <button type="submit" disabled={closing.isSubmitting || (closing.numReported <= 0 && closing.manualCash === '')} className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm uppercase shadow-xl disabled:opacity-40 cursor-pointer">
-            {closing.isSubmitting ? 'Guardando...' : 'Registrar y conciliar cierre'}
-          </button>
+          <div><label className="text-xs font-bold text-neutral-300 block mb-1">Observaciones</label><textarea rows="2" placeholder="Incidencias..." value={closing.observations} onChange={(e) => closing.setObservations(e.target.value)} className="w-full bg-black border border-neutral-700 rounded-2xl px-4 py-2 text-xs text-white" /></div>
+          <button type="submit" disabled={closing.isSubmitting || (closing.numReported <= 0 && closing.manualCash === '')} className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm uppercase shadow-xl disabled:opacity-40 cursor-pointer">{closing.isSubmitting ? 'Guardando...' : 'Registrar y conciliar cierre'}</button>
         </form>
       </div>
-
       <div className="bg-[#121212] p-5 rounded-[32px] border border-neutral-800 space-y-4">
         <div className="flex justify-between items-center pb-2 border-b border-neutral-800">
           <span className="text-xs font-bold uppercase flex items-center gap-2"><Share2 className="w-4 h-4" />WhatsApp</span>

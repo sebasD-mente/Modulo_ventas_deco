@@ -41,22 +41,40 @@ export function invalidateSequenceCache(eventId) {
  * @param {string} seqName
  */
 async function ensureSequenceExists(client, eventId, seqName) {
-  if (initializedSequences.has(seqName)) {
+  if (!eventId || typeof eventId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(eventId) || eventId.length > 50) {
+    throw new Error(`ID de evento inválido para secuencia: ${eventId}`);
+  }
+  const resolvedSeqName = seqName || getSequenceName(eventId);
+  if (initializedSequences.has(resolvedSeqName)) {
     return;
   }
-  if (initPromises.has(seqName)) {
-    return await initPromises.get(seqName);
+  if (initPromises.has(resolvedSeqName)) {
+    return await initPromises.get(resolvedSeqName);
   }
 
   const promise = (async () => {
     const sql = `
       DO $$
       DECLARE
-        current_seq int;
+        start_val int;
+        seq_last int;
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename = '${seqName}') THEN
-          SELECT COALESCE("current_sale_sequence", 0) + 1 INTO current_seq FROM "events" WHERE id = '${eventId}';
-          EXECUTE 'CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ' || COALESCE(current_seq, 1);
+        SELECT GREATEST(
+          COALESCE((SELECT COALESCE("current_sale_sequence", 0) + 1 FROM "events" WHERE "id" = '${eventId}'), 1),
+          COALESCE((
+            SELECT MAX(CAST(SUBSTRING("saleNumber" FROM '([0-9]+)$') AS INTEGER)) + 1
+            FROM "sales"
+            WHERE "eventId" = '${eventId}' AND "saleNumber" ~ '[0-9]+$'
+          ), 1)
+        ) INTO start_val;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename = '${resolvedSeqName}') THEN
+          EXECUTE 'CREATE SEQUENCE IF NOT EXISTS ${resolvedSeqName} START WITH ' || COALESCE(start_val, 1);
+        ELSE
+          SELECT COALESCE(last_value, 0) INTO seq_last FROM pg_sequences WHERE sequencename = '${resolvedSeqName}';
+          IF seq_last < (COALESCE(start_val, 1) - 1) THEN
+            PERFORM setval('${resolvedSeqName}', GREATEST(COALESCE(start_val, 1) - 1, 1), true);
+          END IF;
         END IF;
       END $$;
     `;
@@ -66,14 +84,14 @@ async function ensureSequenceExists(client, eventId, seqName) {
     } else if (typeof client.$queryRawUnsafe === 'function') {
       await client.$queryRawUnsafe(sql);
     }
-    initializedSequences.add(seqName);
+    initializedSequences.add(resolvedSeqName);
   })();
 
-  initPromises.set(seqName, promise);
+  initPromises.set(resolvedSeqName, promise);
   try {
     await promise;
   } finally {
-    initPromises.delete(seqName);
+    initPromises.delete(resolvedSeqName);
   }
 }
 
@@ -85,8 +103,13 @@ async function ensureSequenceExists(client, eventId, seqName) {
  * @param {object} [tx] - Cliente o transacción de Prisma opcional
  * @returns {Promise<string>}
  */
-export async function generateSaleNumber(eventId, tx = prisma) {
-  const client = tx || prisma;
+export async function generateSaleNumber(eventIdOrTx, txOrEventId = prisma) {
+  let eventId = eventIdOrTx;
+  let client = txOrEventId || prisma;
+  if (eventIdOrTx && typeof eventIdOrTx === 'object' && typeof txOrEventId === 'string') {
+    client = eventIdOrTx;
+    eventId = txOrEventId;
+  }
 
   // Fallback para entornos de pruebas unitarias con mocks de event.update
   if (typeof client.$queryRawUnsafe !== 'function') {
@@ -130,7 +153,14 @@ export async function generateSaleNumber(eventId, tx = prisma) {
   if (rawSeq === undefined || rawSeq === null) {
     throw new Error(`Error obteniendo consecutivo de la secuencia ${seqName}`);
   }
-  const currentSeq = Number(rawSeq);
+  const seqNumber = Number(rawSeq);
+
+  if (typeof client?.event?.updateMany === 'function') {
+    await client.event.updateMany({
+      where: { id: eventId, currentSaleSequence: { lt: seqNumber } },
+      data: { currentSaleSequence: seqNumber },
+    });
+  }
 
   // Obtener nombre del evento mediante SELECT simple (AccessShareLock, 0 bloqueos de tupla)
   let event = null;
@@ -145,6 +175,6 @@ export async function generateSaleNumber(eventId, tx = prisma) {
     ? event.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()
     : '') || 'VENTA';
 
-  const sequential = String(currentSeq).padStart(4, '0');
+  const sequential = String(seqNumber).padStart(4, '0');
   return `${prefix}-${sequential}`;
 }

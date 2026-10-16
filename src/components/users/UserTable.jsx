@@ -53,15 +53,15 @@ export default function UserTable({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button" onClick={() => onToggleStatus(u.id)}
-                  className="text-xs font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded-xl bg-neutral-900 border border-neutral-800 cursor-pointer transition-all"
+                  className="min-h-[44px] px-3.5 py-2 text-xs font-bold text-neutral-300 hover:text-white rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 cursor-pointer transition-all flex items-center justify-center"
                 >{u.status === 'ACTIVO' ? 'Desactivar' : 'Activar'}</button>
                 {!isSelf && (
                   <button
                     type="button" onClick={() => onDeleteUser(u.id, u.fullName)} title="Eliminar usuario permanentemente"
-                    className="p-1.5 rounded-xl text-neutral-500 hover:text-red-400 bg-neutral-900 border border-neutral-800 hover:border-red-900 cursor-pointer transition-all"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-neutral-500 hover:text-red-400 bg-neutral-900 border border-neutral-800 hover:border-red-900 cursor-pointer transition-all"
                   ><Trash2 className="w-4 h-4" /></button>
                 )}
               </div>
@@ -76,7 +76,7 @@ export default function UserTable({
                   {roleDefinitions.map((roleDef) => (
                     <button
                       key={roleDef.key} type="button" onClick={() => onToggleRole(u.id, roleDef.key, userRolesList)}
-                      className={`px-2.5 py-1.5 rounded-xl text-[11px] border font-bold transition-all text-center cursor-pointer active:scale-95 ${
+                      className={`min-h-[44px] px-3 py-2 rounded-xl text-xs border font-bold transition-all text-center cursor-pointer active:scale-95 flex items-center justify-center ${
                         userRolesList.includes(roleDef.key) ? roleDef.activeClass : 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
                       }`}
                     >{roleDef.label}</button>
@@ -90,7 +90,7 @@ export default function UserTable({
                 </label>
                 <select
                   value={u.assignedEventId || ''} onChange={(e) => onAssignEvent(u.id, e.target.value)} disabled={!hasVendedorRole}
-                  className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white disabled:opacity-40 cursor-pointer"
+                  className="w-full min-h-[44px] bg-neutral-950 border border-neutral-700/80 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white disabled:opacity-40 cursor-pointer shadow-inner"
                 >
                   <option value="">Sin evento asignado</option>
                   {events.map((ev) => (

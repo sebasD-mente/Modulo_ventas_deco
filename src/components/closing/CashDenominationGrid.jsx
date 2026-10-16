@@ -15,9 +15,9 @@ export default function CashDenominationGrid({
         <button
           type="button"
           onClick={resetCounts}
-          className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 transition cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 hover:text-white px-3.5 min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition cursor-pointer"
         >
-          <RotateCcw className="w-3 h-3" />
+          <RotateCcw className="w-3.5 h-3.5" />
           <span>Reiniciar</span>
         </button>
       </div>
@@ -27,23 +27,24 @@ export default function CashDenominationGrid({
           const count = counts[value] || 0;
           const subtotal = count * value;
           return (
-            <div key={value} className="bg-[#161616] p-2.5 rounded-xl border border-neutral-800 flex flex-col justify-between">
-              <div className="flex justify-between items-center text-xs mb-1.5">
+            <div key={value} className="bg-[#161616] p-3 rounded-2xl border border-neutral-800 flex flex-col justify-between space-y-2">
+              <div className="flex justify-between items-center text-xs">
                 <span className="font-black text-white font-mono flex items-center gap-1">
-                  {type === 'moneda' ? <Coins className="w-3 h-3 text-amber-400" /> : null}
+                  {type === 'moneda' ? <Coins className="w-3.5 h-3.5 text-amber-400" /> : null}
                   {label}
                 </span>
                 <span className="text-[11px] font-mono text-emerald-400 font-bold">
                   Q {subtotal.toFixed(2)}
                 </span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => updateCount(value, (c) => Math.max(0, c - 1))}
-                  className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white flex items-center justify-center font-bold text-sm cursor-pointer active:scale-95 transition"
+                  aria-label={`Restar ${label}`}
                 >
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-4 h-4" />
                 </button>
                 <input
                   type="number"
@@ -51,14 +52,15 @@ export default function CashDenominationGrid({
                   value={count || ''}
                   placeholder="0"
                   onChange={(e) => updateCount(value, Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="flex-1 min-w-0 bg-black text-center border border-neutral-700 rounded-lg py-1 text-xs font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
+                  className="flex-1 min-w-0 min-h-[44px] bg-black text-center border border-neutral-700 rounded-xl py-1 text-sm font-mono font-bold text-white focus:outline-none focus:border-emerald-500 shadow-inner"
                 />
                 <button
                   type="button"
                   onClick={() => updateCount(value, (c) => c + 1)}
-                  className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white flex items-center justify-center font-bold text-sm cursor-pointer active:scale-95 transition"
+                  aria-label={`Sumar ${label}`}
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-4 h-4" />
                 </button>
               </div>
             </div>

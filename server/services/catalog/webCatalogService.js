@@ -4,43 +4,29 @@ import { searchWebPosters } from '../webCatalogService.js';
 import { resolveEntityAlias, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from '../semantic/entityAliases.js';
 import { getCachedProducts } from './catalogCacheStore.js';
 
-export const STANDARD_SIZES = {
-  MINI: { sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, PEQUENO: { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
-  PORTADA_ALBUM: { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 }, MEDIANO: { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
-  GRANDE: { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, GIGANTE: { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+import {
+  isFuzzyTokenMatch,
+  normalizeMatcherString,
+  stemMatcherToken,
+  EXTENDED_STOP_WORDS,
+} from './catalogStringNormalizer.js';
+import {
+  SIZE_CATALOG_MAP as STANDARD_SIZES,
+  normalizeCatalogSizeId as normSize,
+  resolvePosterSizes,
+} from './catalogSizeResolver.js';
+
+export {
+  isFuzzyTokenMatch,
+  normalizeMatcherString,
+  stemMatcherToken,
+  EXTENDED_STOP_WORDS,
+  STANDARD_SIZES,
+  normSize,
+  resolvePosterSizes,
 };
 
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
-
-export function normalizeMatcherString(str) {
-  if (!str || typeof str !== 'string') return '';
-  const withPlaceholder = str.replace(/ñ/gi, '___enie___');
-  const noAccents = withPlaceholder.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/___enie___/g, 'ñ');
-  return noAccents.replace(/[?!¿¡,.:;()_—\-\/\\"'`~*#]/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-export function stemMatcherToken(tok) {
-  if (!tok || tok.length <= 3 || KNOWN_SHORT_ENTITIES.has(tok)) return tok;
-  if (tok.endsWith('es') && tok.length > 4 && !/[aeiou]es$/.test(tok)) return tok.slice(0, -2);
-  if (tok.endsWith('s') && !tok.endsWith('ss') && tok.length > 3) return tok.slice(0, -1);
-  return tok;
-}
-
-export const EXTENDED_STOP_WORDS = new Set([
-  ...UNIVERSAL_STOP_WORDS, 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'en', 'con', 'por', 'para', 'del', 'al', 'y', 'o', 'que', 'sobre', 'sin', 'como', 'su', 'sus', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseno', 'disenos', 'diseño', 'diseños', 'tamano', 'tamanos', 'tamaño', 'tamaños', 'medida', 'medidas',
-]);
-
-function normSize(requestedSize) {
-  if (!requestedSize) return 'MEDIANO';
-  const raw = String(requestedSize).toLowerCase().trim(), compact = raw.replace(/\s+/g, '').replace(/pulgadas?|pulg?|inches?|in\b|"|cms?|cent[ií]metros?/gi, '').replace(/por|\*|x/gi, 'x');
-  if (/30x30|12x12|vinilo|album|[aá]lbum|portada|cuadrad[oa]|disco/.test(compact) || /\b(portada|album|[aá]lbum|vinilo|cuadrad[oa]|disco)\b/i.test(raw)) return 'PORTADA_ALBUM';
-  if (/18x24|24x18|45x60|60x45/.test(compact) || /\b(grande|large|l)\b/i.test(raw)) return 'GRANDE';
-  if (/24x36|36x24|60x90|90x60/.test(compact) || /\b(gigante|extra\s*grande|xl)\b/i.test(raw)) return 'GIGANTE';
-  if (/12x18|18x12|30x45|45x30/.test(compact) || /\b(mediano|medio|medium|m)\b/i.test(raw)) return 'MEDIANO';
-  if (/8(\.5)?x1[01]|1[01]x8(\.5)?|21x27|27x21/.test(compact) || /\b(peque[ñn]o|chico|small|s)\b/i.test(raw)) return 'PEQUENO';
-  if (/5x7|7x5|6x8|8x6|14x21|21x14/.test(compact) || /\b(mini|miniatura|xs)\b/i.test(raw)) return 'MINI';
-  return raw.toUpperCase();
-}
 
 function resolvePosterSize(item, requestedSize) {
   const hasOfficialSizes = Array.isArray(item.sizes) && item.sizes.length > 0;
@@ -49,8 +35,8 @@ function resolvePosterSize(item, requestedSize) {
   const legitPrimary = (typeof item.primarySize === 'object' && item.primarySize)
     || sizes.find((s) => s.sizeId === item.primarySize)
     || (isMusic ? sizes.find((s) => s.sizeId === 'PORTADA_ALBUM') : null)
+    || (!isMusic ? sizes.find((s) => s.sizeId === 'MEDIANO') : null)
     || sizes.find((s) => s.sizeId === 'PORTADA_ALBUM')
-    || (isMusic ? null : sizes.find((s) => s.sizeId === 'MEDIANO'))
     || sizes[0]
     || STANDARD_SIZES.MEDIANO;
 
@@ -175,13 +161,31 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
     }
 
     if (webMatches && webMatches.length > 0) {
-      const canonicalTerms = normalizeMatcherString(aliasRes.searchQuery || aliasRes.canonicalTitle)
+      const titleTerms = normalizeMatcherString(aliasRes.canonicalTitle || '')
         .split(/\s+/)
         .filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
+      const queryTerms = normalizeMatcherString(aliasRes.searchQuery || '')
+        .split(/\s+/)
+        .filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
+      const aliasTokens = normalizeMatcherString(aliasRes.matchedAlias || clean)
+        .split(/\s+/)
+        .filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
+
       const candidate = webMatches.find((p) => {
         const full = normalizeMatcherString(`${p.titulo || ''} ${p.subtitulo || ''} ${(p.tags || []).join(' ')}`);
-        return canonicalTerms.length === 0 || canonicalTerms.every((ct) => new RegExp(`\\b${ct}\\b`, 'i').test(full));
-      }) || webMatches[0];
+        const titleAndSub = normalizeMatcherString(`${p.titulo || ''} ${p.subtitulo || ''}`);
+
+        const matchesAllTitle = titleTerms.length > 0 && titleTerms.every((ct) => new RegExp(`\\b${ct}\\b`, 'i').test(full));
+        if (matchesAllTitle) return true;
+
+        if (aliasRes.matchedAlias && full.includes(normalizeMatcherString(aliasRes.matchedAlias))) return true;
+
+        const hasTitleWord = [...titleTerms, ...aliasTokens].some((t) => new RegExp(`\\b${t}\\b`, 'i').test(titleAndSub));
+        if (hasTitleWord) return true;
+
+        return false;
+      });
+
       if (candidate) return buildPosterResult(candidate, requestedSize || aliasRes.defaultSizeId, webMatches);
     }
     const isTest = process.env.NODE_ENV === 'test' || process.execArgv.includes('--test') || Boolean(process.env.NODE_TEST_CONTEXT);
@@ -193,7 +197,7 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
         categoria: aliasRes.category || 'ARTE',
         imageUrl: '/placeholder-poster.png',
         thumbUrl: '/placeholder-poster.png',
-        sizes: aliasRes.category === 'MUSICA' ? [{ sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', precio: 55 }] : Object.values(STANDARD_SIZES),
+        sizes: aliasRes.category === 'MUSICA' ? [{ sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30×30 cm', precio: 55 }] : Object.values(STANDARD_SIZES),
       };
       return buildPosterResult(syntheticCandidate, requestedSize || aliasRes.defaultSizeId);
     }

@@ -1,4 +1,7 @@
 import { prisma } from '../config/prisma.js';
+import { getGuatemalaDayRange } from './sales/saleKpiService.js';
+
+const ELIGIBLE_SALE_STATUSES = ['COMPLETADA', 'ENTREGADO'];
 
 function createHttpError(message, statusCode) {
   const err = new Error(message);
@@ -22,24 +25,44 @@ export function calculateSaleProductBase(sale) {
 /**
  * Genera el consecutivo atómico mensual de liquidación en formato LIQ-YYYYMM-001
  */
-export async function generateSettlementNumber(tenantId, tx = prisma) {
+export async function generateSettlementNumber(tenantIdOrTx, txOrTenantId = prisma) {
+  let tenantId = tenantIdOrTx;
+  let tx = txOrTenantId || prisma;
+  if (tenantIdOrTx && typeof tenantIdOrTx === 'object' && typeof txOrTenantId === 'string') {
+    tx = tenantIdOrTx;
+    tenantId = txOrTenantId;
+  }
+
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const prefix = `LIQ-${yyyy}${mm}-`;
 
-  const lastSettlement = await tx.commissionSettlement.findFirst({
-    where: { tenantId, settlementNumber: { startsWith: prefix } },
-    orderBy: { settlementNumber: 'desc' },
-    select: { settlementNumber: true },
-  });
-
-  let seq = 1;
-  if (lastSettlement?.settlementNumber) {
-    const parts = lastSettlement.settlementNumber.split('-');
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-    if (!Number.isNaN(lastNum)) seq = lastNum + 1;
+  let maxSeq = 0;
+  if (typeof tx.commissionSettlement?.findMany === 'function') {
+    const existing = await tx.commissionSettlement.findMany({
+      where: { tenantId, settlementNumber: { startsWith: prefix } },
+      select: { settlementNumber: true },
+    });
+    for (const s of existing) {
+      const parts = String(s.settlementNumber || '').split('-');
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!Number.isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+  } else if (typeof tx.commissionSettlement?.findFirst === 'function') {
+    const lastSettlement = await tx.commissionSettlement.findFirst({
+      where: { tenantId, settlementNumber: { startsWith: prefix } },
+      orderBy: { settlementNumber: 'desc' },
+      select: { settlementNumber: true },
+    });
+    if (lastSettlement?.settlementNumber) {
+      const parts = String(lastSettlement.settlementNumber).split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!Number.isNaN(lastNum)) maxSeq = lastNum;
+    }
   }
+
+  const seq = maxSeq + 1;
   return `${prefix}${String(seq).padStart(3, '0')}`;
 }
 
@@ -49,7 +72,8 @@ export async function generateSettlementNumber(tenantId, tx = prisma) {
 export async function getPendingCommissions({ tenantId, sellerId, startDate, endDate }) {
   const where = {
     tenantId,
-    status: 'COMPLETADA',
+    orderType: 'REDES_PERSONALIZADO',
+    status: { in: ELIGIBLE_SALE_STATUSES },
     commissionPaid: false,
     commissionSettlementId: null,
     balanceDue: 0,
@@ -57,8 +81,14 @@ export async function getPendingCommissions({ tenantId, sellerId, startDate, end
   if (sellerId) where.sellerId = sellerId;
   if (startDate || endDate) {
     where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
-    if (endDate) where.createdAt.lte = new Date(endDate);
+    if (startDate) {
+      const isDateOnly = typeof startDate === 'string' && !startDate.includes('T');
+      where.createdAt.gte = isDateOnly ? getGuatemalaDayRange(startDate).startOfDay : new Date(startDate);
+    }
+    if (endDate) {
+      const isDateOnly = typeof endDate === 'string' && !endDate.includes('T');
+      where.createdAt.lte = isDateOnly ? getGuatemalaDayRange(endDate).endOfDay : new Date(endDate);
+    }
   }
 
   const rawSales = await prisma.sale.findMany({
@@ -70,7 +100,12 @@ export async function getPendingCommissions({ tenantId, sellerId, startDate, end
     },
   });
 
-  const eligibleSales = rawSales.filter((s) => Number(s.balanceDue || 0) === 0 && s.status === 'COMPLETADA');
+  const eligibleSales = (rawSales || []).filter(
+    (s) =>
+      Number(s.balanceDue || 0) === 0 &&
+      ELIGIBLE_SALE_STATUSES.includes(s.status) &&
+      (!s.orderType || s.orderType === 'REDES_PERSONALIZADO')
+  );
   const sales = eligibleSales.map((s) => {
     const baseProductos = calculateSaleProductBase(s);
     return {
@@ -81,9 +116,43 @@ export async function getPendingCommissions({ tenantId, sellerId, startDate, end
     };
   });
 
+  let salesWaitingBalance = [];
+  if (typeof prisma.sale?.findMany === 'function') {
+    try {
+      const rawWaiting = await prisma.sale.findMany({
+        where: {
+          tenantId,
+          orderType: 'REDES_PERSONALIZADO',
+          ...(sellerId ? { sellerId } : {}),
+          status: { not: 'ANULADA' },
+          balanceDue: { gt: 0 },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: true,
+          customer: { select: { id: true, fullName: true, phone: true } },
+          seller: { select: { id: true, fullName: true, email: true } },
+        },
+      });
+      salesWaitingBalance = (rawWaiting || []).filter(
+        (s) => Number(s.balanceDue || 0) > 0 && s.status !== 'ANULADA' && (!s.orderType || s.orderType === 'REDES_PERSONALIZADO')
+      );
+    } catch (_) {
+      salesWaitingBalance = [];
+    }
+  }
+
+  const waitingSummary = {
+    count: salesWaitingBalance.length,
+    totalBalance: Number(salesWaitingBalance.reduce((acc, s) => acc + Number(s.balanceDue || 0), 0).toFixed(2)),
+    potentialCommission: Number(
+      salesWaitingBalance.reduce((acc, s) => acc + Number((calculateSaleProductBase(s) * 0.20).toFixed(2)), 0).toFixed(2)
+    ),
+  };
+
   const totalProductsAmount = Number(sales.reduce((sum, s) => sum + s.baseProductos, 0).toFixed(2));
   const totalShippingExcluded = Number(sales.reduce((sum, s) => sum + s.shippingCost, 0).toFixed(2));
-  const totalCommission = Number((totalProductsAmount * 0.20).toFixed(2));
+  const totalCommission = Number(sales.reduce((sum, s) => sum + s.commissionAmount, 0).toFixed(2));
 
   return {
     totalProductsAmount,
@@ -92,6 +161,8 @@ export async function getPendingCommissions({ tenantId, sellerId, startDate, end
     salesCount: sales.length,
     commissionRate: 0.20,
     sales,
+    salesWaitingBalance,
+    waitingSummary,
   };
 }
 
@@ -99,92 +170,125 @@ export async function getPendingCommissions({ tenantId, sellerId, startDate, end
  * Transacción atómica de liquidación: valida compuerta saldo cero, congela ventas y genera LIQ-YYYYMM-001
  */
 export async function createSettlementTransaction({ tenantId, sellerId, saleIds, approvedById, notes }) {
-  return prisma.$transaction(async (tx) => {
-    const seller = await tx.user.findFirst({
-      where: { id: sellerId, tenantId },
-      select: { id: true, fullName: true, email: true },
-    });
-    if (!seller) throw createHttpError('Vendedor no encontrado.', 404);
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const seller = await tx.user.findFirst({
+          where: { id: sellerId, tenantId },
+          select: { id: true, fullName: true, email: true },
+        });
+        if (!seller) throw createHttpError('Vendedor no encontrado.', 404);
 
-    let sales = [];
-    if (saleIds && Array.isArray(saleIds) && saleIds.length > 0) {
-      sales = await tx.sale.findMany({
-        where: { id: { in: saleIds }, tenantId },
-        include: { items: true },
-      });
-      if (sales.length !== saleIds.length) {
-        throw createHttpError('Una o más ventas seleccionadas no existen en la empresa.', 400);
-      }
-    } else {
-      sales = await tx.sale.findMany({
-        where: { tenantId, sellerId, status: 'COMPLETADA', commissionPaid: false, commissionSettlementId: null, balanceDue: 0 },
-        include: { items: true },
-      });
-    }
+        let sales = [];
+        if (saleIds && Array.isArray(saleIds) && saleIds.length > 0) {
+          sales = await tx.sale.findMany({
+            where: { id: { in: saleIds }, tenantId },
+            include: { items: true },
+          });
+          if (sales.length !== saleIds.length) {
+            throw createHttpError('Una o más ventas seleccionadas no existen en la empresa.', 400);
+          }
+        } else {
+          sales = await tx.sale.findMany({
+            where: {
+              tenantId,
+              sellerId,
+              orderType: 'REDES_PERSONALIZADO',
+              status: { in: ELIGIBLE_SALE_STATUSES },
+              commissionPaid: false,
+              commissionSettlementId: null,
+              balanceDue: 0,
+            },
+            include: { items: true },
+          });
+        }
 
-    if (!sales || sales.length === 0) {
-      throw createHttpError('No hay ventas elegibles para liquidar', 400);
-    }
+        if (!sales || sales.length === 0) {
+          throw createHttpError('No hay ventas elegibles para liquidar', 400);
+        }
 
-    for (const sale of sales) {
-      if (sale.sellerId !== sellerId) {
-        throw createHttpError(`Venta #${sale.saleNumber || sale.id} no pertenece al vendedor seleccionado.`, 400);
-      }
-      if (Number(sale.balanceDue || 0) > 0 || sale.status !== 'COMPLETADA') {
-        throw createHttpError(
-          `Venta #${sale.saleNumber || sale.id} no es elegible para liquidación: saldo pendiente o no completada`,
-          422
+        for (const sale of sales) {
+          if (sale.sellerId !== sellerId) {
+            throw createHttpError(`Venta #${sale.saleNumber || sale.id} no pertenece al vendedor seleccionado.`, 400);
+          }
+          if (sale.orderType && sale.orderType !== 'REDES_PERSONALIZADO') {
+            throw createHttpError(`Venta #${sale.saleNumber || sale.id} no es un pedido de Redes Sociales elegible para comisión.`, 422);
+          }
+          if (Number(sale.balanceDue || 0) > 0 || !ELIGIBLE_SALE_STATUSES.includes(sale.status)) {
+            throw createHttpError(
+              `Venta #${sale.saleNumber || sale.id} no es elegible para liquidación: saldo pendiente o no completada`,
+              422
+            );
+          }
+          if (sale.commissionPaid || sale.commissionSettlementId) {
+            throw createHttpError(`Venta #${sale.saleNumber || sale.id} ya fue liquidada previamente.`, 400);
+          }
+        }
+
+        const settlementNumber = await generateSettlementNumber(tenantId, tx);
+        const totalProductsAmount = Number(sales.reduce((sum, s) => sum + calculateSaleProductBase(s), 0).toFixed(2));
+        const totalCommission = Number(
+          sales.reduce((sum, s) => sum + Number((calculateSaleProductBase(s) * 0.20).toFixed(2)), 0).toFixed(2)
         );
+        const salesCount = sales.length;
+
+        const timestamps = sales.map((s) => new Date(s.createdAt).getTime());
+        const settlement = await tx.commissionSettlement.create({
+          data: {
+            tenantId,
+            sellerId,
+            settlementNumber,
+            totalProductsAmount,
+            commissionRate: 0.20,
+            totalCommission,
+            salesCount,
+            periodStart: new Date(Math.min(...timestamps)),
+            periodEnd: new Date(Math.max(...timestamps)),
+            status: 'PENDIENTE_PAGO',
+            approvedById: approvedById || null,
+            notes: notes || null,
+          },
+        });
+
+        const updatedSales = await tx.sale.updateMany({
+          where: {
+            id: { in: sales.map((s) => s.id) },
+            tenantId,
+            commissionSettlementId: null,
+            commissionPaid: false,
+          },
+          data: { commissionSettlementId: settlement.id, commissionPaid: true },
+        });
+        if (updatedSales && typeof updatedSales.count === 'number' && updatedSales.count !== sales.length) {
+          throw createHttpError('Una o más ventas ya fueron incluidas en otra liquidación concurrente.', 409);
+        }
+
+        if (tx.auditLog?.create) {
+          await tx.auditLog.create({
+            data: {
+              tenantId,
+              userId: approvedById || sellerId,
+              action: 'SETTLEMENT_CREATED',
+              entity: 'COMMISSION_SETTLEMENT',
+              entityId: settlement.id,
+              details: { settlementNumber, totalProductsAmount, totalCommission, salesCount },
+            },
+          }).catch(() => {});
+        }
+
+        return { ...settlement, seller, sales };
+      });
+    } catch (err) {
+      if (err?.code === 'P2002' && attempt < MAX_RETRIES) {
+        continue;
       }
-      if (sale.commissionPaid || sale.commissionSettlementId) {
-        throw createHttpError(`Venta #${sale.saleNumber || sale.id} ya fue liquidada previamente.`, 400);
-      }
+      throw err;
     }
-
-    const settlementNumber = await generateSettlementNumber(tenantId, tx);
-    const totalProductsAmount = Number(sales.reduce((sum, s) => sum + calculateSaleProductBase(s), 0).toFixed(2));
-    const totalCommission = Number((totalProductsAmount * 0.20).toFixed(2));
-    const salesCount = sales.length;
-
-    const timestamps = sales.map((s) => new Date(s.createdAt).getTime());
-    const settlement = await tx.commissionSettlement.create({
-      data: {
-        tenantId,
-        sellerId,
-        settlementNumber,
-        totalProductsAmount,
-        commissionRate: 0.20,
-        totalCommission,
-        salesCount,
-        periodStart: new Date(Math.min(...timestamps)),
-        periodEnd: new Date(Math.max(...timestamps)),
-        status: 'PENDIENTE_PAGO',
-        approvedById: approvedById || null,
-        notes: notes || null,
-      },
-    });
-
-    await tx.sale.updateMany({
-      where: { id: { in: sales.map((s) => s.id) }, tenantId },
-      data: { commissionSettlementId: settlement.id, commissionPaid: true },
-    });
-
-    if (tx.auditLog?.create) {
-      await tx.auditLog.create({
-        data: {
-          tenantId,
-          userId: approvedById || sellerId,
-          action: 'SETTLEMENT_CREATED',
-          entity: 'COMMISSION_SETTLEMENT',
-          entityId: settlement.id,
-          details: { settlementNumber, totalProductsAmount, totalCommission, salesCount },
-        },
-      }).catch(() => {});
-    }
-
-    return { ...settlement, seller, sales };
-  });
+  }
 }
+
+export const createCommissionSettlement = createSettlementTransaction;
 
 /**
  * Registra el desembolso efectivo de una liquidación con su comprobante bancario
@@ -214,6 +318,13 @@ export async function markSettlementPaid({ tenantId, settlementId, paymentRefere
         approvedBy: { select: { id: true, fullName: true, email: true } },
       },
     });
+
+    if (typeof tx.sale?.updateMany === 'function') {
+      await tx.sale.updateMany({
+        where: { tenantId, commissionSettlementId: settlementId },
+        data: { commissionPaid: true },
+      });
+    }
 
     if (tx.auditLog?.create) {
       await tx.auditLog.create({

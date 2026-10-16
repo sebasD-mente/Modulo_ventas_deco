@@ -13,13 +13,16 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
 
-// Gemini pricing reference (USD per token — Gen 3 models)
+// Gemini pricing reference (USD per token — Gen 3 and legacy fallback models)
 export const PRICING = {
   'gemini-3.8-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
   'gemini-3.7-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
   'gemini-3.6-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
   'gemini-3.5-flash':      { inputPerToken: 0.0000003, outputPerToken: 0.0000025 },
+  'gemini-3.5-flash-lite': { inputPerToken: 0.000000075, outputPerToken: 0.00000030 },
   'gemini-3.1-flash-lite': { inputPerToken: 0.0000001, outputPerToken: 0.0000004 },
+  'gemini-2.5-flash':      { inputPerToken: 0.00000015, outputPerToken: 0.00000060 },
+  'gemini-2.5-pro':        { inputPerToken: 0.00000125, outputPerToken: 0.00000500 },
 };
 
 export function estimateCostUsd(model, tokensIn, tokensOut) {
@@ -111,6 +114,33 @@ export function markSaleConfirmed(auditLogId) {
     data:  { saleConfirmed: true },
   }).catch((err) => {
     console.warn('[LLM Observability] ⚠️ Failed to mark saleConfirmed:', err.message);
+  });
+}
+
+/**
+ * Searches for the most recent LLM AuditLog in the last 15 minutes for the given tenant & seller,
+ * marking saleConfirmed: true asynchronously (fire-and-forget).
+ */
+export function markRecentLlmSaleConfirmed({ tenantId, userId } = {}) {
+  if (!tenantId) return;
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  prisma.auditLog.findFirst({
+    where: {
+      tenantId,
+      ...(userId ? { userId } : {}),
+      entity: 'LLM',
+      createdAt: { gte: fifteenMinutesAgo },
+    },
+    orderBy: { createdAt: 'desc' },
+  }).then((entry) => {
+    if (entry && !entry.saleConfirmed) {
+      prisma.auditLog.update({
+        where: { id: entry.id },
+        data: { saleConfirmed: true },
+      }).catch(() => {});
+    }
+  }).catch((err) => {
+    console.warn('[LLM Observability] ⚠️ Failed in markRecentLlmSaleConfirmed:', err.message);
   });
 }
 

@@ -70,9 +70,14 @@ export default function ChatMessageList({
                 <img src="/brand/icon-chat-avatar.png" alt="IA" className="w-6 h-6 object-contain" />
               </div>
             )}
-            <div className={`max-w-[85%] sm:max-w-[80%] rounded-[24px] px-4 sm:px-5 py-3 sm:py-3.5 leading-relaxed text-xs sm:text-sm ${
-              m.sender === 'user' ? 'bg-[#303030] text-white border border-neutral-700 shadow-md' : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
-            }`}>
+            <div
+              className={`max-w-[85%] sm:max-w-[80%] rounded-[24px] px-4 sm:px-5 py-3 sm:py-3.5 leading-relaxed text-xs sm:text-sm ${
+                m.sender === 'user'
+                  ? 'bg-[#303030] text-white border border-neutral-700 shadow-md chat-bubble-user'
+                  : 'bg-[#242424] text-neutral-100 border border-neutral-800 shadow-md'
+              }`}
+              data-sender={m.sender === 'user' ? 'user' : 'assistant'}
+            >
               <div className="whitespace-pre-wrap">
                 {renderContent(m.text)}
                 {m.isStreaming && <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-middle" />}

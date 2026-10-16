@@ -87,8 +87,8 @@ export default function SaleCartList({
                           key={sz.sizeId}
                           type="button"
                           onClick={() => onChangeSize && onChangeSize(item.id, sz)}
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
-                            isSel ? 'bg-white text-black' : 'bg-[#181818] text-neutral-400 hover:text-white'
+                          className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center justify-center ${
+                            isSel ? 'bg-white text-black shadow-sm' : 'bg-[#181818] text-neutral-400 hover:text-white border border-neutral-800'
                           }`}
                         >
                           {sz.nombre || sz.sizeId} (Q{sz.precio})
@@ -99,21 +99,36 @@ export default function SaleCartList({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 bg-[#181818] px-2 py-1 rounded-lg border border-neutral-800 shrink-0">
-                <button type="button" onClick={() => onUpdateQty && onUpdateQty(item.id, -1)} className="text-neutral-400 hover:text-white cursor-pointer">
-                  <Minus className="w-3 h-3" />
+              <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-neutral-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onUpdateQty && onUpdateQty(item.id, -1)}
+                  className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+                  title="Disminuir cantidad"
+                >
+                  <Minus className="w-4 h-4" />
                 </button>
-                <span className="w-4 text-center font-bold text-white">{item.quantity}</span>
-                <button type="button" onClick={() => onUpdateQty && onUpdateQty(item.id, 1)} className="text-neutral-400 hover:text-white cursor-pointer">
-                  <Plus className="w-3 h-3" />
+                <span className="w-6 text-center font-bold text-sm text-white">{item.quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => onUpdateQty && onUpdateQty(item.id, 1)}
+                  className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+                  title="Aumentar cantidad"
+                >
+                  <Plus className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="text-right shrink-0 pl-1">
-                <span className="font-bold text-emerald-400 block">Q {Number(item.subtotal || 0).toFixed(2)}</span>
+                <span className="font-bold text-emerald-400 block text-xs">Q {Number(item.subtotal || 0).toFixed(2)}</span>
               </div>
 
-              <button type="button" onClick={() => onRemoveItem && onRemoveItem(item.id)} className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer">
+              <button
+                type="button"
+                onClick={() => onRemoveItem && onRemoveItem(item.id)}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
+                title="Eliminar este póster del ticket"
+              >
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>

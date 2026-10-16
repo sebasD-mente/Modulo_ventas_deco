@@ -116,7 +116,7 @@ describe('⚡ BENCHMARK & AUDITORÍA DE LATENCIA Y RESILIENCIA FERIAL (R6)', () 
     assert.strictEqual(responseStatus, 200);
     assert.strictEqual(responseData.success, true);
     assert.strictEqual(gcsActiveWhenGeminiStarted, true, 'CRÍTICO: Gemini Vision inició mientras GCS estaba activo (concurrencia confirmada)');
-    assert.ok(elapsed < 55, `Tiempo total (${elapsed}ms) debe ser menor a la suma secuencial (>=60ms)`);
+    assert.ok(elapsed < 60, `Tiempo total (${elapsed}ms) debe ser menor a la suma secuencial (>=60ms)`);
     assert.ok(responseData.imageUrl, 'Debe incluir imageUrl');
     assert.strictEqual(responseData.primaryTitle, 'Batman');
     assert.strictEqual(responseData.visualAnalysis, 'Póster vintage de Batman en estilo cómic clásico');

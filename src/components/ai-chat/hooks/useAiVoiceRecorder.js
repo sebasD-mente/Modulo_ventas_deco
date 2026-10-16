@@ -101,15 +101,15 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
             const elapsed = Date.now() - startTime;
             if (elapsed < 400) {
               noiseSamples.push(rms);
-              noiseFloor = Math.max(0.006, Math.min(0.018, (noiseSamples.reduce((a, b) => a + b, 0) / noiseSamples.length) * 1.35));
+              noiseFloor = Math.max(0.006, Math.min(0.018, (noiseSamples.reduce((a, b) => a + b, 0) / noiseSamples.length) * 1.45));
             }
             const voiceThreshold = Math.max(0.012, Math.min(0.028, noiseFloor * 1.6));
             if (rms > voiceThreshold) {
               hasSpokenRef.current = true; lastSoundAt = Date.now(); setVadActive(false);
             } else if (hasSpokenRef.current) {
-              const silence = Date.now() - lastSoundAt;
-              if (silence > 3800) stopRecording();
-              else if (silence > 2500) setVadActive(true);
+              const silence = Date.now() - lastSoundAt; const silentMs = silence;
+              if (silentMs > 1600 || silence > 3800) { stopRecording(); return; }
+              else if (silentMs > 900 || silence > 2500) setVadActive(true);
             }
           }, 100);
         }

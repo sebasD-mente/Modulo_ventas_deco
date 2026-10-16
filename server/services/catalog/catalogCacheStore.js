@@ -12,7 +12,7 @@ export const CACHE_TTL_MS = 5 * 60 * 1000;
 export const DEFAULT_TENANT_KEY = '__GLOBAL__';
 const refreshingTenants = new Set();
 
-export function invalidateCatalogCache(tenantId = null) {
+export function invalidateCatalogCache(tenantId = null, { preserveVectors = false } = {}) {
   if (tenantId) {
     productCache.delete(tenantId);
     productCache.delete(DEFAULT_TENANT_KEY);
@@ -21,9 +21,11 @@ export function invalidateCatalogCache(tenantId = null) {
     productCache.clear();
     refreshingTenants.clear();
   }
-  try {
-    invalidateVectorCache(tenantId);
-  } catch {}
+  if (!preserveVectors) {
+    try {
+      invalidateVectorCache(tenantId);
+    } catch {}
+  }
 }
 
 async function fetchAndCacheProducts(tenantId, key) {
@@ -73,9 +75,9 @@ export async function getCachedProducts(tenantId) {
         sizes: [
           { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
-          { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
         ],
       },
       {
@@ -90,9 +92,9 @@ export async function getCachedProducts(tenantId) {
         sizes: [
           { sizeId: 'MINI', nombre: 'Mini', precio: 25 },
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
-          { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
+          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
         ],
       },
     ];

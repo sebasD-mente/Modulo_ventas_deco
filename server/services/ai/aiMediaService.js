@@ -25,9 +25,12 @@ function hasLexicalArtworkRelevance({ primaryTitle, searchQuery, franchiseOrCate
   const stem = (t) => (t.length > 3 && t.endsWith('s') && !t.endsWith('ss') ? t.slice(0, -1) : t);
   const getTokens = (str) => norm(str).split(' ').filter((t) => (t.length > 2 || ARTWORK_SHORT_ENTITIES.has(t)) && !UNIVERSAL_STOP_WORDS.has(t));
   const candidatePool = Array.isArray(candidates) ? candidates.join(' ') : '';
-  const idToks = getTokens([primaryTitle, searchQuery, franchiseOrCategory, candidatePool].filter(Boolean).join(' '));
-  const aliasRes = resolveEntityAlias(primaryTitle || searchQuery);
-  if (aliasRes.matched && (aliasRes.canonicalTitle || aliasRes.searchQuery)) idToks.push(...getTokens([aliasRes.canonicalTitle, aliasRes.searchQuery].join(' ')));
+  const queriesToExpand = [primaryTitle, searchQuery, franchiseOrCategory, candidatePool].filter(Boolean);
+  const idToks = getTokens(queriesToExpand.join(' '));
+  for (const q of [primaryTitle, searchQuery, ...(Array.isArray(candidates) ? candidates : [])].filter(Boolean)) {
+    const aliasRes = resolveEntityAlias(q);
+    if (aliasRes.matched && (aliasRes.canonicalTitle || aliasRes.searchQuery)) idToks.push(...getTokens([aliasRes.canonicalTitle, aliasRes.searchQuery].join(' ')));
+  }
   const catToks = getTokens([matchedTitle, matchedDescription].filter(Boolean).join(' '));
   if (idToks.length === 0 || catToks.length === 0) return false;
   const idStemmed = new Set(idToks.map(stem)), catStemmed = new Set(catToks.map(stem));
@@ -50,10 +53,11 @@ export function normalizeCatalogSizeId(requestedSize) {
   return raw.toUpperCase();
 }
 
-export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId, pendingDraft = null }) {
+export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/webm', tenantId, pendingDraft = null, geminiClient = null }) {
   const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
   try {
     const { result: response, model: usedModel } = await executeWithModelFallback({
+      client: geminiClient,
       models: getActivePool(), actionName: 'DIRECT_VOICE_SALE_INFERENCE', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: buildVoiceSalePrompt() }, { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } }] }],
@@ -70,18 +74,28 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       return { ...pendingDraft, transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', items: pendingDraft.items, total, paymentMethod: nextMethod, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: `Método de pago actualizado a ${nextMethod} por voz.`, reply: `Método de pago actualizado a ${nextMethod} por voz.` };
     }
     if (!isSale) return { transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.' };
-    const enrichedItems = [], unmatchedItems = [], suggestedPosters = [];
-    let grandTotal = 0;
-    for (const item of parsed.items) {
-      const rawTitle = (item.title || item.rawName || item.name || item.productName || item.description || '').trim(), requestedSize = normalizeCatalogSizeId(item.size || 'MEDIANO');
+
+    const searchResults = await Promise.all(parsed.items.map(async (item) => {
+      const rawTitle = (item.posterName || item.title || item.rawName || item.name || item.productName || item.description || '').trim();
+      const requestedSize = normalizeCatalogSizeId(item.size || 'MEDIANO');
       let matched = await matchPosterEverywhere(tenantId, rawTitle, requestedSize);
       if (!matched) {
         const aliasRes = resolveEntityAlias(rawTitle);
         if (aliasRes.matched && aliasRes.searchQuery) matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, requestedSize || aliasRes.defaultSizeId);
       }
-      const qty = Math.max(1, Math.round(Number(item.quantity) || 1)), normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
-      if (matched && (matched.productId || matched.posterId)) {
-        const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0), subtotal = Number((qty * unitPrice).toFixed(2));
+      return { item, rawTitle, requestedSize, matched };
+    }));
+
+    const enrichedItems = [], unmatchedItems = [], suggestedPosters = [];
+    let grandTotal = 0;
+    for (const { item, rawTitle, requestedSize, matched } of searchResults) {
+      const qty = Math.max(1, Math.round(Number(item.quantity) || 1));
+      const normSize = normalizeCatalogSizeId(requestedSize || matched?.sizeId || 'MEDIANO');
+      const isMusic = matched && String(matched.category || '').toUpperCase().includes('MUSICA');
+
+      if (matched && (matched.productId || matched.posterId) && matched.sizeAvailable !== false) {
+        const unitPrice = normSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
+        const subtotal = Number((qty * unitPrice).toFixed(2));
         grandTotal += subtotal;
         enrichedItems.push({
           productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null,
@@ -90,7 +104,15 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
           quantity: qty, unitPrice, subtotal, sizeId: matched.sizeId || normSize, availableSizes: matched.availableSizes || [], alternatives: matched.alternatives || [],
         });
       } else {
-        unmatchedItems.push({ rawName: rawTitle, requestedTitle: rawTitle, quantity: qty, size: normSize });
+        const sizeConflict = Boolean(matched && matched.sizeAvailable === false);
+        unmatchedItems.push({
+          rawName: rawTitle, requestedTitle: rawTitle, quantity: qty, size: normSize, requestedSize,
+          sizeAvailable: !sizeConflict, sizeConflict, PosterName: matched?.baseTitle || matched?.name || rawTitle,
+          availableSizes: matched?.availableSizes || (isMusic ? ['PORTADA_ALBUM'] : ['PEQUENO', 'MEDIANO', 'GRANDE']),
+          unavailableReason: matched?.unavailableReason
+            ? matched.unavailableReason.replace(/30\s*x\s*30\s*cm/gi, '30×30 cm')
+            : (sizeConflict && isMusic ? `El diseño "${matched?.baseTitle || rawTitle}" es exclusivo en: Portada de Álbum (30×30 cm). No se fabrica en ${normSize}.` : null),
+        });
         try {
           const queryTerm = rawTitle.split(/\s+/)[0] || rawTitle, candidates = await searchWebPosters({ tenantId, query: queryTerm, limit: 3 });
           for (const c of candidates || []) {
@@ -134,8 +156,20 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
     const confidence = Number(parsed.confidence || 0);
     if (confidence < 0.60 || (!parsed.primaryTitle && !parsed.franchiseOrCategory)) return reject();
     if (isNegativeDomainArtwork(parsed.visualAnalysis, parsed.primaryTitle)) return reject();
-    const searchQuery = parsed.primaryTitle || parsed.franchiseOrCategory || null;
-    const matched = searchQuery ? await matchPosterEverywhere(tenantId, searchQuery, parsed.suggestedSize || 'MEDIANO') : null;
+
+    let searchQuery = parsed.primaryTitle || parsed.franchiseOrCategory || null;
+    let matched = searchQuery ? await matchPosterEverywhere(tenantId, searchQuery, parsed.suggestedSize || 'MEDIANO') : null;
+    if (!matched || !hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) {
+      const candidatesToTry = [...(parsed.candidates || []), parsed.franchiseOrCategory].filter(Boolean);
+      for (const cand of candidatesToTry) {
+        matched = await matchPosterEverywhere(tenantId, cand, parsed.suggestedSize || 'MEDIANO');
+        if (matched && hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery: cand, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) {
+          searchQuery = cand;
+          break;
+        }
+      }
+    }
+
     if (!matched || !hasLexicalArtworkRelevance({ primaryTitle: parsed.primaryTitle, searchQuery, franchiseOrCategory: parsed.franchiseOrCategory, candidates: parsed.candidates, matchedTitle: matched.baseTitle, matchedDescription: matched.description })) return reject();
     const total = matched.unitPrice || 65.0;
     const item = { productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null, description: matched.description || parsed.primaryTitle || 'Póster Decorativo Reconocido', baseTitle: matched.baseTitle || parsed.primaryTitle || 'Póster', sizeId: matched.sizeId || 'MEDIANO', thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, quantity: 1, unitPrice: total, subtotal: total, availableSizes: matched.availableSizes, alternatives: matched.alternatives || [] };
@@ -148,25 +182,43 @@ export async function recognizePosterArtworkFromImage({ imageBuffer, mimeType = 
   } catch (err) { throwMediaError('recognizePosterArtworkFromImage', err, 'Error al reconocer arte del póster'); }
 }
 
-export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video/mp4', tenantId }) {
+export async function recognizePostersFromVideo({ videoBuffer, mimeType = 'video/mp4', tenantId, geminiClient = null }) {
   const cleanMime = (mimeType || 'video/mp4').split(';')[0].trim().toLowerCase();
   try {
     const { result: response } = await executeWithModelFallback({
+      client: geminiClient,
       models: getActivePool(), actionName: 'RECOGNIZE_POSTERS_VIDEO', tenantId,
       taskFn: async ({ model, client }) => client.models.generateContent({
         model, contents: [{ role: 'user', parts: [{ text: 'Analiza el video del mostrador de ventas: identifica cada póster visible y cuenta unidades.' }, { inlineData: { data: videoBuffer.toString('base64'), mimeType: cleanMime } }] }],
         config: { responseMimeType: 'application/json', responseSchema: videoRecognitionResponseSchema },
       }),
     });
-    const parsed = JSON.parse(response.text?.trim() || '{}'), enrichedItems = [];
-    let grandTotal = 0;
-    for (const item of parsed.postersDetected || []) {
+    const parsed = JSON.parse(response.text?.trim() || '{}');
+    const posters = parsed.postersDetected || parsed.items || [];
+
+    const matches = await Promise.all(posters.map(async (item) => {
       const matched = await matchPosterEverywhere(tenantId, item.title, item.suggestedSize || 'MEDIANO');
-      const qty = item.quantity || 1, uPrice = matched?.unitPrice || 65.0, subtotal = Number((qty * uPrice).toFixed(2));
-      grandTotal += subtotal;
-      enrichedItems.push({ productId: isUuid(matched?.productId) ? matched.productId : null, webPosterId: matched?.posterId || null, description: matched?.description || item.title || 'Póster de Video', baseTitle: matched?.baseTitle || parsed.primaryTitle || item.title || 'Póster de Video', sizeId: matched?.sizeId || 'MEDIANO', thumbUrl: matched?.thumbUrl, imageUrl: matched?.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched?.availableSizes });
+      return { item, matched };
+    }));
+
+    const enrichedItems = [], unmatchedItems = [];
+    let grandTotal = 0;
+    for (const { item, matched } of matches) {
+      const qty = item.quantity || 1;
+      if (matched && (matched.productId || matched.posterId) && matched.sizeAvailable !== false) {
+        const uPrice = Number(matched.unitPrice || 65.0);
+        const subtotal = Number((qty * uPrice).toFixed(2));
+        grandTotal += subtotal;
+        enrichedItems.push({
+          productId: isUuid(matched.productId) ? matched.productId : null, webPosterId: matched.posterId || null,
+          description: matched.description || item.title || 'Póster de Video', baseTitle: matched.baseTitle || item.title || 'Póster de Video',
+          sizeId: matched.sizeId || 'MEDIANO', thumbUrl: matched.thumbUrl, imageUrl: matched.imageUrl, quantity: qty, unitPrice: uPrice, subtotal, availableSizes: matched.availableSizes,
+        });
+      } else {
+        unmatchedItems.push({ rawName: item.title, quantity: qty, requestedSize: item.suggestedSize || 'MEDIANO' });
+      }
     }
-    return { summary: parsed.summary, items: enrichedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: 'EFECTIVO', confidence: parsed.confidence || 0.90, inputChannel: 'IA_VIDEO_MOSTRADOR' };
+    return { summary: parsed.summary || '', items: enrichedItems, unmatchedItems, total: Number(grandTotal.toFixed(2)), paymentMethod: 'EFECTIVO', confidence: parsed.confidence || 0.90, inputChannel: 'IA_VIDEO_MOSTRADOR' };
   } catch (err) { throwMediaError('recognizePostersFromVideo', err, 'Error al procesar video de mostrador'); }
 }
 
@@ -185,12 +237,30 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
       }),
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
-    let grandTotal = 0;
-    for (const item of parsed.items || []) {
+    const rawItems = parsed.items || [];
+
+    const matches = await Promise.all(rawItems.map(async (item) => {
       const matched = await matchPosterEverywhere(tenantId, item.matchedCode || item.sku || item.description);
-      if (matched) { item.description = matched.description; item.unitPrice = matched.unitPrice; item.thumbUrl = matched.thumbUrl; item.imageUrl = matched.imageUrl; item.subtotal = Number((item.quantity * item.unitPrice).toFixed(2)); }
-      grandTotal += item.subtotal || 0;
+      return { item, matched };
+    }));
+
+    const validItems = [], unmatchedItems = [];
+    let grandTotal = 0;
+    for (const { item, matched } of matches) {
+      if (matched && (matched.productId || matched.posterId)) {
+        item.description = matched.description;
+        item.unitPrice = Number(matched.unitPrice || item.unitPrice || 65);
+        item.thumbUrl = matched.thumbUrl;
+        item.imageUrl = matched.imageUrl;
+        item.subtotal = Number((item.quantity * item.unitPrice).toFixed(2));
+        grandTotal += item.subtotal;
+        validItems.push(item);
+      } else {
+        unmatchedItems.push(item);
+      }
     }
+    parsed.items = validItems;
+    parsed.unmatchedItems = unmatchedItems;
     parsed.totalCalculated = Number(grandTotal.toFixed(2));
     return parsed;
   } catch (err) { throwMediaError('processPostersBatchPhoto', err, 'Error al procesar lote de fotos'); }

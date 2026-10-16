@@ -22,10 +22,10 @@ export default function ProductionFilterTabs({ statusFilter, setStatusFilter, me
             key={tab.id}
             type="button"
             onClick={() => setStatusFilter(tab.id)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-h-[44px] px-4 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center shrink-0 ${
               active
                 ? 'bg-white text-black shadow-sm'
-                : 'bg-black border border-neutral-800 text-neutral-400 hover:text-white'
+                : 'bg-black border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
             }`}
           >
             {label}

@@ -10,6 +10,7 @@ export {
   handleChatQuery,
   handleGetSession,
   handleClearDraft,
+  handleUpdateSessionDraft,
 } from './ai/aiChatController.js';
 export {
   handleVoiceSale,

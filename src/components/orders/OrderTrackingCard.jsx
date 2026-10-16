@@ -134,7 +134,7 @@ export default function OrderTrackingCard({ order, onOpenPayment, onOpenDelivery
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
+          className="min-h-[44px] px-3 flex items-center gap-1 text-xs text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
         >
           <span>{items.length} {items.length === 1 ? 'obra' : 'obras'}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

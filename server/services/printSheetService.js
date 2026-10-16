@@ -9,46 +9,81 @@ function createHttpError(message, statusCode) {
 /**
  * Genera el consecutivo diario del pliego en formato PLI-YYYYMMDD-01, PLI-YYYYMMDD-02, etc.
  */
-export async function generateSheetCode(tenantId, tx = prisma) {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const datePrefix = `PLI-${yyyy}${mm}${dd}-`;
-
-  const lastSheet = await tx.printSheet.findFirst({
-    where: { tenantId, sheetCode: { startsWith: datePrefix } },
-    orderBy: { sheetCode: 'desc' },
-    select: { sheetCode: true },
-  });
-
-  let nextSeq = 1;
-  if (lastSheet?.sheetCode) {
-    const parts = lastSheet.sheetCode.split('-');
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-    if (!Number.isNaN(lastNum)) nextSeq = lastNum + 1;
+export async function generateSheetCode(tenantId, dateStrOrTx = null, maybeTx = null) {
+  let dateStr = null;
+  let tx = prisma;
+  if (typeof dateStrOrTx === 'string') {
+    dateStr = dateStrOrTx;
+    tx = maybeTx || prisma;
+  } else if (dateStrOrTx && typeof dateStrOrTx === 'object') {
+    tx = dateStrOrTx;
   }
 
+  let cleanDate = dateStr ? String(dateStr).replace(/\D/g, '').slice(0, 8) : '';
+  if (cleanDate.length !== 8) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    cleanDate = `${yyyy}${mm}${dd}`;
+  }
+  const datePrefix = `PLI-${cleanDate}-`;
+
+  let maxSeq = 0;
+  if (typeof tx.printSheet?.findMany === 'function') {
+    const existingSheets = await tx.printSheet.findMany({
+      where: { tenantId, sheetCode: { startsWith: datePrefix } },
+      select: { sheetCode: true },
+    });
+    for (const s of existingSheets) {
+      const parts = String(s.sheetCode || '').split('-');
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!Number.isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+  } else if (typeof tx.printSheet?.findFirst === 'function') {
+    const lastSheet = await tx.printSheet.findFirst({
+      where: { tenantId, sheetCode: { startsWith: datePrefix } },
+      orderBy: { sheetCode: 'desc' },
+      select: { sheetCode: true },
+    });
+    if (lastSheet?.sheetCode) {
+      const parts = String(lastSheet.sheetCode).split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!Number.isNaN(lastNum)) maxSeq = lastNum;
+    }
+  }
+
+  const nextSeq = maxSeq + 1;
   return `${datePrefix}${String(nextSeq).padStart(2, '0')}`;
 }
 
 /**
- * Crea un nuevo pliego de impresión en estado inicial ABIERTO.
+ * Crea un nuevo pliego de impresión en estado inicial ABIERTO con reintentos ante colisión P2002.
  */
 export async function createPrintSheet({ tenantId, userId, material, notes }) {
-  return prisma.$transaction(async (tx) => {
-    const sheetCode = await generateSheetCode(tenantId, tx);
-    return tx.printSheet.create({
-      data: {
-        tenantId,
-        sheetCode,
-        material,
-        status: 'ABIERTO',
-        notes: notes || null,
-        createdById: userId || null,
-      },
-    });
-  });
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const sheetCode = await generateSheetCode(tenantId, tx);
+        return tx.printSheet.create({
+          data: {
+            tenantId,
+            sheetCode,
+            material,
+            status: 'ABIERTO',
+            notes: notes || null,
+            createdById: userId || null,
+          },
+        });
+      });
+    } catch (err) {
+      if (err?.code === 'P2002' && attempt < MAX_RETRIES) {
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /**

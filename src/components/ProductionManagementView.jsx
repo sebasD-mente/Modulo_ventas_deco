@@ -1,20 +1,56 @@
-import React from 'react';
-import { Package, Smartphone, Search, RefreshCw, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, Smartphone, Search, RefreshCw, Check, Printer } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useProductionQueue from './production/hooks/useProductionQueue';
 import ProductionFilterTabs from './production/ProductionFilterTabs';
 import ProductionOrderCard from './production/ProductionOrderCard';
+import PrintSheetsSection from './production/PrintSheetsSection';
 
 export default function ProductionManagementView() {
   const { isVendedorRedes, isSuperAdmin, isOperario1, isOperario2 } = useAuth();
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
   const q = useProductionQueue();
+  const [viewMode, setViewMode] = useState('QUEUE'); // 'QUEUE' | 'SHEETS'
 
   const isReposiciones = q.sourceTab === 'REPOSICIONES';
 
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl text-white max-w-2xl mx-auto space-y-6 select-none">
-      {/* Selector superior: Solo visible para encargados de producción (Operarios y Super Admin) */}
+      {/* Selector Maestro: Cola de Producción vs Pliegos Diarios */}
+      {!isVendedorRedesOnly && (
+        <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
+          <button
+            type="button"
+            onClick={() => setViewMode('QUEUE')}
+            className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              viewMode === 'QUEUE'
+                ? 'bg-white text-black shadow-md font-black'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Package className="w-4 h-4 shrink-0" />
+            <span>Cola de Producción</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('SHEETS')}
+            className={`min-h-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              viewMode === 'SHEETS'
+                ? 'bg-cyan-400 text-black shadow-md font-black'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Printer className="w-4 h-4 shrink-0" />
+            <span>Pliegos Diarios</span>
+          </button>
+        </div>
+      )}
+
+      {viewMode === 'SHEETS' && !isVendedorRedesOnly ? (
+        <PrintSheetsSection isOp2Only={q.isOp2Only} isSuperAdmin={isSuperAdmin} />
+      ) : (
+        <>
+          {/* Selector de origen: Solo visible para encargados de producción */}
       {!isVendedorRedesOnly && (
         <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
           <button
@@ -164,6 +200,8 @@ export default function ProductionManagementView() {
           ))
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

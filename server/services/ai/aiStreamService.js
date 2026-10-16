@@ -4,7 +4,8 @@ import { getEventKPIs } from '../saleService.js';
 import { executeWithModelFallback, streamWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { salesAssistantSafetySettings, buildSalesSystemPrompt } from './aiPromptService.js';
 import { salesAssistantTools, constructDraftPayload, executeSearchCatalog, executeGetCashDrawerStatus, executeGetSellerShiftReport, executeGetProductionQueueStatus, executeCheckInventoryStock, executeGetHourlySalesAnalytics, executeGetTopSellingPosters } from './aiToolsService.js';
-import { executeToolCall, streamClosedLoopFollowUp } from './aiClosedLoopService.js';
+import { executeToolCall, streamClosedLoopFollowUp, buildFallbackSummaries } from './aiClosedLoopService.js';
+import { parseStandIntent, extractPaymentMethod } from '../semantic/paymentExtractor.js';
 import { getGeminiClient } from '../../config/gemini.js';
 
 const getActivePool = () => Array.from(new Set([ENV.GEMINI_MODEL || 'gemini-3.8-flash', ...MODEL_PRIORITY_POOL]));
@@ -39,20 +40,30 @@ async function resolveEventContextData({ tenantId, eventId, date = null, context
   };
 }
 
-const FASTPATH_SKIP_REGEX = /\b(kpi|metricas|métricas|vendido|ventas|caja|gaveta|corte|arqueo|top|ranking|vendedor|cola|impresion|impresión|taller|produccion|producción|stock|inventario|disponible|tienes|tenes|hay|buscame|búscame|muestrame|muéstrame|enseñame|enséñame|que\s+posters|qué\s+pósters|recomienda)\b/i;
+const FASTPATH_SKIP_REGEX = /(?<![\p{L}\p{N}])(kpi|metricas|métricas|vendido|ventas|caja|gaveta|corte|arqueo|top|ranking|vendedor|cola|impresion|impresión|taller|produccion|producción|stock|inventario|disponible|tienes|tienen|tenemos|tenes|hay|buscame|búscame|muestrame|muéstrame|enseñame|enséñame|que\s+posters|qué\s+pósters|recomienda)(?![\p{L}\p{N}])|[?¿]/iu;
 const FASTPATH_CANCEL_REGEX = /\b(cancela\s+la\s+orden|cancelar\s+orden|no\s+me\s+llevo\s+nada|olvidalo|olvídalo|borra\s+el\s+carrito|descarta\s+el\s+borrador|limpia\s+la\s+orden)\b/i;
-const FASTPATH_BUY_REGEX = /\b(dame|quiero|llevo|me\s+llevo|apunta|apúntame|apuntalo|apúntalo|cobra|cóbame|cobrale|córbrale|registra|vende|véndeme|agrega|añade)\b/i;
+const FASTPATH_BUY_REGEX = /(?<![\p{L}\p{N}])(quiero|dame|llevo|agrega|ponme|necesito|v[eé]ndeme|vend[ií]|cobrame|c[oó]brame|anota|an[oó]tame|registra|comprar|me\s+llevo|apunta|apúntame|apuntalo|apúntalo|cobra|cóbame|cobrale|córbrale|vende|añade)(?![\p{L}\p{N}])/giu;
 
-export async function tryDeterministicFastPathL0({ tenantId, message = '', pendingDraft = null }) {
+export async function tryDeterministicFastPathL0(params, eventIdArg = null, tenantIdArg = null) {
+  let message = '', tenantId = null, eventId = null, pendingDraft = null;
+  if (typeof params === 'string') {
+    message = params;
+    eventId = eventIdArg;
+    tenantId = tenantIdArg;
+  } else if (params && typeof params === 'object') {
+    ({ tenantId, message = '', pendingDraft = null, eventId = null } = params);
+  }
   const text = String(message || '').trim();
-  if (!text || text.length > 160 || FASTPATH_SKIP_REGEX.test(text)) return null;
+  if (!text || text.length > 200 || FASTPATH_SKIP_REGEX.test(text)) return null;
 
   if (FASTPATH_CANCEL_REGEX.test(text)) {
     const replyText = '🗑️ Listo, he cancelado y limpiado el borrador de venta en pantalla.';
     return {
       reply: replyText,
       text: replyText,
+      fastPath: true,
       functionCalls: [{ name: 'discardSaleDraft', args: { reason: 'Cancelación directa del usuario' } }],
+      toolCall: { name: 'discardSaleDraft', args: { reason: 'Cancelación directa del usuario' } },
       draftSale: null,
       draftAction: 'DISCARDED',
       suggestedPosters: [],
@@ -63,46 +74,123 @@ export async function tryDeterministicFastPathL0({ tenantId, message = '', pendi
     };
   }
 
-  if (!FASTPATH_BUY_REGEX.test(text)) return null;
+  if (/(?<![\p{L}\p{N}])(descuento|rebaja|oferta|menos|saldo|anticipo|d[eé]jamelos?|dej[aá]melo|precio\s+especial|remate)(?![\p{L}\p{N}])/iu.test(text)) return null;
 
-  const qtyMatch = text.match(/\b(\d+)\b/);
-  const quantity = qtyMatch ? Math.min(20, Math.max(1, parseInt(qtyMatch[1], 10))) : 1;
-  const cleanedProduct = text
-    .replace(FASTPATH_BUY_REGEX, ' ')
-    .replace(/\b(un|una|unos|unas|el|la|los|las|de|del|por\s+favor|porfa|mano|cabal|en\s+efectivo|en\s+billete|con\s+pisto|con\s+tarjeta|por\s+transferencia|transferencia|tarjeta|efectivo|poster|póster|cuadro|diseño)\b/gi, ' ')
-    .replace(/\b\d+\b/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const hasBuyWord = FASTPATH_BUY_REGEX.test(text);
+  const parsedIntent = parseStandIntent(text);
+  if (!hasBuyWord && !parsedIntent.isSaleIntent) return null;
 
-  if (!cleanedProduct || cleanedProduct.length < 2) return null;
+  const isMultiItem = /\s+y\s+|\s*\+\s*|,\s*/.test(text) || parsedIntent.items.length > 1;
 
-  const draftPayload = await constructDraftPayload(
-    tenantId,
-    { items: [{ productName: cleanedProduct, quantity }] },
-    text,
-    pendingDraft
-  );
+  if (!isMultiItem && hasBuyWord) {
+    const initialQtyMatch = text.match(/(?:^|[^\p{L}\p{N}])(?:quiero|dame|llevo|agrega|ponme|necesito|v[eé]ndeme|vend[ií]|cobrame|c[oó]brame|anota|an[oó]tame|registra|comprar)\s+(\d+)\s+/iu);
+    const quantity = initialQtyMatch ? Math.min(20, Math.max(1, parseInt(initialQtyMatch[1], 10))) : 1;
 
-  if (
-    draftPayload &&
-    Array.isArray(draftPayload.items) &&
-    draftPayload.items.length > 0 &&
-    (!draftPayload.unmatchedItems || draftPayload.unmatchedItems.length === 0)
-  ) {
-    const summary = draftPayload.items.map((i) => `${i.quantity}x ${i.description} (Q${i.subtotal.toFixed(2)})`).join(', ');
-    const replyText = `⚡ ¡Listo! Borrador preparado al instante: ${summary}. Total: **Q${draftPayload.total.toFixed(2)}** (${draftPayload.paymentMethod}).`;
-    return {
-      reply: replyText,
-      text: replyText,
-      functionCalls: [{ name: 'prepareSaleDraft', args: { items: [{ productName: cleanedProduct, quantity }] } }],
-      draftSale: draftPayload,
-      suggestedPosters: [],
-      unmatchedItems: [],
-      usedModel: 'deterministic-l0-fastpath',
-      initialModel: 'deterministic-l0-fastpath',
-      fallbackOccurred: false,
-    };
+    let cleanedProduct = text
+      .replace(FASTPATH_BUY_REGEX, ' ')
+      .replace(/^\s*\d+\s+/, ' ')
+      .replace(/(?<![\p{L}\p{N}])(un|una|unos|unas|el|la|los|las|de|del|por\s+favor|porfa|mano|cabal|en\s+efectivo|en\s+billete|con\s+pisto|con\s+tarjeta|por\s+transferencia|transferencia|tarjeta|efectivo|poster|póster|cuadro|diseño)(?![\p{L}\p{N}])/giu, ' ');
+
+    cleanedProduct = cleanedProduct.replace(/\s{2,}/g, ' ').trim();
+
+    if (cleanedProduct && cleanedProduct.length >= 2) {
+      const draftPayload = await constructDraftPayload(
+        tenantId,
+        { items: [{ productName: cleanedProduct, quantity }] },
+        text,
+        pendingDraft
+      );
+
+      if (
+        draftPayload &&
+        Array.isArray(draftPayload.items) &&
+        draftPayload.items.length > 0 &&
+        (!draftPayload.unmatchedItems || draftPayload.unmatchedItems.length === 0)
+      ) {
+        const summary = draftPayload.items.map((i) => `${i.quantity}x ${i.description} (Q${i.subtotal.toFixed(2)})`).join(', ');
+        const replyText = `⚡ ¡Listo! Borrador preparado al instante: ${summary}. Total: **Q${draftPayload.total.toFixed(2)}** (${draftPayload.paymentMethod}).`;
+        const mappedItems = draftPayload.items.map((i) => ({
+          ...i,
+          productName: i.baseTitle || i.description,
+          size: i.sizeId || i.size,
+          sizeId: i.sizeId || i.size,
+          quantity: i.quantity,
+        }));
+        return {
+          reply: replyText,
+          text: replyText,
+          fastPath: true,
+          functionCalls: [{ name: 'prepareSaleDraft', args: { items: mappedItems, paymentMethod: draftPayload.paymentMethod } }],
+          toolCall: { name: 'prepareSaleDraft', args: { items: mappedItems, paymentMethod: draftPayload.paymentMethod } },
+          draftSale: draftPayload,
+          suggestedPosters: [],
+          unmatchedItems: [],
+          usedModel: 'deterministic-l0-fastpath',
+          initialModel: 'deterministic-l0-fastpath',
+          fallbackOccurred: false,
+        };
+      }
+    }
   }
+
+  if (parsedIntent.items.length > 0) {
+    const detectedPayment = extractPaymentMethod(text) || parsedIntent.paymentMethod || 'EFECTIVO';
+    const draftPayload = await constructDraftPayload(
+      tenantId,
+      {
+        items: parsedIntent.items.map((it) => ({
+          productName: it.searchQuery || it.rawTitle,
+          quantity: it.quantity || 1,
+          size: it.sizeId,
+        })),
+        paymentMethod: detectedPayment,
+      },
+      text,
+      pendingDraft
+    );
+
+    if (
+      draftPayload &&
+      Array.isArray(draftPayload.items) &&
+      draftPayload.items.length > 0 &&
+      (!draftPayload.unmatchedItems || draftPayload.unmatchedItems.length === 0)
+    ) {
+      const summary = draftPayload.items.map((i) => `${i.quantity}x ${i.description} (Q${i.subtotal.toFixed(2)})`).join(', ');
+      const replyText = `⚡ ¡Listo! Borrador preparado al instante: ${summary}. Total: **Q${draftPayload.total.toFixed(2)}** (${draftPayload.paymentMethod}).`;
+      const mappedItems = draftPayload.items.map((i) => ({
+        ...i,
+        productName: i.baseTitle || i.description,
+        size: i.sizeId || i.size,
+        sizeId: i.sizeId || i.size,
+        quantity: i.quantity,
+      }));
+      return {
+        reply: replyText,
+        text: replyText,
+        functionCalls: [{
+          name: 'prepareSaleDraft',
+          args: {
+            items: mappedItems,
+            paymentMethod: draftPayload.paymentMethod,
+          },
+        }],
+        toolCall: {
+          name: 'prepareSaleDraft',
+          args: {
+            items: mappedItems,
+            paymentMethod: draftPayload.paymentMethod,
+          },
+        },
+        draftSale: draftPayload,
+        suggestedPosters: [],
+        unmatchedItems: [],
+        usedModel: 'deterministic-l0-fastpath',
+        initialModel: 'deterministic-l0-fastpath',
+        fallbackOccurred: false,
+      };
+    }
+  }
+
   return null;
 }
 
@@ -115,6 +203,22 @@ export async function chatWithSalesAssistant({ message, history = [], tenantId, 
     const isSale = /vend[ií]|venta|cobro|compr[oó]|anota/i.test(message);
     return { reply: isSale ? `[Modo Offline] Intención de venta detectada: "${message}".` : `[Modo Offline] ${resolved.totalVendido} vendidos en ${resolved.transaccionesTotales} ventas.`, draftSale: null, suggestedPosters: [], toolCalls: [] };
   }
+
+  if (!explicitClient && process.env.NODE_ENV !== 'test' && tenantId !== 'adversarial-tenant') {
+    const fastPathResult = await tryDeterministicFastPathL0({ tenantId, eventId, message, pendingDraft });
+    if (fastPathResult) {
+      return {
+        reply: fastPathResult.reply,
+        draftSale: fastPathResult.draftSale,
+        suggestedPosters: fastPathResult.suggestedPosters,
+        toolCalls: fastPathResult.functionCalls,
+        usedModel: fastPathResult.usedModel,
+        initialModel: fastPathResult.initialModel,
+        fallbackOccurred: fastPathResult.fallbackOccurred,
+      };
+    }
+  }
+
   try {
     const formattedContents = [...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text || h.content || '' }] })), { role: 'user', parts: [{ text: message }] }];
     const { result: response, usedModel, fallbackOccurred, initialModel } = await executeWithModelFallback({
@@ -337,6 +441,20 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
   if (directDiscard) {
     yield { type: 'token', text: '🗑️ Borrador de venta cancelado y vaciado.' };
     return;
+  }
+
+  const FAST_SUMMARY_TOOLS = new Set([
+    'prepareSaleDraft', 'discardSaleDraft', 'searchCatalog', 'checkInventoryStock',
+    'getEventKPIs', 'getHourlySalesAnalytics', 'getTopSellingPosters',
+    'getCashDrawerStatus', 'getSellerShiftReport', 'getProductionQueueStatus',
+  ]);
+
+  if (!explicitClient && executedTools.length > 0 && executedTools.every((t) => FAST_SUMMARY_TOOLS.has(t.name))) {
+    const instantSummary = buildFallbackSummaries(executedTools);
+    if (instantSummary) {
+      yield { type: 'token', text: instantSummary };
+      return;
+    }
   }
 
   if (executedTools.length > 0) {

@@ -1,11 +1,18 @@
 import { z } from 'zod';
 
 export const saleItemSchema = z.object({
-  id: z.string().uuid().optional().nullable(),
-  productId: z.string().uuid().optional().nullable(),
+  id: z.string().uuid('El ID del ítem debe ser un UUID válido').optional().nullable(),
+  productId: z.string().optional().nullable(),
   description: z.string().min(1, 'La descripción del ítem es requerida'),
   quantity: z.number().int().positive('La cantidad debe ser mayor a 0'),
   unitPrice: z.number().nonnegative('El precio unitario no puede ser negativo'),
+  customImageUrl: z.string().optional().nullable(),
+  productionNotes: z.string().optional().nullable(),
+  productionStatus: z.string().optional().nullable(),
+  isCustom: z.boolean().optional().nullable(),
+  material: z.string().optional().nullable(),
+  customDimensions: z.string().optional().nullable(),
+  sizeId: z.string().optional().nullable(),
 });
 
 export const salePaymentSchema = z.object({
@@ -47,10 +54,15 @@ export const createSaleSchema = z.object({
 });
 
 export const cashClosingSchema = z.object({
-  eventId: z.string().uuid('El ID de evento debe ser un UUID válido'),
-  closingType: z.enum(['DIARIO', 'FINAL_EVENTO']).default('DIARIO'),
+  eventId: z.string().min(1, 'El ID de evento es requerido'),
+  closingType: z.enum(['DIARIO', 'FINAL_EVENTO', 'AUTOMATICO_MEDIANOCHE']).default('DIARIO'),
   totalCashReported: z.number().nonnegative('El efectivo reportado debe ser mayor o igual a 0'),
+  openingCashFloat: z.number().nonnegative('El fondo inicial no puede ser negativo').optional().default(0),
+  pettyCashExpenses: z.number().nonnegative('Los gastos de caja chica no pueden ser negativos').optional().default(0),
+  cashDrops: z.number().nonnegative('Los retiros parciales no pueden ser negativos').optional().default(0),
   observations: z.string().max(1000).optional().nullable(),
+  date: z.string().optional().nullable(),
+  idempotencyKey: z.string().max(255).optional().nullable(),
 });
 
 export const updateSaleSchema = z.object({
@@ -59,4 +71,5 @@ export const updateSaleSchema = z.object({
   discount: z.number().nonnegative('El descuento no puede ser negativo').optional(),
   notes: z.string().max(500).optional().nullable(),
   attachments: z.array(saleAttachmentSchema).optional(),
+  status: z.enum(['COMPLETADA', 'PENDIENTE', 'ENTREGADO', 'ANULADA']).optional(),
 });

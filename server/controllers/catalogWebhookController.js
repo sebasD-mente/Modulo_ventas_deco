@@ -6,13 +6,65 @@
  * sin intervención humana.
  */
 
-import { deltaSyncRecentPosters, normalizeAndUpsertPoster } from '../services/catalog/liveCatalogSyncService.js';
+import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
+import { deltaSyncRecentPosters, normalizeAndUpsertPoster, resolveDefaultTenantId } from '../services/catalog/liveCatalogSyncService.js';
 import { invalidateCatalogCache } from '../services/webCatalogService.js';
 import { invalidateVectorCache } from '../services/embeddingService.js';
-import { resolveDefaultTenantId } from '../services/catalog/liveCatalogSyncService.js';
+import { ENV } from '../config/env.js';
+
+function isWebhookAuthorized(req) {
+  const headers = req?.headers || {};
+  const authHeader = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+  const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+  const incomingSecret = String(
+    headers['x-webhook-secret'] ||
+    headers['x-catalog-webhook-secret'] ||
+    bearerToken ||
+    ''
+  ).trim();
+
+  if (!incomingSecret) return false;
+
+  const expectedSecret = String(
+    ENV.CATALOG_WEBHOOK_SECRET ||
+    process.env.CATALOG_WEBHOOK_SECRET ||
+    ENV.JWT_SECRET ||
+    process.env.JWT_SECRET ||
+    ''
+  ).trim();
+
+  if (expectedSecret) {
+    const incomingBuf = Buffer.from(incomingSecret, 'utf8');
+    const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+    if (incomingBuf.length === expectedBuf.length && crypto.timingSafeEqual(incomingBuf, expectedBuf)) {
+      return true;
+    }
+  }
+
+  const jwtSecret = ENV.JWT_SECRET || process.env.JWT_SECRET;
+  if (bearerToken && jwtSecret) {
+    try {
+      const decoded = jwt.verify(bearerToken, jwtSecret);
+      const roles = Array.isArray(decoded?.roles) ? decoded.roles : (decoded?.role ? [decoded.role] : []);
+      if (roles.includes('SUPER_ADMIN')) {
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
+}
 
 export async function handleCatalogWebhook(req, res) {
   try {
+    if (!isWebhookAuthorized(req)) {
+      return res.status(401).json({
+        success: false,
+        error: 'No autorizado: firma o secreto de webhook inválido.',
+      });
+    }
+
     const { poster, event } = req.body || {};
     const tenantId = req.query?.tenantId || req.body?.tenantId || null;
 

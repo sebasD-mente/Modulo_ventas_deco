@@ -53,18 +53,37 @@ export default function ChatInputBar({
             <Camera className="w-5 h-5 text-white" />
           </button>
           <input
-            type="text" placeholder="Escribe o dicta tu venta..." value={inputText}
-            onChange={(e) => setInputText?.(e.target.value)} disabled={isLoading}
+            type="text"
+            placeholder="Escribe o dicta tu venta..."
+            value={inputText}
+            onChange={(e) => setInputText?.(e.target.value)}
             className="flex-1 h-11 sm:h-12 bg-black text-white placeholder-neutral-500 rounded-full px-5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-neutral-400 shadow-inner"
           />
           <button
-            type="submit" disabled={!inputText.trim() || isLoading} title="Enviar"
+            type="submit"
+            disabled={!inputText.trim() || isLoading}
+            title="Enviar"
             className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:text-neutral-500 cursor-pointer shrink-0 active:scale-95 shadow-md"
           >
             <Send className="w-5 h-5" />
           </button>
         </form>
       )}
+
+      {/* Píldoras rápidas de asistencia ferial (1-Tap Shortcuts) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2 text-[11px]">
+        <span className="text-neutral-400 font-bold uppercase tracking-wider text-[10px] shrink-0">Atajos:</span>
+        {['1 Mediano Efectivo', '1 Grande Tarjeta', '1 Pequeño', 'Portada Álbum'].map((shortcut) => (
+          <button
+            key={shortcut}
+            type="button"
+            onClick={() => setInputText?.(shortcut)}
+            className="min-h-[32px] px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold whitespace-nowrap transition cursor-pointer shrink-0 active:scale-95"
+          >
+            {shortcut}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -80,6 +80,7 @@ import {
   handleChatQuery,
   handleGetSession,
   handleClearDraft,
+  handleUpdateSessionDraft,
   handleArtworkRecognition,
   handleVideoRecognition,
 } from '../controllers/aiController.js';
@@ -96,6 +97,7 @@ const authorize = requireRole;
 router.get('/auth/config', getAuthConfig);
 router.post('/auth/google', handleGoogleLogin);
 router.post('/catalog/webhook', handleCatalogWebhook);
+router.post('/webhooks/catalog-sync', handleCatalogWebhook);
 
 // ==========================================
 // 2. MIDDLEWARE GLOBAL DE AUTENTICACIÓN
@@ -330,6 +332,11 @@ router.get(
   '/ai/session/:sessionId',
   requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   handleGetSession
+);
+router.put(
+  '/ai/session/:sessionId/draft',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  handleUpdateSessionDraft
 );
 router.delete(
   '/ai/session/:sessionId/draft',

@@ -86,13 +86,17 @@ export default function OrderDeliveryModal({ sale, onClose, onSuccess }) {
               placeholder="Ej. Guatex, Forzap, Cargo Expreso, En Mano..."
               className="w-full min-h-[44px] bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-cyan-400"
             />
-            <div className="flex gap-1.5 mt-2 flex-wrap">
+            <div className="flex gap-2 mt-2.5 flex-wrap">
               {['Guatex', 'Forzap', 'Cargo Expreso', 'Mensajería Propia'].map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setCourier(c)}
-                  className="text-[10px] font-semibold bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold border transition-colors cursor-pointer flex items-center justify-center ${
+                    courier === c
+                      ? 'bg-cyan-400 text-black border-cyan-400 font-bold shadow-sm'
+                      : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
+                  }`}
                 >
                   {c}
                 </button>

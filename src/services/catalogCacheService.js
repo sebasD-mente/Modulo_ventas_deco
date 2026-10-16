@@ -18,18 +18,18 @@ export const CANONICAL_SIZES = [
 ];
 export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
 const STORAGE_KEY = 'deko_local_catalog_snapshot_v1';
-export const TIMEOUT_MS = 12000;
-const MAX_LOCAL_CATALOG_ITEMS = 300;
+export const TIMEOUT_MS = 2500;
+const MAX_LOCAL_CATALOG_ITEMS = 1000;
 
 export const SEED_POSTERS = [
-  { id: 'off-1', titulo: 'Chainsaw Man', subtitulo: 'Denji Pochita', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-2', titulo: 'Spider-Man', subtitulo: 'Miles Morales', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-3', titulo: 'Batman', subtitulo: 'The Dark Knight', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-4', titulo: 'Van Gogh', subtitulo: 'Noche Estrellada', categoria: 'ARTE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-5', titulo: 'Bad Bunny', subtitulo: 'Un Verano Sin Ti', categoria: 'MUSICA', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-6', titulo: 'Taylor Swift', subtitulo: 'Midnights', categoria: 'MUSICA', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-7', titulo: 'Star Wars', subtitulo: 'Darth Vader', categoria: 'CINE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
-  { id: 'off-8', titulo: 'Dragon Ball Z', subtitulo: 'Goku Super Saiyan', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: CANONICAL_SIZES },
+  { id: 'off-1', titulo: 'Chainsaw Man', subtitulo: 'Denji Pochita', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-2', titulo: 'Spider-Man', subtitulo: 'Miles Morales', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-3', titulo: 'Batman', subtitulo: 'The Dark Knight', categoria: 'COMICS', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-4', titulo: 'Van Gogh', subtitulo: 'Noche Estrellada', categoria: 'ARTE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-5', titulo: 'Bad Bunny', subtitulo: 'Un Verano Sin Ti', categoria: 'MUSICA', precioMinimo: 55, imageUrl: '/brand/logo-origami.webp', sizes: ALBUM_POSTER_SIZES },
+  { id: 'off-6', titulo: 'Taylor Swift', subtitulo: 'Midnights', categoria: 'MUSICA', precioMinimo: 55, imageUrl: '/brand/logo-origami.webp', sizes: ALBUM_POSTER_SIZES },
+  { id: 'off-7', titulo: 'Star Wars', subtitulo: 'Darth Vader', categoria: 'CINE', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
+  { id: 'off-8', titulo: 'Dragon Ball Z', subtitulo: 'Goku Super Saiyan', categoria: 'ANIME', precioMinimo: 25, imageUrl: '/brand/logo-origami.webp', sizes: STANDARD_POSTER_SIZES },
 ];
 
 export function getLocalCatalog() {
@@ -46,27 +46,32 @@ export function saveCatalogSnapshot(posters, options = {}) {
   const persist = () => {
     try {
       const existingMap = new Map();
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) parsed.forEach((it) => it?.id && existingMap.set(it.id, it));
-        } catch (_) {}
+      const isFullBatch = Boolean(options?.replace === true || posters.length >= 50);
+      if (!isFullBatch) {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) parsed.forEach((it) => it?.id && existingMap.set(it.id, it));
+          } catch (_) {}
+        }
       }
 
       for (const p of posters) {
         if (!p?.id) continue;
         const isTop = Boolean(p.destacado || p.isTopSeller || p.topVentas);
         const salesCount = Number(p.totalVentas || p.ventas || p.salesCount || 0);
+        const cat = (p.categoria || p.category || 'ARTE').toUpperCase();
+        const fallbackSizes = cat === 'MUSICA' ? ALBUM_POSTER_SIZES : STANDARD_POSTER_SIZES;
         const sanitized = {
           id: p.id,
           titulo: p.titulo || p.name || 'Póster',
           subtitulo: p.subtitulo || '',
-          categoria: p.categoria || p.category || 'ARTE',
+          categoria: cat,
           imageUrl: p.imageUrl || p.thumbUrl || '/brand/logo-origami.webp',
           thumbUrl: p.thumbUrl || p.imageUrl || '/brand/logo-origami.webp',
-          precioMinimo: Number(p.precioMinimo) || 25,
-          sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : CANONICAL_SIZES,
+          precioMinimo: Number(p.precioMinimo) || (cat === 'MUSICA' ? 55 : 25),
+          sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : fallbackSizes,
           destacado: isTop,
           totalVentas: salesCount,
         };

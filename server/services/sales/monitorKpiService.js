@@ -12,7 +12,7 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
   const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
   const saleWhere = {
     tenantId,
-    status: 'COMPLETADA',
+    status: { not: 'ANULADA' },
     createdAt: { gte: startOfDay, lte: endOfDay },
   };
   if (eventId) saleWhere.eventId = eventId;
@@ -39,13 +39,14 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       TARJETA: { amount: 0, count: 0, percentage: 0 },
       TRANSFERENCIA: { amount: 0, count: 0, percentage: 0 },
       EFECTIVO: { amount: 0, count: 0, percentage: 0 },
+      OTRO: { amount: 0, count: 0, percentage: 0 },
     };
 
     evSales.forEach((s) => {
       evTotal += Number(s.totalAmount);
       s.payments.forEach((p) => {
-        const m = p.method === 'TARJETA' ? 'TARJETA' : p.method === 'TRANSFERENCIA' ? 'TRANSFERENCIA' : 'EFECTIVO';
-        payments[m].amount += Number(p.amount);
+        const m = payments[p.method] ? p.method : 'OTRO';
+        payments[m].amount = Number((payments[m].amount + Number(p.amount)).toFixed(2));
         payments[m].count += 1;
       });
     });
@@ -54,6 +55,7 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       payments.TARJETA.percentage = Number(((payments.TARJETA.amount / evTotal) * 100).toFixed(1));
       payments.TRANSFERENCIA.percentage = Number(((payments.TRANSFERENCIA.amount / evTotal) * 100).toFixed(1));
       payments.EFECTIVO.percentage = Number(((payments.EFECTIVO.amount / evTotal) * 100).toFixed(1));
+      payments.OTRO.percentage = Number(((payments.OTRO.amount / evTotal) * 100).toFixed(1));
     }
 
     const lastSale = evSales[0]
@@ -86,13 +88,14 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
     TARJETA: { amount: 0, count: 0, percentage: 0 },
     TRANSFERENCIA: { amount: 0, count: 0, percentage: 0 },
     EFECTIVO: { amount: 0, count: 0, percentage: 0 },
+    OTRO: { amount: 0, count: 0, percentage: 0 },
   };
 
   allSales.forEach((s) => {
     grandTotal += Number(s.totalAmount);
     s.payments.forEach((p) => {
-      const m = p.method === 'TARJETA' ? 'TARJETA' : p.method === 'TRANSFERENCIA' ? 'TRANSFERENCIA' : 'EFECTIVO';
-      globalPayments[m].amount += Number(p.amount);
+      const m = globalPayments[p.method] ? p.method : 'OTRO';
+      globalPayments[m].amount = Number((globalPayments[m].amount + Number(p.amount)).toFixed(2));
       globalPayments[m].count += 1;
     });
   });
@@ -101,6 +104,7 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
     globalPayments.TARJETA.percentage = Number(((globalPayments.TARJETA.amount / grandTotal) * 100).toFixed(1));
     globalPayments.TRANSFERENCIA.percentage = Number(((globalPayments.TRANSFERENCIA.amount / grandTotal) * 100).toFixed(1));
     globalPayments.EFECTIVO.percentage = Number(((globalPayments.EFECTIVO.amount / grandTotal) * 100).toFixed(1));
+    globalPayments.OTRO.percentage = Number(((globalPayments.OTRO.amount / grandTotal) * 100).toFixed(1));
   }
 
   return {

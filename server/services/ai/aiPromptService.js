@@ -27,7 +27,7 @@ export function buildVoiceSalePrompt() {
 Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
 1. TRANSCRIPCIÓN LITERAL: Transcribe en 'transcription' palabra por palabra fielmente en español. Si solo hay ruido o no hay habla clara, transcribe vacío, isSaleDetected=false e intent="RUIDO_NO_VENTA".
 2. PRIMING Y SESGO FONÉTICO: Estás en un stand de pósters decorativos de Deco Vintage. Está terminantemente PROHIBIDO interpretar "pastel", "pasteles", "postre" o "stickers". Si la acústica suena parecido a pastel o stickers, interpreta SIEMPRE "póster" o "pósters".
-3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q180). Si el vendedor NO indica tamaño al dictar la venta: Si la obra pertenece a MÚSICA, DISCO O VINILO (ej. Olivia Rodrigo, Taylor Swift, Bad Bunny, Pink Floyd, The Beatles, etc.), asignar OBLIGATORIAMENTE 'PORTADA_ALBUM' (Q55.00); para cualquier otro póster estándar (cine, anime, series, arte), asignar 'MEDIANO' (Q65.00).
+3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q180). Si el vendedor NO indica tamaño al dictar la venta: Si la obra pertenece a MÚSICA, DISCO O VINILO (ej. Olivia Rodrigo, Taylor Swift, Bad Bunny, Pink Floyd, The Beatles, etc.), asignar OBLIGATORIAMENTE 'PORTADA_ALBUM' (Q55.00); para cualquier otro póster estándar (cine, anime, series, arte), asignar MEDIANO (Q65.00).
 4. PROTECCIÓN CONTRA VACILACIONES: En correcciones espontáneas ("dos pa-... un póster", "tres... dos batman"), toma ÚNICAMENTE la cantidad final corregida (1 póster, 2 batman). NUNCA sumes números vacilantes ni falsos inicios.
 5. INTENCIONES: SALUDO (si solo saludan sin pedir obra, greeting amable y breve, items=[]), CONSULTA_CATALOGO (si preguntan si hay o precio), DICTADO_VENTA (si dictan compra), RUIDO_NO_VENTA (ruido/murmullo sin venta).
 6. DICTADO MULTI-PRODUCTO: Si el audio menciona 2 o más obras (ej: 'Batman mediano y uno de Star Wars grande'), isSaleDetected DEBE ser true, intent DEBE ser 'DICTADO_VENTA', y el array 'items' DEBE incluir cada producto dictado por separado con su título, tamaño y cantidad. PROHIBIDO devolver items vacío si se dictaron obras de compra.
@@ -36,6 +36,7 @@ Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
 
 export function buildArtworkRecognitionPrompt() {
   return `Reconoce el arte del póster fotografiado con estricta precisión: personajes, título oficial más probable, franquicia y tamaño sugerido.
+Incluye en 'primaryTitle' el nombre más conocido en español/latino y en 'candidates' títulos alternativos en español e inglés, nombres de personajes y franquicia.
 DIRECTIVA NEGATIVA ESTRICTA: Si la fotografía muestra comida o platillos servidos (ramen, hamburguesas, pizzas, tacos), ropa, calzado, animales vivos o muebles de uso doméstico sin relación con arte gráfico o pósters, indícalo explícitamente como objeto fuera de giro en visualAnalysis y primaryTitle, sin asumir que es un póster de catálogo.`;
 }
 
@@ -43,9 +44,10 @@ export const artworkRecognitionResponseSchema = {
   type: Type.OBJECT, description: 'Reconocimiento visual estricto de arte en diseño de póster físico.',
   properties: {
     visualAnalysis: { type: Type.STRING }, primaryTitle: { type: Type.STRING },
+    candidates: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Títulos alternativos en español e inglés, personajes o franquicias.' },
     franchiseOrCategory: { type: Type.STRING }, suggestedSize: { type: Type.STRING }, confidence: { type: Type.NUMBER },
   },
-  required: ['visualAnalysis', 'primaryTitle', 'confidence'],
+  required: ['visualAnalysis', 'primaryTitle', 'candidates', 'confidence'],
 };
 
 export const videoRecognitionResponseSchema = {

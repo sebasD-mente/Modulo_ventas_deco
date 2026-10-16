@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 import { DEFAULT_SIZES, SIZE_CLEANUP_REGEX } from '../manualSaleConstants';
+import { savePendingSaleOffline } from '../../../services/offlineSalesOutbox';
 
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 
@@ -16,6 +17,43 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const activeSaleUuidRef = useRef(null);
+
+  const storageKey = `deko_manual_cart_${eventId || 'global'}`;
+
+  // Restaurar carrito previo desde localStorage si no hay initialDraft explícito
+  useEffect(() => {
+    if (initialDraft) return;
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.cartItems) && parsed.cartItems.length > 0) {
+          setCartItems(parsed.cartItems);
+        }
+        if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+        if (parsed.discount !== undefined) setDiscount(Number(parsed.discount) || 0);
+        if (parsed.notes) setNotes(parsed.notes);
+      }
+    } catch (e) {
+      // Ignorar errores de JSON corrupto en storage
+    }
+  }, [eventId]);
+
+  // Persistir automáticamente el estado del carrito
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      if (cartItems.length > 0) {
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ cartItems, paymentMethod, discount, notes })
+        );
+      } else {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch (e) {}
+  }, [cartItems, paymentMethod, discount, notes, storageKey]);
 
   useEffect(() => {
     if (!initialDraft || !initialDraft.items?.length) return;
@@ -54,7 +92,22 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
   }, [initialDraft]);
 
   const subtotal = cartItems.reduce((sum, it) => sum + (Number(it.subtotal) || 0), 0);
-  const grandTotal = Math.max(0, subtotal - (Number(discount) || 0));
+
+  // Motor Automático de Combos Feriales (3 Medianos x Q165 -> Ahorro Q30 por cada 3)
+  const mediumCount = cartItems
+    .filter((i) => {
+      const s = (i.selectedSizeId || i.sizeId || i.size || '').toUpperCase();
+      if (s === 'MEDIANO') return true;
+      if (!s && typeof i.description === 'string' && i.description.toUpperCase().includes('MEDIANO')) return true;
+      return false;
+    })
+    .reduce((acc, i) => acc + (Number(i.quantity) || 1), 0);
+
+  const comboSavings = Math.floor(mediumCount / 3) * 30;
+  const hasActiveCombo = comboSavings > 0;
+  const comboTrios = Math.floor(mediumCount / 3);
+  const effectiveDiscount = Math.max(Number(discount) || 0, comboSavings);
+  const grandTotal = Math.max(0, subtotal - effectiveDiscount);
 
   const addItemFromPoster = (poster, size, quantity = 1) => {
     if (!poster || !size) return;
@@ -96,7 +149,20 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
 
   const removeItem = (id) => { activeSaleUuidRef.current = null; setCartItems((prev) => prev.filter((it) => it.id !== id)); };
   const unlinkAttachments = () => { setAttachments([]); setInputChannel('MANUAL_RAPIDA'); };
-  const clearCart = () => { activeSaleUuidRef.current = null; setCartItems([]); setDiscount(0); setNotes(''); setAttachments([]); setInputChannel('MANUAL_RAPIDA'); setErrorMsg(null); };
+  const clearCart = () => {
+    activeSaleUuidRef.current = null;
+    setCartItems([]);
+    setDiscount(0);
+    setNotes('');
+    setAttachments([]);
+    setInputChannel('MANUAL_RAPIDA');
+    setErrorMsg(null);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch (e) {}
+  };
 
   const handleSetDiscount = (val) => {
     activeSaleUuidRef.current = null;
@@ -116,7 +182,7 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
       eventId,
       items: cartItems.map((i) => ({ productId: isUuid(i.productId) ? i.productId : null, description: i.description, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
       payments: [{ method: paymentMethod, amount: grandTotal, reference: notes || null }],
-      discount: Number(discount) || 0,
+      discount: effectiveDiscount,
       notes: notes || null,
       inputChannel: inputChannel || 'MANUAL_RAPIDA',
       attachments: attachments?.length ? attachments : [],
@@ -158,6 +224,25 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
         }
       }
 
+      // Si falló por caída de internet o red, encolar en Sales Outbox local para no detener la fila ferial
+      const isNetworkFail = (typeof navigator !== 'undefined' && !navigator.onLine) || lastError?.name === 'TypeError' || lastError?.message?.includes('fetch') || lastError?.message?.includes('Network');
+      if (isNetworkFail) {
+        await savePendingSaleOffline(salePayload);
+        try { confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 }, colors: ['#F59E0B', '#10B981'] }); } catch (e) {}
+        activeSaleUuidRef.current = null;
+        clearCart();
+        const offlineSale = {
+          ...salePayload,
+          id: clientSaleUuid,
+          saleNumber: `OFFLINE-${Date.now().toString().slice(-4)}`,
+          offline: true,
+          createdAt: new Date().toISOString(),
+        };
+        setErrorMsg('⚠️ Sin conexión a internet. La venta fue guardada en memoria local y se sincronizará automáticamente al volver la red.');
+        if (onSaleRegistered) onSaleRegistered(offlineSale);
+        return offlineSale;
+      }
+
       console.error('Error en confirmSale:', lastError);
       setErrorMsg(lastError?.message || 'Error registrando la venta. Pulsa "Confirmar Venta" para reintentar.');
       return null;
@@ -170,7 +255,8 @@ export function useManualSaleCart({ eventId, onSaleRegistered, initialDraft = nu
     cartItems, setCartItems, paymentMethod, setPaymentMethod,
     discount, setDiscount: handleSetDiscount, notes, setNotes, inputChannel, setInputChannel,
     attachments, setAttachments, isSubmitting, errorMsg, setErrorMsg,
-    subtotal, grandTotal, addItemFromPoster, updateItemQty, changeItemSize,
+    subtotal, grandTotal, effectiveDiscount, hasActiveCombo, comboSavings, comboTrios, mediumCount,
+    addItemFromPoster, updateItemQty, changeItemSize,
     removeItem, clearCart, unlinkAttachments, confirmSale,
   };
 }

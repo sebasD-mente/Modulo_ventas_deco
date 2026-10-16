@@ -50,6 +50,7 @@ export async function updateProductionStatus(req, res) {
     const { id } = req.params;
     const { status, notes } = req.body;
     const { id: userId } = req.user;
+    const tenantId = req.tenantId;
 
     const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
       ? req.user.roles
@@ -58,6 +59,8 @@ export async function updateProductionStatus(req, res) {
     try {
       const updatedItem = await updateItemProductionStatus({
         id,
+        itemId: id,
+        tenantId,
         status,
         notes,
         userId,
@@ -84,6 +87,8 @@ export async function updateProductionStatus(req, res) {
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+
+export const patchItemProductionStatus = updateProductionStatus;
 
 export async function getProductionMetrics(req, res) {
   try {

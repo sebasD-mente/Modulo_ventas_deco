@@ -115,16 +115,16 @@ describe('🛡️ SUITE MODULAR DE ARQUEO DE CAJA: CashClosingView & Submódulos
   // 4. ARITMÉTICA GENUINA DE DENOMINACIONES DE QUETZALES
   // =========================================================================
   describe('4. Aritmética Genuina de Conteo de Denominaciones', () => {
-    it('4.1. Catálogo completo de 7 denominaciones oficiales en Guatemala', () => {
-      assert.equal(DENOMINATIONS.length, 7);
+    it('4.1. Catálogo completo de 9 denominaciones oficiales en Guatemala (6 billetes y 3 monedas)', () => {
+      assert.equal(DENOMINATIONS.length, 9);
       const values = DENOMINATIONS.map(d => d.value);
-      assert.deepEqual(values, [200, 100, 50, 20, 10, 5, 1]);
+      assert.deepEqual(values, [200, 100, 50, 20, 10, 5, 1, 0.5, 0.25]);
 
       const billDenoms = DENOMINATIONS.filter(d => d.type === 'billete');
       const coinDenoms = DENOMINATIONS.filter(d => d.type === 'moneda');
       assert.equal(billDenoms.length, 6);
-      assert.equal(coinDenoms.length, 1);
-      assert.equal(coinDenoms[0].value, 1);
+      assert.equal(coinDenoms.length, 3);
+      assert.deepEqual(coinDenoms.map(c => c.value), [1, 0.5, 0.25]);
     });
 
     it('4.2. Conteo vacío o inicial retorna Q 0.00', () => {

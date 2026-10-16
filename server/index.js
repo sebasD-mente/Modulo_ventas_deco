@@ -12,6 +12,8 @@ import { prisma } from './config/prisma.js';
 import { syncCatalogFromWeb } from './services/catalogSyncService.js';
 import { deltaSyncRecentPosters } from './services/catalog/liveCatalogSyncService.js';
 import { runMidnightClosingAudit } from './services/sales/midnightClosingService.js';
+import { getAvailableKeys, isKeyInCooldown } from './services/ai/aiKeyPoolService.js';
+import { pruneExpiredSessions } from './services/ai/aiSessionService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,10 +28,23 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
-app.use(compression());
+app.use(compression({
+  filter: (req, res) => {
+    if (
+      req.headers.accept?.includes('text/event-stream') ||
+      req.path === '/api/ai/chat' ||
+      String(res.getHeader('Content-Type') || '').includes('text/event-stream')
+    ) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Idempotency-Key', 'X-Webhook-Secret'],
+  exposedHeaders: ['X-Idempotent-Replay'],
 }));
 
 app.use(express.json({ limit: '25mb' }));
@@ -39,7 +54,17 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));
 
 function getGitCommit() {
-  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
+  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT.slice(0, 7);
+  if (process.env.SOURCE_COMMIT) return process.env.SOURCE_COMMIT.slice(0, 7);
+
+  try {
+    const commitFilePath = path.resolve(__dirname, '../.git-commit');
+    if (fs.existsSync(commitFilePath)) {
+      const c = fs.readFileSync(commitFilePath, 'utf-8').trim();
+      if (c && c !== 'unknown') return c.slice(0, 7);
+    }
+  } catch {}
+
   try {
     const gitHeadPath = path.resolve(__dirname, '../.git/HEAD');
     if (fs.existsSync(gitHeadPath)) {
@@ -95,12 +120,16 @@ app.get('/health', async (req, res) => {
 
 // Diagnóstico estático de configuración de IA sin consumo de tokens ni exposición de credenciales
 app.get('/health/ai', (req, res) => {
-  const apiKey = ENV.GEMINI_API_KEY || '';
-  const isConfigured = Boolean(apiKey);
+  const keys = getAvailableKeys();
+  const totalKeys = keys.length;
+  const availableKeys = keys.filter((k) => !isKeyInCooldown(k)).length;
+  const isConfigured = totalKeys > 0;
   res.status(200).json({
     status: isConfigured ? 'ok' : 'unconfigured',
     configured: isConfigured,
-    model: ENV.GEMINI_MODEL || 'gemini-2.5-flash',
+    totalKeys,
+    availableKeys,
+    model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
     contingencyPoolConfigured: true,
     time: new Date().toISOString(),
   });
@@ -199,6 +228,19 @@ const server = app.listen(ENV.PORT, () => {
       console.warn('[MidnightClosing] ⚠️ Error en auditoría programada:', err.message)
     );
   }, MIDNIGHT_AUDIT_INTERVAL_MS).unref();
+
+  // 🧹 Limpieza periódica de sesiones de IA inactivas (>72h)
+  const isTest = ENV.NODE_ENV === 'test' || process.env.NODE_ENV === 'test';
+  if (!isTest) {
+    setTimeout(() => {
+      pruneExpiredSessions(72).catch(() => {});
+    }, 60 * 1000).unref();
+
+    const PRUNE_SESSIONS_INTERVAL_MS = 6 * 60 * 60 * 1000; // cada 6 horas
+    setInterval(() => {
+      pruneExpiredSessions(72).catch(() => {});
+    }, PRUNE_SESSIONS_INTERVAL_MS).unref();
+  }
 
 
   // 🛡️ REGLA ZERO-TRUST: Verificación y reconciliación no destructiva de Super Administradores

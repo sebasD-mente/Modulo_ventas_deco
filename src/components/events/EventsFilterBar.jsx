@@ -22,30 +22,30 @@ export default function EventsFilterBar({
         </div>
         <button
           type="button" onClick={onOpenCreateModal}
-          className="px-4 py-2 rounded-full bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-transform active:scale-95 self-start sm:self-auto"
+          className="min-h-[44px] px-5 py-2.5 rounded-full bg-white hover:bg-neutral-200 text-black font-black text-xs sm:text-sm flex items-center gap-2 shadow-md cursor-pointer transition-transform active:scale-95 self-start sm:self-auto"
         >
-          <Plus className="w-3.5 h-3.5" /> <span>Nuevo evento</span>
+          <Plus className="w-4 h-4" /> <span>Nuevo evento</span>
         </button>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
         {onSearchChange && (
           <div className="relative flex-1 w-full">
-            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text" placeholder="Buscar por nombre, lugar o vendedor..."
               value={searchQuery || ''} onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-[#161616] border border-neutral-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white"
+              className="w-full min-h-[44px] bg-[#161616] border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white shadow-inner"
             />
           </div>
         )}
         {onTabChange && (
-          <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
             {tabs.map((t) => (
               <button
                 key={t.id} type="button" onClick={() => onTabChange(t.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap cursor-pointer ${
-                  activeTab === t.id ? 'bg-white text-black' : 'bg-[#181818] text-neutral-400 hover:text-white border border-neutral-800'
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer flex items-center justify-center ${
+                  activeTab === t.id ? 'bg-white text-black shadow-sm' : 'bg-[#181818] text-neutral-400 hover:text-white border border-neutral-800'
                 }`}
               >
                 {t.label} {t.count !== undefined ? `(${t.count})` : ''}

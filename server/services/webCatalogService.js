@@ -2,33 +2,21 @@ import { prisma } from '../config/prisma.js';
 import { invalidateVectorCache, searchHybridPosters, searchPostersByEmbedding } from './embeddingService.js';
 import { resolveEntityAlias, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from './semantic/entityAliases.js';
 import { productCache, invalidateCatalogCache as invalidateStoreCache, getCachedProducts } from './catalog/catalogCacheStore.js';
-import { formatProductForPos, extractImageSlug, extractPosterTitle, normalizePosterTitle, deduplicatePosters } from './catalog/catalogStringNormalizer.js';
+import {
+  formatProductForPos,
+  extractImageSlug,
+  extractPosterTitle,
+  normalizePosterTitle,
+  deduplicatePosters,
+  isFuzzyTokenMatch,
+  normalizeMatcherString,
+  stemMatcherToken,
+  EXTENDED_STOP_WORDS,
+} from './catalog/catalogStringNormalizer.js';
 
 export function invalidateCatalogCache(tenantId = null) { invalidateStoreCache(tenantId); }
-
-export function isFuzzyTokenMatch(queryToken, targetToken) {
-  if (!queryToken || !targetToken) return false;
-  const q = queryToken.toLowerCase();
-  const t = targetToken.toLowerCase();
-  if (q === t) return true;
-  const qLen = q.length, tLen = t.length;
-  if (qLen < 4 || Math.abs(qLen - tLen) > 2) return false;
-  const maxDistance = qLen >= 7 ? 2 : 1;
-  let prev = Array.from({ length: tLen + 1 }, (_, i) => i);
-  let curr = new Array(tLen + 1);
-  for (let i = 1; i <= qLen; i++) {
-    curr[0] = i;
-    let minVal = curr[0];
-    for (let j = 1; j <= tLen; j++) {
-      const cost = q[i - 1] === t[j - 1] ? 0 : 1;
-      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
-      if (curr[j] < minVal) minVal = curr[j];
-    }
-    if (minVal > maxDistance) return false; // Early exit
-    prev = [...curr];
-  }
-  return prev[tLen] <= maxDistance;
-}
+export { productCache }; // Partición de caché por tenantId implementada con new Map()
+export { isFuzzyTokenMatch, normalizeMatcherString, stemMatcherToken, EXTENDED_STOP_WORDS };
 
 export async function searchWebPosters({ tenantId, query = '', category = null, limit = 24, skipLiveParachute = false }) {
   const cleanQuery = String(query ?? '').trim().toLowerCase();
@@ -50,15 +38,14 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
   }
 
   if (cleanQuery) {
-    const normalize = (str) =>
-      (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[?!¿¡,.:;()]/g, ' ').replace(/[-_]/g, ' ').trim();
+    const normalize = normalizeMatcherString;
     const alphaOnly = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
     const normQuery = normalize(cleanQuery);
     const alphaQuery = alphaOnly(cleanQuery);
     const rawTokens = normQuery.split(/\s+/).filter((t) => t.length > 0);
-    const STOP_WORDS = new Set([...UNIVERSAL_STOP_WORDS, 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'tamano', 'tamanos', 'tamaño', 'tamaños', 'medida', 'medidas']);
-    const stem = (tok) => (!tok || tok.length <= 3 || KNOWN_SHORT_ENTITIES.has(tok)) ? tok : (tok.endsWith('es') && tok.length > 4 && !/[aeiou]es$/.test(tok) ? tok.slice(0, -2) : (tok.endsWith('s') && !tok.endsWith('ss') && tok.length > 3 ? tok.slice(0, -1) : tok));
+    const STOP_WORDS = EXTENDED_STOP_WORDS;
+    const stem = stemMatcherToken;
     const aliasRes = resolveEntityAlias(cleanQuery);
     const aliasTokens = (aliasRes.matched && aliasRes.searchQuery)
       ? normalize(aliasRes.searchQuery).split(/\s+/).filter((t) => !STOP_WORDS.has(t) && t.length > 1)
@@ -138,12 +125,12 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
       let hasFuzzyMatch = false;
       for (const t of tokens) {
-        if (!titleTokensSet.has(t) && !fullTokensSet.has(t) && (hasTitleFuzzy(t) || hasFullFuzzy(t))) {
+        if (t.length >= 5 && !titleTokensSet.has(t) && hasTitleFuzzy(t)) {
           hasFuzzyMatch = true;
           break;
         }
       }
-      if (hasFuzzyMatch) score += 70;
+      if (hasFuzzyMatch) score += 40;
 
       if (tokens.length > 0 && tokens.every(isTokenMatch)) {
         if (tokens.length >= 2 || isTitleTokenMatch(tokens[0]) || normTitleText.startsWith(tokens[0])) score += 150;
@@ -166,7 +153,8 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         const hasFullPhrase = normFullText.includes(normQuery) || (queryCondensed.length >= 3 && normFullText.includes(queryCondensed));
         const meetsRatio = matchedMeaningful.length >= 2 && (matchedMeaningful.length / meaningfulTokens.length) >= 0.5;
         const hasPrimaryTitleWordMatch = matchedMeaningful.some((t) => (t.length >= 4 || KNOWN_SHORT_ENTITIES.has(t)) && (titleTokensSet.has(t) || titleStemmedSet.has(stem(t))));
-        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio && !hasFuzzyMatch && !hasPrimaryTitleWordMatch) score = 0;
+        const allowsFuzzy = hasFuzzyMatch && (matchedMeaningful.length >= 2 || hasPrimaryTitleWordMatch);
+        if (!hasAliasMatch && !hasFullPhrase && !meetsRatio && !allowsFuzzy && !hasPrimaryTitleWordMatch) score = 0;
       }
 
       return { p, score };

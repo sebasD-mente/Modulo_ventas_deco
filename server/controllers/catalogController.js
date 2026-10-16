@@ -5,10 +5,34 @@ import { syncCatalogFromWeb } from '../services/catalogSyncService.js';
 export async function getProducts(req, res) {
   try {
     const tenantId = req.tenantId;
-    const products = await prisma.product.findMany({
-      where: { tenantId, isActive: true },
+    const { page, limit, search, category } = req.query;
+    const where = { tenantId, isActive: true };
+
+    if (category) {
+      where.category = String(category).trim().toUpperCase();
+    }
+
+    if (search && String(search).trim()) {
+      const q = String(search).trim();
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { sku: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const findOptions = {
+      where,
       orderBy: [{ category: 'asc' }, { basePrice: 'asc' }],
-    });
+    };
+
+    if (limit) {
+      const parsedLimit = Math.max(1, Math.min(500, parseInt(limit, 10) || 50));
+      const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+      findOptions.take = parsedLimit;
+      findOptions.skip = (parsedPage - 1) * parsedLimit;
+    }
+
+    const products = await prisma.product.findMany(findOptions);
 
     return res.json({ success: true, data: products, count: products.length });
   } catch (err) {

@@ -25,7 +25,6 @@ const IGNORED_DIRS = [
   '.agents',
   'tests',
   'test',
-  'scripts',
   'scratch',
   '_archive',
   'historico',
@@ -64,11 +63,14 @@ const LEAK_PATTERNS = [
   { name: 'Clave Privada RSA/SSH', regex: /-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----/ },
   { name: 'AWS Access Key ID Hardcodeada', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/ },
   { name: 'Correo Personal Hardcodeado', regex: /@(gmail|hotmail|yahoo|outlook)\.com/i },
+  { name: 'IP Privada de VPS Hardcodeada', regex: /145\.223\.120\.56/ },
 ];
 
 let leaksFound = 0;
+const SELF_FILE = path.resolve(rootDir, 'scripts', 'audit-secrets.js');
 
 for (const file of filesToScan) {
+  if (path.resolve(file) === SELF_FILE) continue;
   const relPath = path.relative(rootDir, file).replace(/\\/g, '/');
   if (relPath.includes('env.example') || relPath.endsWith('package-lock.json')) continue;
 
@@ -77,6 +79,12 @@ for (const file of filesToScan) {
 
   lines.forEach((line, index) => {
     if (line.includes('// test-ignore') || line.includes('// audit-ignore')) return;
+    if (
+      relPath === 'server/config/env.js' &&
+      (line.includes('FORBIDDEN_PATTERNS') || line.includes('prohibidas'))
+    ) {
+      return;
+    }
 
     for (const pattern of LEAK_PATTERNS) {
       if (pattern.regex.test(line)) {

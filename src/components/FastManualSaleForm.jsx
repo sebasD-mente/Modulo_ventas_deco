@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Store, Smartphone, Palette } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { DEFAULT_SIZES } from './manual-sale/manualSaleConstants';
+import { DEFAULT_SIZES, DEFAULT_MEDIUM_SIZE } from './manual-sale/manualSaleConstants';
 import useCatalogSearch from './manual-sale/hooks/useCatalogSearch';
 import useManualSaleCart from './manual-sale/hooks/useManualSaleCart';
 import useRemoteSaleForm from './manual-sale/hooks/useRemoteSaleForm';
@@ -14,6 +14,11 @@ import DeliveryMethodSelector from './manual-sale/DeliveryMethodSelector';
 import RemoteQuoterSummary from './manual-sale/RemoteQuoterSummary';
 import CustomItemModal from './manual-sale/CustomItemModal';
 import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
+
+const TOP_SELLERS_FERIAL = [
+  'Star Wars', 'Anime Retro', 'El Padrino', 'Queen', 'Pink Floyd',
+  'Spider-Man', 'Nirvana', 'Vincent Van Gogh', 'Goku'
+];
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
   const { isVendedorRedes, isVendedor, isSuperAdmin } = useAuth();
@@ -30,12 +35,12 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   const remoteForm = useRemoteSaleForm({ eventId, onSaleRegistered, cart });
 
   const [selectedPoster, setSelectedPoster] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZES[2]);
+  const [selectedSize, setSelectedSize] = useState(DEFAULT_MEDIUM_SIZE);
   const [itemQuantity, setItemQuantity] = useState(1);
 
   const handleSelectPoster = (poster) => {
     setSelectedPoster(poster);
-    setSelectedSize(poster.sizes?.find((s) => s.sizeId === 'MEDIANO') || poster.sizes?.[0] || DEFAULT_SIZES[2]);
+    setSelectedSize(poster.sizes?.find((s) => s.sizeId === 'MEDIANO') || poster.sizes?.[0] || DEFAULT_MEDIUM_SIZE);
     setItemQuantity(1);
     search.selectPoster(poster);
   };
@@ -229,8 +234,46 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           />
         </div>
       ) : (
-        /* MODO MOSTRADOR (FERIA 100%) - INTRACTO */
+        /* MODO MOSTRADOR (FERIA 100%) */
         <div className="space-y-6">
+          {/* Banner de Borrador Importado de IA */}
+          {cart.inputChannel !== 'MANUAL_RAPIDA' && cart.cartItems.length > 0 && (
+            <div className="p-3.5 bg-cyan-950/60 border border-cyan-800 rounded-2xl flex items-center justify-between text-xs gap-2">
+              <div className="flex items-center gap-2 text-cyan-300">
+                <span className="text-base">⚡</span>
+                <span>
+                  Borrador importado desde IA ({cart.cartItems.length} obra{cart.cartItems.length > 1 ? 's' : ''}). Puedes ajustar o cobrar.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={cart.clearCart}
+                className="min-h-[36px] px-3 py-1 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold cursor-pointer shrink-0"
+              >
+                Descartar
+              </button>
+            </div>
+          )}
+
+          {/* Top Sellers Feriales (1-Tap) */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              🔥 Top Sellers Feriales (Búsqueda Rápida)
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+              {TOP_SELLERS_FERIAL.map((title) => (
+                <button
+                  key={title}
+                  type="button"
+                  onClick={() => search.setSearchQuery(title)}
+                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black border border-neutral-800 hover:border-amber-400/60 text-neutral-300 hover:text-amber-300 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 active:scale-95"
+                >
+                  {title}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <CatalogSearchInput
             {...search}
             onSelectPoster={handleSelectPoster}
@@ -257,9 +300,19 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           />
 
           <PaymentSummaryBar
-            paymentMethod={cart.paymentMethod} setPaymentMethod={cart.setPaymentMethod}
-            grandTotal={cart.grandTotal} isSubmitting={cart.isSubmitting}
-            disabled={cart.cartItems.length === 0} onConfirmSale={cart.confirmSale}
+            paymentMethod={cart.paymentMethod}
+            setPaymentMethod={cart.setPaymentMethod}
+            discount={cart.effectiveDiscount || cart.discount}
+            setDiscount={cart.setDiscount}
+            subtotal={cart.subtotal}
+            grandTotal={cart.grandTotal}
+            hasActiveCombo={cart.hasActiveCombo}
+            comboSavings={cart.comboSavings}
+            comboTrios={cart.comboTrios}
+            mediumCount={cart.mediumCount}
+            isSubmitting={cart.isSubmitting}
+            disabled={cart.cartItems.length === 0}
+            onConfirmSale={cart.confirmSale}
           />
         </div>
       )}

@@ -4,14 +4,16 @@ export const DENOMINATIONS = [
   { value: 200, label: 'Q200', type: 'billete' }, { value: 100, label: 'Q100', type: 'billete' },
   { value: 50, label: 'Q50', type: 'billete' }, { value: 20, label: 'Q20', type: 'billete' },
   { value: 10, label: 'Q10', type: 'billete' }, { value: 5, label: 'Q5', type: 'billete' },
-  { value: 1, label: 'Q1', type: 'moneda' },
+  { value: 1, label: 'Q1', type: 'moneda' }, { value: 0.5, label: 'Q0.50', type: 'moneda' },
+  { value: 0.25, label: 'Q0.25', type: 'moneda' },
 ];
 
-export const INITIAL_COUNTS = { 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 1: 0 };
+export const INITIAL_COUNTS = { 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 1: 0, 0.5: 0, 0.25: 0 };
 
 export function calculateDenominationsTotal(counts = {}) {
   const safe = counts || {};
-  return DENOMINATIONS.reduce((sum, d) => sum + (Number(safe[d.value]) || 0) * d.value, 0);
+  const sum = DENOMINATIONS.reduce((acc, d) => acc + (Number(safe[d.value]) || 0) * d.value, 0);
+  return Number(sum.toFixed(2));
 }
 
 export function calculateDifference(numReported, calculatedCash) {
@@ -51,6 +53,9 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
   const fetchFn = authFetch || globalThis.fetch;
   const [counts, setCounts] = useState(INITIAL_COUNTS);
   const [manualCash, setManualCash] = useState('');
+  const [openingCashFloat, setOpeningCashFloat] = useState('');
+  const [pettyCashExpenses, setPettyCashExpenses] = useState('');
+  const [cashDrops, setCashDrops] = useState('');
   const [observations, setObservations] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -59,7 +64,11 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
 
   const denomTotal = useMemo(() => calculateDenominationsTotal(counts), [counts]);
   const numReported = denomTotal > 0 ? denomTotal : (manualCash === '' ? 0 : Number(manualCash));
-  const calculatedCash = liveMetrics?.paymentBreakdown?.EFECTIVO?.amount || 0;
+  const salesCash = liveMetrics?.paymentBreakdown?.EFECTIVO?.amount || 0;
+  const floatAmt = Math.max(0, Number(openingCashFloat) || 0);
+  const expensesAmt = Math.max(0, Number(pettyCashExpenses) || 0);
+  const dropsAmt = Math.max(0, Number(cashDrops) || 0);
+  const calculatedCash = Number(Math.max(0, salesCash + floatAmt - expensesAmt - dropsAmt).toFixed(2));
   const cardAmount = liveMetrics?.paymentBreakdown?.TARJETA?.amount || 0;
   const transferAmount = liveMetrics?.paymentBreakdown?.TRANSFERENCIA?.amount || 0;
   const totalGross = liveMetrics?.totalAmount || 0;
@@ -67,13 +76,10 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
   const discrepancy = useMemo(() => getDiscrepancyStatus(difference), [difference]);
 
   const updateCount = (val, deltaOrExact) => {
-    setCounts(prev => ({
-      ...prev,
-      [val]: Math.max(0, typeof deltaOrExact === 'function' ? deltaOrExact(prev[val] || 0) : (Number(deltaOrExact) || 0))
-    }));
+    setCounts(prev => ({ ...prev, [val]: Math.max(0, typeof deltaOrExact === 'function' ? deltaOrExact(prev[val] || 0) : (Number(deltaOrExact) || 0)) }));
   };
 
-  const resetCounts = () => { setCounts(INITIAL_COUNTS); setManualCash(''); };
+  const resetCounts = () => { setCounts(INITIAL_COUNTS); setManualCash(''); setOpeningCashFloat(''); setPettyCashExpenses(''); setCashDrops(''); };
 
   const copyToClipboard = () => {
     const text = formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations });
@@ -83,9 +89,7 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
   };
 
   const submitClosing = async () => {
-    setIsSubmitting(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
+    setIsSubmitting(true); setErrorMsg(null); setSuccessMsg(null);
     try {
       const res = await fetchFn('/api/closings', {
         method: 'POST',
@@ -94,6 +98,7 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
           eventId: activeEvent?.id || eventId,
           closingType: 'DIARIO',
           totalCashReported: numReported,
+          openingCashFloat: floatAmt, pettyCashExpenses: expensesAmt, cashDrops: dropsAmt,
           observations: observations || null,
         }),
       });
@@ -105,17 +110,15 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
     } catch (err) {
       setErrorMsg(err.message);
       return false;
-    } finally {
-      setIsSubmitting(false);
-    }
+    } finally { setIsSubmitting(false); }
   };
 
   return {
     counts, updateCount, resetCounts, denomTotal, manualCash, setManualCash,
+    openingCashFloat, setOpeningCashFloat, pettyCashExpenses, setPettyCashExpenses, cashDrops, setCashDrops,
     reportedCash: manualCash, setReportedCash: setManualCash, observations, setObservations,
-    numReported, calculatedCash, cardAmount, transferAmount, totalGross, difference, discrepancy,
-    isSubmitting, copied, successMsg, errorMsg, setErrorMsg, setSuccessMsg, copyToClipboard,
-    submitClosing,
+    numReported, salesCash, calculatedCash, cardAmount, transferAmount, totalGross, difference, discrepancy,
+    isSubmitting, copied, successMsg, errorMsg, setErrorMsg, setSuccessMsg, copyToClipboard, submitClosing,
     formatWhatsAppSummary: () => formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations }),
   };
 }

@@ -52,10 +52,11 @@ export default function DonutChart({ data, size = 260 }) {
   const slices = data
     .filter((d) => d.amount > 0)
     .map((item) => {
-      const sliceAngle = (item.amount / total) * 2 * Math.PI;
+      const rawSliceAngle = (item.amount / total) * 2 * Math.PI;
+      const sliceAngle = Math.min(rawSliceAngle, 2 * Math.PI - 0.0001);
       const startAngle = cumulativeAngle;
       const endAngle = cumulativeAngle + sliceAngle;
-      cumulativeAngle += sliceAngle;
+      cumulativeAngle += rawSliceAngle;
 
       // Coordenadas del arco exterior
       const x1 = center + outerRadius * Math.cos(startAngle);

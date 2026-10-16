@@ -33,7 +33,7 @@ export function buildOfflineFallbackReply(query) {
   let sizeId = 'MEDIANO';
   for (const { re, id } of SIZE_ALIASES) if (re.test(q)) { sizeId = id; break; }
   const price = SIZE_PRICE_MAP[sizeId] || 65;
-  const sizeObj = DEFAULT_EVENT_SIZES.find((s) => s.sizeId === sizeId) || DEFAULT_EVENT_SIZES[2];
+  const sizeObj = DEFAULT_EVENT_SIZES.find((s) => s.sizeId === sizeId) || DEFAULT_EVENT_SIZES.find((s) => s.sizeId === 'MEDIANO') || DEFAULT_EVENT_SIZES[3];
   let paymentMethod = 'EFECTIVO';
   for (const { re, method } of PAYMENT_ALIASES) if (re.test(q)) { paymentMethod = method; break; }
 

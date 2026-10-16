@@ -4,12 +4,17 @@
  * Garantiza cero suposiciones mediante verificación criptográfica de commit y uptime.
  */
 
+import 'dotenv/config';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-const DOKPLOY_WEBHOOK_URL = 'http://145.223.120.56:3000/api/deploy/ifJKTSseeCgAumCezDEZx';
-const HEALTH_URL = 'https://ventas.decovintage.online/health';
+const DOKPLOY_WEBHOOK_URL = process.env.DOKPLOY_WEBHOOK_URL;
+if (!DOKPLOY_WEBHOOK_URL) {
+  console.error('❌ [ABORTADO] Falta variable de entorno DOKPLOY_WEBHOOK_URL en .env.');
+  process.exit(1);
+}
+const HEALTH_URL = process.env.PROD_HEALTH_URL || 'https://ventas.decovintage.online/health';
 const POLLING_INTERVAL_MS = 4000;
 const MAX_WAIT_MS = 300000; // 5 minutos (holgura para compilación limpia de imagen Docker en VPS)
 

@@ -78,7 +78,7 @@ export default function CreateEventModal({
                 type="date"
                 value={newEventData.startDate}
                 onChange={(e) => setNewEventData({ ...newEventData, startDate: e.target.value })}
-                className="w-full bg-black border border-neutral-700/90 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-white"
+                className="w-full min-h-[44px] bg-black border border-neutral-700/90 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-white shadow-inner"
               />
             </div>
             <div>
@@ -89,7 +89,7 @@ export default function CreateEventModal({
                 type="date"
                 value={newEventData.endDate}
                 onChange={(e) => setNewEventData({ ...newEventData, endDate: e.target.value })}
-                className="w-full bg-black border border-neutral-700/90 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-white"
+                className="w-full min-h-[44px] bg-black border border-neutral-700/90 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-white shadow-inner"
               />
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function CreateEventModal({
               min="0"
               value={newEventData.salesTarget}
               onChange={(e) => setNewEventData({ ...newEventData, salesTarget: e.target.value })}
-              className="w-full bg-black border border-neutral-700/90 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
+              className="w-full min-h-[44px] bg-black border border-neutral-700/90 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
             />
           </div>
 
@@ -129,21 +129,21 @@ export default function CreateEventModal({
                     <div
                       key={u.id}
                       onClick={() => toggleUser(u.id)}
-                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+                      className={`min-h-[44px] flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all ${
                         isSelected
                           ? 'bg-neutral-900 border border-neutral-600 shadow-sm'
                           : 'hover:bg-neutral-900/60 border border-transparent'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 ${
+                          className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
                             isSelected
                               ? 'bg-white border-white text-black'
                               : 'border-neutral-600 bg-transparent'
                           }`}
                         >
-                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                         </div>
                         {u.avatarUrl ? (
                           <img

@@ -57,6 +57,12 @@ function SellersSection({ event }) {
   );
 }
 
+export const formatEventDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('es-GT', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
 export default function EventCard({
   event,
   statusType,
@@ -78,7 +84,7 @@ export default function EventCard({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> EN CURSO
             </span>
             <span className="text-[11px] text-neutral-400 font-medium">
-              {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
+              {formatEventDate(event.startDate)} - {formatEventDate(event.endDate)}
             </span>
           </div>
           <div>
@@ -130,7 +136,7 @@ export default function EventCard({
               <Archive className="w-2.5 h-2.5" /> ARCHIVADO
             </span>
             <span className="text-[10px] text-neutral-400 font-mono">
-              {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
+              {formatEventDate(event.startDate)} - {formatEventDate(event.endDate)}
             </span>
           </div>
           <h4 className="font-bold text-sm text-neutral-200">{event.name}</h4>
@@ -150,16 +156,16 @@ export default function EventCard({
           </div>
         </div>
         <div className="pt-2 border-t border-neutral-800/80 flex items-center gap-2">
-          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer min-h-[40px]">
+          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer min-h-[44px]">
             <Eye className="w-3.5 h-3.5" /> <span>Ver ventas ({event.salesCount || 0})</span>
           </button>
           {onEdit && (
-            <button type="button" onClick={() => onEdit(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center" title="Editar evento"><Pencil className="w-3.5 h-3.5 text-amber-400" /></button>
+            <button type="button" onClick={() => onEdit(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Editar evento"><Pencil className="w-3.5 h-3.5 text-amber-400" /></button>
           )}
-          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[40px]" title="Restaurar evento a confirmados">
+          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Restaurar evento a confirmados">
             <RotateCcw className="w-3.5 h-3.5" /> <span>Restaurar</span>
           </button>
-          <button type="button" onClick={() => onDelete?.(event)} className="p-2 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center" title={event.salesCount > 0 ? 'Tiene ventas registradas' : 'Eliminar'}><Trash2 className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title={event.salesCount > 0 ? 'Tiene ventas registradas' : 'Eliminar'}><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
     );
@@ -172,7 +178,7 @@ export default function EventCard({
           <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300 font-bold text-[10px] uppercase tracking-wider">
             CONFIRMADO
           </span>
-          <span className="text-[10px] text-neutral-400">{new Date(event.startDate).toLocaleDateString()}</span>
+          <span className="text-[10px] text-neutral-400">{formatEventDate(event.startDate)}</span>
         </div>
         <h4 className="font-bold text-sm text-white">{event.name}</h4>
         <p className="text-xs text-neutral-400 flex items-center gap-1">

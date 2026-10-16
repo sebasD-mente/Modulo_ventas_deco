@@ -1,7 +1,4 @@
-/**
- * server/services/catalog/catalogStringNormalizer.js
- * Tratamiento léxico, formateo para POS, slugs y deduplicación bicapa.
- */
+import { UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from '../semantic/entityAliases.js';
 
 export function formatProductForPos(p) {
   let parsedSizes = [];
@@ -49,6 +46,8 @@ export function formatProductForPos(p) {
     precioDisplay: `Q${minPrice}`,
     tags: Array.isArray(p.tags) ? p.tags : [],
     sizes: parsedSizes,
+    embedding: Array.isArray(p.embedding) ? p.embedding : null,
+    embeddingHash: p.embeddingHash || null,
   };
 }
 
@@ -117,3 +116,46 @@ export function deduplicatePosters(posters) {
   }
   return deduplicated;
 }
+
+export function isFuzzyTokenMatch(queryToken, targetToken) {
+  if (!queryToken || !targetToken) return false;
+  const q = queryToken.toLowerCase();
+  const t = targetToken.toLowerCase();
+  if (q === t) return true;
+  const qLen = q.length, tLen = t.length;
+  if (qLen < 4 || Math.abs(qLen - tLen) > 2) return false;
+  const maxDistance = qLen >= 7 ? 2 : 1;
+  let prev = Array.from({ length: tLen + 1 }, (_, i) => i);
+  let curr = new Array(tLen + 1);
+  for (let i = 1; i <= qLen; i++) {
+    curr[0] = i;
+    let minVal = curr[0];
+    for (let j = 1; j <= tLen; j++) {
+      const cost = q[i - 1] === t[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      if (curr[j] < minVal) minVal = curr[j];
+    }
+    if (minVal > maxDistance) return false; // Early exit
+    prev = [...curr];
+  }
+  return prev[tLen] <= maxDistance;
+}
+
+export function normalizeMatcherString(str) {
+  if (!str || typeof str !== 'string') return '';
+  const withPlaceholder = str.replace(/ñ/gi, '___enie___');
+  const noAccents = withPlaceholder.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/___enie___/g, 'ñ');
+  return noAccents.replace(/[?!¿¡,.:;()_—\-\/\\"'`~*#]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function stemMatcherToken(tok) {
+  if (!tok || tok.length <= 3 || KNOWN_SHORT_ENTITIES.has(tok)) return tok;
+  if (tok.endsWith('es') && tok.length > 4 && !/[aeiou]es$/.test(tok)) return tok.slice(0, -2);
+  if (tok.endsWith('s') && !tok.endsWith('ss') && tok.length > 3) return tok.slice(0, -1);
+  return tok;
+}
+
+export const EXTENDED_STOP_WORDS = new Set([
+  ...UNIVERSAL_STOP_WORDS, 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'en', 'con', 'por', 'para', 'del', 'al', 'y', 'o', 'que', 'sobre', 'sin', 'como', 'su', 'sus', 'poster', 'posters', 'cuadro', 'cuadros', 'obra', 'obras', 'diseno', 'disenos', 'diseño', 'diseños', 'tamano', 'tamanos', 'tamaño', 'tamaños', 'medida', 'medidas',
+]);
+

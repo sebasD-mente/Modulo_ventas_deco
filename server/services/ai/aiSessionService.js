@@ -5,13 +5,49 @@ import { prisma } from '../../config/prisma.js';
  * Erradica la fragilidad stateless en POST /api/ai/chat (Ticket Valkyria #VAL-003).
  */
 
-export async function getOrCreateSession(sessionId, { tenantId = 'default-tenant', eventId = null, sellerName = null } = {}) {
+export async function getOrCreateSession(
+  sessionId,
+  optionsOrTenantId = {},
+  maybeUserId = null,
+  maybeEventId = null
+) {
   if (!sessionId) return null;
+
+  let tenantId = 'default-tenant';
+  let eventId = null;
+  let sellerName = null;
+
+  if (typeof optionsOrTenantId === 'string') {
+    tenantId = optionsOrTenantId || 'default-tenant';
+    sellerName = maybeUserId || null;
+    eventId = maybeEventId || null;
+  } else if (optionsOrTenantId && typeof optionsOrTenantId === 'object') {
+    tenantId = optionsOrTenantId.tenantId || 'default-tenant';
+    eventId = optionsOrTenantId.eventId ?? null;
+    sellerName = optionsOrTenantId.sellerName ?? optionsOrTenantId.userId ?? null;
+  }
+
   try {
+    if (typeof prisma.aiChatSession?.findUnique === 'function') {
+      const existing = await prisma.aiChatSession.findUnique({ where: { sessionId } });
+      if (existing) {
+        if (
+          existing.tenantId &&
+          tenantId &&
+          existing.tenantId !== 'default-tenant' &&
+          tenantId !== 'default-tenant' &&
+          existing.tenantId !== tenantId
+        ) {
+          const err = new Error('CROSS_TENANT_ACCESS_DENIED: Sesión no pertenece a esta organización.');
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+    }
+
     return await prisma.aiChatSession.upsert({
       where: { sessionId },
       update: {
-        ...(tenantId ? { tenantId } : {}),
         ...(eventId !== undefined ? { eventId } : {}),
         ...(sellerName !== undefined ? { sellerName } : {}),
       },
@@ -25,6 +61,9 @@ export async function getOrCreateSession(sessionId, { tenantId = 'default-tenant
       },
     });
   } catch (err) {
+    if (err?.statusCode === 403) {
+      throw err;
+    }
     console.warn(`[aiSessionService] Error persisting session ${sessionId}, falling back to in-memory:`, err?.message || err);
     return {
       sessionId,
@@ -50,9 +89,23 @@ export async function saveSessionState(sessionId, { pendingDraft, history, selle
   }
   if (sellerName !== undefined) updateData.sellerName = sellerName;
   if (eventId !== undefined) updateData.eventId = eventId;
-  if (tenantId !== undefined) updateData.tenantId = tenantId;
 
   try {
+    if (tenantId && typeof prisma.aiChatSession?.findUnique === 'function') {
+      const existing = await prisma.aiChatSession.findUnique({ where: { sessionId } });
+      if (
+        existing &&
+        existing.tenantId &&
+        existing.tenantId !== 'default-tenant' &&
+        tenantId !== 'default-tenant' &&
+        existing.tenantId !== tenantId
+      ) {
+        const err = new Error('CROSS_TENANT_ACCESS_DENIED: Sesión no pertenece a esta organización.');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
     return await prisma.aiChatSession.upsert({
       where: { sessionId },
       update: updateData,
@@ -66,6 +119,7 @@ export async function saveSessionState(sessionId, { pendingDraft, history, selle
       },
     });
   } catch (err) {
+    if (err?.statusCode === 403) throw err;
     console.warn(`[aiSessionService] Error saving state for session ${sessionId}:`, err?.message || err);
     return {
       sessionId,
@@ -78,9 +132,19 @@ export async function saveSessionState(sessionId, { pendingDraft, history, selle
   }
 }
 
-export async function clearSessionDraft(sessionId) {
+export async function clearSessionDraft(sessionId, tenantId = null) {
   if (!sessionId) return null;
   try {
+    if (tenantId) {
+      const existing = typeof prisma.aiChatSession?.findUnique === 'function'
+        ? await prisma.aiChatSession.findUnique({ where: { sessionId } })
+        : (typeof prisma.aiChatSession?.findFirst === 'function'
+          ? await prisma.aiChatSession.findFirst({ where: { sessionId } })
+          : null);
+      if (existing && existing.tenantId && existing.tenantId !== tenantId) {
+        return null;
+      }
+    }
     return await prisma.aiChatSession.update({
       where: { sessionId },
       data: { pendingDraft: null },
@@ -99,14 +163,26 @@ export async function pruneExpiredSessions(hoursOld = 72) {
   return result?.count ?? 0;
 }
 
-export async function getSessionState(sessionId, tenantId = null) {
+export async function getSessionById(sessionId, tenantId = null) {
   if (!sessionId) return null;
   try {
-    const where = { sessionId };
-    if (tenantId) where.tenantId = tenantId;
-    return await prisma.aiChatSession.findFirst({ where });
+    let session = null;
+    if (typeof prisma.aiChatSession?.findUnique === 'function') {
+      session = await prisma.aiChatSession.findUnique({ where: { sessionId } });
+    } else if (typeof prisma.aiChatSession?.findFirst === 'function') {
+      const where = { sessionId };
+      if (tenantId) where.tenantId = tenantId;
+      session = await prisma.aiChatSession.findFirst({ where });
+    }
+    if (!session) return null;
+    if (tenantId && session.tenantId && session.tenantId !== tenantId) {
+      return null;
+    }
+    return session;
   } catch (err) {
     console.warn(`[aiSessionService] Error fetching state for session ${sessionId}:`, err?.message || err);
     return null;
   }
 }
+
+export const getSessionState = getSessionById;

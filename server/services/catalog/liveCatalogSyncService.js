@@ -12,10 +12,14 @@ import { UNIVERSAL_STOP_WORDS } from '../semantic/entityAliases.js';
 
 const recentQueryThrottle = new Map(), THROTTLE_MS = 10000;
 
+let cachedDefaultTenantId = null;
+
 export async function resolveDefaultTenantId(tenantId) {
   if (tenantId) return tenantId;
+  if (cachedDefaultTenantId) return cachedDefaultTenantId;
   const def = await prisma.tenant.findFirst({ where: { slug: { in: ['deco-vintage-guate', 'deco-vintage'] } }, select: { id: true } });
-  return def?.id || (await prisma.tenant.findFirst({ select: { id: true } }))?.id || null;
+  cachedDefaultTenantId = def?.id || (await prisma.tenant.findFirst({ select: { id: true } }))?.id || null;
+  return cachedDefaultTenantId;
 }
 
 export function getCatalogCandidateUrls() {
@@ -25,9 +29,8 @@ export function getCatalogCandidateUrls() {
   );
 }
 
-export async function normalizeAndUpsertPoster(poster, tenantId) {
+export function buildNormalizedPosterData(poster, targetTenantId) {
   const posterId = poster.id || poster._id || poster.legacyId;
-  const targetTenantId = await resolveDefaultTenantId(tenantId);
   if (!posterId || !targetTenantId) return null;
 
   const sku = `WEB-${posterId}`, rawTitle = (poster.titulo || poster.title || 'Póster').trim();
@@ -46,11 +49,20 @@ export async function normalizeAndUpsertPoster(poster, tenantId) {
     ...rawTitle.toLowerCase().split(/\s+/), ...(rawSubtitle ? rawSubtitle.toLowerCase().split(/\s+/) : []),
     ...(Array.isArray(poster.tags) ? poster.tags : []).map((t) => String(t).replace(/^#/, '').toLowerCase().trim()), ...descTokens,
   ])).filter((t) => t.length > 1);
+
   const data = { tenantId: targetTenantId, sku, name, category, basePrice: minPrice, imageUrl, sizes, tags: combinedTags, isActive: isActiveProduct };
+  return { posterId, sku, data };
+}
+
+export async function normalizeAndUpsertPoster(poster, tenantId) {
+  const targetTenantId = await resolveDefaultTenantId(tenantId);
+  const normalized = buildNormalizedPosterData(poster, targetTenantId);
+  if (!normalized) return null;
+  const { sku, data } = normalized;
   try {
     return await prisma.product.upsert({ where: { tenantId_sku: { tenantId: targetTenantId, sku } }, create: data, update: data });
   } catch {
-    return { id: posterId, ...data };
+    return { id: normalized.posterId, ...data };
   }
 }
 
@@ -74,13 +86,50 @@ export async function deltaSyncRecentPosters(tenantId = null) {
 
   try {
     const skus = batch.map((p) => `WEB-${p.id || p._id || p.legacyId}`).filter((s) => s !== 'WEB-undefined');
-    const existing = await prisma.product.findMany({ where: { tenantId: targetTenantId, sku: { in: skus } }, select: { sku: true } });
-    const existingSet = new Set(existing.map((e) => e.sku));
+    const existing = await prisma.product.findMany({
+      where: { tenantId: targetTenantId, sku: { in: skus } },
+      select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true },
+    });
+    const existingBySku = new Map(existing.map((e) => [e.sku, e]));
     let newCount = 0, updatedCount = 0;
+    const toUpsert = [];
+
     for (const p of batch) {
-      if (existingSet.has(`WEB-${p.id || p._id || p.legacyId}`)) updatedCount++; else newCount++;
-      await normalizeAndUpsertPoster(p, targetTenantId);
+      const normalized = buildNormalizedPosterData(p, targetTenantId);
+      if (!normalized) continue;
+      const { sku, data } = normalized;
+      const prev = existingBySku.get(sku);
+      if (!prev) {
+        newCount++;
+        toUpsert.push(data);
+      } else {
+        const changed =
+          prev.name !== data.name ||
+          prev.category !== data.category ||
+          Math.abs(Number(prev.basePrice) - Number(data.basePrice)) > 0.01 ||
+          prev.imageUrl !== data.imageUrl ||
+          prev.isActive !== data.isActive;
+        if (changed) {
+          updatedCount++;
+          toUpsert.push(data);
+        }
+      }
     }
+
+    const CHUNK_SIZE = 10;
+    for (let i = 0; i < toUpsert.length; i += CHUNK_SIZE) {
+      const chunk = toUpsert.slice(i, i + CHUNK_SIZE);
+      await Promise.all(
+        chunk.map((data) =>
+          prisma.product.upsert({
+            where: { tenantId_sku: { tenantId: targetTenantId, sku: data.sku } },
+            create: data,
+            update: data,
+          }).catch(() => null)
+        )
+      );
+    }
+
     if (newCount > 0 || updatedCount > 0) {
       invalidateCatalogCache(targetTenantId);
       try { invalidateVectorCache(targetTenantId); } catch {}
@@ -178,20 +227,60 @@ export async function syncCatalogFromWeb(tenantId) {
   }
   if (allPosters.length === 0) return { success: false, count: 0, warning: 'Catálogo web no disponible o sin conexión. Operando con caché local.' };
 
-  const existing = await prisma.product.findMany({ where: { tenantId: targetTenantId, isActive: true }, select: { sku: true } });
-  const existingSkus = new Set(existing.map((p) => p.sku)), syncedSkus = new Set();
-  let upsertedCount = 0, newCount = 0;
+  const existing = await prisma.product.findMany({
+    where: { tenantId: targetTenantId, isActive: true },
+    select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true },
+  });
+  const existingBySku = new Map(existing.map((p) => [p.sku, p]));
+  const existingSkus = new Set(existingBySku.keys()), syncedSkus = new Set();
+  let updatedCount = 0, newCount = 0;
+  const toUpsert = [];
+
   for (const poster of allPosters) {
-    const prod = await normalizeAndUpsertPoster(poster, targetTenantId);
-    if (prod?.sku) {
-      if (!existingSkus.has(prod.sku)) newCount++;
-      syncedSkus.add(prod.sku);
-      upsertedCount++;
+    const normalized = buildNormalizedPosterData(poster, targetTenantId);
+    if (!normalized) continue;
+    const { sku, data } = normalized;
+    syncedSkus.add(sku);
+    const prev = existingBySku.get(sku);
+    if (!prev) {
+      newCount++;
+      toUpsert.push(data);
+    } else {
+      const changed =
+        prev.name !== data.name ||
+        prev.category !== data.category ||
+        Math.abs(Number(prev.basePrice) - Number(data.basePrice)) > 0.01 ||
+        prev.imageUrl !== data.imageUrl ||
+        prev.isActive !== data.isActive;
+      if (changed) {
+        updatedCount++;
+        toUpsert.push(data);
+      }
     }
   }
-  const removedSkus = [...existingSkus].filter((s) => !syncedSkus.has(s));
-  if (removedSkus.length > 0) await prisma.product.updateMany({ where: { tenantId: targetTenantId, sku: { in: removedSkus } }, data: { isActive: false } }).catch(() => {});
-  await prisma.product.updateMany({ where: { tenantId: targetTenantId, OR: [{ imageUrl: null }, { imageUrl: '' }] }, data: { isActive: false } }).catch(() => {});
-  invalidateCatalogCache(targetTenantId);
-  return { success: true, count: upsertedCount, newCount, source: successfulUrl };
+
+  const CHUNK_SIZE = 15;
+  for (let i = 0; i < toUpsert.length; i += CHUNK_SIZE) {
+    const chunk = toUpsert.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map((data) =>
+        prisma.product.upsert({
+          where: { tenantId_sku: { tenantId: targetTenantId, sku: data.sku } },
+          create: data,
+          update: data,
+        }).catch(() => null)
+      )
+    );
+  }
+
+  const removedSkus = [...existingSkus].filter((s) => s.startsWith('WEB-') && !syncedSkus.has(s));
+  if (removedSkus.length > 0) {
+    await prisma.product.updateMany({ where: { tenantId: targetTenantId, sku: { in: removedSkus } }, data: { isActive: false } }).catch(() => {});
+  }
+
+  if (newCount > 0 || updatedCount > 0 || removedSkus.length > 0) {
+    invalidateCatalogCache(targetTenantId);
+    try { invalidateVectorCache(targetTenantId); } catch {}
+  }
+  return { success: true, count: newCount + updatedCount, newCount, updatedCount, source: successfulUrl };
 }

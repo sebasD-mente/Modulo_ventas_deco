@@ -105,27 +105,27 @@ export default function useCommissionSettlements(arg1, arg2, arg3) {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
 
-      const [resPending, resWaiting] = await Promise.all([
-        authFetch(`/api/commissions/pending?${params.toString()}`),
-        authFetch('/api/sales/events/evt-ventas-redes-online?limit=100').catch(() => null),
-      ]);
-
+      const resPending = await authFetch(`/api/commissions/pending?${params.toString()}`);
       const jsonPending = await resPending.json();
       if (jsonPending.success) {
         setPendingData(jsonPending.data || { totalProductsAmount: 0, totalShippingExcluded: 0, totalCommission: 0, salesCount: 0, commissionRate: 0.20, sales: [] });
+        if (Array.isArray(jsonPending.data?.salesWaitingBalance)) {
+          setSalesWaitingBalance(jsonPending.data.salesWaitingBalance);
+        } else {
+          const resWaiting = await authFetch('/api/sales/events/evt-ventas-redes-online?limit=100').catch(() => null);
+          if (resWaiting && resWaiting.ok) {
+            const jsonWaiting = await resWaiting.json();
+            if (jsonWaiting.success && Array.isArray(jsonWaiting.data)) {
+              const waiting = jsonWaiting.data.filter((s) => {
+                const matchesSeller = isSuperAdmin ? (!targetSellerId || s.sellerId === targetSellerId) : s.sellerId === user?.id;
+                return matchesSeller && Number(s.balanceDue || 0) > 0;
+              });
+              setSalesWaitingBalance(waiting);
+            }
+          }
+        }
       } else {
         setErrorMsg(jsonPending.error || 'Error al obtener comisiones pendientes.');
-      }
-
-      if (resWaiting && resWaiting.ok) {
-        const jsonWaiting = await resWaiting.json();
-        if (jsonWaiting.success && Array.isArray(jsonWaiting.data)) {
-          const waiting = jsonWaiting.data.filter((s) => {
-            const matchesSeller = isSuperAdmin ? (!targetSellerId || s.sellerId === targetSellerId) : s.sellerId === user?.id;
-            return matchesSeller && Number(s.balanceDue || 0) > 0;
-          });
-          setSalesWaitingBalance(waiting);
-        }
       }
     } catch (err) {
       console.error('Error consultando comisiones pendientes:', err);

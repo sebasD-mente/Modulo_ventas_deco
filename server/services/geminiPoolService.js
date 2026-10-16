@@ -6,7 +6,25 @@
  */
 
 import { getGeminiClient } from '../config/gemini.js';
-import { getNextClient, markKeyCooldown, getAvailableKeys } from './ai/aiKeyPoolService.js';
+import { getNextClient, markKeyCooldown, getAvailableKeys, isKeyInCooldown } from './ai/aiKeyPoolService.js';
+
+export function withAttemptTimeout(promise, timeoutMs = 8500) {
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      const err = new Error(`GEMINI_ATTEMPT_TIMEOUT: Superado el tiempo límite de ${timeoutMs}ms para esta llamada a IA`);
+      err.code = 'ETIMEDOUT';
+      err.status = 408;
+      reject(err);
+    }, timeoutMs);
+  });
+  return Promise.race([
+    promise,
+    timeoutPromise,
+  ]).finally(() => {
+    if (timerId) clearTimeout(timerId);
+  });
+}
 
 export const MODEL_PRIORITY_POOL = [
   'gemini-2.5-flash',
@@ -169,7 +187,11 @@ export async function executeWithModelFallback({
 
       for (let attempt = 0; attempt <= 1; attempt++) {
         try {
-          const result = await taskFn({ model: currentModel, client: activeClient });
+          const timeout = context?.timeoutMs || 8500;
+          const result = await withAttemptTimeout(
+            Promise.resolve().then(() => taskFn({ model: currentModel, client: activeClient })),
+            timeout
+          );
 
           if (modelIdx > 0) {
             console.warn(`[Gemini Pool] 🔄 Éxito con modelo de contingencia "${currentModel}" (Fallback desde "${effectiveModels[0]}")`);
@@ -275,11 +297,14 @@ export async function* streamWithModelFallback({
 
       try {
         const { contents, config } = buildContentsAndConfig({ model: activeModel });
-        stream = await activeClient.models.generateContentStream({
-          model: activeModel,
-          contents,
-          config,
-        });
+        stream = await withAttemptTimeout(
+          activeClient.models.generateContentStream({
+            model: activeModel,
+            contents,
+            config,
+          }),
+          8500
+        );
 
         if (i > 0) {
           console.warn(`[Gemini Stream Pool] 🔄 Stream iniciado con modelo de contingencia: "${activeModel}"`);
@@ -333,10 +358,11 @@ export async function* streamWithModelFallback({
 
 export function getPoolStatus() {
   const keys = getAvailableKeys();
+  const exhaustedCount = keys.filter((k) => isKeyInCooldown(k)).length;
   return {
     totalKeys: keys.length,
-    availableKeys: keys.length,
-    exhaustedKeys: 0,
+    availableKeys: Math.max(0, keys.length - exhaustedCount),
+    exhaustedKeys: exhaustedCount,
     keys: keys.map((k) => (k.length > 8 ? `${k.slice(0, 6)}...` : '***')),
     activeCascade: PRIMARY_PRODUCTION_CASCADE,
   };

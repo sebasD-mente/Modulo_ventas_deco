@@ -28,6 +28,10 @@ function ViewLoadingFallback() {
   );
 }
 
+// Helper fecha civil de Guatemala (America/Guatemala)
+const getTodayGuatemalaStr = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+
 function SalesTerminalMain() {
   const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
@@ -110,7 +114,8 @@ function SalesTerminalMain() {
 
         // 2. Métricas selectivas: Solo invocar si es SUPER_ADMIN, VENDEDOR o VENDEDOR_REDES
         if (isSuperAdmin || isVendedor || isVendedorRedes) {
-          const metricsRes = await authFetch(`/api/sales/events/${selectedEvent.id}/metrics`);
+          const todayStr = getTodayGuatemalaStr();
+          const metricsRes = await authFetch(`/api/sales/events/${selectedEvent.id}/metrics?date=${todayStr}`);
           const metricsData = await metricsRes.json();
           if (metricsData.success) {
             setLiveMetrics(metricsData.data);
@@ -128,7 +133,8 @@ function SalesTerminalMain() {
     if (!activeEvent) return;
     if (!(isSuperAdmin || isVendedor || isVendedorRedes)) return;
     try {
-      const metricsRes = await authFetch(`/api/sales/events/${activeEvent.id}/metrics`);
+      const todayStr = getTodayGuatemalaStr();
+      const metricsRes = await authFetch(`/api/sales/events/${activeEvent.id}/metrics?date=${todayStr}`);
       const metricsData = await metricsRes.json();
       if (metricsData.success) {
         setLiveMetrics(metricsData.data);
@@ -173,9 +179,9 @@ function SalesTerminalMain() {
 
       {/* Contenedor Principal Centrado */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-8">
-        {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) */}
-        {activeTab === 'venta' && (isSuperAdmin || isVendedor || isVendedorRedes) && (
-          <div className="space-y-6">
+        {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) - PRESERVADA EN DOM PARA NO ABORTAR SSE/AUDIO */}
+        {(isSuperAdmin || isVendedor || isVendedorRedes) && (
+          <div className={activeTab === 'venta' ? 'space-y-6' : 'hidden'}>
             <UnifiedAiChat
               eventId={activeEvent?.id}
               onSaleRegistered={refreshMetrics}

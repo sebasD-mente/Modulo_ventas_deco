@@ -144,7 +144,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
 
   const numericDeposit = isPendingPaymentOnly ? 0 : (Number(depositInput) || 0);
   const balanceDue = Math.max(0, Number((totalAmount - numericDeposit).toFixed(2)));
-  const isDepositValid = totalAmount > 0 && (isPendingPaymentOnly || numericDeposit >= minDeposit);
+  const isDepositValid = totalAmount > 0 && (isPendingPaymentOnly || (numericDeposit >= minDeposit && numericDeposit <= totalAmount + 0.01));
 
   // Selección de cliente autocompletado
   const selectCustomer = (cust) => {
@@ -225,6 +225,14 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     if (!isPendingPaymentOnly) {
       if (numericDeposit < minDeposit) {
         setSubmitError(`Anticipo insuficiente: Para iniciar producción se requiere un abono mínimo de Q ${minDeposit.toFixed(2)} (50%).`);
+        return false;
+      }
+      if (numericDeposit > totalAmount + 0.01) {
+        setSubmitError('El anticipo no puede ser mayor al total de la orden.');
+        return false;
+      }
+      if (depositPaymentMethod === 'TRANSFERENCIA' && !depositReference.trim() && !depositReceiptUrl) {
+        setSubmitError('Para pagos por Transferencia debes ingresar el No. de Boleta/Referencia o adjuntar foto del comprobante.');
         return false;
       }
     }

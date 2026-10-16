@@ -12,7 +12,7 @@
     "start": "node server/index.js",
     "test": "node --test tests/security/zero-trust.test.js",
     "test:security": "node --test tests/security/zero-trust.test.js",
-    "test:unit": "node --test tests/catalog/deduplication.test.js tests/catalog/fuzzy-typo-tolerance.test.js tests/sales/idempotency.test.js tests/sales/sale-sequences.test.js tests/schema/schema-robustness.test.js",
+    "test:unit": "node --test tests/catalog/deduplication.test.js tests/catalog/fuzzy-typo-tolerance.test.js tests/catalog/phase-3-verification.test.js tests/sales/idempotency.test.js tests/sales/sale-sequences.test.js tests/schema/schema-robustness.test.js tests/frontend/phase5-frontend-ergonomics-resilience.test.js tests/sales/phase6-combos-offline-accelerators.test.js",
     "test:voice": "node --test tests/ai/voice-lexical-priming-hesitation.test.js tests/ai/voice-vad-reengineering.test.js tests/adversarial/m1-voice-priming-hesitation-stress.test.js",
     "test:latency": "node --test tests/benchmarks/latency-audit.test.js",
     "audit:secrets": "node scripts/audit-secrets.js",
@@ -40,6 +40,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.344.0",
     "multer": "^1.4.5-lts.1",
+    "prisma": "^6.9.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zod": "^3.24.2"
@@ -50,7 +51,6 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
     "postcss": "^8.4.35",
-    "prisma": "^6.9.0",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.6"
   }

@@ -1,10 +1,17 @@
+import crypto from 'node:crypto';
 import { executeWithModelFallback } from './geminiPoolService.js';
 import { ENV } from '../config/env.js';
+import { prisma } from '../config/prisma.js';
 import { searchWebPosters, deduplicatePosters, getCachedProducts } from './webCatalogService.js';
 import { UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES, resolveEntityAlias } from './semantic/entityAliases.js';
 
 export const EMBEDDING_MODEL = ENV.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001', MIN_SIMILARITY_THRESHOLD = 0.45, VECTOR_CACHE_TTL_MS = 30 * 60 * 1000;
 const vectorCache = new Map(), warmingPromises = new Map();
+
+export function computePosterEmbeddingHash(poster) {
+  const text = posterToEmbeddingText(poster);
+  return crypto.createHash('sha256').update(text).digest('hex').slice(0, 32);
+}
 
 export function cosineSimilarity(vecA, vecB) {
   if (!vecA || !vecB || !vecA.length || !vecB.length || vecA.length !== vecB.length) return 0.0;
@@ -47,13 +54,30 @@ export async function embedTexts(texts, client = null, taskType = null) {
   return raw.map((e) => (e?.values ? Array.from(e.values) : null)).filter(Boolean);
 }
 export async function getPosterEmbedding(poster, { client = null, tenantId = null } = {}) {
+  const currentHash = computePosterEmbeddingHash(poster);
   const key = `${tenantId || '__GLOBAL__'}:${poster.id || poster.sku || poster.titulo}`;
   const cached = vectorCache.get(key);
-  if (cached && Date.now() - cached.timestamp < VECTOR_CACHE_TTL_MS) return cached.vector;
+  if (cached && cached.hash === currentHash && Date.now() - cached.timestamp < VECTOR_CACHE_TTL_MS) {
+    return cached.vector;
+  }
+  if (Array.isArray(poster?.embedding) && poster.embedding.length > 0 && (!poster.embeddingHash || poster.embeddingHash === currentHash)) {
+    vectorCache.set(key, { id: poster.id, poster, vector: poster.embedding, hash: currentHash, timestamp: Date.now() });
+    return poster.embedding;
+  }
   const [vector] = await embedTexts([posterToEmbeddingText(poster)], client, 'RETRIEVAL_DOCUMENT');
-  if (vector) vectorCache.set(key, { id: poster.id, poster, vector, timestamp: Date.now() });
+  if (vector) {
+    vectorCache.set(key, { id: poster.id, poster, vector, hash: currentHash, timestamp: Date.now() });
+    if (poster.id || poster.sku) {
+      const where = poster.id ? { id: poster.id } : { sku: poster.sku };
+      prisma?.product?.updateMany?.({
+        where,
+        data: { embedding: vector, embeddingHash: currentHash, embeddingUpdatedAt: new Date() },
+      }).catch(() => {});
+    }
+  }
   return vector || null;
 }
+
 export async function warmCatalogVectors(tenantId = null, forceRefresh = false, client = null) {
   const key = tenantId || '__GLOBAL__';
   if (warmingPromises.has(key)) return warmingPromises.get(key);
@@ -64,18 +88,38 @@ export async function warmCatalogVectors(tenantId = null, forceRefresh = false, 
       if (!deduplicated.length) return [];
       const toFetch = [], items = [];
       for (const p of deduplicated) {
-        const cKey = `${key}:${p.id || p.sku || p.titulo}`, cached = vectorCache.get(cKey);
-        if (!forceRefresh && cached && Date.now() - cached.timestamp < VECTOR_CACHE_TTL_MS) items.push(cached);
-        else toFetch.push(p);
+        const cKey = `${key}:${p.id || p.sku || p.titulo}`;
+        const currentHash = computePosterEmbeddingHash(p);
+        const cached = vectorCache.get(cKey);
+
+        if (!forceRefresh && cached && cached.hash === currentHash && Date.now() - cached.timestamp < VECTOR_CACHE_TTL_MS) {
+          items.push(cached);
+        } else if (!forceRefresh && Array.isArray(p.embedding) && p.embedding.length > 0 && (!p.embeddingHash || p.embeddingHash === currentHash)) {
+          const entry = { id: p.id, poster: p, vector: p.embedding, hash: currentHash, timestamp: Date.now() };
+          vectorCache.set(cKey, entry);
+          items.push(entry);
+        } else {
+          toFetch.push({ poster: p, hash: currentHash });
+        }
       }
+
       for (let i = 0; i < toFetch.length; i += 50) {
         const batch = toFetch.slice(i, i + 50);
-        const vectors = await embedTexts(batch.map(posterToEmbeddingText), client, 'RETRIEVAL_DOCUMENT');
+        const vectors = await embedTexts(batch.map((b) => posterToEmbeddingText(b.poster)), client, 'RETRIEVAL_DOCUMENT');
         for (let j = 0; j < vectors.length; j++) {
           if (vectors[j]) {
-            const entry = { id: batch[j].id, poster: batch[j], vector: vectors[j], timestamp: Date.now() };
-            vectorCache.set(`${key}:${batch[j].id || batch[j].sku || batch[j].titulo}`, entry);
+            const { poster: p, hash } = batch[j];
+            const entry = { id: p.id, poster: p, vector: vectors[j], hash, timestamp: Date.now() };
+            vectorCache.set(`${key}:${p.id || p.sku || p.titulo}`, entry);
             items.push(entry);
+
+            if (p.id || p.sku) {
+              const where = p.id ? { id: p.id } : { sku: p.sku };
+              prisma?.product?.updateMany?.({
+                where,
+                data: { embedding: vectors[j], embeddingHash: hash, embeddingUpdatedAt: new Date() },
+              }).catch(() => {});
+            }
           }
         }
       }
@@ -105,6 +149,12 @@ export async function searchHybridPosters({ tenantId = null, query = '', categor
   const rawTokens = extractTokens(cleanQuery);
   const normQueryTokens = rawTokens.length > 0 ? rawTokens : extractTokens(effectiveQuery);
   try {
+    if (vectorCache.size === 0 && !client && lexicalList.length > 25) {
+      warmCatalogVectors(tenantId, false, client).catch(() => {});
+      const res = deduplicatePosters(lexicalList).slice(0, limit);
+      res.results = res; res.source = 'lexical_parachute'; res.fallbackMode = 'lexical_warming_async';
+      return res;
+    }
     const queryVectors = await embedTexts([effectiveQuery], client, 'RETRIEVAL_QUERY');
     if (!queryVectors?.length) throw new Error('EMBEDDINGS_UNAVAILABLE');
     const cachedItems = await warmCatalogVectors(tenantId, false, client);

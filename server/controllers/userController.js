@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
 import { resolveTargetRoles, assignUserToEventService } from '../services/userEventAssignmentService.js';
+import { invalidateUserAuthCache } from '../middleware/authMiddleware.js';
 
 export async function getUsersList(req, res) {
   try {
@@ -47,6 +48,7 @@ export async function updateUserRole(req, res) {
       data: { role: targetRoles[0], roles: targetRoles },
       include: { assignedEvent: true },
     });
+    invalidateUserAuthCache(id);
     return res.status(200).json({
       success: true,
       message: `Roles de ${updated.fullName} actualizados a [${targetRoles.join(', ')}]`,
@@ -62,6 +64,7 @@ export async function assignUserToEvent(req, res) {
     const { id } = req.params;
     const { eventId } = req.body;
     const updated = await assignUserToEventService({ userId: id, eventId, tenantId: req.tenantId });
+    invalidateUserAuthCache(id);
     return res.status(200).json({
       success: true,
       message: `Vendedor asignado al evento ${updated.assignedEvent?.name || 'Ninguno'}`,
@@ -90,6 +93,7 @@ export async function toggleUserStatus(req, res) {
     }
     const newStatus = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
     const updated = await prisma.user.update({ where: { id }, data: { status: newStatus } });
+    invalidateUserAuthCache(id);
     return res.status(200).json({
       success: true,
       message: `Usuario ${newStatus === 'ACTIVO' ? 'activado' : 'desactivado'} correctamente.`,
@@ -151,6 +155,7 @@ export async function deleteUser(req, res) {
       return res.status(400).json({ success: false, error: 'No se puede eliminar a un Super Administrador maestro configurado en las variables de entorno.' });
     }
     await prisma.user.delete({ where: { id } });
+    invalidateUserAuthCache(id);
     return res.status(200).json({ success: true, message: 'Usuario eliminado del sistema correctamente.' });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

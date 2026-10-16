@@ -15,6 +15,10 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
   const minDeposit = Number((Number(sale?.totalAmount || 0) * 0.50).toFixed(2));
 
   const [method, setMethod] = useState(isPendingPayment ? 'TRANSFERENCIA' : 'EFECTIVO');
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splitMethod2, setSplitMethod2] = useState('TRANSFERENCIA');
+  const [splitAmount1, setSplitAmount1] = useState('');
+  const [reference2, setReference2] = useState('');
   const [customAmount, setCustomAmount] = useState(isPendingPayment ? minDeposit.toString() : Number(sale?.balanceDue || 0).toString());
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -23,6 +27,11 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
   const [receiptUploadError, setReceiptUploadError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [idempotencyKey] = useState(() =>
+    (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `bal-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  );
 
   if (!sale) return null;
 
@@ -32,6 +41,8 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
   const customerName = sale.customer?.fullName || sale.customerName || 'Cliente';
   const customerPhone = sale.customer?.phone || '';
   const numericAmount = isPendingPayment ? (Number(customAmount) || 0) : balanceDue;
+  const numSplit1 = Number(splitAmount1) || 0;
+  const numSplit2 = Math.max(0, Number((numericAmount - numSplit1).toFixed(2)));
 
   const handleReceiptUpload = async (file) => {
     if (!file) return;
@@ -61,20 +72,39 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
     if (isPendingPayment && numericAmount > balanceDue + 0.05) {
       return setErrorMsg(`El monto no puede exceder el total de la orden (Q ${balanceDue.toFixed(2)}).`);
     }
-    if ((method === 'TRANSFERENCIA' || method === 'TARJETA') && !reference.trim()) {
-      return setErrorMsg('Para transferencias o tarjeta es requerido el número de boleta o referencia.');
+    if ((method === 'TRANSFERENCIA' || method === 'TARJETA') && !reference.trim() && !receiptUrl) {
+      return setErrorMsg('Para transferencias o tarjeta es requerido el número de boleta o comprobante.');
+    }
+    if (isSplitPayment) {
+      if (numSplit1 <= 0 || numSplit2 <= 0) {
+        return setErrorMsg('Ambos montos del pago dividido deben ser mayores a Q 0.00.');
+      }
+      if ((splitMethod2 === 'TRANSFERENCIA' || splitMethod2 === 'TARJETA') && !reference2.trim() && !receiptUrl) {
+        return setErrorMsg('Ingresa la referencia o comprobante para el segundo método de pago.');
+      }
     }
 
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    const paymentsPayload = isSplitPayment
+      ? [
+          { method, amount: Number(numSplit1.toFixed(2)), reference: reference.trim() || null, receiptUrl: receiptUrl || null },
+          { method: splitMethod2, amount: Number(numSplit2.toFixed(2)), reference: reference2.trim() || reference.trim() || null, receiptUrl: receiptUrl || null },
+        ]
+      : [{ method, amount: numericAmount, reference: reference.trim() || null, receiptUrl: receiptUrl || null }];
+
     try {
       const res = await authFetch(`/api/sales/${sale.id}/balance-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify({
-          payments: [{ method, amount: numericAmount, reference: reference.trim() || null, receiptUrl: receiptUrl || null }],
+          payments: paymentsPayload,
           notes: notes.trim() || null,
+          idempotencyKey,
         }),
       });
 
@@ -159,7 +189,21 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
           )}
 
           <div>
-            <label className="block text-neutral-400 font-semibold mb-1.5">Método de Pago</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-neutral-400 font-semibold">{isSplitPayment ? 'Método 1' : 'Método de Pago'}</label>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isSplitPayment;
+                  setIsSplitPayment(next);
+                  if (next && !splitAmount1) setSplitAmount1(Number((numericAmount / 2).toFixed(2)).toString());
+                  setErrorMsg(null);
+                }}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
+              >
+                {isSplitPayment ? '✕ Usar 1 solo método' : '+ Dividir pago en 2 métodos'}
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {PAYMENT_METHODS.map((m) => {
                 const Icon = m.icon;
@@ -173,6 +217,32 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
               })}
             </div>
           </div>
+
+          {isSplitPayment && (
+            <div className="p-3 rounded-2xl bg-neutral-900/80 border border-neutral-800 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-neutral-400 text-[11px] font-semibold mb-1">Monto {method} (Q)</label>
+                  <input type="number" step="0.01" min="0.01" max={numericAmount} value={splitAmount1} onChange={(e) => setSplitAmount1(e.target.value)} className="w-full min-h-[44px] px-3 py-1.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold text-xs" />
+                </div>
+                <div>
+                  <label className="block text-neutral-400 text-[11px] font-semibold mb-1">Remanente {splitMethod2} (Q)</label>
+                  <div className="w-full min-h-[44px] px-3 py-1.5 bg-black/60 border border-neutral-800 rounded-xl text-emerald-400 font-mono font-bold text-xs flex items-center">Q {numSplit2.toFixed(2)}</div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-neutral-400 text-[11px] font-semibold mb-1">Método 2</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHODS.map((m) => (
+                    <button key={m.id} type="button" onClick={() => setSplitMethod2(m.id)} className={`min-h-[44px] px-2 py-1.5 rounded-xl text-[11px] font-bold border cursor-pointer ${splitMethod2 === m.id ? 'bg-amber-400 text-black border-amber-400' : 'bg-black text-neutral-400 border-neutral-800'}`}>{m.label}</button>
+                  ))}
+                </div>
+              </div>
+              {(splitMethod2 === 'TRANSFERENCIA' || splitMethod2 === 'TARJETA') && (
+                <input type="text" value={reference2} onChange={(e) => setReference2(e.target.value)} placeholder={`Referencia / Boleta ${splitMethod2}`} className="w-full min-h-[44px] px-3 py-1.5 bg-black border border-neutral-800 rounded-xl text-white font-mono text-xs" />
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-neutral-400 font-semibold mb-1">Referencia / No. Boleta {(method === 'TRANSFERENCIA' || method === 'TARJETA') && '*'}</label>

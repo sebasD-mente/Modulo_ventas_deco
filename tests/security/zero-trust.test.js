@@ -175,4 +175,54 @@ describe('🔒 Suite de Seguridad Zero-Trust & Aislamiento Estricto', () => {
       'prisma/seed.js no debe requerir bcrypt para hashing de usuarios planos'
     );
   });
+
+  it('Hallazgo #19: handleCatalogWebhook debe rechazar peticiones sin secreto ni token SUPER_ADMIN con HTTP 401', async () => {
+    const { handleCatalogWebhook } = await import('../../server/controllers/catalogWebhookController.js');
+    let statusCode = 200;
+    let bodyPayload = null;
+    const req = {
+      headers: {},
+      body: {},
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(payload) {
+        bodyPayload = payload;
+        return this;
+      },
+    };
+
+    await handleCatalogWebhook(req, res);
+    assert.equal(statusCode, 401, 'Petición sin credenciales a handleCatalogWebhook debe retornar HTTP 401');
+    assert.equal(bodyPayload?.success, false);
+  });
+
+  it('Hallazgo #57: aiSessionService debe aislar sesiones por tenantId y bloquear secuestro cross-tenant', async () => {
+    const sessionSvcFile = path.join(serverDir, 'services', 'ai', 'aiSessionService.js');
+    const content = fs.readFileSync(sessionSvcFile, 'utf-8');
+    assert.ok(
+      content.includes('existing.tenantId !== tenantId'),
+      'aiSessionService debe verificar pertenencia estricta de tenantId antes de retornar o mutar una sesión'
+    );
+    assert.ok(
+      content.includes('CROSS_TENANT_ACCESS_DENIED'),
+      'aiSessionService debe lanzar error explícito CROSS_TENANT_ACCESS_DENIED ante intento de acceso cruzado en mutación'
+    );
+  });
+
+  it('Hallazgo #59: server/index.js debe permitir el método PATCH y cabeceras de idempotencia en CORS', () => {
+    const indexFile = path.join(serverDir, 'index.js');
+    const content = fs.readFileSync(indexFile, 'utf-8');
+    assert.ok(
+      content.includes("'PATCH'"),
+      'La configuración CORS en server/index.js debe incluir el método PATCH'
+    );
+    assert.ok(
+      content.includes("'Idempotency-Key'") && content.includes("'X-Idempotency-Key'"),
+      'La configuración CORS en server/index.js debe permitir Idempotency-Key y X-Idempotency-Key'
+    );
+  });
 });

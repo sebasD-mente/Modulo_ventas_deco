@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, Calendar, Loader2, Tv } from 'lucide-react';
+import { RotateCcw, Calendar, Loader2, Tv, TrendingUp, Target, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useMonitorDashboard from './monitor/hooks/useMonitorDashboard';
 import MonitorKpiGrid from './monitor/MonitorKpiGrid';
@@ -51,7 +51,67 @@ export default function MonitorDashboardView() {
         </button>
       </div>
 
-      {/* 3. DETALLE POR EVENTO */}
+      {/* 3. RADAR DE PUNTO DE EQUILIBRIO Y RENTABILIDAD FERIAL */}
+      {(() => {
+        const totalGross = Number(resumenGeneral.totalSold || 0);
+        const primaryEv = eventDetails[0]?.event || {};
+        const standFixedCost = Number(primaryEv.budget || primaryEv.standCost || 2500);
+        const estimatedProdCost = totalGross * 0.30;
+        const totalCosts = standFixedCost + estimatedProdCost;
+        const netProfit = totalGross - totalCosts;
+        const breakEvenTarget = standFixedCost / 0.70;
+        const breakEvenProgress = totalGross > 0 ? Math.min(100, Math.round((totalGross / breakEvenTarget) * 100)) : 0;
+
+        return (
+          <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-3.5">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5">
+              <span className="font-bold text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-amber-400" />
+                <span>Radar de Punto de Equilibrio (Break-Even)</span>
+              </span>
+              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${
+                netProfit >= 0 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400' : 'bg-amber-950/60 border-amber-800 text-amber-400'
+              }`}>
+                {breakEvenProgress}% Cubierto
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2.5 rounded-xl bg-black border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-medium">Venta Bruta</span>
+                <span className="text-xs sm:text-sm font-black font-mono text-white">Q {totalGross.toFixed(2)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-medium">Costos Totales</span>
+                <span className="text-xs sm:text-sm font-black font-mono text-neutral-300">Q {totalCosts.toFixed(2)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-medium">Utilidad Neta Real</span>
+                <span className={`text-xs sm:text-sm font-black font-mono ${netProfit >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {netProfit >= 0 ? `+Q ${netProfit.toFixed(2)}` : `-Q ${Math.abs(netProfit).toFixed(2)}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="w-full h-2 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
+                <div
+                  className={`h-full transition-all duration-500 ${netProfit >= 0 ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  style={{ width: `${breakEvenProgress}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                <span>Meta Break-Even: Q {breakEvenTarget.toFixed(2)}</span>
+                <span className={netProfit >= 0 ? 'text-emerald-400 font-bold' : 'text-amber-300'}>
+                  {netProfit >= 0 ? '🎉 Stand en zona de ganancia neta' : `Faltan Q ${Math.max(0, breakEvenTarget - totalGross).toFixed(2)} para equilibrio`}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 4. DETALLE POR EVENTO */}
       <EventsPerformanceList eventDetails={eventDetails} expandedEvents={expandedEvents} onToggleEvent={toggleEvent} selectedDate={selectedDate} />
 
       {/* 4. RESUMEN GENERAL DE LA JORNADA (Solo visible para Super Admin o cuando hay múltiples stands) */}

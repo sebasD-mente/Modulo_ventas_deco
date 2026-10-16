@@ -57,8 +57,9 @@ describe('🧪 Desafío Empírico de Robustez del Esquema Prisma (Milestone 1)',
   // --------------------------------------------------------------------------
   describe('2. Generación e Integridad de Tipos de Prisma Client', () => {
     it('npx prisma generate debe compilar en menos de 2500ms sin degradación', () => {
+      const prismaBin = path.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js');
       const start = Date.now();
-      const output = execSync('npx prisma generate', {
+      const output = execSync(`"${process.execPath}" "${prismaBin}" generate --no-engine`, {
         cwd: rootDir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],

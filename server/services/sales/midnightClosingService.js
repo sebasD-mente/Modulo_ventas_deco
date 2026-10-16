@@ -86,7 +86,7 @@ export async function runMidnightClosingAudit() {
               where: {
                 tenantId: event.tenantId,
                 role: 'SUPER_ADMIN',
-                isActive: true,
+                status: 'ACTIVO',
               },
               select: { id: true },
             });
@@ -98,7 +98,7 @@ export async function runMidnightClosingAudit() {
             continue;
           }
 
-          // 6. Obtener KPIs de esa fecha y generar cierre automático
+          // 6. Obtener KPIs de esa fecha y generar cierre automático pendiente de conteo físico
           const kpis = await getEventKPIs({
             tenantId: event.tenantId,
             eventId: event.id,
@@ -106,16 +106,15 @@ export async function runMidnightClosingAudit() {
           });
 
           if (kpis.totalTransactions > 0) {
-            const totalCash = kpis.paymentBreakdown.EFECTIVO.amount;
-
             await createCashClosingTransaction({
               tenantId: event.tenantId,
               eventId: event.id,
               closedById,
               closingType: 'AUTOMATICO_MEDIANOCHE',
-              totalCashReported: totalCash,
-              observations: '⚠️ Día sin cierre oficial. Conciliación automática del sistema a medianoche.',
-              date: dayRange.endOfDay, // Registrar al final de la jornada
+              totalCashReported: 0,
+              status: 'PENDIENTE_CONTEO_FISICO',
+              observations: '⚠️ Día sin cierre oficial. Pendiente de arqueo físico por administración.',
+              date: dayStr,
             });
 
             console.log(

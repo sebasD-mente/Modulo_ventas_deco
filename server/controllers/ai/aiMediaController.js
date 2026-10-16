@@ -8,12 +8,17 @@ import { getSessionState, saveSessionState } from '../../services/ai/aiSessionSe
 import { ENV } from '../../config/env.js';
 
 async function safePersistMedia(file, defaultName, defaultMime, folder) {
+  let timerId;
   try {
-    const uploadRes = await uploadBufferToStorage({ buffer: file.buffer, originalname: file.originalname || defaultName, mimetype: file.mimetype || defaultMime, folder });
+    const uploadPromise = uploadBufferToStorage({ buffer: file.buffer, originalname: file.originalname || defaultName, mimetype: file.mimetype || defaultMime, folder });
+    const timeoutPromise = new Promise((resolve) => { timerId = setTimeout(() => resolve(null), 2500); });
+    const uploadRes = await Promise.race([uploadPromise, timeoutPromise]);
     return uploadRes?.url || null;
   } catch (gcsErr) {
     console.warn(`⚠️ [GCS Warning] No se pudo persistir en ${folder}:`, gcsErr.message);
     return null;
+  } finally {
+    if (timerId) clearTimeout(timerId);
   }
 }
 
@@ -67,11 +72,8 @@ export async function handleVoiceSale(req, res) {
     if (sessionId) await saveSessionState(sessionId, { pendingDraft: finalDraftSale, eventId, tenantId });
 
     return res.json({
-      success: true,
-      draftSale: finalDraftSale,
-      requiresConfirmation: true,
-      unmatchedItems: draft.unmatchedItems || [],
-      suggestedPosters: draft.suggestedPosters || [],
+      success: true, draftSale: finalDraftSale, requiresConfirmation: true,
+      unmatchedItems: draft.unmatchedItems || [], suggestedPosters: draft.suggestedPosters || [],
       message: draft.message || 'Audio analizado con éxito. Por favor verifica y confirma los datos de la venta.',
     });
   } catch (err) {
@@ -86,11 +88,11 @@ export async function handleBatchPhoto(req, res) {
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
-    const imageUrl = await safePersistMedia(file, 'posters-bundle.jpg', 'image/jpeg', 'posters_scans');
     const t0Batch = Date.now();
-    const analysis = await processPostersBatchPhoto({
-      imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId,
-    });
+    const [imageUrl, analysis] = await Promise.all([
+      safePersistMedia(file, 'posters-bundle.jpg', 'image/jpeg', 'posters_scans'),
+      processPostersBatchPhoto({ imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId }),
+    ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_BATCH_QR_SCAN',
       model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
@@ -98,14 +100,18 @@ export async function handleBatchPhoto(req, res) {
       details: { eventId, codesDetected: analysis.detectedCodes?.length || 0 },
     });
 
+    const validItems = analysis.items || [];
+    const hasValid = validItems.length > 0;
+    const draftSale = hasValid ? {
+      items: validItems, total: analysis.totalCalculated, paymentMethod: 'EFECTIVO', imageUrl, inputChannel: 'IA_IMAGEN_QR',
+      notes: `Escaneo de foto (${analysis.detectedCodes?.length || 0} códigos detectados)`,
+    } : null;
+
     return res.json({
-      success: true,
-      draftSale: {
-        items: analysis.items, total: analysis.totalCalculated, paymentMethod: 'EFECTIVO', imageUrl, inputChannel: 'IA_IMAGEN_QR',
-        notes: `Escaneo de foto (${analysis.detectedCodes?.length || 0} códigos detectados: ${analysis.detectedCodes?.join(', ') || 'N/A'})`,
-      },
-      summary: analysis.summary, detectedCodes: analysis.detectedCodes, requiresConfirmation: true,
-      message: 'Foto de pósters analizada con éxito. Verifica los ítems y selecciona el método de pago.',
+      success: true, draftSale, itemsDetected: hasValid, summary: analysis.summary,
+      detectedCodes: analysis.detectedCodes, unmatchedItems: analysis.unmatchedItems || [],
+      requiresConfirmation: hasValid,
+      message: hasValid ? 'Foto de pósters analizada con éxito. Verifica los ítems y confirma.' : 'No se identificaron pósters válidos en la foto.',
     });
   } catch (err) {
     console.error('❌ Error en handleBatchPhoto:', err);
@@ -119,12 +125,18 @@ export async function handleArtworkRecognition(req, res) {
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen de la obra.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
+    const t0Art = Date.now();
     const [imageUrl, analysis] = await Promise.all([
       safePersistMedia(file, 'artwork.jpg', 'image/jpeg', 'artwork_scans'),
-      recognizePosterArtworkFromImage({
-        imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId,
-      }),
+      recognizePosterArtworkFromImage({ imageBuffer: file.buffer, mimeType: file.mimetype || 'image/jpeg', tenantId, eventId }),
     ]);
+    recordLlmInteraction({
+      tenantId, userId: req.userId || null, action: 'AI_ARTWORK_RECOGNITION',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      latencyMs: Date.now() - t0Art, ipAddress: req.ip,
+      details: { eventId, detected: analysis.isArtworkDetected, title: analysis.primaryTitle },
+    });
+
     if (analysis.isArtworkDetected === false || !analysis.items?.length) {
       return res.json({
         success: true, imageUrl, draftSale: null, isArtworkDetected: false,
@@ -157,18 +169,29 @@ export async function handleVideoRecognition(req, res) {
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún clip de video.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
-    const videoUrl = await safePersistMedia(file, 'counter-video.mp4', 'video/mp4', 'counter_videos');
-    const analysis = await recognizePostersFromVideo({
-      videoBuffer: file.buffer, mimeType: file.mimetype || 'video/mp4', tenantId, eventId,
+    const t0Vid = Date.now();
+    const [videoUrl, analysis] = await Promise.all([
+      safePersistMedia(file, 'counter-video.mp4', 'video/mp4', 'counter_videos'),
+      recognizePostersFromVideo({ videoBuffer: file.buffer, mimeType: file.mimetype || 'video/mp4', tenantId, eventId }),
+    ]);
+    recordLlmInteraction({
+      tenantId, userId: req.userId || null, action: 'AI_VIDEO_RECOGNITION',
+      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      latencyMs: Date.now() - t0Vid, ipAddress: req.ip,
+      details: { eventId, count: analysis.items?.length || 0 },
     });
+
+    const validItems = analysis.items || [];
+    const hasValid = validItems.length > 0;
+    const draftSale = hasValid ? {
+      items: validItems, total: analysis.total, paymentMethod: 'EFECTIVO', videoUrl, inputChannel: 'IA_VIDEO_MOSTRADOR',
+      notes: `Video del mostrador: ${validItems.length} obras detectadas`,
+    } : null;
+
     return res.json({
-      success: true,
-      draftSale: {
-        items: analysis.items, total: analysis.total, paymentMethod: 'EFECTIVO', videoUrl, inputChannel: 'IA_VIDEO_MOSTRADOR',
-        notes: `Video del mostrador: ${analysis.items.length} obras detectadas`,
-      },
-      summary: analysis.summary, requiresConfirmation: true,
-      message: 'Video analizado con éxito. Se detectaron las obras mostradas en el mostrador.',
+      success: true, draftSale, itemsDetected: hasValid, summary: analysis.summary,
+      unmatchedItems: analysis.unmatchedItems || [], requiresConfirmation: hasValid,
+      message: hasValid ? 'Video analizado con éxito. Se detectaron las obras mostradas en el mostrador.' : 'No se detectaron obras del catálogo en el video.',
     });
   } catch (err) {
     console.error('❌ Error en handleVideoRecognition:', err);

@@ -39,16 +39,28 @@ export default function DraftItemRow({
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={item.sizeId || currentSize?.sizeId}
-              onChange={(e) => onUpdateSize?.(index, e.target.value)}
-              className="min-h-[44px] bg-[#222222] border border-neutral-700 rounded-lg px-2.5 py-1 text-[11px] font-bold text-white focus:outline-none focus:border-white cursor-pointer"
-            >
-              {itemSizes.map((s) => (
-                <option key={s.sizeId} value={s.sizeId}>{s.nombre} (Q{s.precio})</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {itemSizes.map((s) => {
+                const isSelected = (item.sizeId || currentSize?.sizeId) === s.sizeId;
+                return (
+                  <button
+                    key={s.sizeId}
+                    type="button"
+                    onClick={() => onUpdateSize?.(index, s.sizeId)}
+                    className={`min-h-[38px] px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-white text-black border-white shadow-sm'
+                        : 'bg-[#222222] border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500'
+                    }`}
+                  >
+                    <span>{s.nombre || s.sizeId}</span>
+                    <span className={isSelected ? 'text-black font-extrabold' : 'text-emerald-400 font-extrabold'}>
+                      (Q{s.precio})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             <div className="flex items-center gap-1 bg-[#222] border border-neutral-700 rounded-xl p-0.5">
               <button
                 type="button"
@@ -80,8 +92,7 @@ export default function DraftItemRow({
             )}
           </div>
         </div>
-      </div>
-      {alternatives.length > 0 && (
+        {alternatives.length > 0 && (
         <div className="pt-1.5 border-t border-neutral-900 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <span className="text-[10px] font-bold text-neutral-400 shrink-0">Otros diseños:</span>
           {alternatives.map((alt) => (

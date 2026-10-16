@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Lock, CheckCircle2, AlertCircle, Loader2, Layers, Search, RefreshCw, Scissors } from 'lucide-react';
+import { X, Lock, CheckCircle2, AlertCircle, Loader2, Layers, Search, RefreshCw, Scissors, MessageCircle } from 'lucide-react';
+
+import { SIZE_AREAS_CM2, STANDARD_SHEET_AREA_CM2, getItemAreaCm2 } from '../../utils/printSheetDimensions.js';
 
 export default function AssignItemsToSheetModal({
   sheet,
@@ -47,6 +49,18 @@ export default function AssignItemsToSheetModal({
       return true;
     });
   }, [unassignedItems, onlyMatchingMaterial, sheet?.material, filterSearch]);
+
+  const selectedAreaCm2 = useMemo(() => {
+    let total = 0;
+    unassignedItems.forEach((it) => {
+      if (selectedIds.has(it.id)) {
+        total += getItemAreaCm2(it);
+      }
+    });
+    return total;
+  }, [unassignedItems, selectedIds]);
+
+  const sheetOccupancyPercent = Math.min(100, Math.round((selectedAreaCm2 / STANDARD_SHEET_AREA_CM2) * 100));
 
   if (!isOpen || !sheet) return null;
 
@@ -140,6 +154,25 @@ export default function AssignItemsToSheetModal({
           </div>
         </div>
 
+        {/* Barra de Ocupación Geométrica del Pliego (70x100cm = 7,000 cm²) */}
+        <div className="p-3 rounded-2xl bg-black border border-neutral-800 space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-neutral-300 flex items-center gap-1.5">
+              <span>📐 Ocupación del Pliego:</span>
+              <span className="font-mono text-cyan-400">{selectedAreaCm2.toLocaleString()} cm² / 7,000 cm²</span>
+            </span>
+            <span className={`font-mono font-bold text-xs ${sheetOccupancyPercent > 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {sheetOccupancyPercent}% {sheetOccupancyPercent > 100 ? '(Excede pliego)' : 'cubierto'}
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
+            <div
+              className={`h-full transition-all duration-300 ${sheetOccupancyPercent > 100 ? 'bg-amber-400' : 'bg-cyan-400'}`}
+              style={{ width: `${Math.min(100, sheetOccupancyPercent)}%` }}
+            />
+          </div>
+        </div>
+
         {/* Selection summary */}
         <div className="flex items-center justify-between text-xs px-1 text-neutral-400">
           <span>{selectedIds.size} seleccionada(s) de {filteredItems.length} disponible(s)</span>
@@ -225,7 +258,7 @@ export default function AssignItemsToSheetModal({
                       Orden <span className="font-semibold text-neutral-200">#{sale.saleNumber || 'S/N'}</span> • {customerName}
                       {item.customDimensions && <span> • Dim: {item.customDimensions}</span>}
                     </div>
-                    <div className="mt-1.5">
+                    <div className="mt-1.5 flex items-center justify-between gap-2 flex-wrap">
                       {isBlocked ? (
                         <div className="flex items-center gap-1.5 text-[11px] text-red-400 font-semibold" title="Prohibido meter a taller pedidos sin anticipo confirmado">
                           <Lock className="w-3.5 h-3.5 shrink-0 text-red-400" />
@@ -236,6 +269,21 @@ export default function AssignItemsToSheetModal({
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
                           <span>🟢 Anticipo Confirmado</span>
                         </div>
+                      )}
+
+                      {/* Botón Acelerador Ferial: Notificar al cliente por WhatsApp */}
+                      {sale.customer?.phone && (
+                        <a
+                          href={`https://wa.me/502${sale.customer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`¡Hola ${customerName}! Tu pedido #${sale.saleNumber || ''} de Deco Vintage ("${item.description}") ya está listo en taller.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="min-h-[36px] px-2.5 py-1 rounded-xl bg-emerald-950/60 border border-emerald-700/80 hover:bg-emerald-900 text-emerald-300 text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                          title="Avisar por WhatsApp al cliente"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>📲 Notificar por WhatsApp</span>
+                        </a>
                       )}
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma.js';
 import { generateSaleNumber } from './saleNumberGenerator.js';
+import { validateOfficialItemPrice } from '../catalog/catalogSizeResolver.js';
 
 /**
  * Busca o crea un cliente CRM de forma atómica e idempotente por (tenantId, phone).
@@ -24,36 +25,39 @@ export async function findOrCreateCustomer(tenantId, customerData, tx = prisma) 
       : existing;
   }
 
-  return await client.customer.create({
-    data: {
-      tenantId,
-      fullName: customerData.fullName?.trim(),
-      phone,
-      email: customerData.email?.trim() || null,
-      deliveryAddress: customerData.deliveryAddress?.trim() || null,
-      department: customerData.department?.trim() || null,
-      municipality: customerData.municipality?.trim() || null,
-      sourceChannel: customerData.sourceChannel || 'WHATSAPP',
-      notes: customerData.notes?.trim() || null,
-    },
-  });
+  try {
+    return await client.customer.create({
+      data: {
+        tenantId,
+        fullName: customerData.fullName?.trim(),
+        phone,
+        email: customerData.email?.trim() || null,
+        deliveryAddress: customerData.deliveryAddress?.trim() || null,
+        department: customerData.department?.trim() || null,
+        municipality: customerData.municipality?.trim() || null,
+        sourceChannel: customerData.sourceChannel || 'WHATSAPP',
+        notes: customerData.notes?.trim() || null,
+      },
+    });
+  } catch (err) {
+    if (err?.code === 'P2002') {
+      const recovered = await client.customer.findUnique({
+        where: { tenantId_phone: { tenantId, phone } },
+      });
+      if (recovered) return recovered;
+    }
+    throw err;
+  }
 }
 
-/**
- * Registro manual explícito de un cliente en CRM. Rechaza duplicados en el tenant con 409.
- */
 export async function createCustomer({ tenantId, customerData }) {
   const phone = customerData.phone?.trim();
-  const existing = await prisma.customer.findUnique({
-    where: { tenantId_phone: { tenantId, phone } },
-  });
-
+  const existing = await prisma.customer.findUnique({ where: { tenantId_phone: { tenantId, phone } } });
   if (existing) {
     const error = new Error(`Ya existe un cliente registrado con el número de teléfono/WhatsApp ${phone}`);
     error.statusCode = 409;
     throw error;
   }
-
   return await prisma.customer.create({
     data: {
       tenantId,
@@ -69,14 +73,10 @@ export async function createCustomer({ tenantId, customerData }) {
   });
 }
 
-/**
- * Búsqueda paginada y filtrado de clientes para CRM.
- */
-export async function getCustomersList({ tenantId, query, phone, page = 1, limit = 20 }) {
+export async function getCustomersList({ tenantId, query, phone, page = 1, limit = 50, offset = undefined }) {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
-  const take = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-  const skip = (pageNum - 1) * take;
-
+  const take = Math.min(Math.max(1, Number(limit) || 50), 100);
+  const skip = offset !== undefined ? Math.max(0, Number(offset) || 0) : (pageNum - 1) * take;
   const where = { tenantId };
   if (phone) {
     where.phone = { contains: phone.trim() };
@@ -87,56 +87,43 @@ export async function getCustomersList({ tenantId, query, phone, page = 1, limit
       { phone: { contains: trimmed } },
     ];
   }
-
   const [customers, total] = await Promise.all([
-    prisma.customer.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { sales: true } } },
-    }),
+    prisma.customer.findMany({ where, skip, take, orderBy: { createdAt: 'desc' }, include: { _count: { select: { sales: true } } } }),
     prisma.customer.count({ where }),
   ]);
-
   return { customers, total, page: pageNum, limit: take, totalPages: Math.ceil(total / take) };
 }
 
-/**
- * Ficha 360 del Cliente: datos de contacto, historial de pedidos y métricas contables (LTV, saldos).
- */
 export async function getCustomerById({ tenantId, customerId }) {
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, tenantId },
-    include: {
-      sales: {
-        orderBy: { createdAt: 'desc' },
-        include: { items: true, payments: true },
-      },
-    },
+    include: { sales: { orderBy: { createdAt: 'desc' }, include: { items: true, payments: true } } },
   });
-
   if (!customer) {
     const error = new Error('Cliente no encontrado');
     error.statusCode = 404;
     throw error;
   }
-
   const validSales = customer.sales.filter((s) => s.status !== 'ANULADA');
   const totalOrders = validSales.length;
   const ltv = validSales.reduce((acc, s) => acc + Number(s.totalAmount), 0);
   const pendingBalance = validSales.reduce((acc, s) => acc + Number(s.balanceDue), 0);
   const lastOrderDate = validSales.length > 0 ? validSales[0].createdAt : null;
-
   return {
     customer,
-    metrics: {
-      totalOrders,
-      ltv: Number(ltv.toFixed(2)),
-      pendingBalance: Number(pendingBalance.toFixed(2)),
-      lastOrderDate,
-    },
+    metrics: { totalOrders, ltv: Number(ltv.toFixed(2)), pendingBalance: Number(pendingBalance.toFixed(2)), lastOrderDate },
   };
+}
+
+async function findExistingRemoteSaleByKey(client, tenantId, idempotencyKey) {
+  const include = { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } };
+  if (typeof client.sale?.findFirst === 'function') {
+    return await client.sale.findFirst({ where: { tenantId, idempotencyKey }, include });
+  }
+  if (typeof client.sale?.findUnique === 'function') {
+    return await client.sale.findUnique({ where: { idempotencyKey }, include });
+  }
+  return null;
 }
 
 /**
@@ -145,28 +132,28 @@ export async function getCustomerById({ tenantId, customerId }) {
 export async function createRemoteSaleTransaction({ tenantId, sellerId, data, idempotencyKey = null }) {
   // Fast-Path Idempotencia RFC 7231
   if (idempotencyKey) {
-    const existingSale = await prisma.sale.findUnique({
-      where: { idempotencyKey },
-      include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
-    });
+    const existingSale = await findExistingRemoteSaleByKey(prisma, tenantId, idempotencyKey);
     if (existingSale) return { ...existingSale, idempotentReplay: true };
   }
 
   const eventId = data.eventId || 'evt-ventas-redes-online';
 
-  // 1. Aritmética Financiera Estricta
-  const itemsData = data.items.map((item) => ({
-    productId: item.productId || null,
-    description: item.description.trim(),
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    subtotal: Number((item.quantity * item.unitPrice).toFixed(2)),
-    isCustom: Boolean(item.isCustom),
-    material: item.material || null,
-    customDimensions: item.customDimensions || null,
-    customImageUrl: item.customImageUrl || null,
-    productionStatus: 'PENDIENTE',
-  }));
+  // 1. Aritmética Financiera Estricta y Validación de Precios
+  const itemsData = data.items.map((item) => {
+    validateOfficialItemPrice(item);
+    return {
+      productId: item.productId || null,
+      description: item.description.trim(),
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: Number((item.quantity * item.unitPrice).toFixed(2)),
+      isCustom: Boolean(item.isCustom),
+      material: item.material || null,
+      customDimensions: item.customDimensions || null,
+      customImageUrl: item.customImageUrl || null,
+      productionStatus: 'PENDIENTE',
+    };
+  });
 
   const itemsSubtotal = itemsData.reduce((acc, item) => acc + item.subtotal, 0);
   const discount = Number(data.discount || 0);
@@ -190,9 +177,18 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
     status = 'PENDIENTE';
     itemProductionStatus = 'PENDIENTE';
   } else {
+    if (paymentsTotal > totalAmount + 0.01) {
+      const error = new Error(
+        `El monto de pago registrado (Q ${paymentsTotal.toFixed(2)}) no puede superar el total de la orden (Q ${totalAmount.toFixed(2)}).`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
     // 2. Compuerta Inquebrantable del 50% de Anticipo cuando se incluye pago
     const requiredDeposit = Number((totalAmount * 0.50).toFixed(2));
-    if (paymentsTotal < requiredDeposit) {
+    const minProductDeposit = Number((productsAmount * 0.50).toFixed(2));
+    if (paymentsTotal < requiredDeposit && paymentsTotal < minProductDeposit) {
       const error = new Error(
         `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un anticipo de Q ${paymentsTotal.toFixed(2)}.`
       );
@@ -214,10 +210,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
   try {
     return await prisma.$transaction(async (tx) => {
       if (idempotencyKey) {
-        const existing = await tx.sale.findUnique({
-          where: { idempotencyKey },
-          include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
-        });
+        const existing = await findExistingRemoteSaleByKey(tx, tenantId, idempotencyKey);
         if (existing) return { ...existing, idempotentReplay: true };
       }
 
@@ -276,31 +269,67 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
       return sale;
     }, { maxWait: 15000, timeout: 30000 });
   } catch (err) {
-    if (idempotencyKey && (err.code === 'P2002' || err.message?.includes('idempotencyKey') || err.message?.includes('sales_idempotencyKey_key'))) {
-      const existing = await prisma.sale.findUnique({
-        where: { idempotencyKey },
-        include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
-      });
+    if (
+      idempotencyKey &&
+      (err.code === 'P2002' ||
+        err.message?.includes('idempotencyKey') ||
+        err.message?.includes('sales_idempotencyKey_key') ||
+        err.message?.includes('sales_tenantId_idempotencyKey_key'))
+    ) {
+      const existing = await findExistingRemoteSaleByKey(prisma, tenantId, idempotencyKey);
       if (existing) return { ...existing, idempotentReplay: true };
     }
     throw err;
   }
 }
 
+export const createRemoteOrder = createRemoteSaleTransaction;
+
 /**
  * Cobro y liquidación del saldo adeudado para despacho/entrega.
  */
-export async function registerBalancePayment({ saleId, tenantId, sellerId, payments, notes = null, tx = null }) {
+export async function registerBalancePayment({
+  saleId,
+  tenantId,
+  sellerId,
+  payments,
+  notes = null,
+  idempotencyKey = null,
+  userRole = null,
+  userRoles = null,
+  assignedEventId = null,
+  tx = null,
+}) {
   const executeOperation = async (client) => {
     const sale = await client.sale.findFirst({
       where: { id: saleId, tenantId },
-      include: { customer: true },
+      include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
     });
 
     if (!sale) {
       const error = new Error('Venta no encontrada');
       error.statusCode = 404;
       throw error;
+    }
+
+    const roles = Array.isArray(userRoles) && userRoles.length > 0 ? userRoles : (userRole ? [userRole] : []);
+    const isPrivileged = roles.includes('SUPER_ADMIN') || roles.includes('VENDEDOR_REDES');
+    if (assignedEventId && !isPrivileged && sale.orderType !== 'REDES_PERSONALIZADO' && sale.eventId !== assignedEventId && sale.pickupEventId !== assignedEventId) {
+      const error = new Error('No tienes permiso para cobrar el saldo de una venta fuera de tu evento asignado.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      const existingInSale = Array.isArray(sale.payments)
+        ? sale.payments.find((p) => p.idempotencyKey === idempotencyKey)
+        : null;
+      const existingPayment = existingInSale || (typeof client.salePayment?.findFirst === 'function'
+        ? await client.salePayment.findFirst({ where: { saleId: sale.id, idempotencyKey } })
+        : null);
+      if (existingPayment) {
+        return { ...sale, idempotentReplay: true };
+      }
     }
 
     if (sale.status === 'ANULADA') {
@@ -352,8 +381,49 @@ export async function registerBalancePayment({ saleId, tenantId, sellerId, payme
         newBalanceDue = Number((Number(sale.totalAmount) - newPaymentsTotal).toFixed(2));
         newDepositAmount = newPaymentsTotal;
       }
+    } else {
+      if (Number(Math.abs(newPaymentsTotal - currentBalance).toFixed(2)) > 0.05) {
+        const error = new Error(
+          `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      newPaymentStatus = 'PAGADO_TOTAL';
+      newStatus = 'COMPLETADA';
+      newBalanceDue = 0.0;
+      newDepositAmount = Number(sale.totalAmount);
+    }
 
-      // ACTIVACIÓN A TALLER: Actualizar los ítems de la venta a 'A_PRODUCCION'
+    const labelNote = isPendingPayment ? 'Anticipo registrado' : 'Saldo cobrado';
+    const updatedNotes = notes
+      ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`)
+      : sale.notes;
+
+    // Protección atómica contra condiciones de carrera concurrentes (TOCTOU)
+    if (typeof client.sale?.updateMany === 'function') {
+      const atomicGuard = await client.sale.updateMany({
+        where: {
+          id: sale.id,
+          tenantId,
+          balanceDue: { gte: Number((newPaymentsTotal - 0.05).toFixed(2)) },
+        },
+        data: {
+          balanceDue: newBalanceDue,
+          depositAmount: newDepositAmount,
+          paymentStatus: newPaymentStatus,
+          status: newStatus,
+          notes: updatedNotes,
+        },
+      });
+      if (atomicGuard && typeof atomicGuard.count === 'number' && atomicGuard.count === 0) {
+        const error = new Error('El saldo de este pedido ya fue liquidado o modificado por otra operación concurrente.');
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+
+    if (isPendingPayment) {
       const saleItems = await client.saleItem.findMany({
         where: { saleId: sale.id },
         select: { id: true, productionStatus: true },
@@ -377,30 +447,18 @@ export async function registerBalancePayment({ saleId, tenantId, sellerId, payme
           })),
         });
       }
-    } else {
-      if (Number(Math.abs(newPaymentsTotal - currentBalance).toFixed(2)) > 0.05) {
-        const error = new Error(
-          `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-      newPaymentStatus = 'PAGADO_TOTAL';
-      newStatus = 'COMPLETADA';
-      newBalanceDue = 0.0;
-      newDepositAmount = Number(sale.totalAmount);
     }
 
     await client.salePayment.createMany({
-      data: payments.map((p) => ({
-        saleId: sale.id, method: p.method, amount: p.amount, reference: p.reference || null, receiptUrl: p.receiptUrl || null,
+      data: payments.map((p, idx) => ({
+        saleId: sale.id,
+        method: p.method,
+        amount: p.amount,
+        reference: p.reference || null,
+        receiptUrl: p.receiptUrl || null,
+        idempotencyKey: idempotencyKey ? (idx === 0 ? idempotencyKey : `${idempotencyKey}-${idx}`) : null,
       })),
     });
-
-    const labelNote = isPendingPayment ? 'Anticipo registrado' : 'Saldo cobrado';
-    const updatedNotes = notes
-      ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`)
-      : sale.notes;
 
     const updatedSale = await client.sale.update({
       where: { id: sale.id },

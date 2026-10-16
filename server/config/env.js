@@ -37,7 +37,7 @@ export const envSchema = z.object({
     }),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_API_KEYS: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   GCS_BUCKET_NAME: z.string().default('deko-eventsales-media'),
   GCS_CREDENTIALS_BASE64: z.string().optional(),
   GCS_PROJECT_ID: z.string().optional(),
@@ -45,6 +45,7 @@ export const envSchema = z.object({
   DEFAULT_CURRENCY: z.string().default('GTQ'),
   DEFAULT_CURRENCY_SYMBOL: z.string().default('Q'),
   WEB_CATALOG_URL: z.string().default('https://decovintage.online'),
+  CATALOG_WEBHOOK_SECRET: z.string().min(16).optional(),
 });
 
 const rawEnv = {
@@ -73,7 +74,9 @@ if (!parsedEnv.success) {
   }
 }
 
-export const ENV = parsedEnv.success ? parsedEnv.data : {};
+export const ENV = parsedEnv.success
+  ? { ...parsedEnv.data, CATALOG_WEBHOOK_SECRET: parsedEnv.data.CATALOG_WEBHOOK_SECRET || '' }
+  : { CATALOG_WEBHOOK_SECRET: process.env.CATALOG_WEBHOOK_SECRET || '' };
 
 // 🛡️ REGLA PERMANENTE: CANDADO DE AISLAMIENTO ESTRICTO DE INFRAESTRUCTURA
 const FORBIDDEN_PATTERNS = ['145.223.120.56', 'catalog_db', 'admin_deco'];

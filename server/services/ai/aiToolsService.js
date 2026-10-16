@@ -55,7 +55,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
 
   const globalMsgSize = rawItems.length === 1 ? extractSizeFromText(userMessage) : null;
 
-  for (const it of rawItems) {
+  const itemResults = await Promise.all(rawItems.map(async (it) => {
     let rawName = String(it.productName || it.title || it.description || 'Póster').trim();
     const nameExtractedSize = extractSizeFromText(rawName);
     if (nameExtractedSize) {
@@ -134,43 +134,47 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
           ? `El diseño "${title}" es exclusivo en Portada de Álbum (30×30 cm a Q55.00). No se fabrica en ${requestedSizeToReport}.`
           : (matched.unavailableReason || `El diseño "${title}" no se fabrica en ${requestedSizeToReport}. Tamaños disponibles: ${availList}.`);
 
-        unmatchedItems.push({
-          rawName,
-          requestedSize: requestedSizeToReport,
-          quantity: qty,
-          sizeAvailable: false,
-          sizeConflict: true,
-          unavailableReason: customUnavailable,
-          availableSizes: matched.availableSizes || [],
-          candidates: [{
-            id: matched.posterId || matched.productId,
-            titulo: title,
-            subtitulo: customUnavailable,
-            categoria: matched.category,
-          }],
-        });
+        return {
+          unmatchedItem: {
+            rawName,
+            requestedSize: requestedSizeToReport,
+            quantity: qty,
+            sizeAvailable: false,
+            sizeConflict: true,
+            unavailableReason: customUnavailable,
+            availableSizes: matched.availableSizes || [],
+            candidates: [{
+              id: matched.posterId || matched.productId,
+              titulo: title,
+              subtitulo: customUnavailable,
+              categoria: matched.category,
+            }],
+          }
+        };
       } else {
         const finalNormSize = normalizeCatalogSizeId(matched.sizeId || 'MEDIANO');
         const unitPrice = finalNormSize === 'PORTADA_ALBUM' ? 55.0 : Number(matched.unitPrice || 65.0);
         const subtotal = Number((qty * unitPrice).toFixed(2));
-        grandTotal += subtotal;
-        enrichedItems.push({
-          productId: isUuid(matched?.productId) ? matched.productId : null,
-          webPosterId: matched.posterId || null,
-          description: matched.description || `${matched.baseTitle || rawName} (${matched.sizeName || finalNormSize})`,
-          baseTitle: matched.baseTitle || rawName,
-          category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
-          thumbUrl: matched.thumbUrl || null,
-          imageUrl: matched.imageUrl || null,
-          quantity: qty,
-          unitPrice,
-          subtotal,
-          sizeId: finalNormSize,
-          availableSizes: matched.availableSizes || [],
-          alternatives: Array.isArray(matched.alternatives) ? matched.alternatives : [],
-          sizeAvailable: true,
-          unavailableReason: null,
-        });
+        return {
+          enrichedItem: {
+            productId: isUuid(matched?.productId) ? matched.productId : null,
+            webPosterId: matched.posterId || null,
+            description: matched.description || `${matched.baseTitle || rawName} (${matched.sizeName || finalNormSize})`,
+            baseTitle: matched.baseTitle || rawName,
+            category: matched.category || (aliasRes.matched ? aliasRes.category : 'ARTE'),
+            thumbUrl: matched.thumbUrl || null,
+            imageUrl: matched.imageUrl || null,
+            quantity: qty,
+            unitPrice,
+            subtotal,
+            sizeId: finalNormSize,
+            availableSizes: matched.availableSizes || [],
+            alternatives: Array.isArray(matched.alternatives) ? matched.alternatives : [],
+            sizeAvailable: true,
+            unavailableReason: null,
+          },
+          subtotal
+        };
       }
     } else {
       let candidates = [];
@@ -202,17 +206,29 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
       } catch (err) {
         console.warn('[constructDraftPayload] Error buscando candidatos para obra no encontrada:', err.message);
       }
-      unmatchedItems.push({
-        rawName,
-        requestedSize: userSpecifiedSize || 'MEDIANO',
-        quantity: qty,
-        candidates: (candidates || []).map((c) => ({
-          id: c.id,
-          titulo: c.titulo,
-          subtitulo: c.subtitulo,
-          categoria: c.categoria,
-        })),
-      });
+      return {
+        unmatchedItem: {
+          rawName,
+          requestedSize: userSpecifiedSize || 'MEDIANO',
+          quantity: qty,
+          candidates: (candidates || []).map((c) => ({
+            id: c.id,
+            titulo: c.titulo,
+            subtitulo: c.subtitulo,
+            categoria: c.categoria,
+          })),
+        }
+      };
+    }
+  }));
+
+  for (const res of itemResults) {
+    if (res.enrichedItem) {
+      enrichedItems.push(res.enrichedItem);
+      grandTotal += res.subtotal;
+    }
+    if (res.unmatchedItem) {
+      unmatchedItems.push(res.unmatchedItem);
     }
   }
   const isAdditiveIntent = /\b(agrega|añade|suma|tambien|también|ademas|además|otro|otra|mas|más)\b/i.test(userMessage);
@@ -240,7 +256,7 @@ export async function executeGetCashDrawerStatus(tenantId, eventId) {
     let cash = 0, cashCnt = 0, card = 0, cardCnt = 0, transfer = 0, transferCnt = 0, other = 0, otherCnt = 0;
     (payments || []).forEach((p) => { const amt = Number(Number(p._sum?.amount || 0).toFixed(2)), c = p._count?.id || 0; if (p.method === 'EFECTIVO') { cash = amt; cashCnt = c; } else if (p.method === 'TARJETA') { card = amt; cardCnt = c; } else if (p.method === 'TRANSFERENCIA') { transfer = amt; transferCnt = c; } else { other += amt; otherCnt += c; } });
     let postCash = cash, postCnt = cashCnt;
-    if (lastClosing) { const postAgg = await prisma.salePayment?.aggregate?.({ where: { method: 'EFECTIVO', sale: { ...saleWhere, createdAt: { gt: lastClosing.createdAt } } }, _sum: { amount: true }, _count: { id: true } }); postCash = Number(Number(postAgg?._sum?.amount || 0).toFixed(2)); postCnt = postAgg?._count?.id || 0; }
+    if (lastClosing) { const cutoffDate = lastClosing.closingDate || lastClosing.createdAt; const postAgg = await prisma.salePayment?.aggregate?.({ where: { method: 'EFECTIVO', sale: { ...saleWhere, createdAt: { gt: cutoffDate } } }, _sum: { amount: true }, _count: { id: true } }); postCash = Number(Number(postAgg?._sum?.amount || 0).toFixed(2)); postCnt = postAgg?._count?.id || 0; }
     let lastClosingInfo = null;
     if (lastClosing) {
       const diff = Number(lastClosing.cashDifference || 0);
@@ -324,14 +340,35 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
     const matchedSizeInfo = foundSize || null;
     const targetSizeId = foundSize?.sizeId || 'MEDIANO';
     const isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
+
+    let standPhysicalStock = 0;
+    try {
+      const variant = await prisma.productVariant?.findFirst?.({
+        where: {
+          ...(tenantId ? { tenantId } : {}),
+          OR: [
+            { productId: primaryMatch.id, size: targetSizeId },
+            { posterId: primaryMatch.id, size: targetSizeId },
+          ],
+        },
+        select: { stock: true },
+      });
+      standPhysicalStock = variant && typeof variant.stock === 'number' ? Math.max(0, variant.stock) : (isDirectStock ? 5 : 0);
+    } catch {
+      standPhysicalStock = isDirectStock ? 5 : 0;
+    }
+
     const stockAvailability = {
       availableInCatalog: true,
       sizeSupported: isSizeSupported,
       unsupportedSizeMessage: !isSizeSupported ? `El diseño "${primaryMatch.titulo}" no se fabrica en ${requestedSizeNorm}. Formatos oficiales: ${allSizes.map(s => `${s.nombre} (${s.dimensiones || ''})`).join(', ')}.` : null,
-      standPhysicalStock: isDirectStock ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER',
-      estimatedWaitMinutes: isDirectStock ? 0 : 12,
+      standPhysicalStock,
+      stockAvailable: standPhysicalStock > 0,
+      unitsInStock: standPhysicalStock,
+      stockStatus: standPhysicalStock > 0 ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER',
+      estimatedWaitMinutes: standPhysicalStock > 0 ? 0 : 12,
       tallerCapability: 'Impresión bajo demanda en taller (~12 min)',
-      deliveryMode: isDirectStock ? 'Entrega inmediata en mostrador' : 'Producción personalizada en taller (~10-15 min)',
+      deliveryMode: standPhysicalStock > 0 ? `Entrega inmediata en mostrador (${standPhysicalStock} en stock)` : 'Producción personalizada en taller (~10-15 min)',
     };
     const fullArtworkTitle = primaryMatch.subtitulo ? `${primaryMatch.titulo} - ${primaryMatch.subtitulo}` : primaryMatch.titulo;
     return {

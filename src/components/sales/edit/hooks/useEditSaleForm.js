@@ -47,66 +47,75 @@ export default function useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated 
 
   const handleSaveChanges = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    if (items.length === 0) {
-      setErrorMsg('Debes incluir al menos un producto.');
-      return;
-    }
-    setIsSaving(true);
-    setErrorMsg(null);
+    if (items.length === 0) { setErrorMsg('Debes incluir al menos un producto.'); return; }
+    setIsSaving(true); setErrorMsg(null);
     try {
+      const originalPaymentsSum = (sale?.payments || []).reduce((acc, p) => acc + Number(p.amount || 0), 0);
+      const isMultiPayment = Array.isArray(sale?.payments) && sale.payments.length > 1;
+      const paymentMethodUnchanged = isMultiPayment && sale.payments[0]?.method === paymentMethod;
+      const totalUnchanged = Math.abs(originalPaymentsSum - grandTotal) <= 0.01;
+
+      const paymentsPayload = (isMultiPayment && paymentMethodUnchanged && totalUnchanged)
+        ? sale.payments.map((p) => ({
+            method: p.method,
+            amount: Number(p.amount),
+            reference: p.reference || notes || null,
+            receiptUrl: p.receiptUrl || null,
+          }))
+        : [{ method: paymentMethod, amount: Number(grandTotal.toFixed(2)), reference: notes || null }];
+
       const payload = {
         items: items.map((it) => ({
+          id: it.id || null,
           productId: it.productId || null,
           description: it.description,
           quantity: it.quantity,
           unitPrice: Number(it.unitPrice),
+          customImageUrl: it.customImageUrl || null,
+          productionNotes: it.productionNotes || null,
+          isCustom: Boolean(it.isCustom),
+          material: it.material || null,
+          customDimensions: it.customDimensions || null,
         })),
-        payments: [
-          {
-            method: paymentMethod,
-            amount: Number(grandTotal.toFixed(2)),
-            reference: notes || null,
-          },
-        ],
+        payments: paymentsPayload,
         discount: Number(discount || 0),
         notes: notes || null,
       };
-
       const res = await authFetch(`/api/sales/${sale.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Error al guardar los cambios.');
-      }
-
+      if (!res.ok || !json.success) throw new Error(json.error || 'Error al guardar los cambios.');
       const callback = onSaved || onSaleUpdated;
       if (callback) callback(json.data);
       if (onClose) onClose();
     } catch (err) {
-      console.error('Error editando venta:', err);
       setErrorMsg(err.message);
-    } finally {
-      setIsSaving(false);
-    }
+    } finally { setIsSaving(false); }
+  };
+
+  const handleCancelSale = async () => {
+    setIsSaving(true); setErrorMsg(null);
+    try {
+      const res = await authFetch(`/api/sales/${sale.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ANULADA', notes: notes || 'Venta anulada en mostrador' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Error al anular la venta.');
+      const callback = onSaved || onSaleUpdated;
+      if (callback) callback(json.data);
+      if (onClose) onClose();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally { setIsSaving(false); }
   };
 
   return {
-    paymentMethod,
-    setPaymentMethod,
-    items,
-    discount,
-    setDiscount,
-    notes,
-    setNotes,
-    isSaving,
-    errorMsg,
-    grandTotal,
-    handleUpdateQuantity,
-    handleRemoveItem,
-    handleSaveChanges,
+    paymentMethod, setPaymentMethod, items, discount, setDiscount, notes, setNotes,
+    isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleRemoveItem, handleSaveChanges, handleCancelSale,
   };
 }
