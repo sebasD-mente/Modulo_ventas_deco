@@ -1,7 +1,4 @@
-import {
-  processVoiceSaleAudio, processPostersBatchPhoto,
-  recognizePosterArtworkFromImage, recognizePostersFromVideo,
-} from '../../services/aiMultimodalService.js';
+import { processVoiceSaleAudio, processPostersBatchPhoto, recognizePosterArtworkFromImage, recognizePostersFromVideo } from '../../services/aiMultimodalService.js';
 import { verifyDepositReceipt } from '../../services/ai/aiReceiptOcrService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
@@ -12,15 +9,12 @@ async function safePersistMedia(file, defaultName, defaultMime, folder) {
   let timerId;
   try {
     const uploadPromise = uploadBufferToStorage({ buffer: file.buffer, originalname: file.originalname || defaultName, mimetype: file.mimetype || defaultMime, folder });
-    const timeoutPromise = new Promise((resolve) => { timerId = setTimeout(() => resolve(null), 2500); });
-    const uploadRes = await Promise.race([uploadPromise, timeoutPromise]);
+    const uploadRes = await Promise.race([uploadPromise, new Promise((resolve) => { timerId = setTimeout(() => resolve(null), 2500); })]);
     return uploadRes?.url || null;
   } catch (gcsErr) {
     console.warn(`⚠️ [GCS Warning] No se pudo persistir en ${folder}:`, gcsErr.message);
     return null;
-  } finally {
-    if (timerId) clearTimeout(timerId);
-  }
+  } finally { if (timerId) clearTimeout(timerId); }
 }
 
 function parseDraftInput(rawDraft) {
@@ -34,11 +28,8 @@ function parseDraftInput(rawDraft) {
 
 export async function handleVoiceSale(req, res) {
   try {
-    const file = req.file;
-    const eventId = req.body?.eventId;
-    const sessionId = req.body?.sessionId;
-    const rawDraft = req.body?.pendingDraft;
-    const tenantId = req.tenantId;
+    const { file, body, tenantId } = req;
+    const { eventId, sessionId, pendingDraft: rawDraft } = body || {};
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún archivo de audio.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -89,9 +80,8 @@ export async function handleVoiceSale(req, res) {
 
 export async function handleBatchPhoto(req, res) {
   try {
-    const file = req.file;
-    const eventId = req.body?.eventId;
-    const tenantId = req.tenantId;
+    const { file, body, tenantId } = req;
+    const eventId = body?.eventId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -128,9 +118,8 @@ export async function handleBatchPhoto(req, res) {
 
 export async function handleArtworkRecognition(req, res) {
   try {
-    const file = req.file;
-    const eventId = req.body?.eventId;
-    const tenantId = req.tenantId;
+    const { file, body, tenantId } = req;
+    const eventId = body?.eventId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen de la obra.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -149,8 +138,7 @@ export async function handleArtworkRecognition(req, res) {
     if (analysis.isArtworkDetected === false || !analysis.items?.length) {
       return res.json({
         success: true, imageUrl, draftSale: null, isArtworkDetected: false,
-        primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis,
-        candidates: analysis.candidates || [],
+        primaryTitle: analysis.primaryTitle, visualAnalysis: analysis.visualAnalysis, candidates: analysis.candidates || [],
         message: analysis.message || 'La obra fotografiada no pertenece al catálogo oficial de Deco Vintage Guate o no se identificó con certeza. Puedes buscarla manualmente en el catálogo.',
       });
     }
@@ -174,9 +162,8 @@ export async function handleArtworkRecognition(req, res) {
 
 export async function handleVideoRecognition(req, res) {
   try {
-    const file = req.file;
-    const eventId = req.body?.eventId;
-    const tenantId = req.tenantId;
+    const { file, body, tenantId } = req;
+    const eventId = body?.eventId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún clip de video.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -214,24 +201,13 @@ export async function handleVerifyReceipt(req, res) {
   try {
     const { receiptUrl, expectedAmount } = req.body || {};
     const tenantId = req.tenantId;
-    if (!receiptUrl) {
-      return res.status(400).json({ success: false, error: 'receiptUrl es obligatorio para verificar el comprobante.' });
-    }
+    if (!receiptUrl) return res.status(400).json({ success: false, error: 'receiptUrl es obligatorio para verificar el comprobante.' });
     const t0Ocr = Date.now();
-    const result = await verifyDepositReceipt({
-      imageUrl: receiptUrl,
-      expectedAmount: Number(expectedAmount) || 0,
-      tenantId,
-    });
+    const result = await verifyDepositReceipt({ imageUrl: receiptUrl, expectedAmount: Number(expectedAmount) || 0, tenantId });
     recordLlmInteraction({
-      tenantId,
-      userId: req.userId || null,
-      action: 'AI_RECEIPT_OCR',
-      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
-      tokensIn: null,
-      tokensOut: null,
-      latencyMs: Date.now() - t0Ocr,
-      ipAddress: req.ip,
+      tenantId, userId: req.userId || null, action: 'AI_RECEIPT_OCR',
+      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      latencyMs: Date.now() - t0Ocr, ipAddress: req.ip,
       details: { isMatch: result.isMatch, bank: result.bank, referenceNumber: result.referenceNumber },
     });
     return res.json({ success: true, ...result });
