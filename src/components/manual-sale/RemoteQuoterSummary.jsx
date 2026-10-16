@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Calculator, Smartphone, CreditCard, Banknote, AlertTriangle, CheckCircle2, Loader2, DollarSign, Upload, X, Clock, Zap, Search } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const PAYMENT_METHODS = [
   { id: 'TRANSFERENCIA', label: 'Transferencia', icon: Smartphone },
@@ -19,6 +20,9 @@ export default function RemoteQuoterSummary({
   const isInsufficient = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit < minDeposit;
   const isPaidTotal = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit >= totalAmount;
 
+  const authContext = useAuth ? useAuth() : null;
+  const authFetch = authContext?.authFetch || window.fetch.bind(window);
+
   const [isVerifyingOcr, setIsVerifyingOcr] = useState(false);
   const [ocrResult, setOcrResult] = useState(null);
 
@@ -27,25 +31,23 @@ export default function RemoteQuoterSummary({
     setIsVerifyingOcr(true);
     setOcrResult(null);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      const refNum = depositReference && !isNaN(Number(depositReference)) ? Number(depositReference) : null;
-      const detectedAmount = Number(refNum || numericDeposit || 100);
-      const isMatch = Math.abs(detectedAmount - numericDeposit) < 0.01;
-      setOcrResult({
-        detectedAmount,
-        expectedAmount: numericDeposit,
-        isMatch,
-        bank: depositPaymentMethod === 'TRANSFERENCIA' ? 'Banco Industrial / BI' : 'Pago Electrónico',
-        summary: isMatch
-          ? `✓ Boleta válida por Q ${detectedAmount.toFixed(2)} (Coincide con anticipo)`
-          : `⚠️ Discrepancia: Boleta detectada por Q ${detectedAmount.toFixed(2)} vs Anticipo Q ${numericDeposit.toFixed(2)}`,
+      const res = await authFetch('/api/ai/verify-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptUrl: depositReceiptUrl, expectedAmount: numericDeposit }),
       });
-    } catch {
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Error verificando comprobante');
+      setOcrResult(data);
+      if (data.referenceNumber && !depositReference && setDepositReference) {
+        setDepositReference(data.referenceNumber);
+      }
+    } catch (err) {
       setOcrResult({
-        detectedAmount: numericDeposit,
+        detectedAmount: 0,
         expectedAmount: numericDeposit,
-        isMatch: true,
-        summary: `✓ Boleta verificada por Q ${numericDeposit.toFixed(2)}`,
+        isMatch: false,
+        summary: `⚠️ Fallo en OCR: ${err.message}`,
       });
     } finally {
       setIsVerifyingOcr(false);
@@ -251,18 +253,26 @@ export default function RemoteQuoterSummary({
                   </button>
 
                   {ocrResult && (
-                    <div className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                    <div className={`p-2.5 rounded-xl border text-xs space-y-1.5 ${
                       ocrResult.isMatch
                         ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-                        : 'bg-amber-950/40 border-amber-800 text-amber-300'
+                        : 'bg-red-950/40 border-red-800 text-red-300'
                     }`}>
-                      <div className="flex items-center gap-2">
-                        {ocrResult.isMatch ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />}
-                        <span className="font-semibold">{ocrResult.summary}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {ocrResult.isMatch ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />}
+                          <span className="font-semibold truncate">{ocrResult.summary}</span>
+                        </div>
+                        <span className="font-mono font-bold text-[11px] shrink-0 bg-black/60 px-2 py-0.5 rounded border border-neutral-700">
+                          Q {ocrResult.detectedAmount !== undefined ? ocrResult.detectedAmount.toFixed(2) : '0.00'}
+                        </span>
                       </div>
-                      <span className="font-mono font-bold text-[11px] shrink-0 bg-black/60 px-2 py-0.5 rounded border border-neutral-700">
-                        Q {ocrResult.detectedAmount.toFixed(2)}
-                      </span>
+                      {(ocrResult.bank || ocrResult.referenceNumber) && (
+                        <div className="flex items-center justify-between text-[11px] text-neutral-400 pt-1 border-t border-neutral-800/80 font-mono">
+                          <span>Banco: <strong className="text-white">{ocrResult.bank || 'No detectado'}</strong></span>
+                          <span>Ref: <strong className="text-amber-300">{ocrResult.referenceNumber || 'S/N'}</strong></span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

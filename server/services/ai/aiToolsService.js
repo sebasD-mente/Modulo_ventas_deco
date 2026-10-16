@@ -339,7 +339,6 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
     const isSizeSupported = requestedSizeNorm ? Boolean(foundSize) : true;
     const matchedSizeInfo = foundSize || null;
     const targetSizeId = foundSize?.sizeId || 'MEDIANO';
-    const isDirectStock = ['MEDIANO', 'PORTADA_ALBUM', 'PEQUENO', 'MINI'].includes(targetSizeId);
 
     let standPhysicalStock = 0;
     try {
@@ -353,9 +352,9 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
         },
         select: { stock: true },
       });
-      standPhysicalStock = variant && typeof variant.stock === 'number' ? Math.max(0, variant.stock) : (isDirectStock ? 5 : 0);
+      standPhysicalStock = variant && typeof variant.stock === 'number' ? Math.max(0, variant.stock) : 0;
     } catch {
-      standPhysicalStock = isDirectStock ? 5 : 0;
+      standPhysicalStock = 0;
     }
 
     const stockAvailability = {
@@ -367,10 +366,13 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
       unitsInStock: standPhysicalStock,
       stockStatus: standPhysicalStock > 0 ? 'DISPONIBLE_MOSTRADOR' : 'PRODUCCION_TALLER',
       estimatedWaitMinutes: standPhysicalStock > 0 ? 0 : 12,
-      tallerCapability: 'Impresión bajo demanda en taller (~12 min)',
-      deliveryMode: standPhysicalStock > 0 ? `Entrega inmediata en mostrador (${standPhysicalStock} en stock)` : 'Producción personalizada en taller (~10-15 min)',
+      tallerCapability: 'Impresión bajo demanda en taller (~10-15 min)',
+      deliveryMode: standPhysicalStock > 0 ? `Entrega inmediata en mostrador (${standPhysicalStock} en stock)` : 'Impresión bajo demanda en taller (~10-15 min)',
     };
     const fullArtworkTitle = primaryMatch.subtitulo ? `${primaryMatch.titulo} - ${primaryMatch.subtitulo}` : primaryMatch.titulo;
+    const sellerStockInfo = standPhysicalStock > 0
+      ? `Entrega inmediata en mostrador (${standPhysicalStock} en stock)`
+      : 'Esta obra no tiene stock físico para entrega inmediata en el stand; se enviará a impresión en taller (tiempo estimado: 10-15 min)';
     return {
       found: true,
       query: cleanQuery,
@@ -380,7 +382,7 @@ export async function executeCheckInventoryStock(tenantId, query, sizeId = null,
       stockAvailability,
       eventStockHistory: null,
       suggestedPosters: matches,
-      summary: !isSizeSupported ? stockAvailability.unsupportedSizeMessage : `🎨 Disponibilidad — "${fullArtworkTitle}": ${stockAvailability.deliveryMode}.`,
+      summary: !isSizeSupported ? stockAvailability.unsupportedSizeMessage : `🎨 Disponibilidad — "${fullArtworkTitle}": ${sellerStockInfo}.`,
     };
   } catch (err) {
     return { found: false, query: query.trim(), message: `Error consultando stock: ${err.message}`, availableInCatalog: false, suggestedPosters: [] };

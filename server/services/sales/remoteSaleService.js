@@ -371,49 +371,30 @@ export async function registerBalancePayment({
 
       const isFull = Math.abs(newPaymentsTotal - currentBalance) <= 0.05 || newPaymentsTotal >= currentBalance;
       if (isFull) {
-        newPaymentStatus = 'PAGADO_TOTAL';
-        newStatus = 'COMPLETADA';
-        newBalanceDue = 0.0;
-        newDepositAmount = Number(sale.totalAmount);
+        newPaymentStatus = 'PAGADO_TOTAL'; newStatus = 'COMPLETADA'; newBalanceDue = 0.0; newDepositAmount = Number(sale.totalAmount);
       } else {
-        newPaymentStatus = 'ANTICIPO_PAGADO';
-        newStatus = 'PENDIENTE';
-        newBalanceDue = Number((Number(sale.totalAmount) - newPaymentsTotal).toFixed(2));
-        newDepositAmount = newPaymentsTotal;
+        newPaymentStatus = 'ANTICIPO_PAGADO'; newStatus = 'PENDIENTE'; newBalanceDue = Number((Number(sale.totalAmount) - newPaymentsTotal).toFixed(2)); newDepositAmount = newPaymentsTotal;
       }
     } else {
       if (Number(Math.abs(newPaymentsTotal - currentBalance).toFixed(2)) > 0.05) {
-        const error = new Error(
-          `El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`
-        );
+        const error = new Error(`El monto pagado (Q ${newPaymentsTotal.toFixed(2)}) no coincide con el saldo adeudado de la orden (Q ${currentBalance.toFixed(2)})`);
         error.statusCode = 400;
         throw error;
       }
-      newPaymentStatus = 'PAGADO_TOTAL';
-      newStatus = 'COMPLETADA';
-      newBalanceDue = 0.0;
-      newDepositAmount = Number(sale.totalAmount);
+      newPaymentStatus = 'PAGADO_TOTAL'; newStatus = 'COMPLETADA'; newBalanceDue = 0.0; newDepositAmount = Number(sale.totalAmount);
     }
 
     const labelNote = isPendingPayment ? 'Anticipo registrado' : 'Saldo cobrado';
-    const updatedNotes = notes
-      ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`)
-      : sale.notes;
+    const updatedNotes = notes ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`) : sale.notes;
+    const shouldAssignPickup = Boolean(assignedEventId && !sale.pickupEventId);
 
     // Protección atómica contra condiciones de carrera concurrentes (TOCTOU)
     if (typeof client.sale?.updateMany === 'function') {
       const atomicGuard = await client.sale.updateMany({
-        where: {
-          id: sale.id,
-          tenantId,
-          balanceDue: { gte: Number((newPaymentsTotal - 0.05).toFixed(2)) },
-        },
+        where: { id: sale.id, tenantId, balanceDue: { gte: Number((newPaymentsTotal - 0.05).toFixed(2)) } },
         data: {
-          balanceDue: newBalanceDue,
-          depositAmount: newDepositAmount,
-          paymentStatus: newPaymentStatus,
-          status: newStatus,
-          notes: updatedNotes,
+          balanceDue: newBalanceDue, depositAmount: newDepositAmount, paymentStatus: newPaymentStatus, status: newStatus, notes: updatedNotes,
+          ...(shouldAssignPickup ? { pickupEventId: assignedEventId } : {}),
         },
       });
       if (atomicGuard && typeof atomicGuard.count === 'number' && atomicGuard.count === 0) {
@@ -424,25 +405,15 @@ export async function registerBalancePayment({
     }
 
     if (isPendingPayment) {
-      const saleItems = await client.saleItem.findMany({
-        where: { saleId: sale.id },
-        select: { id: true, productionStatus: true },
-      });
+      const saleItems = await client.saleItem.findMany({ where: { saleId: sale.id }, select: { id: true, productionStatus: true } });
       await client.saleItem.updateMany({
         where: { saleId: sale.id },
-        data: {
-          productionStatus: 'A_PRODUCCION',
-          statusChangedAt: new Date(),
-          statusChangedById: sellerId || null,
-        },
+        data: { productionStatus: 'A_PRODUCCION', statusChangedAt: new Date(), statusChangedById: sellerId || null },
       });
       if (saleItems.length > 0) {
         await client.productionLog.createMany({
           data: saleItems.map((it) => ({
-            saleItemId: it.id,
-            previousStatus: it.productionStatus,
-            newStatus: 'A_PRODUCCION',
-            userId: sellerId || null,
+            saleItemId: it.id, previousStatus: it.productionStatus, newStatus: 'A_PRODUCCION', userId: sellerId || null,
             notes: `Activación a taller por acreditación de depósito (Q ${newPaymentsTotal.toFixed(2)})`,
           })),
         });
@@ -451,11 +422,7 @@ export async function registerBalancePayment({
 
     await client.salePayment.createMany({
       data: payments.map((p, idx) => ({
-        saleId: sale.id,
-        method: p.method,
-        amount: p.amount,
-        reference: p.reference || null,
-        receiptUrl: p.receiptUrl || null,
+        saleId: sale.id, method: p.method, amount: p.amount, reference: p.reference || null, receiptUrl: p.receiptUrl || null,
         idempotencyKey: idempotencyKey ? (idx === 0 ? idempotencyKey : `${idempotencyKey}-${idx}`) : null,
       })),
     });
@@ -463,11 +430,8 @@ export async function registerBalancePayment({
     const updatedSale = await client.sale.update({
       where: { id: sale.id },
       data: {
-        balanceDue: newBalanceDue,
-        depositAmount: newDepositAmount,
-        paymentStatus: newPaymentStatus,
-        status: newStatus,
-        notes: updatedNotes,
+        balanceDue: newBalanceDue, depositAmount: newDepositAmount, paymentStatus: newPaymentStatus, status: newStatus, notes: updatedNotes,
+        ...(shouldAssignPickup ? { pickupEventId: assignedEventId } : {}),
       },
       include: { items: true, payments: true, customer: true, seller: { select: { id: true, fullName: true, email: true } } },
     });

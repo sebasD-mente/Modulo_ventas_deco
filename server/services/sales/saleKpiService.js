@@ -66,8 +66,15 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
   const paymentWhere = {
     sale: {
       status: { not: 'ANULADA' },
-      ...(eventId ? { eventId } : {}),
       ...(tenantId ? { tenantId } : {}),
+      ...(eventId
+        ? {
+            OR: [
+              { eventId },
+              { pickupEventId: eventId },
+            ],
+          }
+        : {}),
     },
   };
 

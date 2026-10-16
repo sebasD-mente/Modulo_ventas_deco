@@ -85,6 +85,14 @@ export async function handleChatQuery(req, res) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.flushHeaders?.();
 
+    let fullText = '';
+    let isClientClosed = false;
+    let currentDraft = effectivePendingDraft;
+
+    req.on('close', () => {
+      isClientClosed = true;
+    });
+
     const writeSse = (payload) => {
       if (!isClientClosed && !res.writableEnded && !res.destroyed) {
         res.write(payload);
@@ -93,9 +101,6 @@ export async function handleChatQuery(req, res) {
     };
 
     writeSse(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`);
-
-    let fullText = '', isClientClosed = false, currentDraft = effectivePendingDraft;
-    req.on('close', () => { isClientClosed = true; });
     const t0Stream = Date.now();
 
     try {
@@ -154,7 +159,7 @@ export async function handleChatQuery(req, res) {
     console.error('❌ Error en handleChatQuery:', err);
     if (!res.headersSent) {
       return res.status(500).json({ success: false, error: err.message || 'Error comunicándose con el asistente de IA.' });
-    } else {
+    } else if (!res.writableEnded && !res.destroyed) {
       res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
       res.end();
     }

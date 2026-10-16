@@ -41,14 +41,14 @@ export default function ChatInputBar({
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); onSendText?.(); }} className="flex items-center gap-2 sm:gap-2.5">
           <button
-            type="button" onClick={onStartRecording} disabled={isLoading} title="Dictar venta por voz"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:opacity-40 cursor-pointer shrink-0 active:scale-95 shadow-md"
+            type="button" onClick={onStartRecording} title="Dictar venta por voz"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-md"
           >
             <Mic className="w-5 h-5 text-white" />
           </button>
           <button
-            type="button" onClick={() => fileInputRef.current?.click()} disabled={isLoading} title="Tomar foto del arte del póster"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all disabled:opacity-40 cursor-pointer shrink-0 active:scale-95 shadow-md"
+            type="button" onClick={() => fileInputRef.current?.click()} title="Tomar foto del arte del póster"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-black hover:bg-neutral-800 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-md"
           >
             <Camera className="w-5 h-5 text-white" />
           </button>

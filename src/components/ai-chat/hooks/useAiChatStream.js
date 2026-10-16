@@ -107,6 +107,10 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   };
 
   const uploadMedia = async (url, form, userText, note, onDone) => {
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort(); } catch (_) {}
+      abortControllerRef.current = null;
+    }
     setIsLoading(true); setProcessingNote(note); setAiError(null); setMessages((p) => [...p, { id: genId(), sender: 'user', text: userText, timestamp: getNow() }]);
     try {
       const res = await authFetch(url, { method: 'POST', body: form }), data = await res.json();
@@ -254,8 +258,12 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
   };
 
   const handleSendText = async (customText = null) => {
-    const query = (customText || inputText).trim(); if (!query || isLoading) return;
-    setInputText(''); setAiError(null); const userMsgId = genId(), aiMsgId = genId();
+    const query = (customText || inputText).trim(); if (!query) return;
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort(); } catch (_) {}
+      abortControllerRef.current = null;
+    }
+    setIsLoading(true); setInputText(''); setAiError(null); const userMsgId = genId(), aiMsgId = genId();
     setMessages((p) => [...p, { id: userMsgId, sender: 'user', text: query, timestamp: getNow() }, { id: aiMsgId, sender: 'ai', text: '', isStreaming: true, suggestedPosters: [], timestamp: getNow() }]);
     const updateAiMsg = (updater) => setMessages((p) => p.map((m) => (m.sender === 'ai' && m.id === aiMsgId ? updater(m) : m)));
     const controller = new AbortController(); abortControllerRef.current = controller; const circuitBreakerTimeout = setTimeout(() => controller.abort(), 25000);

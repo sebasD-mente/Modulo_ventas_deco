@@ -17,4 +17,5 @@ export {
   handleBatchPhoto,
   handleArtworkRecognition,
   handleVideoRecognition,
+  handleVerifyReceipt,
 } from './ai/aiMediaController.js';

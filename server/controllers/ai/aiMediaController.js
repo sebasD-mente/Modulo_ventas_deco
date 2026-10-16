@@ -2,6 +2,7 @@ import {
   processVoiceSaleAudio, processPostersBatchPhoto,
   recognizePosterArtworkFromImage, recognizePostersFromVideo,
 } from '../../services/aiMultimodalService.js';
+import { verifyDepositReceipt } from '../../services/ai/aiReceiptOcrService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
 import { getSessionState, saveSessionState } from '../../services/ai/aiSessionService.js';
@@ -33,7 +34,11 @@ function parseDraftInput(rawDraft) {
 
 export async function handleVoiceSale(req, res) {
   try {
-    const { file, body: { eventId, sessionId, pendingDraft: rawDraft } = {}, tenantId } = req;
+    const file = req.file;
+    const eventId = req.body?.eventId;
+    const sessionId = req.body?.sessionId;
+    const rawDraft = req.body?.pendingDraft;
+    const tenantId = req.tenantId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún archivo de audio.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -84,7 +89,9 @@ export async function handleVoiceSale(req, res) {
 
 export async function handleBatchPhoto(req, res) {
   try {
-    const { file, body: { eventId }, tenantId } = req;
+    const file = req.file;
+    const eventId = req.body?.eventId;
+    const tenantId = req.tenantId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -121,7 +128,9 @@ export async function handleBatchPhoto(req, res) {
 
 export async function handleArtworkRecognition(req, res) {
   try {
-    const { file, body: { eventId }, tenantId } = req;
+    const file = req.file;
+    const eventId = req.body?.eventId;
+    const tenantId = req.tenantId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ninguna imagen de la obra.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -165,7 +174,9 @@ export async function handleArtworkRecognition(req, res) {
 
 export async function handleVideoRecognition(req, res) {
   try {
-    const { file, body: { eventId }, tenantId } = req;
+    const file = req.file;
+    const eventId = req.body?.eventId;
+    const tenantId = req.tenantId;
     if (!file) return res.status(400).json({ success: false, error: 'No se recibió ningún clip de video.' });
     if (!eventId) return res.status(400).json({ success: false, error: 'El ID del evento es obligatorio.' });
 
@@ -196,5 +207,36 @@ export async function handleVideoRecognition(req, res) {
   } catch (err) {
     console.error('❌ Error en handleVideoRecognition:', err);
     return res.status(500).json({ success: false, error: err.message || 'Error analizando video de pósters.' });
+  }
+}
+
+export async function handleVerifyReceipt(req, res) {
+  try {
+    const { receiptUrl, expectedAmount } = req.body || {};
+    const tenantId = req.tenantId;
+    if (!receiptUrl) {
+      return res.status(400).json({ success: false, error: 'receiptUrl es obligatorio para verificar el comprobante.' });
+    }
+    const t0Ocr = Date.now();
+    const result = await verifyDepositReceipt({
+      imageUrl: receiptUrl,
+      expectedAmount: Number(expectedAmount) || 0,
+      tenantId,
+    });
+    recordLlmInteraction({
+      tenantId,
+      userId: req.userId || null,
+      action: 'AI_RECEIPT_OCR',
+      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+      tokensIn: null,
+      tokensOut: null,
+      latencyMs: Date.now() - t0Ocr,
+      ipAddress: req.ip,
+      details: { isMatch: result.isMatch, bank: result.bank, referenceNumber: result.referenceNumber },
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('❌ Error en handleVerifyReceipt:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Error verificando comprobante bancario.' });
   }
 }

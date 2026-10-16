@@ -258,7 +258,7 @@ export async function createSettlementTransaction({ tenantId, sellerId, saleIds,
             commissionSettlementId: null,
             commissionPaid: false,
           },
-          data: { commissionSettlementId: settlement.id, commissionPaid: true },
+          data: { commissionSettlementId: settlement.id, commissionPaid: false },
         });
         if (updatedSales && typeof updatedSales.count === 'number' && updatedSales.count !== sales.length) {
           throw createHttpError('Una o más ventas ya fueron incluidas en otra liquidación concurrente.', 409);
@@ -396,4 +396,50 @@ export async function getSettlementById({ tenantId, settlementId }) {
 
   if (!settlement) throw createHttpError('Liquidación no encontrada.', 404);
   return settlement;
+}
+
+/**
+ * Rechaza una liquidación pendiente y libera las ventas asociadas
+ */
+export async function rejectSettlement({ tenantId, settlementId, userId, reason }) {
+  return prisma.$transaction(async (tx) => {
+    const settlement = await tx.commissionSettlement.findFirst({ where: { id: settlementId, tenantId } });
+    if (!settlement) throw createHttpError('Liquidación no encontrada.', 404);
+    if (settlement.status === 'PAGADO') throw createHttpError('No se puede rechazar una liquidación ya pagada.', 400);
+
+    const updated = await tx.commissionSettlement.update({
+      where: { id: settlementId },
+      data: { status: 'RECHAZADA', notes: reason ? `${settlement.notes ? settlement.notes + ' | ' : ''}Rechazada: ${reason}` : settlement.notes },
+    });
+    if (typeof tx.sale?.updateMany === 'function') {
+      await tx.sale.updateMany({
+        where: { commissionSettlementId: settlement.id, tenantId },
+        data: { commissionSettlementId: null, commissionPaid: false },
+      });
+    }
+    return updated;
+  });
+}
+
+/**
+ * Anula una liquidación pendiente y libera las ventas asociadas
+ */
+export async function cancelSettlement({ tenantId, settlementId, userId, reason }) {
+  return prisma.$transaction(async (tx) => {
+    const settlement = await tx.commissionSettlement.findFirst({ where: { id: settlementId, tenantId } });
+    if (!settlement) throw createHttpError('Liquidación no encontrada.', 404);
+    if (settlement.status === 'PAGADO') throw createHttpError('No se puede anular una liquidación ya pagada.', 400);
+
+    const updated = await tx.commissionSettlement.update({
+      where: { id: settlementId },
+      data: { status: 'ANULADA', notes: reason ? `${settlement.notes ? settlement.notes + ' | ' : ''}Anulada: ${reason}` : settlement.notes },
+    });
+    if (typeof tx.sale?.updateMany === 'function') {
+      await tx.sale.updateMany({
+        where: { commissionSettlementId: settlement.id, tenantId },
+        data: { commissionSettlementId: null, commissionPaid: false },
+      });
+    }
+    return updated;
+  });
 }

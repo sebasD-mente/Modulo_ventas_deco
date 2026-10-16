@@ -83,6 +83,7 @@ import {
   handleUpdateSessionDraft,
   handleArtworkRecognition,
   handleVideoRecognition,
+  handleVerifyReceipt,
 } from '../controllers/aiController.js';
 
 import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
@@ -321,6 +322,11 @@ router.post(
   upload.single('video'),
   requireEventAccess,
   handleVideoRecognition
+);
+router.post(
+  '/ai/verify-receipt',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  handleVerifyReceipt
 );
 router.post(
   '/ai/chat',
