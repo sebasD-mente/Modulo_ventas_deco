@@ -5,26 +5,18 @@ export { getMonitorDashboardMetrics } from './monitorKpiService.js';
 /**
  * Retorna el rango civil exacto de inicio y fin de un día en la zona horaria oficial America/Guatemala (UTC-6).
  */
-export function getGuatemalaDayRange(dateStr = null) {
+export function getGuatemalaDayRange(dateInput = null) {
   let targetDate;
-  if (!dateStr) {
+  if (!dateInput) {
     targetDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
-  } else if (dateStr instanceof Date) {
-    targetDate = !Number.isNaN(dateStr.getTime())
-      ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(dateStr)
+  } else if (dateInput instanceof Date) {
+    targetDate = !Number.isNaN(dateInput.getTime())
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(dateInput)
       : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
   } else {
-    const raw = String(dateStr).trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-      targetDate = raw.slice(0, 10);
-    } else {
-      const parsed = new Date(raw);
-      targetDate = !Number.isNaN(parsed.getTime())
-        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(parsed)
-        : raw.split('T')[0];
-    }
+    const raw = String(dateInput).trim();
+    targetDate = raw.includes('T') ? raw.split('T')[0] : raw.slice(0, 10);
   }
-
   const startOfDay = new Date(`${targetDate}T00:00:00.000-06:00`);
   const endOfDay = new Date(`${targetDate}T23:59:59.999-06:00`);
   return { targetDate, startOfDay, endOfDay };

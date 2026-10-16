@@ -16,7 +16,7 @@ export default function ProductionManagementView() {
 
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl text-white max-w-2xl mx-auto space-y-6 select-none">
-      {/* Selector Maestro: Cola de Producción vs Pliegos Diarios */}
+      {/* Selector Maestro: Cola de Ítems Individuales vs Pliegos de Impresión (Taller) */}
       {!isVendedorRedesOnly && (
         <div className="grid grid-cols-2 gap-2 p-1 bg-black rounded-2xl border border-neutral-800">
           <button
@@ -29,7 +29,7 @@ export default function ProductionManagementView() {
             }`}
           >
             <Package className="w-4 h-4 shrink-0" />
-            <span>Cola de Producción</span>
+            <span>Cola de Ítems Individuales</span>
           </button>
           <button
             type="button"
@@ -41,7 +41,7 @@ export default function ProductionManagementView() {
             }`}
           >
             <Printer className="w-4 h-4 shrink-0" />
-            <span>Pliegos Diarios</span>
+            <span>Pliegos de Impresión (Taller)</span>
           </button>
         </div>
       )}

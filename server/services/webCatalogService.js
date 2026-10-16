@@ -120,8 +120,9 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
         return false;
       };
 
+      const isExactTitleToken = (t) => titleTokensSet.has(t) || titleStemmedSet.has(stem(t));
       const isTokenMatch = (t) => fullTokensSet.has(t) || fullStemmedSet.has(stem(t)) || normFullText.startsWith(t) || (stem(t).length >= 4 && normFullText.replace(/\s+/g, '').includes(stem(t))) || hasFullFuzzy(t);
-      const isTitleTokenMatch = (t) => titleTokensSet.has(t) || titleStemmedSet.has(stem(t)) || (stem(t).length >= 4 && normTitleText.replace(/\s+/g, '').includes(stem(t))) || hasTitleFuzzy(t);
+      const isTitleTokenMatch = (t) => isExactTitleToken(t) || (stem(t).length >= 4 && normTitleText.replace(/\s+/g, '').includes(stem(t))) || hasTitleFuzzy(t);
 
       let hasFuzzyMatch = false;
       for (const t of tokens) {
@@ -130,15 +131,16 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
           break;
         }
       }
-      if (hasFuzzyMatch) score += 40;
+      if (hasFuzzyMatch) score += 20;
 
       if (tokens.length > 0 && tokens.every(isTokenMatch)) {
         if (tokens.length >= 2 || isTitleTokenMatch(tokens[0]) || normTitleText.startsWith(tokens[0])) score += 150;
       }
 
       for (const token of tokens) {
-        if (isTitleTokenMatch(token)) score += 35;
-        else if (isTokenMatch(token)) score += 15;
+        if (isExactTitleToken(token)) score += 80;
+        else if (isTitleTokenMatch(token)) score += 35;
+        else if (isTokenMatch(token)) score += 20;
       }
 
       if (meaningfulTokens.length === 1) {

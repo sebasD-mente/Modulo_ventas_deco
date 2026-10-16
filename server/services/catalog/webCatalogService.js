@@ -170,6 +170,9 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       const aliasTokens = normalizeMatcherString(aliasRes.matchedAlias || clean)
         .split(/\s+/)
         .filter((t) => (t.length > 2 || KNOWN_SHORT_ENTITIES.has(t)) && !EXTENDED_STOP_WORDS.has(t));
+      const canonicalTerms = Array.isArray(aliasRes.canonicalTerms)
+        ? aliasRes.canonicalTerms.map((t) => normalizeMatcherString(t)).filter((t) => t.length > 2 && !EXTENDED_STOP_WORDS.has(t))
+        : [];
 
       const candidate = webMatches.find((p) => {
         const full = normalizeMatcherString(`${p.titulo || ''} ${p.subtitulo || ''} ${(p.tags || []).join(' ')}`);
@@ -180,7 +183,7 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
 
         if (aliasRes.matchedAlias && full.includes(normalizeMatcherString(aliasRes.matchedAlias))) return true;
 
-        const hasTitleWord = [...titleTerms, ...aliasTokens].some((t) => new RegExp(`\\b${t}\\b`, 'i').test(titleAndSub));
+        const hasTitleWord = [...titleTerms, ...aliasTokens, ...canonicalTerms].some((t) => new RegExp(`\\b${t}\\b`, 'i').test(titleAndSub));
         if (hasTitleWord) return true;
 
         return false;

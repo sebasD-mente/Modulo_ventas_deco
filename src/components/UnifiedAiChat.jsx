@@ -12,6 +12,7 @@ export { getSupportedAudioMimeType };
 
 export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateManualForm }) {
   const chatContainerRef = useRef(null), chatBottomRef = useRef(null), isPinnedToBottomRef = useRef(true);
+  const draftCardRef = useRef(null);
   const chatStream = useAiChatStream({ eventId, onSaleRegistered, onPopulateManualForm });
   const voiceRecorder = useAiVoiceRecorder({ onRecordingComplete: chatStream.handleVoiceUpload });
 
@@ -20,6 +21,15 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [voiceRecorder.isRecording, chatStream.aiError]);
+
+  useEffect(() => {
+    if (chatStream.pendingDraft && (chatStream.pendingDraft.items?.length > 0 || chatStream.pendingDraft.unmatchedItems?.length > 0)) {
+      const timer = setTimeout(() => {
+        draftCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [chatStream.pendingDraft]);
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -52,15 +62,17 @@ export default function UnifiedAiChat({ eventId, onSaleRegistered, onPopulateMan
         />
       </div>
       {chatStream.pendingDraft && (
-        <ChatDraftCard
-          pendingDraft={chatStream.pendingDraft}
-          onUpdateSize={chatStream.updateDraftItemSize} onUpdateQty={chatStream.updateDraftItemQty}
-          onRemoveItem={chatStream.removeDraftItem} onUpdatePaymentMethod={chatStream.updateDraftPaymentMethod}
-          onDiscard={chatStream.discardDraft} onConfirmSale={chatStream.confirmPendingSale}
-          onPopulateManualForm={onPopulateManualForm} onSelectVariant={chatStream.selectVariantInline}
-          onOpenSwapModal={(idx, initialQuery) => { chatStream.setSwappingIndex(idx); if (initialQuery) { chatStream.handleSwapSearchChange(initialQuery); } else { chatStream.fetchInitialSwapPosters(); } }}
-          isLoading={chatStream.isLoading}
-        />
+        <div ref={draftCardRef}>
+          <ChatDraftCard
+            pendingDraft={chatStream.pendingDraft}
+            onUpdateSize={chatStream.updateDraftItemSize} onUpdateQty={chatStream.updateDraftItemQty}
+            onRemoveItem={chatStream.removeDraftItem} onUpdatePaymentMethod={chatStream.updateDraftPaymentMethod}
+            onDiscard={chatStream.discardDraft} onConfirmSale={chatStream.confirmPendingSale}
+            onPopulateManualForm={onPopulateManualForm} onSelectVariant={chatStream.selectVariantInline}
+            onOpenSwapModal={(idx, initialQuery) => { chatStream.setSwappingIndex(idx); if (initialQuery) { chatStream.handleSwapSearchChange(initialQuery); } else { chatStream.fetchInitialSwapPosters(); } }}
+            isLoading={chatStream.isLoading}
+          />
+        </div>
       )}
       <ChatSwapModal
         isOpen={chatStream.swappingIndex !== null} onClose={() => chatStream.setSwappingIndex(null)}

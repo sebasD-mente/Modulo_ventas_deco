@@ -171,14 +171,14 @@ export async function handleGetSession(req, res) {
     const { sessionId } = req.params;
     const session = await getSessionById(sessionId, req.tenantId);
     if (!session) {
-      return res.json({
+      return res.status(200).json({
         status: 'ok',
         success: true,
         session: null,
         data: { sessionId, history: [], pendingDraft: null, exists: false },
       });
     }
-    return res.json({ status: 'ok', success: true, session, data: session });
+    return res.status(200).json({ status: 'ok', success: true, session, data: session });
   } catch (err) {
     return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }

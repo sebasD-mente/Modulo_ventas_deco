@@ -248,12 +248,13 @@ export const STAND_ENTITY_ALIASES = [
   },
   {
     canonicalTitle: 'Chainsaw Man',
-    searchQuery: 'chainsaw man hombre motosierra denji pochita',
+    canonicalTerms: ['chainsaw', 'man', 'denji', 'pochita', 'motosierra', 'demonio'],
+    searchQuery: 'Chainsaw Man Denji Pochita Motosierra',
     category: 'ANIME',
     aliases: [
       'chainsaw man', 'chainsawman', 'hombre motosierra', 'el hombre motosierra',
       'el pibe motosierra', 'el vato motosierra', 'motosierra', 'denji', 'pochita',
-      'makima', 'power anime', 'power chainsaw'
+      'makima', 'power anime', 'power chainsaw', 'demonio motosierra'
     ]
   },
   {
@@ -514,6 +515,7 @@ export function resolveEntityAlias(query) {
         matched: true,
         exactMatch: true,
         canonicalTitle: item.entity.canonicalTitle,
+        canonicalTerms: item.entity.canonicalTerms || null,
         searchQuery: item.entity.searchQuery,
         category: item.entity.category,
         defaultSizeId: item.entity.defaultSizeId || null,
@@ -546,6 +548,7 @@ export function resolveEntityAlias(query) {
           matched: true,
           exactMatch: false,
           canonicalTitle: item.entity.canonicalTitle,
+          canonicalTerms: item.entity.canonicalTerms || null,
           searchQuery: compositeQuery || item.entity.searchQuery,
           category: item.entity.category,
           defaultSizeId: item.entity.defaultSizeId || null,

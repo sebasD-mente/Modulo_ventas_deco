@@ -25,7 +25,7 @@ export default function ChatDraftCard({
   const getSizes = (it) => (Array.isArray(it.availableSizes) && it.availableSizes.length > 0 ? it.availableSizes : DEFAULT_EVENT_SIZES);
 
   useEffect(() => {
-    draftCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    draftCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [pendingDraft]);
 
   // Auto-commit con Deshacer (8s) si la orden tiene 100% de certeza y método de pago

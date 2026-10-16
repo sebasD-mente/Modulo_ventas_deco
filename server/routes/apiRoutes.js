@@ -336,7 +336,7 @@ router.post(
 );
 router.get(
   '/ai/session/:sessionId',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2']),
   handleGetSession
 );
 router.put(
