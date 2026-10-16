@@ -47,18 +47,8 @@ else
 fi
 
 # 2. Automated Schema Migration / Push (Safe Execution without Data Loss)
-echo "🔄 [Entrypoint] Synchronizing database schema with Prisma..."
-if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
-  echo "📦 [Entrypoint] Migrations directory detected. Executing 'prisma migrate deploy'..."
-  npx --no-install prisma migrate deploy || {
-    echo "⚠️ [Entrypoint] Migration deploy encountered conflict. Resolving baseline..."
-    npx --no-install prisma migrate resolve --applied 20260913000000_init_stand_ia || true
-    npx --no-install prisma migrate deploy || npx --no-install prisma db push --skip-generate
-  }
-else
-  echo "📦 [Entrypoint] No migrations directory detected. Executing safe 'prisma db push --skip-generate'..."
-  npx --no-install prisma db push --skip-generate
-fi
+echo "🔄 [Entrypoint] Synchronizing database schema with Prisma db push..."
+npx --no-install prisma db push --skip-generate
 echo "✅ [Entrypoint] Database schema synchronized successfully."
 
 # 3. Master Data Verification (Fast Check + Non-blocking Seed)
