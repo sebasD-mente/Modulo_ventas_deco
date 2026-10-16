@@ -16,11 +16,11 @@ export function buildFallbackSummaries(executedTools) {
       const d = t.result;
       if (d.items?.length > 0) {
         const items = d.items.map(it => `• **${it.quantity}x ${it.description}** (${it.sizeId || 'MEDIANO'}) — Q${Number(it.unitPrice).toFixed(2)} c/u`).join('\n');
-        const warn = d.unmatchedItems?.length > 0 ? `\n⚠️ *No encontradas en catálogo: ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')}*` : '';
+        const warn = d.unmatchedItems?.length > 0 ? `\n⚠️ *No encontradas en catálogo: ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')}. ¿Me confirmas el nombre o personaje?*` : '';
         summaries.push(`🎉 **¡Listo! Te preparé el borrador en pantalla:**\n${items}${warn}\n\n💳 **Total:** Q ${Number(d.total || 0).toFixed(2)} (${d.paymentMethod || 'EFECTIVO'}). Presiona **"Confirmar Venta"** para registrarla.`);
       } else if (d.unmatchedItems?.length > 0) {
         const unavail = d.unmatchedItems.find(u => u.unavailableReason);
-        summaries.push(unavail?.unavailableReason || `No encontré la obra ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')} en el catálogo de Deco Vintage.`);
+        summaries.push(unavail?.unavailableReason || `⚠️ No encontré coincidencia en el catálogo para: ${d.unmatchedItems.map(u => `'${u.rawName}'`).join(', ')}. ¿Me confirmas el nombre o personaje?`);
       }
     } else if (t.name === 'discardSaleDraft') {
       summaries.push('🗑️ Borrador de venta cancelado y vaciado.');
@@ -59,7 +59,7 @@ export async function executeToolCall(call, { tenantId, eventId, date, message, 
     if (call.name === 'prepareSaleDraft' && call.args) {
       const draft = await constructDraftPayload(tenantId, call.args, message, pendingDraft);
       const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
-      return { event: { type: 'draft_sale', data: effectiveDraft }, toolRecord: { name: call.name, args: call.args, result: draft, id } };
+      return { event: { type: 'draft_sale', data: effectiveDraft, unmatchedItems: draft?.unmatchedItems || [] }, toolRecord: { name: call.name, args: call.args, result: draft, id } };
     }
     if (call.name === 'searchCatalog' && call.args?.query) {
       const matches = await executeSearchCatalog(tenantId, call.args.query, call.args.category, 12);

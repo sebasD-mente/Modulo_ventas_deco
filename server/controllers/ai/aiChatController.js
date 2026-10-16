@@ -73,11 +73,12 @@ export async function handleChatQuery(req, res) {
       const effectiveDraft = (draft && draft.items?.length > 0) ? draft : null;
       if (!effectiveDraft) await clearSessionDraft(sessionId, tenantId);
 
-      const updatedHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: result.reply || '' }].slice(-20);
+      const replyText = result.reply || (result.unmatchedItems?.length > 0 ? `⚠️ No encontré coincidencia en el catálogo para: ${result.unmatchedItems.map(u => typeof u === 'string' ? `'${u}'` : `'${u.rawName || u.title || u.name}'`).join(', ')}. ¿Me confirmas el nombre o personaje?` : 'No logré identificar el póster en el catálogo. ¿Me repites el nombre o lo buscamos abajo?');
+      const updatedHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: replyText }].slice(-20);
       await saveSessionState(sessionId, { pendingDraft: effectiveDraft, history: updatedHistory, sellerName, eventId, tenantId });
 
       const effectiveToolCalls = (toolCalls || []).filter((t) => t.name !== 'prepareSaleDraft' || effectiveDraft !== null);
-      return res.json({ success: true, sessionId, reply: result.reply, draft: effectiveDraft, draftSale: effectiveDraft, suggestedPosters, toolCalls: effectiveToolCalls });
+      return res.json({ success: true, sessionId, reply: replyText, draft: effectiveDraft, draftSale: effectiveDraft, suggestedPosters, toolCalls: effectiveToolCalls });
     }
 
     // Modo Streaming con Server-Sent Events (SSE) y Gemini 3.8 Flash
@@ -109,6 +110,8 @@ export async function handleChatQuery(req, res) {
         pendingDraft: effectivePendingDraft, contextData: { sellerName, sessionId },
       });
 
+      let detectedUnmatched = [];
+
       for await (const chunk of streamGenerator) {
         if (isClientClosed || res.writableEnded || res.destroyed) break;
         if (chunk.type === 'token') {
@@ -117,6 +120,11 @@ export async function handleChatQuery(req, res) {
         } else if (chunk.type && chunk.data !== undefined) {
           if (chunk.type === 'draft_sale') {
             currentDraft = chunk.data || null;
+            if (Array.isArray(chunk.unmatchedItems) && chunk.unmatchedItems.length > 0) {
+              detectedUnmatched = chunk.unmatchedItems;
+            } else if (Array.isArray(chunk.data?.unmatchedItems) && chunk.data.unmatchedItems.length > 0) {
+              detectedUnmatched = chunk.data.unmatchedItems;
+            }
             if (!currentDraft?.items?.length) {
               currentDraft = null;
             }
@@ -125,7 +133,18 @@ export async function handleChatQuery(req, res) {
         }
       }
 
-      const finalHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: fullText || '¡Con gusto te asesoro!' }].slice(-20);
+      if (!fullText.trim()) {
+        if (detectedUnmatched.length > 0) {
+          const missingNames = detectedUnmatched.map((u) => (typeof u === 'string' ? `'${u}'` : `'${u.rawName || u.title || u.name}'`)).join(', ');
+          fullText = `⚠️ No encontré coincidencia en el catálogo para: ${missingNames}. ¿Me confirmas el nombre o personaje?`;
+          writeSse(`event: token\ndata: ${JSON.stringify({ text: fullText, delta: fullText })}\n\n`);
+        } else {
+          fullText = 'No logré identificar el póster en el catálogo. ¿Me repites el nombre o lo buscamos abajo?';
+          writeSse(`event: token\ndata: ${JSON.stringify({ text: fullText, delta: fullText })}\n\n`);
+        }
+      }
+
+      const finalHistory = [...effectiveHistory, { role: 'user', text: message.trim() }, { role: 'model', text: fullText }].slice(-20);
 
       const estimatedTokensIn = Math.ceil(
         (String(message || '').length + JSON.stringify(effectiveHistory || []).length) / 4
@@ -143,7 +162,7 @@ export async function handleChatQuery(req, res) {
       });
 
       if (!isClientClosed && !res.writableEnded && !res.destroyed) {
-        writeSse(`event: done\ndata: ${JSON.stringify({ fullText: fullText || '¡Con gusto te asesoro con cualquier duda o venta en el stand!', sessionId, draftSale: currentDraft })}\n\n`);
+        writeSse(`event: done\ndata: ${JSON.stringify({ fullText: fullText || 'No logré identificar el póster en el catálogo. ¿Me repites el nombre o lo buscamos abajo?', sessionId, draftSale: currentDraft })}\n\n`);
         res.end();
       }
 

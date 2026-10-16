@@ -351,17 +351,14 @@ describe('⚔️ CHALLENGER 2: Empirical Stress Test — Catalog Matcher & Visio
       assert.strictEqual(await matchPosterEverywhere(TEST_TENANT, 'de la en con'), null);
     });
 
-    it('3.4 "olivia uña" vs "olivia rodrigo": preserves "ñ", rejects "olivia uña" and accepts "olivia rodrigo"', async () => {
-      // Query "olivia uña": "uña" is NOT stripped to "una".
-      // Significant tokens: ['olivia', 'uña'] (2 tokens).
-      // Candidate: "Olivia Rodrigo - Sour". Only 'olivia' matches (1/2 = 50% < 70%).
-      // Result: MUST RETURN NULL!
+    it('3.4 Tolerancia a ruido de dictado de 2 tokens: "olivia uña" y "olivia rodrigo" emparejan a Olivia Rodrigo', async () => {
+      // Query "olivia uña": "uña" es ruido de dictado por voz.
+      // Cobertura 0.50 (1 de 2 tokens), pero 'olivia' coincide exactamente con la artista en el título.
+      // Con la tolerancia de 2 tokens aprobada por Gary, DEBE emparejar a Olivia Rodrigo.
       const matchUnia = await matchPosterEverywhere(TEST_TENANT, 'olivia uña');
-      assert.strictEqual(
-        matchUnia,
-        null,
-        'CRITICAL: "olivia uña" must NOT falsely match Olivia Rodrigo (uña != stopword una)'
-      );
+      assert.ok(matchUnia !== null, '"olivia uña" debe emparejar a Olivia Rodrigo por tolerancia de dictado');
+      assert.strictEqual(matchUnia.posterId, '8a1b2c3d-0010-4000-8000-000000000010');
+      assert.match(matchUnia.description, /Olivia Rodrigo/i);
 
       // Query "olivia rodrigo": tokens ['olivia', 'rodrigo'] (2/2 = 100% >= 70%).
       // Result: MUST MATCH Olivia Rodrigo!

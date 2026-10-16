@@ -1,6 +1,7 @@
 import { ENV } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
-import { searchWebPosters, searchHybridPosters, matchPosterEverywhere } from '../webCatalogService.js';
+import { searchWebPosters, searchHybridPosters } from '../webCatalogService.js';
+import { matchPosterEverywhere } from '../catalog/webCatalogService.js';
 import { executeWithModelFallback, MODEL_PRIORITY_POOL } from '../geminiPoolService.js';
 import { voiceSaleResponseSchema, buildVoiceSalePrompt, buildArtworkRecognitionPrompt, artworkRecognitionResponseSchema, videoRecognitionResponseSchema, batchPhotoResponseSchema } from './aiPromptService.js';
 import { resolveEntityAlias, normalizeArtworkQuery, UNIVERSAL_STOP_WORDS, KNOWN_SHORT_ENTITIES } from '../semantic/entityAliases.js';

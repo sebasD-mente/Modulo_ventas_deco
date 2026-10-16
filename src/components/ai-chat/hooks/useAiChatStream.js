@@ -305,7 +305,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
               else if (ev === 'done' || ev === 'completed') {
                 cancelRaf();
                 const currentDraft = pendingDraftRef.current;
-                updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro!') }));
+                updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || data.fullText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : 'No logré identificar el póster en el catálogo. ¿Me repites el nombre o lo buscamos abajo?') }));
               }
               else if (ev === 'error') { cancelRaf(); throw new Error(data.error || 'Error en stream SSE'); }
               else if (data && TOOL_EVENT_MAP[ev]) updateAiMsg((m) => ({ ...m, [TOOL_EVENT_MAP[ev]]: ev === 'suggested_posters' ? (Array.isArray(data) ? data : data.posters || []) : (data[ev] || data.kpis || data.cashStatus || data.report || data.queue || data.stock || data) }));
@@ -314,7 +314,7 @@ export function useAiChatStream({ eventId, onSaleRegistered, onPopulateManualFor
         }
         cancelRaf();
         const currentDraft = pendingDraftRef.current;
-        updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : '¡Con gusto te asesoro!') }));
+        updateAiMsg((m) => ({ ...m, isStreaming: false, text: accumulatedText || m.text || (currentDraft ? '¡Listo! Te dejé preparado el borrador en pantalla.' : 'No logré identificar el póster en el catálogo. ¿Me repites el nombre o lo buscamos abajo?') }));
       } else {
         const json = await res.json(); if (!res.ok || !json.success) throw new Error(json.error || 'Error al comunicarse con la IA');
         const d = json.draftSale || json.draft; if (!d || !d.items || d.items.length === 0) { pendingDraftRef.current = null; setPendingDraft(null); } else { pendingDraftRef.current = d; setPendingDraft(d); }

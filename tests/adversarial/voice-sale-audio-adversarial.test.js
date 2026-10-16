@@ -20,7 +20,8 @@ import assert from 'node:assert/strict';
 import { productCache, invalidateCatalogCache } from '../../server/services/catalog/catalogCacheStore.js';
 import { processVoiceSaleAudio } from '../../server/services/ai/aiMediaService.js';
 import { handleVoiceSale } from '../../server/controllers/ai/aiMediaController.js';
-import { matchPosterEverywhere, searchWebPosters } from '../../server/services/webCatalogService.js';
+import { searchWebPosters } from '../../server/services/webCatalogService.js';
+import { matchPosterEverywhere } from '../../server/services/catalog/webCatalogService.js';
 import { ENV } from '../../server/config/env.js';
 import { getClientForKey } from '../../server/services/ai/aiKeyPoolService.js';
 

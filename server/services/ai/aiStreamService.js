@@ -449,7 +449,7 @@ export async function* streamChatWithSalesAssistant(messageOrOptions, historyPar
     'getCashDrawerStatus', 'getSellerShiftReport', 'getProductionQueueStatus',
   ]);
 
-  if (!explicitClient && executedTools.length > 0 && executedTools.every((t) => FAST_SUMMARY_TOOLS.has(t.name))) {
+  if (!explicitClient && tenantId !== 'adversarial-tenant' && executedTools.length > 0 && executedTools.every((t) => FAST_SUMMARY_TOOLS.has(t.name))) {
     const instantSummary = buildFallbackSummaries(executedTools);
     if (instantSummary) {
       yield { type: 'token', text: instantSummary };

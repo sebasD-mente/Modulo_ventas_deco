@@ -76,7 +76,8 @@ export const STAND_ENTITY_ALIASES = [
     defaultSizeId: 'PORTADA_ALBUM',
     aliases: [
       'olivia rodrigo', 'olivia', 'la olivia', 'guts', 'sour',
-      'olivia mordiendo uña', 'olivia rodrigo guts', 'vampire', 'bad idea right'
+      'olivia mordiendo uña', 'olivia rodrigo guts', 'vampire', 'bad idea right',
+      'olivia uña', 'olivia una'
     ]
   },
   {
@@ -350,8 +351,7 @@ export const STAND_ENTITY_ALIASES = [
     searchQuery: 'Pablo Escobar',
     category: 'HISTORICOS',
     aliases: [
-      'pablo', 'pablo escobar', 'patron', 'el patron', 'el patrón', 'del patron',
-      'del patrón', 'los del patron', 'los del patrón', 'el patron del mal',
+      'pablo', 'pablo escobar', 'el patron del mal',
       'patron del mal', 'la sonrisa de pablo', 'el mugshot de pablo', 'pablo sonriendo',
       'cartel de medellin', 'escobar'
     ]
@@ -369,7 +369,10 @@ export const STAND_ENTITY_ALIASES = [
     canonicalTitle: 'The Godfather - El Padrino',
     searchQuery: 'The Godfather El Padrino Marlon Brando',
     category: 'SERIESYPELICULAS',
-    aliases: ['el padrino', 'the godfather', 'don vito', 'vito corleone', 'marlon brando']
+    aliases: [
+      'el padrino', 'the godfather', 'don vito', 'vito corleone', 'marlon brando',
+      'el patron', 'del patron', 'el patrón', 'del patrón', 'patron', 'patrón'
+    ]
   },
   {
     canonicalTitle: 'Pulp Fiction - Tiempos Violentos',
@@ -381,7 +384,10 @@ export const STAND_ENTITY_ALIASES = [
     canonicalTitle: 'Scarface - Tony Montana',
     searchQuery: 'Scarface Tony Montana Cara Cortada',
     category: 'SERIESYPELICULAS',
-    aliases: ['scarface', 'cara cortada', 'tony montana', 'al pacino']
+    aliases: [
+      'scarface', 'cara cortada', 'tony montana', 'al pacino',
+      'scarface trono', 'scarface sillon', 'scarface sillón'
+    ]
   },
   {
     canonicalTitle: 'Breaking Bad - Walter White Heisenberg',

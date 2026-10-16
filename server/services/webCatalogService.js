@@ -225,7 +225,6 @@ export async function getWebPosterById(posterId, tenantId = null) {
 }
 
 export const searchPosters = searchWebPosters, getCatalogPosters = searchWebPosters;
-export { matchPosterEverywhere, findLocalMatch, matchesCatalogWordBoundary } from './catalog/webCatalogService.js';
 export {
   getCachedProducts, formatProductForPos, extractImageSlug, extractPosterTitle,
   normalizePosterTitle, deduplicatePosters, searchHybridPosters, searchPostersByEmbedding,

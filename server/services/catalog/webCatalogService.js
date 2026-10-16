@@ -257,7 +257,12 @@ export async function matchPosterEverywhere(tenantId, query, requestedSize = nul
       }
     }
 
-    if (coverage >= 0.70 && franchiseCheckPassed) {
+    const isTwoTokenVoiceNoise = significantTokens.length === 2 && coverage === 0.5 && candidate === candidates[0] && franchiseCheckPassed && matchedTokens.some((t) => {
+      const titleNorm = normalizeMatcherString(candidate.titulo || '');
+      return (t.length >= 3 || KNOWN_SHORT_ENTITIES.has(t)) && (new RegExp(`\\b${t}\\b`, 'i').test(titleNorm) || titleNorm.split(/\s+/).includes(t));
+    });
+
+    if ((coverage >= 0.70 || isTwoTokenVoiceNoise) && franchiseCheckPassed) {
       return buildPosterResult(candidate, requestedSize, candidates);
     }
   }
