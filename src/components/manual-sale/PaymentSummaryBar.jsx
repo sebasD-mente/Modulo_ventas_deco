@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Banknote, CreditCard, Smartphone, CheckCircle2, Loader2, DollarSign, Split } from 'lucide-react';
 
 export default function PaymentSummaryBar({
@@ -16,8 +16,6 @@ export default function PaymentSummaryBar({
   disabled = false,
   onConfirmSale,
 }) {
-  const [cashReceived, setCashReceived] = useState('');
-
   const methods = [
     { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote },
     { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard },
@@ -26,16 +24,6 @@ export default function PaymentSummaryBar({
   ];
 
   const totalNum = Number(grandTotal || 0);
-  const receivedNum = Number(cashReceived) || 0;
-  const changeDue = receivedNum >= totalNum ? receivedNum - totalNum : null;
-
-  const handleQuickCash = (amount) => {
-    setCashReceived(String(amount));
-  };
-
-  const handleQuickDiscount = (amount) => {
-    if (setDiscount) setDiscount(amount);
-  };
 
   return (
     <div className="space-y-4">
@@ -63,7 +51,7 @@ export default function PaymentSummaryBar({
         </div>
       </div>
 
-      {/* 2. Sección de Descuento Ferial (Táctil >= 44px) */}
+      {/* 2. Sección de Descuento Ferial (Input Directo Limpio >= 44px) */}
       <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-neutral-300 flex items-center gap-1.5">
@@ -84,114 +72,49 @@ export default function PaymentSummaryBar({
             </span>
           </div>
         )}
-        <div className="flex items-center gap-2 flex-wrap">
-          {[0, 5, 10, 15, 20].map((val) => (
+        <div className="flex items-center bg-black border border-neutral-800 focus-within:border-amber-400/60 rounded-xl px-3 transition-colors">
+          <span className="text-xs text-neutral-500 font-mono font-bold">Q</span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Monto de descuento (ej. 10)"
+            value={discount === 0 ? '' : discount}
+            onChange={(e) => {
+              const val = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0);
+              if (setDiscount) setDiscount(val);
+            }}
+            className="w-full min-h-[44px] bg-transparent text-white font-mono text-xs sm:text-sm font-bold px-2 focus:outline-none placeholder-neutral-600"
+          />
+          {Number(discount) > 0 && (
             <button
-              key={val}
               type="button"
-              onClick={() => handleQuickDiscount(val)}
-              className={`min-h-[44px] px-3.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                Number(discount) === val
-                  ? 'bg-amber-400 text-black font-black'
-                  : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
-              }`}
+              onClick={() => setDiscount && setDiscount(0)}
+              className="text-[11px] text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 cursor-pointer shrink-0 transition-colors"
             >
-              {val === 0 ? 'Q 0' : `- Q ${val}`}
+              Borrar
             </button>
-          ))}
-          <div className="flex-1 min-w-[100px] flex items-center bg-black border border-neutral-800 rounded-xl px-2.5">
-            <span className="text-xs text-neutral-500 font-mono">Q</span>
-            <input
-              type="number"
-              min="0"
-              placeholder="Otro"
-              value={discount || ''}
-              onChange={(e) => setDiscount && setDiscount(Math.max(0, Number(e.target.value) || 0))}
-              className="w-full min-h-[44px] bg-transparent text-white font-mono text-xs font-bold px-1.5 focus:outline-none"
-            />
-          </div>
+          )}
         </div>
       </div>
 
-      {/* 3. Vuelto Rápido en Efectivo (Solo visible si método es Efectivo) */}
-      {paymentMethod === 'EFECTIVO' && totalNum > 0 && (
-        <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-neutral-300 flex items-center gap-1.5">
-              <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-              Calculadora de Vuelto Rápido
-            </span>
-            {changeDue !== null && (
-              <span className="text-sm font-black font-mono text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-lg border border-emerald-800">
-                Vuelto: Q {changeDue.toFixed(2)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleQuickCash(totalNum)}
-              className={`min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                receivedNum === totalNum
-                  ? 'bg-emerald-400 text-black font-black'
-                  : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white'
-              }`}
-            >
-              Cabal (Q {totalNum.toFixed(0)})
-            </button>
-            {[50, 100, 150, 200].filter((v) => v >= totalNum).map((val) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => handleQuickCash(val)}
-                className={`min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  receivedNum === val
-                    ? 'bg-emerald-400 text-black font-black'
-                    : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white'
-                }`}
-              >
-                Paga Q {val}
-              </button>
-            ))}
-            <div className="flex-1 min-w-[110px] flex items-center bg-black border border-neutral-800 rounded-xl px-2.5">
-              <span className="text-xs text-neutral-500 font-mono">Q</span>
-              <input
-                type="number"
-                min="0"
-                placeholder="Recibido..."
-                value={cashReceived}
-                onChange={(e) => setCashReceived(e.target.value)}
-                className="w-full min-h-[44px] bg-transparent text-white font-mono text-xs font-bold px-1.5 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Resumen Total y Botón de Registro */}
-      <div className="p-5 rounded-2xl bg-black border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <span className="text-xs text-neutral-400 font-medium block">Total a Cobrar:</span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
-            Q {totalNum.toFixed(2)}
-          </span>
-        </div>
-
+      {/* 3. Botón de Registro Directo (Grande, Táctil y Sin Redundancia) */}
+      <div className="pt-1">
         <button
           type="button"
           onClick={onConfirmSale}
           disabled={disabled || isSubmitting}
-          className="w-full sm:w-auto min-h-[48px] px-8 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 disabled:opacity-40 transition-all cursor-pointer active:scale-95"
+          className="w-full min-h-[58px] sm:min-h-[64px] px-6 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 disabled:opacity-40 transition-all cursor-pointer active:scale-98"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Asentando en Postgres...</span>
+              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+              <span>Asentando Venta en Base de Datos...</span>
             </>
           ) : (
             <>
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Registrar Venta (Q {totalNum.toFixed(2)})</span>
+              <CheckCircle2 className="w-6 h-6 shrink-0" strokeWidth={2.5} />
+              <span>Registrar Venta • Q {totalNum.toFixed(2)}</span>
             </>
           )}
         </button>
