@@ -54,86 +54,90 @@ export default function SaleCartList({
           <span>No hay pósters agregados todavía. Llama una obra arriba para agregarla a esta venta.</span>
         </div>
       ) : (
-        <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+        <div className="space-y-2.5 max-h-80 overflow-y-auto no-scrollbar">
           {cartItems.map((item) => {
             const imgUrl = item.customImageUrl || item.thumbUrl || item.imageUrl;
+            const sizes = Array.isArray(item.availableSizes) && item.availableSizes.length > 0 ? item.availableSizes : DEFAULT_SIZES;
             return (
-              <div key={item.id} className="p-3 rounded-2xl bg-black border border-neutral-800 flex items-center justify-between gap-3 text-xs">
-                {imgUrl ? (
-                  <img src={imgUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
-                ) : (
-                  <div className="w-9 h-12 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
-                    <ShoppingBag className="w-3.5 h-3.5" />
+              <div key={item.id} className="p-3 sm:p-3.5 rounded-2xl bg-black border border-neutral-800 flex flex-col gap-2.5 text-xs">
+                {/* Cabecera: Arte, Título y Eliminar */}
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {imgUrl ? (
+                      <img src={imgUrl} alt="" className="w-10 h-13 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
+                    ) : (
+                      <div className="w-10 h-13 rounded-lg border border-neutral-800 bg-neutral-900 flex items-center justify-center shrink-0 text-neutral-600">
+                        <ShoppingBag className="w-4 h-4" />
+                      </div>
+                    )}
+                    <span className="font-bold text-white block truncate text-xs sm:text-sm">{item.description}</span>
                   </div>
-                )}
 
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-white block truncate">{item.description}</span>
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  {(() => {
-                    const sizes = Array.isArray(item.availableSizes) && item.availableSizes.length > 0 ? item.availableSizes : DEFAULT_SIZES;
-                    if (sizes.length <= 1) {
-                      const sz = sizes[0];
-                      return (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                          {sz?.nombre || sz?.sizeId || 'Portada de Álbum'} (Q{sz?.precio || item.unitPrice})
-                        </span>
-                      );
-                    }
-                    return sizes.map((sz) => {
+                  <button
+                    type="button"
+                    onClick={() => onRemoveItem && onRemoveItem(item.id)}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
+                    title="Eliminar este póster del ticket"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tamaños disponibles (Scroll horizontal limpio de 1 toque) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {sizes.length <= 1 ? (
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                      {sizes[0]?.nombre || sizes[0]?.sizeId || 'Portada de Álbum'} (Q{sizes[0]?.precio || item.unitPrice})
+                    </span>
+                  ) : (
+                    sizes.map((sz) => {
                       const isSel = item.selectedSizeId ? item.selectedSizeId === sz.sizeId : item.unitPrice === sz.precio;
                       return (
                         <button
                           key={sz.sizeId}
                           type="button"
                           onClick={() => onChangeSize && onChangeSize(item.id, sz)}
-                          className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center justify-center ${
+                          className={`min-h-[36px] px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors flex items-center justify-center shrink-0 ${
                             isSel ? 'bg-white text-black shadow-sm' : 'bg-[#181818] text-neutral-400 hover:text-white border border-neutral-800'
                           }`}
                         >
                           {sz.nombre || sz.sizeId} (Q{sz.precio})
                         </button>
                       );
-                    });
-                  })()}
+                    })
+                  )}
+                </div>
+
+                {/* Barra Inferior: Selector de Cantidad y Subtotal */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-900">
+                  <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-neutral-800 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onUpdateQty && onUpdateQty(item.id, -1)}
+                      className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+                      title="Disminuir cantidad"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-7 text-center font-bold text-sm text-white">{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateQty && onUpdateQty(item.id, 1)}
+                      className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
+                      title="Aumentar cantidad"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] text-neutral-400 block font-medium">Subtotal</span>
+                    <span className="font-extrabold text-emerald-400 text-sm sm:text-base">Q {Number(item.subtotal || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 bg-[#181818] p-1 rounded-xl border border-neutral-800 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onUpdateQty && onUpdateQty(item.id, -1)}
-                  className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
-                  title="Disminuir cantidad"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="w-6 text-center font-bold text-sm text-white">{item.quantity}</span>
-                <button
-                  type="button"
-                  onClick={() => onUpdateQty && onUpdateQty(item.id, 1)}
-                  className="min-w-[44px] min-h-[44px] rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white flex items-center justify-center font-bold text-base cursor-pointer active:scale-95 transition-all"
-                  title="Aumentar cantidad"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="text-right shrink-0 pl-1">
-                <span className="font-bold text-emerald-400 block text-xs">Q {Number(item.subtotal || 0).toFixed(2)}</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onRemoveItem && onRemoveItem(item.id)}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-red-400 p-2 rounded-xl hover:bg-red-950/30 transition-colors cursor-pointer shrink-0"
-                title="Eliminar este póster del ticket"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       )}
     </div>

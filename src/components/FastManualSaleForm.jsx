@@ -15,10 +15,6 @@ import RemoteQuoterSummary from './manual-sale/RemoteQuoterSummary';
 import CustomItemModal from './manual-sale/CustomItemModal';
 import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
 
-const TOP_SELLERS_FERIAL = [
-  'Star Wars', 'Anime Retro', 'El Padrino', 'Queen', 'Pink Floyd',
-  'Spider-Man', 'Nirvana', 'Vincent Van Gogh', 'Goku'
-];
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
   const { isVendedorRedes, isVendedor, isSuperAdmin } = useAuth();
@@ -255,24 +251,6 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             </div>
           )}
 
-          {/* Top Sellers Feriales (1-Tap) */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              🔥 Top Sellers Feriales (Búsqueda Rápida)
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-              {TOP_SELLERS_FERIAL.map((title) => (
-                <button
-                  key={title}
-                  type="button"
-                  onClick={() => search.setSearchQuery(title)}
-                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black border border-neutral-800 hover:border-amber-400/60 text-neutral-300 hover:text-amber-300 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 active:scale-95"
-                >
-                  {title}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <CatalogSearchInput
             {...search}
