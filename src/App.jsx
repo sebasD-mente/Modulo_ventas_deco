@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import LoginView from './components/LoginView';
-import UnifiedAiChat from './components/UnifiedAiChat';
 import FastManualSaleForm from './components/FastManualSaleForm';
 import RecentSalesList from './components/RecentSalesList';
 import { Loader2 } from 'lucide-react';
@@ -182,20 +181,13 @@ function SalesTerminalMain() {
         {/* PÁGINA 1: NUEVA VENTA (TERMINAL DE ALTA VELOCIDAD) - PRESERVADA EN DOM PARA NO ABORTAR SSE/AUDIO */}
         {(isSuperAdmin || isVendedor || isVendedorRedes) && (
           <div className={activeTab === 'venta' ? 'space-y-6' : 'hidden'}>
-            <UnifiedAiChat
-              eventId={activeEvent?.id}
-              onSaleRegistered={refreshMetrics}
-              onPopulateManualForm={(draft) => {
-                setManualDraft(draft);
-                window.scrollTo({ top: 380, behavior: 'smooth' });
-              }}
-            />
-
-            <FastManualSaleForm
-              eventId={activeEvent?.id}
-              onSaleRegistered={refreshMetrics}
-              initialDraft={manualDraft}
-            />
+            <div id="manual-sale-form-anchor">
+              <FastManualSaleForm
+                eventId={activeEvent?.id}
+                onSaleRegistered={refreshMetrics}
+                initialDraft={manualDraft}
+              />
+            </div>
 
             <RecentSalesList
               eventId={activeEvent?.id}

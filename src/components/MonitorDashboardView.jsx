@@ -1,13 +1,15 @@
-import React from 'react';
-import { RotateCcw, Calendar, Loader2, Tv, TrendingUp, Target, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw, Calendar, Loader2, Tv, TrendingUp, Target, DollarSign, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useMonitorDashboard from './monitor/hooks/useMonitorDashboard';
 import MonitorKpiGrid from './monitor/MonitorKpiGrid';
 import PaymentMethodsBreakdown from './monitor/PaymentMethodsBreakdown';
 import EventsPerformanceList from './monitor/EventsPerformanceList';
+import UnifiedAiChat from './UnifiedAiChat';
 
 export default function MonitorDashboardView() {
   const { isSuperAdmin } = useAuth();
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const {
     selectedDate, setSelectedDate, monitorData, isLoading,
     isRefreshing, lastSyncTime, expandedEvents, toggleEvent, fetchMonitorData,
@@ -50,6 +52,45 @@ export default function MonitorDashboardView() {
           <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /><span>Actualizar</span>
         </button>
       </div>
+ 
+      {/* 2.1. COPILOTO GERENCIAL & AUDITORÍA IA (EXCLUSIVO SUPER_ADMIN) */}
+      {isSuperAdmin && (
+        <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsCopilotOpen((prev) => !prev)}
+            aria-expanded={isCopilotOpen}
+            className="w-full min-h-[44px] p-4 flex items-center justify-between gap-3 text-left hover:bg-neutral-900/60 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-xs sm:text-sm text-white block">
+                  🧠 Copiloto Gerencial & Auditoría IA
+                </span>
+                <span className="text-[11px] text-neutral-400 block">
+                  Consultas de caja en vivo, corte de turno por vendedor, KPIs y pruebas multimodales
+                </span>
+              </div>
+            </div>
+            <div className="text-neutral-400 shrink-0">
+              {isCopilotOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </div>
+          </button>
+
+          {isCopilotOpen && (
+            <div className="p-4 border-t border-neutral-800 bg-black/40">
+              <UnifiedAiChat
+                eventId={eventDetails[0]?.event?.id}
+                eventName={eventDetails[0]?.event?.name || 'Monitor Global'}
+                onSaleRegistered={() => fetchMonitorData(true)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. RADAR DE PUNTO DE EQUILIBRIO Y RENTABILIDAD FERIAL */}
       {(() => {

@@ -73,7 +73,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     </div>
   ) : null;
 
-  const search = useCatalogSearch();
+  const search = useCatalogSearch(eventId);
   const cart = useManualSaleCart({ eventId, onSaleRegistered, initialDraft });
   const remoteForm = useRemoteSaleForm({ eventId, onSaleRegistered, cart });
 
@@ -195,6 +195,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
             <CatalogSearchInput
               {...search}
+              eventId={eventId}
               onSelectPoster={handleSelectPoster}
               onClearSearch={search.clearSearch}
               hasSelectedPoster={Boolean(selectedPoster)}
@@ -295,6 +296,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             {renderSyncFeedback()}
             <CatalogSearchInput
               {...search}
+              eventId={eventId}
               onSelectPoster={handleSelectPoster}
               onClearSearch={search.clearSearch}
               hasSelectedPoster={Boolean(selectedPoster)}
