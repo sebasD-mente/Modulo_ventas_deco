@@ -72,15 +72,36 @@ export async function deltaSyncRecentPosters(tenantId = null) {
   let batch = [];
   for (const rawBase of getCatalogCandidateUrls()) {
     const baseUrl = rawBase.replace(/\/+$/, '');
-    try {
-      const controller = new AbortController(), timeoutId = setTimeout(() => controller.abort(), 12000);
-      const res = await fetch(`${baseUrl}/api/catalog/posters?take=100&orderBy=desc&order=desc&sort=desc`, { headers: { Accept: 'application/json' }, signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const json = await res.json(), items = json.data || json.posters || [];
-        if (Array.isArray(items) && items.length > 0) { batch = items; break; }
+    const queryUrls = [
+      `${baseUrl}/api/catalog/posters?take=100`,
+      `${baseUrl}/api/catalog/posters?take=100&sort=desc`,
+    ];
+    let candidateItems = [];
+    for (const url of queryUrls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = await res.json();
+          const items = json.data || json.posters || [];
+          if (Array.isArray(items) && items.length > 0) {
+            candidateItems = items;
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn(`[deltaSyncRecentPosters] Advertencia de red consultando ${url}:`, err.message);
       }
-    } catch {}
+    }
+    if (candidateItems.length > 0) {
+      batch = candidateItems;
+      break;
+    }
   }
   if (batch.length === 0) return { success: true, updated: 0, newCount: 0 };
 
@@ -132,7 +153,11 @@ export async function deltaSyncRecentPosters(tenantId = null) {
 
     if (newCount > 0 || updatedCount > 0) {
       invalidateCatalogCache(targetTenantId);
-      try { invalidateVectorCache(targetTenantId); } catch {}
+      try {
+        invalidateVectorCache(targetTenantId);
+      } catch (err) {
+        console.warn('[deltaSyncRecentPosters] No se pudo invalidar vector cache:', err.message);
+      }
     }
     return { success: true, updated: updatedCount, newCount };
   } catch (err) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Store, Smartphone, Palette } from 'lucide-react';
+import { ShoppingBag, Store, Smartphone, Palette, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_SIZES, DEFAULT_MEDIUM_SIZE } from './manual-sale/manualSaleConstants';
 import useCatalogSearch from './manual-sale/hooks/useCatalogSearch';
@@ -17,7 +17,7 @@ import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
 
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
-  const { isVendedorRedes, isVendedor, isSuperAdmin } = useAuth();
+  const { isVendedorRedes, isVendedor, isSuperAdmin, authFetch } = useAuth();
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isVendedor && !isSuperAdmin);
   const isVendedorMostradorOnly = Boolean(isVendedor && !isVendedorRedes && !isSuperAdmin);
   const canToggleSaleMode = Boolean(isSuperAdmin || (isVendedor && isVendedorRedes));
@@ -25,6 +25,53 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     isVendedorRedesOnly ? 'REDES_PERSONALIZADO' : 'POS_FERIA'
   );
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
+  const [syncFeedbackMsg, setSyncFeedbackMsg] = useState(null);
+
+  const handleSyncCatalog = async () => {
+    if (isSyncingCatalog) return;
+    setIsSyncingCatalog(true);
+    setSyncFeedbackMsg(null);
+    try {
+      const res = await authFetch('/api/catalog/sync', { method: 'POST' });
+      if (res.ok) {
+        const json = await res.json();
+        const count = json.count ?? json.data?.count ?? 0;
+        setSyncFeedbackMsg({ text: `Catálogo actualizado (${count} obra${count === 1 ? '' : 's'} nueva${count === 1 ? '' : 's'})`, isError: false });
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setSyncFeedbackMsg({ text: errJson.error || 'No se pudo sincronizar el catálogo', isError: true });
+      }
+    } catch (err) {
+      console.warn('[FastManualSaleForm] Error sincronizando catálogo web:', err);
+      setSyncFeedbackMsg({ text: 'No se pudo conectar con la tienda web', isError: true });
+    } finally {
+      setIsSyncingCatalog(false);
+      setTimeout(() => setSyncFeedbackMsg(null), 5000);
+    }
+  };
+
+  const renderSyncControl = (label = 'Sincronizar catálogo') => (
+    <button
+      type="button"
+      onClick={handleSyncCatalog}
+      disabled={isSyncingCatalog}
+      title="Sincronizar catálogo web"
+      aria-label="Sincronizar catálogo web"
+      className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <RefreshCw className={`w-4 h-4 text-cyan-400 shrink-0 ${isSyncingCatalog ? 'animate-spin' : ''}`} />
+      <span className="text-xs">{label}</span>
+    </button>
+  );
+
+  const renderSyncFeedback = () => syncFeedbackMsg ? (
+    <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+      syncFeedbackMsg.isError ? 'bg-red-500/10 border border-red-500/30 text-red-400' : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+    }`}>
+      <span>{syncFeedbackMsg.text}</span>
+    </div>
+  ) : null;
 
   const search = useCatalogSearch();
   const cart = useManualSaleCart({ eventId, onSaleRegistered, initialDraft });
@@ -128,19 +175,23 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Búsqueda Catálogo + Botón Personalizado */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
-                Catálogo Físico o Pedido Personalizado
+                Catálogo Físico o Personalizado
               </label>
-              <button
-                type="button"
-                onClick={() => setIsCustomModalOpen(true)}
-                className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Palette className="w-4 h-4" />
-                <span>+ Personalizado</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {renderSyncControl('Sincronizar')}
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(true)}
+                  className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Palette className="w-4 h-4" />
+                  <span>+ Personalizado</span>
+                </button>
+              </div>
             </div>
+            {renderSyncFeedback()}
 
             <CatalogSearchInput
               {...search}
@@ -164,16 +215,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Selector de Entrega y Logística */}
           <DeliveryMethodSelector
-            deliveryMethod={remoteForm.deliveryMethod}
-            setDeliveryMethod={remoteForm.setDeliveryMethod}
-            shippingCost={remoteForm.shippingCost}
-            setShippingCost={remoteForm.setShippingCost}
-            shippingCourier={remoteForm.shippingCourier}
-            setShippingCourier={remoteForm.setShippingCourier}
-            shippingTrackingNumber={remoteForm.shippingTrackingNumber}
-            setShippingTrackingNumber={remoteForm.setShippingTrackingNumber}
-            pickupEventId={remoteForm.pickupEventId}
-            setPickupEventId={remoteForm.setPickupEventId}
+            deliveryMethod={remoteForm.deliveryMethod} setDeliveryMethod={remoteForm.setDeliveryMethod}
+            shippingCost={remoteForm.shippingCost} setShippingCost={remoteForm.setShippingCost}
+            shippingCourier={remoteForm.shippingCourier} setShippingCourier={remoteForm.setShippingCourier}
+            shippingTrackingNumber={remoteForm.shippingTrackingNumber} setShippingTrackingNumber={remoteForm.setShippingTrackingNumber}
+            pickupEventId={remoteForm.pickupEventId} setPickupEventId={remoteForm.setPickupEventId}
             availablePickupEvents={remoteForm.availablePickupEvents}
           />
 
@@ -186,32 +232,19 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Cotizador 50/50 y Registro de Anticipo */}
           <RemoteQuoterSummary
-            productsSubtotal={remoteForm.productsSubtotal}
-            productsAmount={remoteForm.productsAmount}
-            discount={cart.discount}
-            effectiveShippingCost={remoteForm.effectiveShippingCost}
-            totalAmount={remoteForm.totalAmount}
-            minDeposit={remoteForm.minDeposit}
-            depositInput={remoteForm.depositInput}
-            setDepositInput={remoteForm.setDepositInput}
-            numericDeposit={remoteForm.numericDeposit}
-            balanceDue={remoteForm.balanceDue}
-            isDepositValid={remoteForm.isDepositValid}
-            depositPaymentMethod={remoteForm.depositPaymentMethod}
-            setDepositPaymentMethod={remoteForm.setDepositPaymentMethod}
-            depositReference={remoteForm.depositReference}
-            setDepositReference={remoteForm.setDepositReference}
-            remoteSaleNotes={remoteForm.remoteSaleNotes}
-            setRemoteSaleNotes={remoteForm.setRemoteSaleNotes}
-            depositReceiptUrl={remoteForm.depositReceiptUrl}
-            setDepositReceiptUrl={remoteForm.setDepositReceiptUrl}
-            isUploadingReceipt={remoteForm.isUploadingReceipt}
-            receiptUploadError={remoteForm.receiptUploadError}
-            onUploadReceipt={remoteForm.handleReceiptUpload}
-            isPendingPaymentOnly={remoteForm.isPendingPaymentOnly}
-            setIsPendingPaymentOnly={remoteForm.setIsPendingPaymentOnly}
-            isSubmitting={remoteForm.isSubmitting}
-            submitError={remoteForm.submitError}
+            productsSubtotal={remoteForm.productsSubtotal} productsAmount={remoteForm.productsAmount}
+            discount={cart.discount} effectiveShippingCost={remoteForm.effectiveShippingCost}
+            totalAmount={remoteForm.totalAmount} minDeposit={remoteForm.minDeposit}
+            depositInput={remoteForm.depositInput} setDepositInput={remoteForm.setDepositInput}
+            numericDeposit={remoteForm.numericDeposit} balanceDue={remoteForm.balanceDue}
+            isDepositValid={remoteForm.isDepositValid} depositPaymentMethod={remoteForm.depositPaymentMethod}
+            setDepositPaymentMethod={remoteForm.setDepositPaymentMethod} depositReference={remoteForm.depositReference}
+            setDepositReference={remoteForm.setDepositReference} remoteSaleNotes={remoteForm.remoteSaleNotes}
+            setRemoteSaleNotes={remoteForm.setRemoteSaleNotes} depositReceiptUrl={remoteForm.depositReceiptUrl}
+            setDepositReceiptUrl={remoteForm.setDepositReceiptUrl} isUploadingReceipt={remoteForm.isUploadingReceipt}
+            receiptUploadError={remoteForm.receiptUploadError} onUploadReceipt={remoteForm.handleReceiptUpload}
+            isPendingPaymentOnly={remoteForm.isPendingPaymentOnly} setIsPendingPaymentOnly={remoteForm.setIsPendingPaymentOnly}
+            isSubmitting={remoteForm.isSubmitting} submitError={remoteForm.submitError}
             onConfirmRemoteSale={remoteForm.confirmRemoteSale}
           />
 
@@ -252,12 +285,21 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           )}
 
 
-          <CatalogSearchInput
-            {...search}
-            onSelectPoster={handleSelectPoster}
-            onClearSearch={search.clearSearch}
-            hasSelectedPoster={Boolean(selectedPoster)}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                Catálogo Ferial
+              </span>
+              {renderSyncControl('Sincronizar catálogo')}
+            </div>
+            {renderSyncFeedback()}
+            <CatalogSearchInput
+              {...search}
+              onSelectPoster={handleSelectPoster}
+              onClearSearch={search.clearSearch}
+              hasSelectedPoster={Boolean(selectedPoster)}
+            />
+          </div>
 
           {selectedPoster && (
             <PosterConfigurator

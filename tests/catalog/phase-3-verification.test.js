@@ -13,6 +13,7 @@ import { matchPosterEverywhere, normalizeMatcherString, stemMatcherToken } from 
 import { computePosterEmbeddingHash } from '../../server/services/embeddingService.js';
 import { SEED_POSTERS, TIMEOUT_MS, saveCatalogSnapshot, STANDARD_POSTER_SIZES, ALBUM_POSTER_SIZES } from '../../src/services/catalogCacheService.js';
 import { productCache } from '../../server/services/catalog/catalogCacheStore.js';
+import { deltaSyncRecentPosters } from '../../server/services/catalog/liveCatalogSyncService.js';
 
 describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ, EMBEDDINGS, FINANZAS)', () => {
   describe('1. Unificación de Tallas y Precios Canónicos (Hallazgos #17, #34, #39)', () => {
@@ -147,4 +148,62 @@ describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ
       assert.ok(sliceAngle > 2 * Math.PI - 0.001, 'sliceAngle debe cubrir casi el círculo completo');
     });
   });
+
+  describe('7. Delta-Sync de Catálogo Web (Ticket DEKO-POS-043)', () => {
+    it('7.1 deltaSyncRecentPosters consulta la API con take=100 limpio y no envía orderBy=desc', async () => {
+      const originalFetch = globalThis.fetch;
+      const requestedUrls = [];
+      try {
+        globalThis.fetch = async (url) => {
+          requestedUrls.push(String(url));
+          return {
+            ok: true,
+            json: async () => ({ success: true, posters: [] }),
+          };
+        };
+
+        await deltaSyncRecentPosters('mock_tenant_id');
+
+        assert.ok(requestedUrls.length > 0, 'Debe haber realizado al menos una petición HTTP');
+        for (const url of requestedUrls) {
+          assert.strictEqual(
+            url.includes('orderBy=desc'),
+            false,
+            `La URL no debe contener el parámetro inválido orderBy=desc: ${url}`
+          );
+          assert.ok(
+            url.includes('/api/catalog/posters?take=100'),
+            `La URL debe consultar take=100: ${url}`
+          );
+        }
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('7.2 deltaSyncRecentPosters ejecuta fallback con sort=desc si la primera petición retorna vacío', async () => {
+      const originalFetch = globalThis.fetch;
+      const requestedUrls = [];
+      try {
+        globalThis.fetch = async (url) => {
+          const urlStr = String(url);
+          requestedUrls.push(urlStr);
+          return {
+            ok: true,
+            json: async () => ({ success: true, posters: [] }),
+          };
+        };
+
+        await deltaSyncRecentPosters('mock_tenant_id');
+
+        const hasPrimary = requestedUrls.some((u) => u.includes('take=100') && !u.includes('sort=desc'));
+        const hasFallback = requestedUrls.some((u) => u.includes('take=100&sort=desc'));
+        assert.ok(hasPrimary, 'Debe intentar la URL primaria take=100');
+        assert.ok(hasFallback, 'Debe intentar la URL fallback take=100&sort=desc');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  });
 });
+
