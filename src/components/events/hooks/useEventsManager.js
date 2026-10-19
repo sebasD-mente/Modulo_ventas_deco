@@ -16,6 +16,7 @@ export function useEventsManager({ onEventActivated } = {}) {
   const [eventToDelete, setEventToDelete] = useState(null), [isSubmittingDelete, setIsSubmittingDelete] = useState(false), [deleteErrorMsg, setDeleteErrorMsg] = useState(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false), [newEventData, setNewEventData] = useState(INITIAL_EVENT_DATA);
   const [eventToEdit, setEventToEdit] = useState(null), [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+  const [eventForExpenses, setEventForExpenses] = useState(null);
   const [archivedSearchQuery, setArchivedSearchQuery] = useState(''), [archivedDateFilter, setArchivedDateFilter] = useState(''), [showArchivedSection, setShowArchivedSection] = useState(true);
 
   const loadEvents = async () => {
@@ -66,22 +67,28 @@ export function useEventsManager({ onEventActivated } = {}) {
   };
 
   const handleConfirmActivation = async () => {
-    if (!sellerGoogleEmail.trim()) { alert('Debes ingresar el correo de Google del vendedor.'); return; }
     setIsSubmittingActivation(true);
     try {
+      const payload = {};
+      if (sellerGoogleEmail && sellerGoogleEmail.trim()) {
+        payload.assignedSellerEmail = sellerGoogleEmail.trim();
+        payload.assignedSellerName = sellerName?.trim() || sellerGoogleEmail.split('@')[0];
+      }
       const res = await authFetch(`/api/events/${activatingEvent.id}/activate`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignedSellerEmail: sellerGoogleEmail.trim(),
-          assignedSellerName: sellerName.trim() || sellerGoogleEmail.split('@')[0],
-        }),
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error activando evento');
-      setActivatingEvent(null); await loadEvents();
+      setActivatingEvent(null);
+      await loadEvents();
       if (onEventActivated) onEventActivated(json.data);
-    } catch (err) { alert(err.message); }
-    finally { setIsSubmittingActivation(false); }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSubmittingActivation(false);
+    }
   };
 
   const handleConfirmArchive = async () => {
@@ -192,6 +199,7 @@ export function useEventsManager({ onEventActivated } = {}) {
     eventToDelete, setEventToDelete, openDeleteModal, isSubmittingDelete, deleteErrorMsg, setDeleteErrorMsg, handleConfirmDelete,
     isCreatingEvent, setIsCreatingEvent, newEventData, setNewEventData, handleCreateEvent,
     eventToEdit, setEventToEdit, isSubmittingUpdate, handleUpdateEvent,
+    eventForExpenses, setEventForExpenses,
   };
 }
 

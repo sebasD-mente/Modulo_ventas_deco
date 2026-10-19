@@ -19,6 +19,38 @@ export async function createSale(req, res) {
       return res.status(400).json({ success: false, error: 'Contexto de usuario o empresa no válido.' });
     }
 
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'El evento destino es obligatorio.' });
+    }
+
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+    const isVendedor = userRoles.includes('VENDEDOR');
+
+    if (isVendedor && !isSuperAdmin && !isVendedorRedes && req.user?.assignedEventId) {
+      if (eventId !== req.user.assignedEventId) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes autorización para registrar ventas en un evento diferente al asignado.',
+        });
+      }
+    }
+
+    if (prisma.event && typeof prisma.event.findFirst === 'function') {
+      try {
+        const targetEvent = await prisma.event.findFirst({
+          where: { id: eventId, tenantId },
+          select: { id: true, status: true },
+        });
+        if (targetEvent && targetEvent.status === 'ARCHIVADO') {
+          return res.status(400).json({ success: false, error: 'No se pueden registrar ventas en un evento archivado.' });
+        }
+      } catch (_) {}
+    }
+
     const sale = await createSaleTransaction({
       tenantId, sellerId, eventId, items, payments, discount, notes, inputChannel,
       attachments: attachments || [], idempotencyKey,
@@ -118,24 +150,7 @@ export async function getMonitorMetrics(req, res) {
     }
     // 2. Vendedor de mostrador ferial: anclado estrictamente a su evento presencial
     else if (isVendedor && !isSuperAdmin && !isVendedorRedes) {
-      let sellerEvent = null;
-      if (user?.assignedEventId) {
-        sellerEvent = await prisma.event.findFirst({
-          where: { id: user.assignedEventId, tenantId },
-        });
-      }
-      if (!sellerEvent && user?.email) {
-        sellerEvent = await prisma.event.findFirst({
-          where: { tenantId, status: 'ACTIVO', assignedSellerEmail: user.email },
-        });
-      }
-      if (!sellerEvent) {
-        sellerEvent = await prisma.event.findFirst({
-          where: { tenantId, status: 'ACTIVO', NOT: { id: 'evt-ventas-redes-online' } },
-          orderBy: { startDate: 'desc' },
-        });
-      }
-      targetEventId = sellerEvent?.id || 'none';
+      targetEventId = user?.assignedEventId || 'none';
     }
 
     const data = await getMonitorDashboardMetrics({

@@ -35,6 +35,7 @@ const DOMAIN_CEILINGS = {
   'server/controllers/printSheetController.js': { max: 300, reason: 'Controlador de pliegos de taller y asignación' },
   'server/controllers/commissionController.js': { max: 300, reason: 'Controlador de comisiones y liquidaciones' },
   'server/controllers/saleController.js': { max: 450, reason: 'Controlador de ventas feriales, arqueos y logística de pedidos' },
+  'server/controllers/eventController.js': { max: 520, reason: 'Controlador integral de eventos multi-stand, activación concurrente y bitácora de gastos' },
   'src/components/FastManualSaleForm.jsx': { max: 350, reason: 'Terminal unificada de venta manual rápida, cotizador 50/50, top sellers y carrito' },
   'src/components/sales/BalancePaymentModal.jsx': { max: 350, reason: 'Modal integral de cobro de saldos, liquidación financiera y comprobantes' },
   'src/components/manual-sale/RemoteQuoterSummary.jsx': { max: 350, reason: 'Cotizador integral 50/50 con validación OCR de boletas y anticipos' },

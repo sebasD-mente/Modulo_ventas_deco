@@ -67,6 +67,9 @@ import {
   archiveEvent,
   unarchiveEvent,
   deleteEvent,
+  getEventExpenses,
+  createEventExpense,
+  removeEventExpense,
 } from '../controllers/eventController.js';
 import {
   getProducts,
@@ -177,6 +180,9 @@ router.patch('/events/:id/activate', requireRole(['SUPER_ADMIN']), activateEvent
 router.patch('/events/:id/archive', requireRole(['SUPER_ADMIN']), archiveEvent);
 router.patch('/events/:id/unarchive', requireRole(['SUPER_ADMIN']), unarchiveEvent);
 router.delete('/events/:id', requireRole(['SUPER_ADMIN']), deleteEvent);
+router.get('/events/:id/expenses', requireRole(['SUPER_ADMIN']), getEventExpenses);
+router.post('/events/:id/expenses', requireRole(['SUPER_ADMIN']), createEventExpense);
+router.delete('/events/:id/expenses/:expenseId', requireRole(['SUPER_ADMIN']), removeEventExpense);
 router.get('/products', getProducts);
 
 router.get('/catalog/web-posters', searchWebPostersCatalog);

@@ -1,5 +1,12 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
+import { invalidateUserAuthCache } from '../middleware/authMiddleware.js';
+import {
+  calculateEventFinancials,
+  listEventExpenses,
+  addEventExpense,
+  deleteEventExpense,
+} from '../services/eventFinanceService.js';
 
 const SELLER_SELECT = {
   id: true, fullName: true, email: true, role: true, roles: true, avatarUrl: true,
@@ -20,18 +27,73 @@ function getDevFallbackEvent(tenantId) {
 export async function getActiveEvent(req, res) {
   try {
     const tenantId = req.tenantId;
-    let event;
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [req.user?.role || 'VENDEDOR'];
+    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+    const isVendedor = userRoles.includes('VENDEDOR');
+    const assignedEventId = req.user?.assignedEventId;
+
+    let event = null;
     const selectTenant = { select: { name: true, currencySymbol: true, currency: true } };
+
     try {
-      event = (await prisma.event.findFirst({
-        where: { tenantId, status: 'ACTIVO' },
-        include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
-        orderBy: { startDate: 'desc' },
-      })) || (await prisma.event.findFirst({
-        where: { tenantId },
-        include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
-        orderBy: { createdAt: 'desc' },
-      }));
+      if (isVendedorRedes && !isSuperAdmin && !isVendedor) {
+        event = await prisma.event.findFirst({
+          where: { id: 'evt-ventas-redes-online', tenantId },
+          include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+        });
+        if (!event) {
+          event = await prisma.event.findFirst({
+            where: { tenantId, status: 'ACTIVO' },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+          });
+        }
+      } else if (isVendedor && !isSuperAdmin) {
+        if (assignedEventId) {
+          event = await prisma.event.findFirst({
+            where: { id: assignedEventId, tenantId },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+          });
+        } else {
+          return res.json({
+            success: true,
+            data: null,
+            unassignedSeller: true,
+            message: 'No tienes un stand asignado actualmente. Contacta al administrador.',
+          });
+        }
+      } else {
+        const requestedEventId = req.query?.eventId;
+        if (requestedEventId) {
+          event = await prisma.event.findFirst({
+            where: { id: requestedEventId, tenantId },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+          });
+        }
+        if (!event) {
+          event = await prisma.event.findFirst({
+            where: { tenantId, status: 'ACTIVO', id: { not: 'evt-ventas-redes-online' } },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+            orderBy: { startDate: 'desc' },
+          });
+        }
+        if (!event) {
+          event = await prisma.event.findFirst({
+            where: { tenantId, status: 'ACTIVO' },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+            orderBy: { startDate: 'desc' },
+          });
+        }
+        if (!event) {
+          event = await prisma.event.findFirst({
+            where: { tenantId },
+            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+      }
     } catch (dbErr) {
       if (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test') {
         event = getDevFallbackEvent(tenantId);
@@ -39,13 +101,34 @@ export async function getActiveEvent(req, res) {
         throw dbErr;
       }
     }
+
     if (!event && (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test')) {
       event = getDevFallbackEvent(tenantId);
     }
+
     if (!event) {
       return res.status(404).json({ success: false, error: 'No hay eventos configurados para este negocio.' });
     }
-    return res.json({ success: true, data: event });
+
+    let financials = null;
+    try {
+      const salesAgg = await prisma.sale.aggregate({
+        where: { tenantId, eventId: event.id, status: { not: 'ANULADA' } },
+        _sum: { totalAmount: true },
+      });
+      const expenses = (prisma.eventExpense && typeof prisma.eventExpense.findMany === 'function')
+        ? await prisma.eventExpense.findMany({ where: { tenantId, eventId: event.id } })
+        : [];
+      financials = calculateEventFinancials({
+        event,
+        cumulativeSold: Number(salesAgg._sum?.totalAmount || 0),
+        expenses,
+      });
+    } catch (_fErr) {
+      financials = calculateEventFinancials({ event, cumulativeSold: 0, expenses: [] });
+    }
+
+    return res.json({ success: true, data: { ...event, financials } });
   } catch (err) {
     console.error('❌ Error obteniendo evento activo:', err);
     return res.status(500).json({ success: false, error: 'Error del servidor al obtener evento.' });
@@ -55,8 +138,7 @@ export async function getActiveEvent(req, res) {
 export async function getEventsList(req, res) {
   try {
     const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
-      ? req.user.roles
-      : [req.user?.role || 'VENDEDOR'];
+      ? req.user.roles : [req.user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
     const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
 
@@ -68,22 +150,47 @@ export async function getEventsList(req, res) {
     const events = await prisma.event.findMany({
       where: whereClause,
       orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
-      include: {
-        sales: {
-          where: { status: { not: 'ANULADA' } },
-          select: { totalAmount: true },
-        },
-        assignedSellers: { select: SELLER_SELECT },
-      },
+      include: { assignedSellers: { select: SELLER_SELECT } },
     });
-    const formatted = events.map(({ sales, _count, ...rest }) => {
-      const activeSales = Array.isArray(sales) ? sales : [];
-      return {
-        ...rest,
-        totalSold: Number(activeSales.reduce((acc, s) => acc + Number(s.totalAmount || 0), 0).toFixed(2)),
-        salesCount: activeSales.length,
-      };
+
+    let salesByEvent = new Map();
+    try {
+      const salesAgg = await prisma.sale.groupBy({
+        by: ['eventId'],
+        where: { tenantId: req.tenantId, status: { not: 'ANULADA' } },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      });
+      salesAgg.forEach((r) => {
+        if (r.eventId) {
+          salesByEvent.set(r.eventId, {
+            totalSold: Number(Number(r._sum?.totalAmount || 0).toFixed(2)),
+            salesCount: r._count?.id || 0,
+          });
+        }
+      });
+    } catch (_) {}
+
+    let expensesByEvent = new Map();
+    try {
+      if (prisma.eventExpense && typeof prisma.eventExpense.findMany === 'function') {
+        const allExpenses = await prisma.eventExpense.findMany({ where: { tenantId: req.tenantId } });
+        allExpenses.forEach((exp) => {
+          if (!expensesByEvent.has(exp.eventId)) expensesByEvent.set(exp.eventId, []);
+          expensesByEvent.get(exp.eventId).push(exp);
+        });
+      }
+    } catch (_) {}
+
+    const formatted = events.map((ev) => {
+      const salesInfo = salesByEvent.get(ev.id) || { totalSold: 0, salesCount: 0 };
+      const evExpenses = expensesByEvent.get(ev.id) || [];
+      const financials = calculateEventFinancials({
+        event: ev, cumulativeSold: salesInfo.totalSold, expenses: evExpenses,
+      });
+      return { ...ev, totalSold: salesInfo.totalSold, salesCount: salesInfo.salesCount, financials };
     });
+
     return res.json({ success: true, data: formatted });
   } catch (err) {
     console.error('❌ Error obteniendo lista de eventos:', err);
@@ -96,31 +203,30 @@ export async function activateEvent(req, res) {
     const { id } = req.params;
     const { assignedSellerEmail, assignedSellerName } = req.body;
     const tenantId = req.tenantId;
-    if (!assignedSellerEmail?.trim()) {
-      return res.status(400).json({ success: false, error: 'El correo de Google del vendedor es obligatorio.' });
+
+    const existingEvent = await prisma.event.findFirst({
+      where: { id, tenantId },
+      include: { assignedSellers: true },
+    });
+    if (!existingEvent) return res.status(404).json({ success: false, error: 'Evento no encontrado.' });
+
+    const updateData = { status: 'ACTIVO' };
+    if (assignedSellerEmail && assignedSellerEmail.trim()) {
+      updateData.assignedSellerEmail = assignedSellerEmail.trim();
+      updateData.assignedSellerName = (assignedSellerName || assignedSellerEmail.split('@')[0]).trim();
     }
-    const runActivate = async (tx) => {
-      await tx.event.updateMany({
-        where: { tenantId, status: 'ACTIVO', id: { not: id } },
-        data: { status: 'CONFIRMADO' },
-      });
-      return await tx.event.update({
-        where: { id },
-        data: {
-          status: 'ACTIVO',
-          assignedSellerEmail: assignedSellerEmail.trim(),
-          assignedSellerName: (assignedSellerName || assignedSellerEmail.split('@')[0]).trim(),
-        },
-        include: { assignedSellers: { select: SELLER_SELECT } },
-      });
-    };
-    const updated = typeof prisma.$transaction === 'function'
-      ? await prisma.$transaction(runActivate)
-      : await runActivate(prisma);
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: updateData,
+      include: { assignedSellers: { select: SELLER_SELECT } },
+    });
+
+    invalidateUserAuthCache();
     return res.json({
       success: true,
       data: updated,
-      message: `El evento "${updated.name}" está ahora EN CURSO con vendedor ${updated.assignedSellerEmail}.`,
+      message: `El evento "${updated.name}" está ahora EN CURSO (concurrente).`,
     });
   } catch (err) {
     console.error('❌ Error activando evento:', err);
@@ -188,6 +294,7 @@ export async function createEvent(req, res) {
       ? await prisma.$transaction(runCreate)
       : await runCreate(prisma);
 
+    invalidateUserAuthCache();
     return res.status(201).json({
       success: true,
       data: resultEvent,
@@ -239,10 +346,7 @@ export async function updateEvent(req, res) {
         }
       }
 
-      await tx.event.update({
-        where: { id },
-        data: updateData,
-      });
+      await tx.event.update({ where: { id }, data: updateData });
 
       return await tx.event.findUnique({
         where: { id },
@@ -258,10 +362,12 @@ export async function updateEvent(req, res) {
       ? await prisma.$transaction(runUpdate)
       : await runUpdate(prisma);
 
+    invalidateUserAuthCache();
+
     const formatted = {
       ...updated,
-      totalSold: updated.sales.reduce((acc, s) => acc + Number(s.totalAmount), 0),
-      salesCount: updated._count.sales,
+      totalSold: updated.sales ? updated.sales.reduce((acc, s) => acc + Number(s.totalAmount), 0) : 0,
+      salesCount: updated._count ? updated._count.sales : 0,
     };
 
     return res.json({
@@ -285,6 +391,7 @@ async function changeEventStatus(req, res, targetStatus, successMsg, errorMsg, l
       data: { status: targetStatus },
       include: { assignedSellers: { select: SELLER_SELECT } },
     });
+    invalidateUserAuthCache();
     return res.json({ success: true, data: updated, message: `El evento "${updated.name}" ${successMsg}.` });
   } catch (err) {
     console.error(`❌ Error ${logAction} evento:`, err);
@@ -292,8 +399,15 @@ async function changeEventStatus(req, res, targetStatus, successMsg, errorMsg, l
   }
 }
 
-export const archiveEvent = (req, res) =>
-  changeEventStatus(req, res, 'ARCHIVADO', 'ha sido archivado exitosamente', 'Error al archivar el evento.', 'archivando');
+export const archiveEvent = (req, res) => {
+  if (req.params.id === 'evt-ventas-redes-online') {
+    return res.status(400).json({
+      success: false,
+      error: 'El Punto de Venta Digital Permanente no puede ser archivado.',
+    });
+  }
+  return changeEventStatus(req, res, 'ARCHIVADO', 'ha sido archivado exitosamente', 'Error al archivar el evento.', 'archivando');
+};
 
 export const unarchiveEvent = (req, res) =>
   changeEventStatus(req, res, 'CONFIRMADO', 'ha sido restaurado a la lista de confirmados', 'Error al restaurar el evento.', 'desarchivando');
@@ -312,23 +426,80 @@ export async function deleteEvent(req, res) {
     const isSuperAdmin = req.user?.roles?.includes('SUPER_ADMIN') || req.user?.role === 'SUPER_ADMIN';
     if (force === 'true' && isSuperAdmin) {
       await prisma.user.updateMany({ where: { assignedEventId: id }, data: { assignedEventId: null } });
+      if (prisma.eventExpense && typeof prisma.eventExpense.deleteMany === 'function') {
+        await prisma.eventExpense.deleteMany({ where: { eventId: id } });
+      }
       await prisma.cashClosing.deleteMany({ where: { eventId: id } });
       await prisma.sale.deleteMany({ where: { eventId: id } });
       await prisma.event.delete({ where: { id } });
-      return res.json({ success: true, message: `El evento "${event.name}" y sus registros de prueba fueron purgados con éxito.` });
+      invalidateUserAuthCache();
+      return res.json({ success: true, message: `El evento "${event.name}" y sus registros fueron purgados con éxito.` });
     }
 
-    if (event._count.sales > 0 || event._count.cashClosings > 0) {
+    const expensesCount = (prisma.eventExpense && typeof prisma.eventExpense.count === 'function')
+      ? await prisma.eventExpense.count({ where: { eventId: id } }) : 0;
+
+    if (event._count.sales > 0 || event._count.cashClosings > 0 || expensesCount > 0) {
       return res.status(400).json({
         success: false,
-        error: `No se puede eliminar "${event.name}" porque tiene registros contables (${event._count.sales} ventas y ${event._count.cashClosings} arqueos). Puedes archivarlo para preservar el historial o purgarlo si eres administrador.`,
+        error: `No se puede eliminar "${event.name}" porque tiene registros contables (${event._count.sales} ventas, ${event._count.cashClosings} arqueos y ${expensesCount} gastos).`,
       });
     }
+
     await prisma.user.updateMany({ where: { assignedEventId: id }, data: { assignedEventId: null } });
     await prisma.event.delete({ where: { id } });
+    invalidateUserAuthCache();
     return res.json({ success: true, message: `El evento "${event.name}" fue eliminado correctamente.` });
   } catch (err) {
     console.error('❌ Error eliminando evento:', err);
     return res.status(500).json({ success: false, error: 'Error al eliminar el evento.' });
+  }
+}
+
+export async function getEventExpenses(req, res) {
+  try {
+    const { id } = req.params;
+    const result = await listEventExpenses({ tenantId: req.tenantId, eventId: id });
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('❌ Error obteniendo gastos del evento:', err);
+    const status = err.message?.includes('no existe') ? 404 : 400;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+}
+
+export async function createEventExpense(req, res) {
+  try {
+    const { id } = req.params;
+    const { category, description, amount, expenseDate } = req.body;
+    const result = await addEventExpense({
+      tenantId: req.tenantId,
+      eventId: id,
+      category,
+      description,
+      amount,
+      expenseDate,
+      createdById: req.user?.id,
+    });
+    return res.status(201).json({
+      success: true,
+      data: result.expense,
+      financials: result.financials,
+      message: 'Gasto registrado correctamente.',
+    });
+  } catch (err) {
+    console.error('❌ Error registrando gasto:', err);
+    return res.status(400).json({ success: false, error: err.message });
+  }
+}
+
+export async function removeEventExpense(req, res) {
+  try {
+    const { id, expenseId } = req.params;
+    const result = await deleteEventExpense({ tenantId: req.tenantId, eventId: id, expenseId });
+    return res.json({ success: true, data: result, message: 'Gasto eliminado exitosamente.' });
+  } catch (err) {
+    console.error('❌ Error eliminando gasto:', err);
+    return res.status(400).json({ success: false, error: err.message });
   }
 }

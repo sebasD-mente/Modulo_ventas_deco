@@ -27,6 +27,7 @@ model Tenant {
   cashClosings CashClosing[]
   auditLogs    AuditLog[]
   customers    Customer[]
+  eventExpenses EventExpense[]
 
   @@map("tenants")
 }
@@ -82,6 +83,7 @@ model Event {
   pickupSales     Sale[]        @relation("PickupEventSales")
   cashClosings    CashClosing[]
   assignedSellers User[]        @relation("AssignedSeller")
+  expenses        EventExpense[]
 
   @@index([tenantId, status])
   @@map("events")
@@ -403,3 +405,23 @@ model AiChatSession {
   @@index([updatedAt])
   @@map("ai_chat_sessions")
 }
+
+model EventExpense {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  category    String   @default("PUBLICIDAD_OTROS") // ARRENDAMIENTO_STAND | PAGO_VENDEDOR | ALIMENTACION | TRANSPORTE_LOGISTICA | PUBLICIDAD_OTROS
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  expenseDate DateTime @default(now())
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, eventId])
+  @@index([eventId, category])
+  @@map("event_expenses")
+}
+

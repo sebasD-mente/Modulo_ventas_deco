@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, User, Mail, Play, Eye, Archive, RotateCcw, Trash2, Pencil, Users } from 'lucide-react';
+import { MapPin, User, Mail, Play, Eye, Archive, RotateCcw, Trash2, Pencil, Users, Receipt } from 'lucide-react';
 
 function SellersSection({ event }) {
   const sellers = event.assignedSellers || [];
@@ -57,6 +57,45 @@ function SellersSection({ event }) {
   );
 }
 
+function FinancialsBadgeSection({ financials }) {
+  if (!financials || (financials.totalExpenses === 0 && financials.cumulativeSold === 0)) return null;
+  const isHealthy = financials.standRentRatioPct > 0 && financials.standRentRatioPct <= 20;
+  const isCovered = financials.preProductionBalance >= 0;
+
+  return (
+    <div className="p-2.5 rounded-xl bg-[#141414] border border-neutral-800 space-y-1.5">
+      <div className="grid grid-cols-2 gap-2 text-center text-xs">
+        <div>
+          <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Gastos Stand</span>
+          <span className="text-xs font-bold text-red-400 font-mono">Q {(financials.totalExpenses || 0).toFixed(2)}</span>
+        </div>
+        <div>
+          <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Balance Pre-Prod</span>
+          <span className={`text-xs font-bold font-mono ${financials.preProductionBalance >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {financials.preProductionBalance >= 0 ? '+Q ' : '-Q '}
+            {Math.abs(financials.preProductionBalance || 0).toFixed(2)}
+          </span>
+        </div>
+      </div>
+      {financials.standRentCost > 0 && (
+        <div className={`px-2 py-1 rounded-lg text-[10px] font-bold text-center border truncate ${
+          isHealthy
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : isCovered
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+        }`}>
+          {isHealthy
+            ? `🟢 Arriendo: ${financials.standRentRatioPct}% (≤20% Saludable)`
+            : isCovered
+              ? `🟡 Arriendo: ${financials.standRentRatioPct}% (Meta: Q${financials.healthySalesTarget20Pct})`
+              : `🔴 Recuperando gastos (Faltan Q${financials.remainingForExpenseRecovery})`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const formatEventDate = (dateStr) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -72,12 +111,13 @@ export default function EventCard({
   onUnarchive,
   onDelete,
   onEdit,
+  onManageExpenses,
 }) {
   const type = statusType || event.status;
 
   if (type === 'ACTIVO') {
     return (
-      <div className="p-4 sm:p-5 rounded-2xl bg-black border-2 border-emerald-500/70 shadow-xl space-y-4 relative overflow-hidden flex flex-col justify-between">
+      <div className="p-4 sm:p-5 rounded-2xl bg-black border-2 border-emerald-500/70 shadow-xl space-y-3 relative overflow-hidden flex flex-col justify-between">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="px-3 py-1 rounded-full border border-emerald-500 bg-white text-emerald-600 font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
@@ -104,18 +144,24 @@ export default function EventCard({
               <span className="text-lg font-black text-white font-mono">{event.salesCount || 0}</span>
             </div>
           </div>
+          <FinancialsBadgeSection financials={event.financials} />
         </div>
         <div className="pt-2 flex items-center gap-2">
-          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md min-h-[44px]">
-            <Eye className="w-4 h-4" /> <span>Ver ventas ({event.salesCount || 0})</span>
+          <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-md min-h-[44px]">
+            <Eye className="w-4 h-4" /> <span>Ventas ({event.salesCount || 0})</span>
           </button>
-          {onEdit && (
-            <button type="button" onClick={() => onEdit(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Editar evento y vendedores">
-              <Pencil className="w-3.5 h-3.5 text-amber-400" /> <span className="hidden sm:inline">Editar</span>
+          {onManageExpenses && (
+            <button type="button" onClick={() => onManageExpenses(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-amber-300 hover:text-amber-200 border border-amber-500/30 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Gestionar gastos del stand">
+              <Receipt className="w-3.5 h-3.5 text-amber-400" /> <span className="hidden sm:inline">Gastos</span>
             </button>
           )}
-          <button type="button" onClick={() => onArchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Archivar evento cuando concluya">
-            <Archive className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Archivar</span>
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Editar evento">
+              <Pencil className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+          )}
+          <button type="button" onClick={() => onArchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#1a1a1a] hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Archivar evento">
+            <Archive className="w-3.5 h-3.5" />
           </button>
           {onDelete && (
             <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar evento">
@@ -154,18 +200,22 @@ export default function EventCard({
               <span className="text-sm font-black text-white font-mono">{event.salesCount || 0}</span>
             </div>
           </div>
+          <FinancialsBadgeSection financials={event.financials} />
         </div>
         <div className="pt-2 border-t border-neutral-800/80 flex items-center gap-2">
           <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer min-h-[44px]">
-            <Eye className="w-3.5 h-3.5" /> <span>Ver ventas ({event.salesCount || 0})</span>
+            <Eye className="w-3.5 h-3.5" /> <span>Ventas ({event.salesCount || 0})</span>
           </button>
+          {onManageExpenses && (
+            <button type="button" onClick={() => onManageExpenses(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-amber-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Historial de gastos"><Receipt className="w-3.5 h-3.5" /></button>
+          )}
           {onEdit && (
             <button type="button" onClick={() => onEdit(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Editar evento"><Pencil className="w-3.5 h-3.5 text-amber-400" /></button>
           )}
-          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Restaurar evento a confirmados">
-            <RotateCcw className="w-3.5 h-3.5" /> <span>Restaurar</span>
+          <button type="button" onClick={() => onUnarchive?.(event)} className="py-2.5 px-3 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer min-h-[44px]" title="Restaurar a confirmados">
+            <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Restaurar</span>
           </button>
-          <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title={event.salesCount > 0 ? 'Tiene ventas registradas' : 'Eliminar'}><Trash2 className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-500 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
     );
@@ -185,19 +235,23 @@ export default function EventCard({
           <MapPin className="w-3 h-3 text-neutral-400 shrink-0" /> <span className="truncate">{event.location}</span>
         </p>
         <SellersSection event={event} />
+        <FinancialsBadgeSection financials={event.financials} />
       </div>
       <div className="pt-2 border-t border-neutral-800/80 flex items-center gap-2">
         <button type="button" onClick={() => onActivate?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer min-h-[44px]">
-          <Play className="w-3.5 h-3.5 fill-current" /> <span>Activar / En curso</span>
+          <Play className="w-3.5 h-3.5 fill-current" /> <span>Activar</span>
         </button>
+        {onManageExpenses && (
+          <button type="button" onClick={() => onManageExpenses(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-amber-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Presupuesto y gastos"><Receipt className="w-3.5 h-3.5" /></button>
+        )}
         {onEdit && (
-          <button type="button" onClick={() => onEdit(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors" title="Editar evento y vendedores">
+          <button type="button" onClick={() => onEdit(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors" title="Editar evento">
             <Pencil className="w-3.5 h-3.5 text-amber-400" />
           </button>
         )}
-        <button type="button" onClick={() => onViewSales?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:text-white cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Ver historial de ventas"><Eye className="w-3.5 h-3.5" /></button>
-        <button type="button" onClick={() => onArchive?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Archivar evento"><Archive className="w-3.5 h-3.5" /></button>
-        <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar evento"><Trash2 className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => onViewSales?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:text-white cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Historial"><Eye className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => onArchive?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Archivar"><Archive className="w-3.5 h-3.5" /></button>
+        <button type="button" onClick={() => onDelete?.(event)} className="p-2.5 rounded-xl bg-[#181818] hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
       </div>
     </div>
   );
