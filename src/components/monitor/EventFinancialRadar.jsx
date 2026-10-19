@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Target, TrendingUp, Receipt, AlertCircle, Sparkles, Plus, Clock } from 'lucide-react';
 
 export default function EventFinancialRadar({
   eventDetails = [],
   globalFinancials = null,
   isSuperAdmin = false,
+  selectedEventId = null,
   onOpenExpenseModal,
 }) {
   const physicalEvents = useMemo(() => {
@@ -12,8 +13,17 @@ export default function EventFinancialRadar({
   }, [eventDetails]);
 
   const [selectedStandId, setSelectedStandId] = useState(() => {
+    if (selectedEventId && selectedEventId !== 'evt-ventas-redes-online') return selectedEventId;
     return physicalEvents[0]?.eventId || 'GLOBAL';
   });
+
+  useEffect(() => {
+    if (selectedEventId && physicalEvents.some((e) => e.eventId === selectedEventId)) {
+      setSelectedStandId(selectedEventId);
+    } else if (selectedStandId !== 'GLOBAL' && physicalEvents.length > 0 && !physicalEvents.some((e) => e.eventId === selectedStandId)) {
+      setSelectedStandId(physicalEvents[0].eventId);
+    }
+  }, [selectedEventId, physicalEvents]);
 
   const activeEvent = useMemo(() => {
     if (selectedStandId === 'GLOBAL') return null;

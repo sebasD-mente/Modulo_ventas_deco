@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Menu, X, ShoppingBag, Calendar, Activity,
@@ -17,6 +17,7 @@ export default function Header({
   const { user, logout, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isStandSelectorOpen, setIsStandSelectorOpen] = useState(false);
+  const standSelectorRef = useRef(null);
 
   useEffect(() => {
     document.body.style.overflow = isMenuOpen ? 'hidden' : '';
@@ -26,12 +27,19 @@ export default function Header({
         setIsStandSelectorOpen(false);
       }
     };
-    if (isMenuOpen) window.addEventListener('keydown', handleKeyDown);
+    const handleClickOutside = (e) => {
+      if (standSelectorRef.current && !standSelectorRef.current.contains(e.target)) {
+        setIsStandSelectorOpen(false);
+      }
+    };
+    if (isMenuOpen || isStandSelectorOpen) window.addEventListener('keydown', handleKeyDown);
+    if (isStandSelectorOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, isStandSelectorOpen]);
 
   let navTabs = [];
   if (isSuperAdmin) {
@@ -107,11 +115,13 @@ export default function Header({
 
         <div className="flex items-center gap-2">
           {activeEvent && (
-            <div className="relative">
+            <div className="relative" ref={standSelectorRef}>
               {isSuperAdmin && activeEventsList.length > 1 ? (
                 <div>
                   <button
-                    type="button" onClick={() => setIsStandSelectorOpen((p) => !p)}
+                    type="button"
+                    data-testid="header-stand-selector-btn"
+                    onClick={() => setIsStandSelectorOpen((p) => !p)}
                     className="min-h-[44px] px-2.5 py-1 rounded-xl bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer max-w-[130px] sm:max-w-[180px]"
                     title="Cambiar stand activo"
                   >
@@ -120,7 +130,10 @@ export default function Header({
                     <ChevronDown className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                   </button>
                   {isStandSelectorOpen && (
-                    <div className="absolute right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in duration-150">
+                    <div
+                      data-testid="header-stand-selector-menu"
+                      className="absolute right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in duration-150"
+                    >
                       <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2 py-1 block">Stands ({activeEventsList.length})</span>
                       <div className="space-y-1">
                         {activeEventsList.map((ev) => (

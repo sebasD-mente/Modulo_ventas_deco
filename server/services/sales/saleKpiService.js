@@ -78,16 +78,44 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     }
   }
 
-  const [salesAggregate, unitsAggregate, paymentsGroup, topProductsGroup, recentSales, eventRecord] = await Promise.all([
+  const [salesAggregate, unitsAggregate, paymentsGroup, topProductsGroup, daySales, eventRecord] = await Promise.all([
     prisma.sale.aggregate({ where: saleWhere, _sum: { totalAmount: true }, _count: { id: true } }),
     prisma.saleItem.aggregate({ where: { sale: saleWhere }, _sum: { quantity: true } }),
     prisma.salePayment.groupBy({ by: ['method'], where: paymentWhere, _count: { id: true }, _sum: { amount: true } }),
     prisma.saleItem.groupBy({ by: ['description'], where: { sale: saleWhere }, _sum: { quantity: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 10 }),
-    prisma.sale.findMany({ where: saleWhere, take: 15, orderBy: { createdAt: 'desc' }, include: { seller: true, payments: true, items: true } }),
+    prisma.sale.findMany({ where: saleWhere, take: 250, orderBy: { createdAt: 'desc' }, include: { seller: true, payments: true, items: true } }),
     eventId
       ? prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, location: true, status: true, startDate: true, endDate: true } })
       : Promise.resolve(null),
   ]);
+
+  const recentSales = (daySales || []).slice(0, 15);
+  const sellerMap = new Map();
+  (daySales || []).forEach((s) => {
+    const sId = s.sellerId || s.seller?.id || 'sin-asignar';
+    if (!sellerMap.has(sId)) {
+      sellerMap.set(sId, {
+        sellerId: sId,
+        sellerName: s.seller?.fullName || 'Vendedor Stand',
+        sellerEmail: s.seller?.email || '',
+        transactions: 0,
+        totalSold: 0,
+        cashCollected: 0,
+        cardCollected: 0,
+        transferCollected: 0,
+      });
+    }
+    const entry = sellerMap.get(sId);
+    entry.transactions += 1;
+    entry.totalSold = Number((entry.totalSold + Number(s.totalAmount || 0)).toFixed(2));
+    (s.payments || []).forEach((p) => {
+      const amt = Number(p.amount || 0);
+      if (p.method === 'EFECTIVO') entry.cashCollected = Number((entry.cashCollected + amt).toFixed(2));
+      else if (p.method === 'TARJETA') entry.cardCollected = Number((entry.cardCollected + amt).toFixed(2));
+      else if (p.method === 'TRANSFERENCIA') entry.transferCollected = Number((entry.transferCollected + amt).toFixed(2));
+    });
+  });
+  const sellerBreakdown = Array.from(sellerMap.values()).sort((a, b) => b.totalSold - a.totalSold);
 
   const totalTransactions = salesAggregate._count?.id || 0;
   const totalAmount = Number(Number(salesAggregate._sum?.totalAmount || 0).toFixed(2));
@@ -134,6 +162,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     paymentBreakdown,
     topProducts,
     recentSales,
+    sellerBreakdown,
   };
 }
 

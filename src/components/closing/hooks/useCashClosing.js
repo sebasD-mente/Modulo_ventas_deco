@@ -29,6 +29,13 @@ export function getDiscrepancyStatus(diff) {
 export function formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations }) {
   const todayStr = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const diffText = difference === 0 ? 'Q 0.00 (Cuadrado Exacto ✅)' : difference > 0 ? `+Q ${difference.toFixed(2)} (Sobrante 🟢)` : `-Q ${Math.abs(difference).toFixed(2)} (Faltante 🔴)`;
+
+  let sellerSection = '';
+  if (Array.isArray(liveMetrics?.sellerBreakdown) && liveMetrics.sellerBreakdown.length > 0) {
+    const lines = liveMetrics.sellerBreakdown.map((s) => `• ${s.sellerName} (${s.transactions} tx): Ef Q ${(s.cashCollected || 0).toFixed(2)} | Tot Q ${(s.totalSold || 0).toFixed(2)}`).join('\n');
+    sellerSection = `\n\n👥 *COBRO POR VENDEDOR:*\n${lines}`;
+  }
+
   return `🎪 *CIERRE DE CAJA — ${activeEvent?.tenant?.name || 'DECO VINTAGE'}*
 📅 *Fecha:* ${todayStr}
 📍 *Evento:* ${activeEvent?.name || 'Evento'} (${activeEvent?.location || 'Stand'})
@@ -40,7 +47,7 @@ export function formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash
 💳 *DESGLOSE POR MÉTODO DE PAGO:*
 • 💵 Efectivo en Caja: Q ${(calculatedCash || 0).toFixed(2)} (${liveMetrics?.paymentBreakdown?.EFECTIVO?.count || 0} tx)
 • 💳 Tarjeta (POS): Q ${(cardAmount || 0).toFixed(2)} (${liveMetrics?.paymentBreakdown?.TARJETA?.count || 0} tx)
-• 📲 Transferencia: Q ${(transferAmount || 0).toFixed(2)} (${liveMetrics?.paymentBreakdown?.TRANSFERENCIA?.count || 0} tx)
+• 📲 Transferencia: Q ${(transferAmount || 0).toFixed(2)} (${liveMetrics?.paymentBreakdown?.TRANSFERENCIA?.count || 0} tx)${sellerSection}
 
 ⚖️ *ARQUEO DE EFECTIVO:*
 • Sistema: Q ${(calculatedCash || 0).toFixed(2)}

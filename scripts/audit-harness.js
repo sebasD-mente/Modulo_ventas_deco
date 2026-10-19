@@ -26,10 +26,12 @@ const skipUnit = args.includes('--skip-unit');
 const results = {
   secrets: 'PENDING',
   syntax: 'PENDING',
+  reactContracts: 'SKIPPED',
   models: 'PENDING',
   monoliths: 'PENDING',
   security: 'SKIPPED',
   tests: 'SKIPPED',
+  build: 'SKIPPED',
 };
 
 function runStep(name, cmd, cmdArgs = [], options = {}) {
@@ -54,7 +56,7 @@ function runStep(name, cmd, cmdArgs = [], options = {}) {
   }
 
   if (res.status !== 0) {
-    console.error(`\n❌ [FALLO EN ARNÉS] La fase '${name}' ha fallado tras ${duration}s.`);
+    console.error(`\n❌ [FALLO EN ARNÉS 3.0] La fase '${name}' ha fallado tras ${duration}s.`);
     console.error('🛑 RECHAZO COERCITIVO: Ningún commit o despliegue puede proceder.\n');
     process.exit(1);
   }
@@ -65,49 +67,60 @@ function runStep(name, cmd, cmdArgs = [], options = {}) {
 
 // 1. Auditoría de Secretos
 if (fs.existsSync(path.join(rootDir, 'scripts', 'audit-secrets.js'))) {
-  runStep('1/6: Auditoría de Secretos y Zero-Trust', process.execPath, ['scripts/audit-secrets.js']);
+  runStep('1/7: Auditoría de Secretos y Zero-Trust', process.execPath, ['scripts/audit-secrets.js']);
   results.secrets = 'PASS';
 } else {
   console.warn('⚠️ scripts/audit-secrets.js no encontrado. Omitiendo.');
   results.secrets = 'SKIPPED';
 }
 
-// 2. Chequeo Estático de Sintaxis
+// 2. Chequeo Estático de Sintaxis Node.js
 if (fs.existsSync(path.join(rootDir, 'scripts', 'audit-syntax.js'))) {
-  runStep('2/6: Chequeo Estático de Sintaxis (node --check)', process.execPath, ['scripts/audit-syntax.js']);
+  runStep('2/7: Chequeo Estático de Sintaxis (node --check)', process.execPath, ['scripts/audit-syntax.js']);
   results.syntax = 'PASS';
 } else {
   console.warn('⚠️ scripts/audit-syntax.js no encontrado. Omitiendo.');
   results.syntax = 'SKIPPED';
 }
 
-// 3. Verificación de Modelos Oficiales de IA
+// 3. Auditoría Coercitiva de Contratos React & Cables de Estado (Arnés 3.0)
+if (fs.existsSync(path.join(rootDir, 'scripts', 'audit-react-contracts.js'))) {
+  runStep('3/7: Contratos React & Cables de Estado (AST)', process.execPath, ['scripts/audit-react-contracts.js']);
+  results.reactContracts = 'PASS';
+} else if (fs.existsSync(path.join(rootDir, 'src')) && fs.readdirSync(path.join(rootDir, 'src')).some(f => /\.(jsx|tsx)$/i.test(f))) {
+  console.error('❌ [ERROR ARNÉS 3.0] Se detectó frontend React en src/ pero falta scripts/audit-react-contracts.js');
+  process.exit(1);
+} else {
+  results.reactContracts = 'SKIPPED';
+}
+
+// 4. Verificación de Modelos Oficiales de IA
 if (fs.existsSync(path.join(rootDir, 'scripts', 'verify-gemini-models.js'))) {
-  runStep('3/6: Verificación de Modelos Oficiales de Google Gemini', process.execPath, ['scripts/verify-gemini-models.js']);
+  runStep('4/7: Verificación de Modelos Oficiales de Google Gemini', process.execPath, ['scripts/verify-gemini-models.js']);
   results.models = 'PASS';
 } else {
   results.models = 'SKIPPED';
 }
 
-// 4. Techos Dinámicos de Dominio
+// 5. Techos Dinámicos de Dominio
 if (fs.existsSync(path.join(rootDir, 'scripts', 'audit-monoliths.js'))) {
-  runStep('4/6: Techos Dinámicos de Dominio (Anti-Ravioli)', process.execPath, ['scripts/audit-monoliths.js']);
+  runStep('5/7: Techos Dinámicos de Dominio (Anti-Ravioli)', process.execPath, ['scripts/audit-monoliths.js']);
   results.monoliths = 'PASS';
 } else {
   console.warn('⚠️ scripts/audit-monoliths.js no encontrado. Omitiendo.');
   results.monoliths = 'SKIPPED';
 }
 
-// 5. Suite de Seguridad Zero-Trust
+// 6. Suite de Seguridad Zero-Trust
 const securityTestPath = path.join(rootDir, 'tests', 'security', 'zero-trust.test.js');
 if (fs.existsSync(securityTestPath)) {
-  runStep('5/6: Suite de Seguridad Zero-Trust', process.execPath, ['--test', 'tests/security/zero-trust.test.js']);
+  runStep('6/7: Suite de Seguridad Zero-Trust', process.execPath, ['--test', 'tests/security/zero-trust.test.js']);
   results.security = 'PASS';
 } else {
   results.security = 'SKIPPED';
 }
 
-// 6. Suite de Pruebas Unitarias Fail-Fast
+// 7. Suite de Pruebas Unitarias Fail-Fast
 if (!skipUnit) {
   let pkg = {};
   try {
@@ -115,7 +128,7 @@ if (!skipUnit) {
   } catch (e) {}
 
   if (pkg.scripts && pkg.scripts['test:unit']) {
-    runStep('6/6: Suite de Pruebas Unitarias (npm run test:unit)', 'npm', ['run', 'test:unit']);
+    runStep('7/7: Suite de Pruebas Unitarias (npm run test:unit)', 'npm', ['run', 'test:unit']);
     results.tests = 'PASS';
   } else {
     const candidateDirs = ['test', 'tests'];
@@ -130,11 +143,10 @@ if (!skipUnit) {
       }
     }
 
-    // Excluir zero-trust para no duplicar la ejecución de la fase 5
     testFiles = testFiles.filter((f) => !f.includes('zero-trust'));
 
     if (testFiles.length > 0) {
-      runStep(`6/6: Suite de Pruebas Unitarias (${testFiles.length} suites)`, process.execPath, [
+      runStep(`7/7: Suite de Pruebas Unitarias (${testFiles.length} suites)`, process.execPath, [
         '--test',
         '--test-concurrency=1',
         ...testFiles,
@@ -148,6 +160,15 @@ if (!skipUnit) {
 } else {
   console.log('⏩ [Flag --skip-unit activa] Omitiendo suite unitaria extendida.');
 }
+
+// 8. Verificación de Compilación Frontend en tiempo de arnés
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
+  if (pkg.scripts && pkg.scripts.build && fs.existsSync(path.join(rootDir, 'src'))) {
+    runStep('Verificación de Compilación Frontend (npm run build)', 'npm', ['run', 'build']);
+    results.build = 'PASS';
+  }
+} catch (_) {}
 
 const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
 

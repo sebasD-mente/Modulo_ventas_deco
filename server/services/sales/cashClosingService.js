@@ -21,6 +21,25 @@ export async function createCashClosingTransaction({
 }) {
   const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
 
+  const kpis = await getEventKPIs({ tenantId, eventId, date: date ? targetDate : null });
+
+  const salesCash = Number(kpis.paymentBreakdown?.EFECTIVO?.amount || 0);
+  const floatAmt = Math.max(0, Number(openingCashFloat || 0));
+  const expensesAmt = Math.max(0, Number(pettyCashExpenses || 0));
+  const dropsAmt = Math.max(0, Number(cashDrops || 0));
+  const totalCashCalculated = Number(Math.max(0, salesCash + floatAmt - expensesAmt - dropsAmt).toFixed(2));
+  const totalCard = kpis.paymentBreakdown?.TARJETA?.amount || 0;
+  const totalTransfer = kpis.paymentBreakdown?.TRANSFERENCIA?.amount || 0;
+  const cashDifference = Number((totalCashReported - totalCashCalculated).toFixed(2));
+
+  const extraNotes = [];
+  if (floatAmt > 0) extraNotes.push(`Fondo inicial: Q${floatAmt.toFixed(2)}`);
+  if (expensesAmt > 0) extraNotes.push(`Gastos caja chica: Q${expensesAmt.toFixed(2)}`);
+  if (dropsAmt > 0) extraNotes.push(`Retiros parciales: Q${dropsAmt.toFixed(2)}`);
+  const finalObservations = extraNotes.length > 0
+    ? [observations, `[${extraNotes.join(' | ')}]`].filter(Boolean).join(' ')
+    : observations;
+
   if (closingType === 'DIARIO' && typeof prisma.cashClosing?.findFirst === 'function') {
     const existingDaily = await prisma.cashClosing.findFirst({
       where: {
@@ -37,36 +56,40 @@ export async function createCashClosingTransaction({
 
     if (existingDaily) {
       if (
-        idempotencyKey &&
-        (existingDaily.observations?.includes(idempotencyKey) ||
-          Math.abs(Number(existingDaily.totalCashReported) - Number(totalCashReported)) < 0.01)
+        (idempotencyKey && existingDaily.observations?.includes(idempotencyKey)) ||
+        (Math.abs(Number(existingDaily.totalCashReported) - Number(totalCashReported)) < 0.01 &&
+          Number(existingDaily.totalSalesCount || 0) === Number(kpis.totalTransactions || 0))
       ) {
         return { ...existingDaily, idempotentReplay: true };
       }
+
+      if (typeof prisma.cashClosing?.update === 'function') {
+        return await prisma.cashClosing.update({
+          where: { id: existingDaily.id },
+          data: {
+            closedById,
+            totalCashCalculated,
+            totalCashReported,
+            cashDifference,
+            totalCard,
+            totalTransfer,
+            totalSalesCount: kpis.totalTransactions,
+            grossTotal: kpis.totalAmount,
+            observations: finalObservations,
+            status,
+          },
+          include: {
+            closedBy: { select: { fullName: true, email: true } },
+            event: { select: { name: true } },
+          },
+        });
+      }
+
       const err = new Error(`Ya existe un cierre de caja diario registrado para esta jornada (${targetDate}).`);
       err.statusCode = 409;
       throw err;
     }
   }
-
-  const kpis = await getEventKPIs({ tenantId, eventId, date: date ? targetDate : null });
-
-  const salesCash = Number(kpis.paymentBreakdown.EFECTIVO.amount || 0);
-  const floatAmt = Math.max(0, Number(openingCashFloat || 0));
-  const expensesAmt = Math.max(0, Number(pettyCashExpenses || 0));
-  const dropsAmt = Math.max(0, Number(cashDrops || 0));
-  const totalCashCalculated = Number(Math.max(0, salesCash + floatAmt - expensesAmt - dropsAmt).toFixed(2));
-  const totalCard = kpis.paymentBreakdown.TARJETA.amount;
-  const totalTransfer = kpis.paymentBreakdown.TRANSFERENCIA.amount;
-  const cashDifference = Number((totalCashReported - totalCashCalculated).toFixed(2));
-
-  const extraNotes = [];
-  if (floatAmt > 0) extraNotes.push(`Fondo inicial: Q${floatAmt.toFixed(2)}`);
-  if (expensesAmt > 0) extraNotes.push(`Gastos caja chica: Q${expensesAmt.toFixed(2)}`);
-  if (dropsAmt > 0) extraNotes.push(`Retiros parciales: Q${dropsAmt.toFixed(2)}`);
-  const finalObservations = extraNotes.length > 0
-    ? [observations, `[${extraNotes.join(' | ')}]`].filter(Boolean).join(' ')
-    : observations;
 
   const closingDateValue = date instanceof Date
     ? date

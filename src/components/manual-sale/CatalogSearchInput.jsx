@@ -18,7 +18,7 @@ export default function CatalogSearchInput({
 
   return (
     <div ref={searchContainerRef} className="relative space-y-1.5">
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+      <input ref={fileInputRef} data-testid="catalog-camera-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
       <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
         <span>1. Buscar póster en catálogo</span>
         {(isSearching || isRecognizingPhoto) && (
@@ -44,7 +44,7 @@ export default function CatalogSearchInput({
             </button>
           )}
           <button
-            type="button" onClick={() => fileInputRef.current?.click()} disabled={isRecognizingPhoto}
+            type="button" data-testid="catalog-camera-btn" onClick={() => fileInputRef.current?.click()} disabled={isRecognizingPhoto}
             title="Buscar póster por foto" aria-label="Buscar póster por foto"
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer disabled:opacity-50"
           >

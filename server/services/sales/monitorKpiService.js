@@ -47,7 +47,7 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
   try {
     const cumulativeAgg = await prisma.sale.groupBy({
       by: ['eventId'],
-      where: { tenantId, status: { not: 'ANULADA' } },
+      where: { tenantId, status: { not: 'ANULADA' }, createdAt: { lte: endOfDay } },
       _sum: { totalAmount: true },
     });
     cumulativeAgg.forEach((row) => {
@@ -186,6 +186,9 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       acc.dailySold = Number((acc.dailySold + (f.dailySold || 0)).toFixed(2));
       acc.preProductionBalance = Number((acc.preProductionBalance + (f.preProductionBalance || 0)).toFixed(2));
       acc.healthySalesTarget20Pct = Number((acc.healthySalesTarget20Pct + (f.healthySalesTarget20Pct || 0)).toFixed(2));
+      acc.totalEventDays = Math.max(acc.totalEventDays, Number(f.totalEventDays || 1));
+      acc.requiredDailyRunRate = Number((acc.requiredDailyRunRate + (f.requiredDailyRunRate || 0)).toFixed(2));
+      acc.requiredDailyMediumPosters += Number(f.requiredDailyMediumPosters || 0);
       return acc;
     },
     {
@@ -196,6 +199,9 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       dailySold: 0,
       preProductionBalance: 0,
       healthySalesTarget20Pct: 0,
+      totalEventDays: 1,
+      requiredDailyRunRate: 0,
+      requiredDailyMediumPosters: 0,
     }
   );
 
@@ -232,7 +238,9 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
   return {
     date: targetDate,
     lastUpdated: new Date().toISOString(),
-    eventDetails: eventDetails.filter((e) => e.status === 'ACTIVO' || e.transactions > 0),
+    eventDetails: eventDetails.filter(
+      (e) => e.status === 'ACTIVO' || e.transactions > 0 || (e.financials?.totalExpenses || 0) > 0
+    ),
     resumenGeneral: {
       totalTransactions: allSales.length,
       totalSold: Number(grandTotal.toFixed(2)),

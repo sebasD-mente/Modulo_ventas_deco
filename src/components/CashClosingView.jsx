@@ -35,6 +35,26 @@ export default function CashClosingView({ liveMetrics, activeEvent, eventId, onC
         {closing.successMsg && <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2"><ShieldCheck className="w-4 h-4" /><span>{closing.successMsg}</span></div>}
         {closing.errorMsg && <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4" /><span>{closing.errorMsg}</span></div>}
 
+        {Array.isArray(liveMetrics?.sellerBreakdown) && liveMetrics.sellerBreakdown.length > 0 && (
+          <div data-testid="closing-seller-breakdown" className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-2">
+            <span className="text-xs font-bold text-neutral-300 block">👥 Cobros por Vendedor en este Stand</span>
+            <div className="space-y-1.5">
+              {liveMetrics.sellerBreakdown.map((sb) => (
+                <div key={sb.sellerId} className="flex items-center justify-between text-xs py-1 px-2.5 rounded-xl bg-neutral-900 border border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white truncate max-w-[140px]">{sb.sellerName}</span>
+                    <span className="text-[10px] text-neutral-400">({sb.transactions} tx)</span>
+                  </div>
+                  <div className="flex items-center gap-3 font-mono">
+                    <span className="text-emerald-400 font-medium">Ef: Q{Number(sb.cashCollected || 0).toFixed(2)}</span>
+                    <span className="text-neutral-300">Tot: Q{Number(sb.totalSold || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleOpenConfirmation} className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
             <div><label className="text-[10px] font-bold text-neutral-400 block mb-1">Fondo Inicial (Q)</label><input type="number" step="0.01" min="0" placeholder="0.00" value={closing.openingCashFloat} onChange={(e) => closing.setOpeningCashFloat(e.target.value)} className="w-full bg-black border border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-mono text-white" /></div>

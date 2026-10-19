@@ -73,3 +73,27 @@ export const updateSaleSchema = z.object({
   attachments: z.array(saleAttachmentSchema).optional(),
   status: z.enum(['COMPLETADA', 'PENDIENTE', 'ENTREGADO', 'ANULADA']).optional(),
 });
+
+export const createEventExpenseSchema = z.object({
+  category: z.enum([
+    'ARRENDAMIENTO_STAND',
+    'PAGO_VENDEDOR',
+    'ALIMENTACION',
+    'TRANSPORTE_LOGISTICA',
+    'PUBLICIDAD_OTROS',
+    'STAND_RENT',
+    'STAFF_PAY',
+    'FOOD',
+    'TRANSPORT',
+    'SETUP_MATERIALS',
+    'OTHER',
+  ], {
+    errorMap: () => ({ message: 'Categoría de gasto no válida' }),
+  }),
+  description: z.string().trim().min(1, 'La descripción del gasto es obligatoria').max(300, 'La descripción no puede exceder los 300 caracteres'),
+  amount: z.number({ invalid_type_error: 'El monto debe ser numérico' })
+    .finite('El monto debe ser un número finito')
+    .positive('El monto del gasto debe ser mayor a Q 0.00')
+    .max(9999999.99, 'El monto del gasto no puede superar Q 9,999,999.99'),
+  expenseDate: z.string().optional().nullable(),
+});

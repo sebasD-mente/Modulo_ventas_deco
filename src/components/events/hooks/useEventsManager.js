@@ -6,9 +6,15 @@ const INITIAL_EVENT_DATA = {
   assignedSellerEmail: '', assignedSellerName: '', assignedUserIds: [],
 };
 
-export function useEventsManager({ onEventActivated } = {}) {
+export function useEventsManager({ onEventActivated, onEventsChanged } = {}) {
   const { authFetch, isSuperAdmin } = useAuth();
   const [events, setEvents] = useState([]), [isLoading, setIsLoading] = useState(true), [errorMsg, setErrorMsg] = useState(null);
+
+  const notifyMutations = () => {
+    if (typeof onEventsChanged === 'function') {
+      try { onEventsChanged(); } catch (e) { console.error('Error notificando cambio de eventos:', e); }
+    }
+  };
   const [usersList, setUsersList] = useState([]);
   const [selectedEventForSales, setSelectedEventForSales] = useState(null), [eventSalesList, setEventSalesList] = useState([]), [eventClosingsList, setEventClosingsList] = useState([]), [isLoadingSales, setIsLoadingSales] = useState(false);
   const [activatingEvent, setActivatingEvent] = useState(null), [sellerGoogleEmail, setSellerGoogleEmail] = useState(''), [sellerName, setSellerName] = useState(''), [isSubmittingActivation, setIsSubmittingActivation] = useState(false);
@@ -98,7 +104,7 @@ export function useEventsManager({ onEventActivated } = {}) {
       const res = await authFetch(`/api/events/${eventToArchive.id}/archive`, { method: 'PATCH' });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error al archivar el evento.');
-      setEventToArchive(null); await loadEvents();
+      setEventToArchive(null); await loadEvents(); notifyMutations();
     } catch (err) { alert(err.message); }
     finally { setIsSubmittingArchive(false); }
   };
@@ -108,7 +114,7 @@ export function useEventsManager({ onEventActivated } = {}) {
       const res = await authFetch(`/api/events/${event.id}/unarchive`, { method: 'PATCH' });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error al restaurar el evento.');
-      await loadEvents();
+      await loadEvents(); notifyMutations();
     } catch (err) { alert(err.message); }
   };
 
@@ -122,7 +128,7 @@ export function useEventsManager({ onEventActivated } = {}) {
       const res = await authFetch(url, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error al eliminar el evento.');
-      setEventToDelete(null); await loadEvents();
+      setEventToDelete(null); await loadEvents(); notifyMutations();
     } catch (err) { setDeleteErrorMsg(err.message); }
     finally { setIsSubmittingDelete(false); }
   };
@@ -141,7 +147,7 @@ export function useEventsManager({ onEventActivated } = {}) {
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error creando evento');
-      setIsCreatingEvent(false); setNewEventData(INITIAL_EVENT_DATA); await loadEvents();
+      setIsCreatingEvent(false); setNewEventData(INITIAL_EVENT_DATA); await loadEvents(); notifyMutations();
     } catch (err) { alert(err.message); }
   };
 
@@ -156,7 +162,7 @@ export function useEventsManager({ onEventActivated } = {}) {
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Error al actualizar el evento');
       setEventToEdit(null);
-      await loadEvents();
+      await loadEvents(); notifyMutations();
       return json.data;
     } catch (err) {
       alert(err.message);

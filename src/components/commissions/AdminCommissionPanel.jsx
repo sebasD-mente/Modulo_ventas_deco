@@ -211,7 +211,7 @@ export default function AdminCommissionPanel({
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => {}} // el onClick en la fila ya lo gestiona
+                            onChange={() => toggleSaleSelection && toggleSaleSelection(sale.id)}
                             className="w-4 h-4 rounded text-emerald-500 cursor-pointer accent-emerald-500"
                           />
                         </div>

@@ -143,12 +143,15 @@ function SalesTerminalMain() {
     }
   }, [authFetch, token, isVendedorRedes, isVendedor, isSuperAdmin]);
 
-  const refreshMetrics = useCallback(async () => {
-    if (!activeEvent) return;
+  const refreshMetrics = useCallback(async (eventOverride = null) => {
+    const targetId = (typeof eventOverride === 'object' && eventOverride?.id)
+      ? eventOverride.id
+      : (typeof eventOverride === 'string' ? eventOverride : activeEvent?.id);
+    if (!targetId) return;
     if (!(isSuperAdmin || isVendedor || isVendedorRedes)) return;
     try {
       const todayStr = getTodayGuatemalaStr();
-      const metricsRes = await authFetch(`/api/sales/events/${activeEvent.id}/metrics?date=${todayStr}`);
+      const metricsRes = await authFetch(`/api/sales/events/${targetId}/metrics?date=${todayStr}`);
       const metricsData = await metricsRes.json();
       if (metricsData.success) {
         setLiveMetrics(metricsData.data);
@@ -159,6 +162,34 @@ function SalesTerminalMain() {
     }
   }, [activeEvent, authFetch, isSuperAdmin, isVendedor, isVendedorRedes]);
 
+  const syncEventsList = useCallback(async (preferredEvent = null) => {
+    if (!token) return;
+    try {
+      const eventsRes = await authFetch('/api/events');
+      const eventsJson = await eventsRes.json();
+      if (!eventsJson.success || !Array.isArray(eventsJson.data)) return;
+      const allActive = eventsJson.data.filter((e) => e.status === 'ACTIVO');
+      setActiveEventsList(allActive);
+
+      const nextEvent = preferredEvent
+        || allActive.find((e) => e.id === activeEvent?.id)
+        || allActive.find((e) => e.id !== 'evt-ventas-redes-online')
+        || allActive[0]
+        || null;
+
+      setActiveEvent(nextEvent);
+      if (nextEvent) {
+        try {
+          localStorage.setItem('deko_admin_selected_event_id', nextEvent.id);
+          localStorage.setItem('deko_active_event', JSON.stringify(nextEvent));
+        } catch (_) {}
+        await refreshMetrics(nextEvent);
+      }
+    } catch (err) {
+      console.error('Error sincronizando lista de stands activos:', err);
+    }
+  }, [token, authFetch, activeEvent?.id, refreshMetrics]);
+
   const handleSelectEvent = useCallback((ev) => {
     if (!ev) return;
     setActiveEvent(ev);
@@ -166,7 +197,7 @@ function SalesTerminalMain() {
       localStorage.setItem('deko_admin_selected_event_id', ev.id);
       localStorage.setItem('deko_active_event', JSON.stringify(ev));
     } catch (_) {}
-    refreshMetrics();
+    refreshMetrics(ev);
   }, [refreshMetrics]);
 
   useEffect(() => {
@@ -243,6 +274,7 @@ function SalesTerminalMain() {
                 eventId={activeEvent?.id}
                 onSaleRegistered={refreshMetrics}
                 initialDraft={manualDraft}
+                onDraftConsumed={() => setManualDraft(null)}
               />
             </div>
 
@@ -258,16 +290,22 @@ function SalesTerminalMain() {
         <Suspense fallback={<ViewLoadingFallback />}>
           {activeTab === 'eventos' && (isSuperAdmin || isVendedorRedes) && (
             <EventsManagementView
-              onEventActivated={(activatedEvent) => {
-                setActiveEvent(activatedEvent);
-                refreshMetrics();
+              onEventActivated={async (activatedEvent) => {
+                await syncEventsList(activatedEvent);
                 setActiveTab('venta');
               }}
+              onEventsChanged={syncEventsList}
             />
           )}
 
           {activeTab === 'monitor' && (isSuperAdmin || isVendedor || isVendedorRedes) && (
-            <MonitorDashboardView />
+            <MonitorDashboardView
+              activeEvent={activeEvent}
+              onPopulateManualForm={(draft) => {
+                setManualDraft(draft);
+                setActiveTab('venta');
+              }}
+            />
           )}
 
           {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2 || isVendedorRedes) && (

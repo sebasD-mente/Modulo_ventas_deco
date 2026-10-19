@@ -2,7 +2,8 @@ import React from 'react';
 import { MapPin, User, Mail, Play, Eye, Archive, RotateCcw, Trash2, Pencil, Users, Receipt } from 'lucide-react';
 
 function SellersSection({ event }) {
-  const sellers = event.assignedSellers || [];
+  const hasRelationalArray = Array.isArray(event.assignedSellers);
+  const sellers = hasRelationalArray ? event.assignedSellers : [];
   if (sellers.length > 0) {
     return (
       <div className="p-2.5 rounded-xl bg-[#181818] border border-neutral-800 space-y-1.5 text-xs">
@@ -32,7 +33,7 @@ function SellersSection({ event }) {
     );
   }
 
-  if (event.assignedSellerName || event.assignedSellerEmail) {
+  if (!hasRelationalArray && (event.assignedSellerName || event.assignedSellerEmail)) {
     return (
       <div className="p-2.5 rounded-xl bg-[#181818] border border-neutral-800 space-y-1 text-xs">
         <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Encargado del evento:</div>

@@ -9,7 +9,7 @@ import EventFinancialRadar from './monitor/EventFinancialRadar';
 import EventExpensesModal from './events/modals/EventExpensesModal';
 import UnifiedAiChat from './UnifiedAiChat';
 
-export default function MonitorDashboardView() {
+export default function MonitorDashboardView({ activeEvent = null, onPopulateManualForm }) {
   const { isSuperAdmin } = useAuth();
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [eventForExpenses, setEventForExpenses] = useState(null);
@@ -61,6 +61,7 @@ export default function MonitorDashboardView() {
         <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-hidden">
           <button
             type="button"
+            data-testid="toggle-ai-copilot-btn"
             onClick={() => setIsCopilotOpen((prev) => !prev)}
             aria-expanded={isCopilotOpen}
             className="w-full min-h-[44px] p-4 flex items-center justify-between gap-3 text-left hover:bg-neutral-900/60 transition-colors cursor-pointer"
@@ -86,8 +87,8 @@ export default function MonitorDashboardView() {
           {isCopilotOpen && (
             <div className="p-4 border-t border-neutral-800 bg-black/40">
               <UnifiedAiChat
-                eventId={eventDetails[0]?.event?.id}
-                eventName={eventDetails[0]?.event?.name || 'Monitor Global'}
+                eventId={activeEvent?.id || eventDetails[0]?.eventId || 'evt-ventas-redes-online'}
+                eventName={activeEvent?.name || eventDetails[0]?.name || 'Monitor Global'}
                 onSaleRegistered={() => fetchMonitorData(true)}
               />
             </div>
@@ -100,6 +101,7 @@ export default function MonitorDashboardView() {
         eventDetails={eventDetails}
         globalFinancials={resumenGeneral?.globalFinancials}
         isSuperAdmin={isSuperAdmin}
+        selectedEventId={activeEvent?.id}
         onOpenExpenseModal={(ev) => setEventForExpenses(ev)}
       />
 

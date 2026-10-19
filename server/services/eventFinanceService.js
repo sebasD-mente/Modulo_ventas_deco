@@ -8,7 +8,28 @@ export const EXPENSE_CATEGORIES = {
   PUBLICIDAD_OTROS: 'Publicidad / Imprevistos / Otros',
 };
 
+export const EXPENSE_CATEGORY_ALIASES = {
+  ARRENDAMIENTO_STAND: 'ARRENDAMIENTO_STAND',
+  STAND_RENT: 'ARRENDAMIENTO_STAND',
+  PAGO_VENDEDOR: 'PAGO_VENDEDOR',
+  STAFF_PAY: 'PAGO_VENDEDOR',
+  ALIMENTACION: 'ALIMENTACION',
+  FOOD: 'ALIMENTACION',
+  TRANSPORTE_LOGISTICA: 'TRANSPORTE_LOGISTICA',
+  TRANSPORT: 'TRANSPORTE_LOGISTICA',
+  PUBLICIDAD_OTROS: 'PUBLICIDAD_OTROS',
+  SETUP_MATERIALS: 'PUBLICIDAD_OTROS',
+  OTHER: 'PUBLICIDAD_OTROS',
+};
+
 export const VALID_EXPENSE_CATEGORIES = Object.keys(EXPENSE_CATEGORIES);
+export const ALL_ACCEPTED_EXPENSE_CATEGORIES = Object.keys(EXPENSE_CATEGORY_ALIASES);
+
+export function normalizeExpenseCategory(rawCategory) {
+  if (!rawCategory || typeof rawCategory !== 'string') return null;
+  const key = rawCategory.trim().toUpperCase();
+  return EXPENSE_CATEGORY_ALIASES[key] || null;
+}
 
 /**
  * Función pura que calcula los KPIs financieros y el Radar del 20% para un evento.
@@ -17,13 +38,13 @@ export function calculateEventFinancials({ event, cumulativeSold = 0, dailySold 
   const safeExpenses = Array.isArray(expenses) ? expenses : [];
   const standRentCost = Number(
     safeExpenses
-      .filter((e) => e.category === 'ARRENDAMIENTO_STAND')
+      .filter((e) => normalizeExpenseCategory(e.category) === 'ARRENDAMIENTO_STAND')
       .reduce((acc, e) => acc + Number(e.amount || 0), 0)
       .toFixed(2)
   );
   const otherOperationalCost = Number(
     safeExpenses
-      .filter((e) => e.category !== 'ARRENDAMIENTO_STAND')
+      .filter((e) => normalizeExpenseCategory(e.category) !== 'ARRENDAMIENTO_STAND')
       .reduce((acc, e) => acc + Number(e.amount || 0), 0)
       .toFixed(2)
   );
@@ -157,17 +178,18 @@ export async function addEventExpense({
   }
 
   const numericAmount = Number(amount);
-  if (isNaN(numericAmount) || numericAmount <= 0) {
-    throw new Error('El monto del gasto debe ser un número mayor a 0.');
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > 9999999.99) {
+    throw new Error('El monto del gasto debe ser un número válido entre Q 0.01 y Q 9,999,999.99.');
   }
 
-  if (!description || !description.trim()) {
-    throw new Error('La descripción del gasto es obligatoria.');
+  if (!description || typeof description !== 'string' || !description.trim() || description.trim().length > 300) {
+    throw new Error('La descripción del gasto es obligatoria y no debe exceder 300 caracteres.');
   }
 
-  const normalizedCategory = VALID_EXPENSE_CATEGORIES.includes(category)
-    ? category
-    : 'PUBLICIDAD_OTROS';
+  const normalizedCategory = normalizeExpenseCategory(category);
+  if (!normalizedCategory) {
+    throw new Error(`Categoría de gasto inválida: "${category}".`);
+  }
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, tenantId },

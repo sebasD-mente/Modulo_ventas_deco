@@ -188,7 +188,10 @@ export async function getEventsList(req, res) {
       const financials = calculateEventFinancials({
         event: ev, cumulativeSold: salesInfo.totalSold, expenses: evExpenses,
       });
-      return { ...ev, totalSold: salesInfo.totalSold, salesCount: salesInfo.salesCount, financials };
+      const hasRel = Array.isArray(ev.assignedSellers);
+      const assignedSellerName = hasRel ? (ev.assignedSellers.length > 0 ? ev.assignedSellers.map((u) => u.fullName).join(', ') : null) : ev.assignedSellerName;
+      const assignedSellerEmail = hasRel ? (ev.assignedSellers.length > 0 ? ev.assignedSellers.map((u) => u.email).join(', ') : null) : ev.assignedSellerEmail;
+      return { ...ev, assignedSellerName, assignedSellerEmail, totalSold: salesInfo.totalSold, salesCount: salesInfo.salesCount, financials };
     });
 
     return res.json({ success: true, data: formatted });
@@ -415,6 +418,12 @@ export const unarchiveEvent = (req, res) =>
 export async function deleteEvent(req, res) {
   try {
     const { id } = req.params;
+    if (id === 'evt-ventas-redes-online') {
+      return res.status(400).json({
+        success: false,
+        error: 'El Punto de Venta Digital Permanente no puede ser eliminado.',
+      });
+    }
     const { force } = req.query;
     const tenantId = req.tenantId;
     const event = await prisma.event.findFirst({

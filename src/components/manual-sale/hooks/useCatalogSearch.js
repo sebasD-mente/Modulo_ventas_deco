@@ -105,7 +105,7 @@ export function useCatalogSearch(options = {}) {
   }, []);
 
   const handlePhotoSearch = async (file, eventIdOverride, onPosterMatched) => {
-    const targetEventId = eventIdOverride || eventIdFromOptions;
+    const targetEventId = eventIdOverride || eventIdFromOptions || 'evt-ventas-redes-online';
     const targetOnMatched = onPosterMatched || onSelectFromOptions;
 
     if (!file) return;

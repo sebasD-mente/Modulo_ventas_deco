@@ -2,7 +2,7 @@ import express from 'express';
 import { authMiddleware, requireRole, requireEventAccess } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validateMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
-import { createSaleSchema, cashClosingSchema, updateSaleSchema } from '../validators/saleValidators.js';
+import { createSaleSchema, cashClosingSchema, updateSaleSchema, createEventExpenseSchema } from '../validators/saleValidators.js';
 import { customerSchema, createRemoteSaleSchema, balancePaymentSchema } from '../validators/remoteSaleValidators.js';
 import { createPrintSheetSchema, assignItemsToSheetSchema, updateSheetStatusSchema } from '../validators/printSheetValidators.js';
 import { settleCommissionSchema, paySettlementSchema } from '../validators/commissionValidators.js';
@@ -181,7 +181,7 @@ router.patch('/events/:id/archive', requireRole(['SUPER_ADMIN']), archiveEvent);
 router.patch('/events/:id/unarchive', requireRole(['SUPER_ADMIN']), unarchiveEvent);
 router.delete('/events/:id', requireRole(['SUPER_ADMIN']), deleteEvent);
 router.get('/events/:id/expenses', requireRole(['SUPER_ADMIN']), getEventExpenses);
-router.post('/events/:id/expenses', requireRole(['SUPER_ADMIN']), createEventExpense);
+router.post('/events/:id/expenses', requireRole(['SUPER_ADMIN']), validate(createEventExpenseSchema), createEventExpense);
 router.delete('/events/:id/expenses/:expenseId', requireRole(['SUPER_ADMIN']), removeEventExpense);
 router.get('/products', getProducts);
 

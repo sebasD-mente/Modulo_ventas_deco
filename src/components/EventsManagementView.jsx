@@ -12,9 +12,9 @@ import EventSalesModal from './events/modals/EventSalesModal';
 import EventActionModals from './events/modals/EventActionModals';
 import DigitalEventMonitorSection from './events/DigitalEventMonitorSection';
 
-export default function EventsManagementView({ onEventActivated }) {
+export default function EventsManagementView({ onEventActivated, onEventsChanged }) {
   const { isVendedorRedes, isSuperAdmin } = useAuth();
-  const m = useEventsManager({ onEventActivated });
+  const m = useEventsManager({ onEventActivated, onEventsChanged });
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin);
 
   const digitalEvent = m.events?.find((e) => e.id === 'evt-ventas-redes-online') || m.activeEvents?.[0] || m.events?.[0];
@@ -129,7 +129,7 @@ export default function EventsManagementView({ onEventActivated }) {
           <EditEventModal isOpen={Boolean(m.eventToEdit)} onClose={() => m.setEventToEdit(null)} event={m.eventToEdit} usersList={m.usersList} onUpdate={m.handleUpdateEvent} isSubmitting={m.isSubmittingUpdate} />
           <ActivateEventModal event={m.activatingEvent} onClose={() => m.setActivatingEvent(null)} sellerGoogleEmail={m.sellerGoogleEmail} setSellerGoogleEmail={m.setSellerGoogleEmail} sellerName={m.sellerName} setSellerName={m.setSellerName} onConfirm={m.handleConfirmActivation} isSubmitting={m.isSubmittingActivation} />
           <EventActionModals eventToArchive={m.eventToArchive} onCloseArchive={() => m.setEventToArchive(null)} onConfirmArchive={m.handleConfirmArchive} isSubmittingArchive={m.isSubmittingArchive} eventToDelete={m.eventToDelete} onCloseDelete={() => { m.setEventToDelete(null); m.setDeleteErrorMsg(null); }} onConfirmDelete={m.handleConfirmDelete} isSubmittingDelete={m.isSubmittingDelete} deleteErrorMsg={m.deleteErrorMsg} />
-          <EventExpensesModal isOpen={Boolean(m.eventForExpenses)} event={m.eventForExpenses} onClose={() => m.setEventForExpenses(null)} onExpensesUpdated={m.loadEvents} />
+          <EventExpensesModal isOpen={Boolean(m.eventForExpenses)} event={m.eventForExpenses} onClose={() => m.setEventForExpenses(null)} onExpensesUpdated={() => { m.loadEvents(); onEventsChanged?.(); }} />
         </>
       )}
       <EventSalesModal event={m.selectedEventForSales} salesList={m.eventSalesList} closingsList={m.eventClosingsList} isLoading={m.isLoadingSales} onClose={() => m.setSelectedEventForSales(null)} />

@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { ENV } from '../config/env.js';
-import { resolveTargetRoles, assignUserToEventService } from '../services/userEventAssignmentService.js';
+import { resolveTargetRoles, assignUserToEventService, syncEventAssignedSellersMetadata } from '../services/userEventAssignmentService.js';
 import { invalidateUserAuthCache } from '../middleware/authMiddleware.js';
 
 export async function getUsersList(req, res) {
@@ -93,6 +93,9 @@ export async function toggleUserStatus(req, res) {
     }
     const newStatus = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
     const updated = await prisma.user.update({ where: { id }, data: { status: newStatus } });
+    if (user.assignedEventId) {
+      await syncEventAssignedSellersMetadata(user.assignedEventId, req.tenantId);
+    }
     invalidateUserAuthCache(id);
     return res.status(200).json({
       success: true,
@@ -128,6 +131,9 @@ export async function createUser(req, res) {
       },
       include: { assignedEvent: { select: { id: true, name: true, location: true, status: true } } },
     });
+    if (assignedEventId) {
+      await syncEventAssignedSellersMetadata(assignedEventId, req.tenantId);
+    }
     return res.status(201).json({
       success: true,
       message: `Usuario ${newUser.fullName} (${newUser.email}) registrado y autorizado correctamente.`,
@@ -155,6 +161,9 @@ export async function deleteUser(req, res) {
       return res.status(400).json({ success: false, error: 'No se puede eliminar a un Super Administrador maestro configurado en las variables de entorno.' });
     }
     await prisma.user.delete({ where: { id } });
+    if (targetUser.assignedEventId) {
+      await syncEventAssignedSellersMetadata(targetUser.assignedEventId, req.tenantId);
+    }
     invalidateUserAuthCache(id);
     return res.status(200).json({ success: true, message: 'Usuario eliminado del sistema correctamente.' });
   } catch (error) {

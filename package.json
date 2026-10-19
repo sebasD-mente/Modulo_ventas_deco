@@ -12,7 +12,7 @@
     "start": "node server/index.js",
     "test": "node --test tests/security/zero-trust.test.js",
     "test:security": "node --test tests/security/zero-trust.test.js",
-    "test:unit": "node --test tests/catalog/deduplication.test.js tests/catalog/fuzzy-typo-tolerance.test.js tests/catalog/phase-3-verification.test.js tests/sales/idempotency.test.js tests/sales/sale-sequences.test.js tests/schema/schema-robustness.test.js tests/frontend/phase5-frontend-ergonomics-resilience.test.js tests/sales/phase6-combos-offline-accelerators.test.js tests/adversarial/surgeries-zero-compromise.test.js",
+    "test:unit": "node --test tests/catalog/deduplication.test.js tests/catalog/fuzzy-typo-tolerance.test.js tests/catalog/phase-3-verification.test.js tests/sales/idempotency.test.js tests/sales/sale-sequences.test.js tests/schema/schema-robustness.test.js tests/frontend/phase5-frontend-ergonomics-resilience.test.js tests/sales/phase6-combos-offline-accelerators.test.js tests/adversarial/surgeries-zero-compromise.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js",
     "test:voice": "node --test tests/ai/voice-lexical-priming-hesitation.test.js tests/ai/voice-vad-reengineering.test.js tests/adversarial/m1-voice-priming-hesitation-stress.test.js",
     "test:latency": "node --test tests/benchmarks/latency-audit.test.js",
     "audit:secrets": "node scripts/audit-secrets.js",
@@ -24,7 +24,8 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "node prisma/seed.js",
-    "audit:syntax": "node scripts/audit-syntax.js"
+    "audit:syntax": "node scripts/audit-syntax.js",
+    "audit:contracts": "node scripts/audit-react-contracts.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",
