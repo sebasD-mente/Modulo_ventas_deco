@@ -84,19 +84,19 @@ function SalesTerminalMain() {
       setUnassignedSeller(false);
       let selectedEvent = null;
 
-      // Cargar lista de eventos activos concurrentes
+      // Cargar lista de eventos activos concurrentes (excluyendo canal digital permanente)
       const eventsRes = await authFetch('/api/events');
       const eventsJson = await eventsRes.json();
       const allActive = eventsJson.success && Array.isArray(eventsJson.data)
-        ? eventsJson.data.filter((e) => e.status === 'ACTIVO')
+        ? eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online')
         : [];
       setActiveEventsList(allActive);
 
       // Evento para VENDEDOR_REDES exclusivo
       if (isVendedorRedes && !isVendedor && !isSuperAdmin) {
-        selectedEvent = allActive.find(
-          (e) => e.id === 'evt-ventas-redes-online' || e.name?.toLowerCase().includes('redes')
-        ) || allActive[0] || null;
+        selectedEvent = (eventsJson.success && Array.isArray(eventsJson.data)
+          ? eventsJson.data.find((e) => e.id === 'evt-ventas-redes-online' || e.name?.toLowerCase().includes('redes'))
+          : null) || null;
       }
 
       // Si es SUPER_ADMIN, verificar si tiene stand seleccionado en localStorage
@@ -143,10 +143,10 @@ function SalesTerminalMain() {
     }
   }, [authFetch, token, isVendedorRedes, isVendedor, isSuperAdmin]);
 
-  const refreshMetrics = useCallback(async (eventOverride = null) => {
-    const targetId = (typeof eventOverride === 'object' && eventOverride?.id)
-      ? eventOverride.id
-      : (typeof eventOverride === 'string' ? eventOverride : activeEvent?.id);
+  const refreshMetrics = useCallback(async (override = null) => {
+    const targetId = (typeof override === 'object' && override !== null)
+      ? (override.eventId || (override.location !== undefined ? override.id : activeEvent?.id))
+      : (typeof override === 'string' ? override : activeEvent?.id);
     if (!targetId) return;
     if (!(isSuperAdmin || isVendedor || isVendedorRedes)) return;
     try {
@@ -168,7 +168,7 @@ function SalesTerminalMain() {
       const eventsRes = await authFetch('/api/events');
       const eventsJson = await eventsRes.json();
       if (!eventsJson.success || !Array.isArray(eventsJson.data)) return;
-      const allActive = eventsJson.data.filter((e) => e.status === 'ACTIVO');
+      const allActive = eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online');
       setActiveEventsList(allActive);
 
       const nextEvent = preferredEvent
@@ -312,8 +312,8 @@ function SalesTerminalMain() {
             <ProductionManagementView />
           )}
 
-          {activeTab === 'seguimiento' && (isSuperAdmin || isVendedorRedes) && (
-            <OrderTrackingView />
+          {activeTab === 'seguimiento' && (isSuperAdmin || isVendedor || isVendedorRedes || isOperario1 || isOperario2) && (
+            <OrderTrackingView onOrderUpdated={refreshMetrics} />
           )}
 
           {activeTab === 'cierre' && (isSuperAdmin || isVendedor) && (

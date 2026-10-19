@@ -145,6 +145,8 @@ export async function getEventsList(req, res) {
     const whereClause = { tenantId: req.tenantId };
     if (isVendedorRedes && !isSuperAdmin) {
       whereClause.id = 'evt-ventas-redes-online';
+    } else if (!isSuperAdmin) {
+      whereClause.id = { not: 'evt-ventas-redes-online' };
     }
 
     const events = await prisma.event.findMany({

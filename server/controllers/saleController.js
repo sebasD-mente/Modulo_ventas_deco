@@ -193,12 +193,6 @@ export async function purgeEventSales(req, res) {
 export async function getOrderTrackingList(req, res) {
   try {
     const tenantId = req.tenantId;
-    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
-      ? req.user.roles
-      : [req.user?.role || 'VENDEDOR'];
-    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
-    const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
-
     const { paymentStatus, search, page, limit } = req.query;
 
     const parsedPage = Math.max(1, parseInt(page, 10) || 1);
@@ -211,17 +205,6 @@ export async function getOrderTrackingList(req, res) {
       status: { not: 'ANULADA' },
     };
 
-    const scopeConditions = [];
-    if (!isSuperAdmin) {
-      if (req.user?.assignedEventId) {
-        scopeConditions.push({
-          OR: [{ sellerId: req.user.id }, { pickupEventId: req.user.assignedEventId }],
-        });
-      } else if (isVendedorRedes) {
-        whereClause.sellerId = req.user.id;
-      }
-    }
-
     if (paymentStatus === 'CON_SALDO') {
       whereClause.balanceDue = { gt: 0 };
     } else if (paymentStatus === 'PAGADO_TOTAL') {
@@ -230,19 +213,11 @@ export async function getOrderTrackingList(req, res) {
 
     if (search && search.trim()) {
       const term = search.trim();
-      scopeConditions.push({
-        OR: [
-          { saleNumber: { contains: term, mode: 'insensitive' } },
-          { customer: { fullName: { contains: term, mode: 'insensitive' } } },
-          { customer: { phone: { contains: term, mode: 'insensitive' } } },
-        ],
-      });
-    }
-
-    if (scopeConditions.length === 1 && scopeConditions[0].OR) {
-      whereClause.OR = scopeConditions[0].OR;
-    } else if (scopeConditions.length > 1) {
-      whereClause.AND = scopeConditions;
+      whereClause.OR = [
+        { saleNumber: { contains: term, mode: 'insensitive' } },
+        { customer: { fullName: { contains: term, mode: 'insensitive' } } },
+        { customer: { phone: { contains: term, mode: 'insensitive' } } },
+      ];
     }
 
     const [total, orders] = await Promise.all([
@@ -310,13 +285,6 @@ export async function getOrderTrackingList(req, res) {
       tenantId,
       orderType: 'REDES_PERSONALIZADO',
       status: { not: 'ANULADA' },
-      ...(!isSuperAdmin
-        ? req.user?.assignedEventId
-          ? { OR: [{ sellerId: req.user.id }, { pickupEventId: req.user.assignedEventId }] }
-          : isVendedorRedes
-            ? { sellerId: req.user.id }
-            : {}
-        : {}),
     };
 
     const [totalCount, pendingBalanceAgg, deliveredCount, inWorkshopCount] = await Promise.all([
@@ -367,12 +335,12 @@ export async function getOrderTrackingList(req, res) {
 }
 
 /**
- * Actualiza la información logística (guía, courier, entrega) de un pedido
+ * Actualiza la información logística (guía, courier, entrega) de un pedido con trazabilidad forense
  */
 export async function updateOrderDelivery(req, res) {
   try {
     const { id } = req.params;
-    const { shippingCourier, shippingTrackingNumber, isDelivered } = req.body;
+    const { shippingCourier, shippingTrackingNumber, isDelivered, deliveryReceiptUrl, deliveryNotes } = req.body;
     const tenantId = req.tenantId;
 
     const sale = await prisma.sale.findFirst({
@@ -381,16 +349,6 @@ export async function updateOrderDelivery(req, res) {
 
     if (!sale) {
       return res.status(404).json({ success: false, error: 'Pedido de redes no encontrado.' });
-    }
-
-    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
-      ? req.user.roles
-      : [req.user?.role || 'VENDEDOR'];
-    const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
-    const isAllowedPickupSeller = Boolean(req.user?.assignedEventId && sale.pickupEventId === req.user.assignedEventId);
-
-    if (!isSuperAdmin && sale.sellerId !== req.user.id && !isAllowedPickupSeller) {
-      return res.status(403).json({ success: false, error: 'No tienes permiso para modificar este pedido.' });
     }
 
     if (isDelivered === true && Number(sale.balanceDue || 0) > 0) {
@@ -409,6 +367,19 @@ export async function updateOrderDelivery(req, res) {
       updateData.status = Number(sale.balanceDue) > 0 ? 'PENDIENTE' : 'COMPLETADA';
     }
 
+    const actorName = req.user?.fullName || req.user?.email || 'Usuario';
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0 ? req.user.roles : [req.user?.role || 'STAFF'];
+    const actorRole = userRoles[0];
+    const logDetails = [
+      `Logística/Entrega registrada por: ${actorName} (${actorRole})`,
+      isDelivered ? 'ESTADO: ENTREGADO' : null,
+      deliveryReceiptUrl ? `Recibo: ${deliveryReceiptUrl}` : null,
+      deliveryNotes ? `Nota: ${deliveryNotes}` : null,
+    ].filter(Boolean).join(' • ');
+
+    const newStamp = `[${logDetails}]`;
+    updateData.notes = sale.notes ? `${sale.notes}\n${newStamp}` : newStamp;
+
     const updated = await prisma.sale.update({
       where: { id },
       data: updateData,
@@ -418,6 +389,33 @@ export async function updateOrderDelivery(req, res) {
         payments: true,
       },
     });
+
+    try {
+      if (prisma.auditLog?.create) {
+        await prisma.auditLog.create({
+          data: {
+            tenantId,
+            userId: req.user.id,
+            action: isDelivered ? 'PEDIDO_ENTREGADO' : 'LOGISTICA_ACTUALIZADA',
+            entity: 'sale',
+            entityId: sale.id,
+            details: {
+              saleId: sale.id,
+              saleNumber: sale.saleNumber,
+              isDelivered,
+              shippingCourier,
+              shippingTrackingNumber,
+              deliveryReceiptUrl,
+              deliveryNotes,
+              actorName,
+              actorRole,
+            },
+          },
+        });
+      }
+    } catch (auditErr) {
+      console.warn('[updateOrderDelivery] Error auditLog:', auditErr.message);
+    }
 
     return res.status(200).json({
       success: true,

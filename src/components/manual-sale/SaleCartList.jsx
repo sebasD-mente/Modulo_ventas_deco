@@ -97,7 +97,7 @@ export default function SaleCartList({
                           key={sz.sizeId}
                           type="button"
                           onClick={() => onChangeSize && onChangeSize(item.id, sz)}
-                          className={`min-h-[36px] px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors flex items-center justify-center shrink-0 ${
+                          className={`min-h-[44px] min-w-[44px] px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-colors flex items-center justify-center shrink-0 ${
                             isSel ? 'bg-white text-black shadow-sm' : 'bg-[#181818] text-neutral-400 hover:text-white border border-neutral-800'
                           }`}
                         >

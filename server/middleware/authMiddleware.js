@@ -151,7 +151,7 @@ export function requireRole(allowedRoles = []) {
   };
 }
 
-export function requireEventAccess(req, res, next) {
+export async function requireEventAccess(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ success: false, error: 'No autenticado' });
   }
@@ -172,6 +172,18 @@ export function requireEventAccess(req, res, next) {
         success: false,
         error: 'No tienes un evento asignado activo para realizar operaciones.',
       });
+    }
+
+    if (req.params?.id && prisma.sale?.findFirst) {
+      try {
+        const sale = await prisma.sale.findFirst({
+          where: { id: req.params.id, tenantId: req.tenantId },
+          select: { eventId: true, pickupEventId: true, sellerId: true },
+        });
+        if (sale && (sale.eventId === req.user.assignedEventId || sale.pickupEventId === req.user.assignedEventId || sale.sellerId === req.user.id)) {
+          return next();
+        }
+      } catch (_) {}
     }
 
     if (requestedEventId && req.user.assignedEventId !== requestedEventId) {

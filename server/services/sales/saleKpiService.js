@@ -55,6 +55,11 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
   if (eventId) saleWhere.eventId = eventId;
   if (tenantId) saleWhere.tenantId = tenantId;
 
+  // Aislamiento contable estricto de caja (Pilar 5):
+  // 1. Para ventas propias del stand (eventId), cuentan todos sus pagos de la fecha.
+  // 2. Para pedidos asignados para retiro en stand (pickupEventId === eventId y eventId !== targetStandId),
+  //    SOLO entran en la caja los pagos de saldo cobrados en el stand (con '[SALDO]' en reference).
+  //    El anticipo inicial cobrado en redes jamás entra a la caja del stand ferial.
   const paymentWhere = {
     sale: {
       status: { not: 'ANULADA' },
@@ -68,6 +73,16 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
           }
         : {}),
     },
+    ...(eventId
+      ? {
+          NOT: {
+            AND: [
+              { sale: { eventId: { not: eventId }, pickupEventId: eventId } },
+              { NOT: { reference: { contains: '[SALDO]' } } },
+            ],
+          },
+        }
+      : {}),
   };
 
   if (date) {
@@ -174,13 +189,45 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
   const parsedLimit = Math.min(500, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
 
-  const where = { eventId };
-  if (tenantId) where.tenantId = tenantId;
+  const isStand = Boolean(eventId && eventId !== 'evt-ventas-redes-online');
+  const where = {
+    status: { not: 'ANULADA' },
+    ...(tenantId ? { tenantId } : {}),
+  };
 
   if (date) {
     const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
     if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
-      where.createdAt = { gte: startOfDay, lte: endOfDay };
+      if (isStand) {
+        where.OR = [
+          // 1. Ventas propias del stand creadas en esa fecha
+          { eventId, createdAt: { gte: startOfDay, lte: endOfDay } },
+          // 2. Pedidos remotos asignados a este stand con saldo pendiente (sin importar fecha de creación)
+          { pickupEventId: eventId, balanceDue: { gt: 0 } },
+          // 3. Pedidos remotos liquidados en este stand con pagos registrados en esa fecha
+          {
+            pickupEventId: eventId,
+            payments: {
+              some: {
+                reference: { contains: '[SALDO]' },
+                createdAt: { gte: startOfDay, lte: endOfDay },
+              },
+            },
+          },
+        ];
+      } else {
+        where.eventId = eventId;
+        where.createdAt = { gte: startOfDay, lte: endOfDay };
+      }
+    }
+  } else {
+    if (isStand) {
+      where.OR = [
+        { eventId },
+        { pickupEventId: eventId },
+      ];
+    } else {
+      where.eventId = eventId;
     }
   }
 

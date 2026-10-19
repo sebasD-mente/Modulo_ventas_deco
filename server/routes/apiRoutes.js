@@ -209,7 +209,7 @@ router.get(
 );
 router.post(
   '/sales/upload-art',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2']),
   upload.single('image'),
   uploadCustomArt
 );
@@ -221,18 +221,18 @@ router.post(
 );
 router.post(
   '/sales/:id/balance-payment',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2']),
   validate(balancePaymentSchema),
   registerBalancePayment
 );
 router.get(
   '/sales/orders/tracking',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2']),
   getOrderTrackingList
 );
 router.patch(
   '/sales/:id/delivery',
-  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES', 'OPERARIO_1', 'OPERARIO_2']),
   updateOrderDelivery
 );
 router.post(

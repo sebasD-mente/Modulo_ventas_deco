@@ -160,8 +160,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
         </div>
       )}
 
-      {/* MODO REDES / PERSONALIZADO */}
-      {saleMode === 'REDES_PERSONALIZADO' ? (
+      {/* MODO REDES / PERSONALIZADO (Exclusivo para SUPER_ADMIN y VENDEDOR_REDES) */}
+      {saleMode === 'REDES_PERSONALIZADO' && (isSuperAdmin || isVendedorRedes) ? (
         <div className="space-y-5">
           {/* CRM y Cliente */}
           <CustomerWhatsAppSearch

@@ -36,7 +36,9 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const [shippingCost, setShippingCost] = useState(35);
   const [shippingCourier, setShippingCourier] = useState('GUATEX');
   const [shippingTrackingNumber, setShippingTrackingNumber] = useState('');
-  const [pickupEventId, setPickupEventId] = useState(eventId || '');
+  const [pickupEventId, setPickupEventId] = useState(
+    eventId && eventId !== 'evt-ventas-redes-online' ? eventId : ''
+  );
   const [availablePickupEvents, setAvailablePickupEvents] = useState([]);
 
   // Anticipo, Comprobante y Pagos
@@ -112,7 +114,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     };
   }, [customerQuery, authFetch]);
 
-  // Cargar eventos para retiro si el método es RETIRO_EVENTO
+  // Cargar eventos para retiro si el método es RETIRO_EVENTO (excluyendo el canal digital)
   useEffect(() => {
     let isMounted = true;
     async function loadEvents() {
@@ -120,7 +122,15 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
         const res = await authFetch('/api/events');
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {
-          setAvailablePickupEvents(json.data.filter((e) => e.status === 'ACTIVO' || e.id === eventId));
+          const pickupStands = json.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online');
+          setAvailablePickupEvents(pickupStands);
+          if (pickupStands.length > 0) {
+            setPickupEventId((prev) => {
+              if (prev && pickupStands.some((s) => s.id === prev)) return prev;
+              const matchCurrent = eventId && eventId !== 'evt-ventas-redes-online' && pickupStands.find((s) => s.id === eventId);
+              return matchCurrent ? matchCurrent.id : pickupStands[0].id;
+            });
+          }
         }
       } catch (_) {}
     }
@@ -242,7 +252,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
 
     const clientUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sale-rem-${Date.now()}`;
     const payload = {
-      eventId: eventId || 'evt-ventas-redes-online',
+      eventId: 'evt-ventas-redes-online',
       customerId: selectedCustomer?.id || null,
       customer: selectedCustomer?.id ? null : {
         fullName: customerData.fullName.trim(),

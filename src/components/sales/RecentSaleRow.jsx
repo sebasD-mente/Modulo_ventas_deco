@@ -68,17 +68,19 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
         <div className="text-[11px] text-slate-300 space-y-1 pt-0.5">
           {(sale.items || []).map((it, idx) => {
             const img = it.customImageUrl || it.product?.imageUrl || it.imageUrl || it.thumbUrl;
+            const rawDesc = it.description || it.product?.name || 'Póster';
+            const cleanDesc = String(rawDesc).replace(/\bundefined\b/gi, '').replace(/\s{2,}/g, ' ').trim() || 'Póster';
             return (
               <div key={idx} className="flex items-center justify-between gap-2 text-slate-300">
                 <div className="flex items-center gap-2 min-w-0">
                   {img ? (
-                    <img src={img} alt={it.description} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-neutral-900 border border-neutral-800 shrink-0" />
+                    <img src={img} alt={cleanDesc} className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-neutral-900 border border-neutral-800 shrink-0" />
                   ) : (
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-neutral-900 border border-neutral-800 shrink-0 flex items-center justify-center text-neutral-600">
                       <ImageIcon className="w-4 h-4" />
                     </div>
                   )}
-                  <span className="truncate">{it.quantity}x {it.description}</span>
+                  <span className="truncate">{it.quantity}x {cleanDesc}</span>
                 </div>
                 <span className="font-mono text-slate-400 shrink-0">Q {Number(it.subtotal).toFixed(2)}</span>
               </div>

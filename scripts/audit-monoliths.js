@@ -21,7 +21,7 @@ const DOMAIN_CEILINGS = {
   'server/services/geminiPoolService.js': { max: 500, reason: 'Máquina de estados para rotación y pool de API Keys' },
 
   // 3. Herramientas, Motores de IA y Catálogos
-  'server/services/ai/aiToolsService.js': { max: 400, reason: 'Catálogo oficial de Function Calling de Gemini (8 herramientas) y validación de borradores' },
+  'server/services/ai/aiToolsService.js': { max: 450, reason: 'Catálogo oficial de Function Calling de Gemini (10 herramientas), validación de borradores y frontera dura anti-mercancía ajena' },
   'server/services/ai/aiMediaService.js': { max: 350, reason: 'Orquestador multimodal de medios e inferencia' },
   'server/services/catalog/webCatalogService.js': { max: 350, reason: 'Motor de emparejamiento léxico y resolución de formatos de catálogo' },
   'server/services/catalog/liveCatalogSyncService.js': { max: 350, reason: 'Sincronizador en vivo de catálogo' },
@@ -34,7 +34,7 @@ const DOMAIN_CEILINGS = {
   'server/controllers/remoteSaleController.js': { max: 350, reason: 'Controlador integral de clientes y ventas remotas' },
   'server/controllers/printSheetController.js': { max: 300, reason: 'Controlador de pliegos de taller y asignación' },
   'server/controllers/commissionController.js': { max: 300, reason: 'Controlador de comisiones y liquidaciones' },
-  'server/controllers/saleController.js': { max: 450, reason: 'Controlador de ventas feriales, arqueos y logística de pedidos' },
+  'server/controllers/saleController.js': { max: 480, reason: 'Controlador de ventas feriales, arqueos y logística de pedidos multi-rol con recibos de entrega' },
   'server/controllers/eventController.js': { max: 520, reason: 'Controlador integral de eventos multi-stand, activación concurrente y bitácora de gastos' },
   'src/components/FastManualSaleForm.jsx': { max: 350, reason: 'Terminal unificada de venta manual rápida, cotizador 50/50, top sellers y carrito' },
   'src/components/sales/BalancePaymentModal.jsx': { max: 350, reason: 'Modal integral de cobro de saldos, liquidación financiera y comprobantes' },

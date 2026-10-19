@@ -74,7 +74,13 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       const total = Number(pendingDraft.items.reduce((s, i) => s + Number(i.subtotal || i.unitPrice * i.quantity || 0), 0).toFixed(2));
       return { ...pendingDraft, transcription: cleanTranscription, isSaleDetected: true, intent: 'DICTADO_VENTA', items: pendingDraft.items, total, paymentMethod: nextMethod, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: `Método de pago actualizado a ${nextMethod} por voz.`, reply: `Método de pago actualizado a ${nextMethod} por voz.` };
     }
-    if (!isSale) return { transcription: cleanTranscription, isSaleDetected: false, intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.' };
+    if (!isSale) {
+      const isGenericAlbum = /\b(portadas?(?:\s+de\s+[aá]lbum)?|[aá]lbum(?:es)?|discos?|vinilos?)\b/i.test(cleanTranscription) && (/\b(55|cincuenta\s*y\s*cinco|cuadrad[oa]|30\s*x\s*30)\b/i.test(cleanTranscription) || /\bportada\s+de\s+[aá]lbum\b/i.test(cleanTranscription));
+      const msg = isGenericAlbum
+        ? 'Contamos con gran variedad de portadas de álbum musicales en formato 30×30 cm a Q55.00 (Taylor Swift, Pink Floyd, The Beatles, Metallica, etc.). ¿Qué artista o álbum musical deseas agregar?'
+        : 'No se identificaron pósters del catálogo en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.';
+      return { transcription: cleanTranscription, isSaleDetected: false, intent: isGenericAlbum ? 'CONSULTA_CATALOGO' : intent, greeting: parsed.greeting || null, items: [], total: 0, unmatchedItems: [], suggestedPosters: [], paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: msg, reply: msg };
+    }
 
     const searchResults = await Promise.all(parsed.items.map(async (item) => {
       const rawTitle = (item.posterName || item.title || item.rawName || item.name || item.productName || item.description || '').trim();
@@ -123,8 +129,11 @@ export async function processVoiceSaleAudio({ audioBuffer, mimeType = 'audio/web
       }
     }
     if (enrichedItems.length === 0) {
-      const zeroMatchMsg = 'No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.';
-      return { transcription: cleanTranscription, isSaleDetected: false, intent: cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO', greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
+      const isGenericAlbum = /\b(portadas?(?:\s+de\s+[aá]lbum)?|[aá]lbum(?:es)?|discos?|vinilos?)\b/i.test(cleanTranscription) && (/\b(55|cincuenta\s*y\s*cinco|cuadrad[oa]|30\s*x\s*30)\b/i.test(cleanTranscription) || /\bportada\s+de\s+[aá]lbum\b/i.test(cleanTranscription));
+      const zeroMatchMsg = isGenericAlbum
+        ? 'Contamos con gran variedad de portadas de álbum musicales en formato 30×30 cm a Q55.00 (Taylor Swift, Pink Floyd, The Beatles, Metallica, etc.). ¿Qué artista o álbum musical deseas agregar?'
+        : 'No se identificaron pósters del catálogo oficial en el dictado de voz. Verifica el diseño o selecciónalo en el buscador.';
+      return { transcription: cleanTranscription, isSaleDetected: false, intent: isGenericAlbum ? 'CONSULTA_CATALOGO' : (cleanTranscription.length < 2 ? 'RUIDO_NO_VENTA' : 'CONSULTA_CATALOGO'), greeting: parsed.greeting || null, draftSale: null, items: [], total: 0, unmatchedItems, suggestedPosters: suggestedPosters.slice(0, 3), paymentMethod: parsed.paymentMethod || 'EFECTIVO', confidence: parsed.confidence || 0.95, usedModel: usedModel || 'gemini-3.8-flash', inputChannel: 'IA_VOZ', message: zeroMatchMsg, reply: zeroMatchMsg };
     }
     if (pendingDraft?.items?.length > 0 && /\b(agrega|añade|suma|tambien|también|ademas|además|otro|otra|mas|más|ponme|dame)\b/i.test(cleanTranscription)) {
       const existingKeys = new Set(enrichedItems.map((i) => `${i.webPosterId || i.productId || i.baseTitle}::${i.sizeId}`));

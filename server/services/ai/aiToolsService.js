@@ -26,11 +26,17 @@ export const discardSaleDraftDeclaration = {
 export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, discardSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getHourlySalesAnalyticsDeclaration, getTopSellingPostersDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
 
 const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 }];
-const sizePrice = (s) => s === 'PORTADA_ALBUM' ? 55.0 : s === 'MINI' ? 25.0 : s === 'PEQUENO' ? 35.0 : s === 'GRANDE' ? 125.0 : s === 'GIGANTE' ? 180.0 : 65.0;
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
   return (await prisma.event?.findFirst?.({ where: { status: 'ACTIVO', ...(tenantId ? { tenantId } : {}) }, select: { id: true } }))?.id || null;
+}
+
+export const NON_CATALOG_MERCH_REGEX = /\b(playeras?|camisas?|camisetas?|t-?shirts?|tazas?|pocillos?|mugs?|gorras?|sombreros?|llaveros?|funkos?|figuras?(?:\s+de\s+acci[oó]n)?|muñecos?|juguetes?|peluches?|ropas?|calzados?|zapatos?|tenis|sudaderas?|su[eé]teres?|hoodies?|comidas?|bebidas?|alimentos?|caf[eé]s?|hamburguesas?|pizzas?|pantal[oó]nes?|shorts?)\b/i;
+
+export function isItemOutsideBusinessDomain(text) {
+  if (!text || typeof text !== 'string') return false;
+  return NON_CATALOG_MERCH_REGEX.test(text);
 }
 
 export async function constructDraftPayload(tenantId, args, userMessage = '', pendingDraft = null) {
@@ -88,12 +94,26 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
       }
     }
 
+    const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
+    if (isItemOutsideBusinessDomain(rawName) || isItemOutsideBusinessDomain(it.productName)) {
+      const outOfDomainReason = `Deco Vintage se especializa exclusivamente en pósters, cuadros decorativos y portadas de álbum. No comercializamos '${rawName}'.`;
+      return {
+        unmatchedItem: {
+          rawName,
+          requestedSize: userSpecifiedSize || 'MEDIANO',
+          quantity: qty,
+          sizeAvailable: false,
+          outOfDomain: true,
+          unavailableReason: outOfDomainReason,
+          candidates: []
+        }
+      };
+    }
+
     let matched = await matchPosterEverywhere(tenantId, rawName, initialRequestedSize, { skipLiveParachute: true });
     if (!matched && aliasRes.matched && aliasRes.exactMatch && aliasRes.searchQuery) {
       matched = await matchPosterEverywhere(tenantId, aliasRes.searchQuery, initialRequestedSize, { skipLiveParachute: true });
     }
-
-    const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
 
     if (matched) {
       const isMusicCategory = matched.category === 'MUSICA' || aliasRes.category === 'MUSICA';
@@ -272,7 +292,9 @@ export { executeGetSellerShiftReport } from './aiShiftReportService.js';
 export { getHourlySalesAnalytics as executeGetHourlySalesAnalytics, getTopSellingPosters as executeGetTopSellingPosters } from '../sales/saleAnalyticsService.js';
 export async function executeSearchCatalog(tenantId, query, category = null, limit = 12) {
   if (!query || typeof query !== 'string' || !query.trim()) return [];
-  const clean = query.trim(), norm = normalizeArtworkQuery(clean);
+  const clean = query.trim();
+  if (isItemOutsideBusinessDomain(clean)) return [];
+  const norm = normalizeArtworkQuery(clean);
   let matches = [];
   try {
     matches = await searchWebPosters({ tenantId, query: norm, category, limit, skipLiveParachute: true });

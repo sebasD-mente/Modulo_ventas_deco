@@ -172,9 +172,10 @@ export function useEventsManager({ onEventActivated, onEventsChanged } = {}) {
     }
   };
 
-  const activeEvents = events.filter((e) => e.status === 'ACTIVO');
-  const confirmedEvents = events.filter((e) => e.status === 'CONFIRMADO' || (e.status !== 'ACTIVO' && e.status !== 'ARCHIVADO'));
-  const archivedEvents = events.filter((e) => e.status === 'ARCHIVADO');
+  const digitalPos = events.find((e) => e.id === 'evt-ventas-redes-online') || null;
+  const activeEvents = events.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online');
+  const confirmedEvents = events.filter((e) => (e.status === 'CONFIRMADO' || (e.status !== 'ACTIVO' && e.status !== 'ARCHIVADO')) && e.id !== 'evt-ventas-redes-online');
+  const archivedEvents = events.filter((e) => e.status === 'ARCHIVADO' && e.id !== 'evt-ventas-redes-online');
 
   const filteredArchivedEvents = useMemo(() => {
     return archivedEvents.filter((ev) => {
@@ -194,7 +195,7 @@ export function useEventsManager({ onEventActivated, onEventsChanged } = {}) {
   }, [archivedEvents, archivedSearchQuery, archivedDateFilter]);
 
   return {
-    events, isLoading, errorMsg, loadEvents, activeEvents, confirmedEvents, archivedEvents,
+    events, isLoading, errorMsg, loadEvents, digitalPos, activeEvents, confirmedEvents, archivedEvents,
     usersList, loadUsers,
     archivedSearchQuery, setArchivedSearchQuery, archivedDateFilter, setArchivedDateFilter,
     showArchivedSection, setShowArchivedSection, filteredArchivedEvents,

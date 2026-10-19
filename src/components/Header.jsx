@@ -71,6 +71,7 @@ export default function Header({
     if (isOperario1 && isOperario2) tabMap.set('produccion', { id: 'produccion', label: 'Producción' });
     else if (isOperario1) tabMap.set('produccion', { id: 'produccion', label: 'Producción & Stock' });
     else if (isOperario2) tabMap.set('produccion', { id: 'produccion', label: 'Taller de Impresión' });
+    tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
     if (isVendedor) tabMap.set('cierre', { id: 'cierre', label: 'Cierre de caja' });
     navTabs = Array.from(tabMap.values());
     if (navTabs.length === 0) navTabs = [{ id: 'venta', label: 'Terminal de Ventas' }];
@@ -114,7 +115,16 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-2">
-          {activeEvent && (
+          {isVendedorRedes && !isSuperAdmin && !isVendedor ? (
+            <div
+              data-testid="header-online-pos-badge"
+              className="min-h-[44px] px-2.5 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-bold flex items-center gap-1.5"
+              title="Punto de Venta Digital Permanente (24/7)"
+            >
+              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse shrink-0" />
+              <span className="truncate">📱 Redes / Online</span>
+            </div>
+          ) : activeEvent ? (
             <div className="relative" ref={standSelectorRef}>
               {isSuperAdmin && activeEventsList.length > 1 ? (
                 <div>
@@ -157,7 +167,7 @@ export default function Header({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
 
           {user ? (
             <div className="flex items-center gap-1 py-1 px-1 rounded-2xl bg-neutral-50 border border-neutral-200/80 shadow-xs shrink-0">
@@ -182,7 +192,12 @@ export default function Header({
             </div>
 
             <div className="my-3 shrink-0">
-              {activeEvent ? (
+              {isVendedorRedes && !isSuperAdmin && !isVendedor ? (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-purple-900">
+                  <span className="shrink-0 text-sm">📱</span>
+                  <span className="truncate">Punto de Venta: <strong className="font-bold">Redes / Online (24/7)</strong></span>
+                </div>
+              ) : activeEvent ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-900">
                   <span className="shrink-0 text-sm">📍</span>
                   <span className="truncate">Stand: <strong className="font-bold">{activeEvent.name}</strong></span>

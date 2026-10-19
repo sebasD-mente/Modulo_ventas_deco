@@ -141,6 +141,35 @@ export default function OrderTrackingCard({ order, onOpenPayment, onOpenDelivery
         </button>
       </div>
 
+      {/* Historial de Trazabilidad Forense (Quién cobró saldo, quién entregó) */}
+      {order.notes && (
+        <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-2.5 text-[11px] space-y-1">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Trazabilidad de la Orden:</div>
+          <div className="whitespace-pre-line text-neutral-300 font-mono text-[10px] leading-relaxed">
+            {order.notes}
+          </div>
+        </div>
+      )}
+
+      {/* Comprobantes de Pago / Anticipo */}
+      {Array.isArray(order.payments) && order.payments.some((p) => p.receiptUrl) && (
+        <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
+          <span className="text-[11px] font-semibold text-neutral-400">Comprobantes:</span>
+          {order.payments.filter((p) => p.receiptUrl).map((p, idx) => (
+            <a
+              key={idx}
+              href={p.receiptUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-[11px] text-cyan-400 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>Boleta #{idx + 1} ({p.method})</span>
+            </a>
+          ))}
+        </div>
+      )}
+
       {/* Lista Desplegable de Obras del Pedido */}
       {isExpanded && (
         <div className="space-y-2 pt-2 border-t border-neutral-900">

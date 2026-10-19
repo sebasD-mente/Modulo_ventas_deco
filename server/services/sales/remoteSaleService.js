@@ -384,8 +384,25 @@ export async function registerBalancePayment({
       newPaymentStatus = 'PAGADO_TOTAL'; newStatus = 'COMPLETADA'; newBalanceDue = 0.0; newDepositAmount = Number(sale.totalAmount);
     }
 
+    let collectorUser = null;
+    if (sellerId && typeof client.user?.findUnique === 'function') {
+      try {
+        collectorUser = await client.user.findUnique({
+          where: { id: sellerId },
+          select: { id: true, fullName: true, role: true },
+        });
+      } catch (_) {}
+    }
+    const collectorName = collectorUser?.fullName || 'Usuario';
+    const collectorRole = collectorUser?.role || userRole || 'STAFF';
+
+    const auditStamp = isPendingPayment
+      ? `[Anticipo Q${newPaymentsTotal.toFixed(2)} registrado por: ${collectorName} (${collectorRole})]`
+      : `[Saldo Q${newPaymentsTotal.toFixed(2)} cobrado por: ${collectorName} (${collectorRole})]`;
     const labelNote = isPendingPayment ? 'Anticipo registrado' : 'Saldo cobrado';
-    const updatedNotes = notes ? (sale.notes ? `${sale.notes}\n[${labelNote}]: ${notes}` : `[${labelNote}]: ${notes}`) : sale.notes;
+    const userNote = notes ? `[${labelNote}]: ${notes}` : '';
+    const notePieces = [auditStamp, userNote].filter(Boolean).join(' • ');
+    const updatedNotes = sale.notes ? `${sale.notes}\n${notePieces}` : notePieces;
     const shouldAssignPickup = Boolean(assignedEventId && !sale.pickupEventId);
 
     // Protección atómica contra condiciones de carrera concurrentes (TOCTOU)
@@ -421,10 +438,20 @@ export async function registerBalancePayment({
     }
 
     await client.salePayment.createMany({
-      data: payments.map((p, idx) => ({
-        saleId: sale.id, method: p.method, amount: p.amount, reference: p.reference || null, receiptUrl: p.receiptUrl || null,
-        idempotencyKey: idempotencyKey ? (idx === 0 ? idempotencyKey : `${idempotencyKey}-${idx}`) : null,
-      })),
+      data: payments.map((p, idx) => {
+        let paymentRef = p.reference ? p.reference.trim() : null;
+        if (!isPendingPayment) {
+          paymentRef = paymentRef ? `${paymentRef} [SALDO]` : '[SALDO]';
+        }
+        return {
+          saleId: sale.id,
+          method: p.method,
+          amount: p.amount,
+          reference: paymentRef,
+          receiptUrl: p.receiptUrl || null,
+          idempotencyKey: idempotencyKey ? (idx === 0 ? idempotencyKey : `${idempotencyKey}-${idx}`) : null,
+        };
+      }),
     });
 
     const updatedSale = await client.sale.update({
@@ -449,6 +476,8 @@ export async function registerBalancePayment({
           previousBalance: currentBalance,
           newPaymentStatus,
           activatedToProduction: isPendingPayment,
+          collectorName,
+          collectorRole,
         },
       },
     });
