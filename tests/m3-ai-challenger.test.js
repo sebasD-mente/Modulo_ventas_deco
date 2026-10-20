@@ -99,10 +99,10 @@ describe('⚔️ EMPIRICAL CHALLENGER: Milestone 3 AI Normalization & Conversati
   // =========================================================================
   describe('2. Canonical Poster Sizes Resolution Matrix', () => {
     
-    it('Gigante (60x90 cm / 24x36") mapea a GIGANTE (Q180)', () => {
+    it('Gigante (60x100 cm / 24x36") mapea a GIGANTE (Q210)', () => {
       const giganteInputs = [
         '24x36', '24 x 36', '24 x 36 pulgadas', '24x36 in', '24"x36"',
-        '60x90', '60 x 90 cm', '36x24', '90x60',
+        '60x100', '60 x 100 cm', '36x24', '100x60',
         'gigante', 'GIGANTE', 'extra grande', 'xl', 'XL'
       ];
       for (const input of giganteInputs) {
@@ -226,7 +226,7 @@ describe('⚔️ EMPIRICAL CHALLENGER: Milestone 3 AI Normalization & Conversati
       { sizeId: 'PEQUENO', nombre: 'Pequeño (21 x 27 cm)', dimensiones: '21 x 27 cm', precio: 35 },
       { sizeId: 'MEDIANO', nombre: 'Mediano (30 x 45 cm)', dimensiones: '30 x 45 cm', precio: 65 },
       { sizeId: 'GRANDE', nombre: 'Grande (45 x 60 cm)', dimensiones: '45 x 60 cm', precio: 125 },
-      { sizeId: 'GIGANTE', nombre: 'Gigante (60 x 90 cm)', dimensiones: '60 x 90 cm', precio: 180 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante (60 x 100 cm)', dimensiones: '60 x 100 cm', precio: 210 },
     ];
 
     // Simular la lógica de resolución de tamaño implementada en matchPosterEverywhere
@@ -271,10 +271,10 @@ describe('⚔️ EMPIRICAL CHALLENGER: Milestone 3 AI Normalization & Conversati
       assert.strictEqual(selected.precio, 125);
     });
 
-    it('Solicitud de "24x36" asigna GIGANTE a Q180', () => {
+    it('Solicitud de "24x36" asigna GIGANTE a Q210', () => {
       const selected = resolveMatchedSize('24x36');
       assert.strictEqual(selected.sizeId, 'GIGANTE');
-      assert.strictEqual(selected.precio, 180);
+      assert.strictEqual(selected.precio, 210);
     });
 
     it('Solicitud de "12x18" asigna MEDIANO a Q65', () => {

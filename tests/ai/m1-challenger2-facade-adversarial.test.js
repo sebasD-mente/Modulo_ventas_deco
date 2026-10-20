@@ -219,7 +219,7 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica — Fachada B
       assert.strictEqual(normalizeCatalogSizeId('18x24'), 'GRANDE');
       assert.strictEqual(normalizeCatalogSizeId('45x60'), 'GRANDE');
       assert.strictEqual(normalizeCatalogSizeId('24x36'), 'GIGANTE');
-      assert.strictEqual(normalizeCatalogSizeId('60x90'), 'GIGANTE');
+      assert.strictEqual(normalizeCatalogSizeId('60x100'), 'GIGANTE');
       assert.strictEqual(normalizeCatalogSizeId('12x18'), 'MEDIANO');
       assert.strictEqual(normalizeCatalogSizeId('30x45'), 'MEDIANO');
       assert.strictEqual(normalizeCatalogSizeId('30x30'), 'PORTADA_ALBUM');

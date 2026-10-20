@@ -184,11 +184,11 @@ describe('⚔️ CHALLENGER 2: Verificación Adversarial Empírica para Hito M4 
       assert.ok(prompt.includes('Portada de Álbum (Q55.00)'));
       assert.ok(prompt.includes('Mediano [OPCIÓN ESTRELLA] (Q65.00)'));
       assert.ok(prompt.includes('Grande (Q125.00)'));
-      assert.ok(prompt.includes('Gigante (Q180.00)'));
+      assert.ok(prompt.includes('Gigante (Q210.00)'));
 
       // Reglas canónicas de conversión
       assert.ok(prompt.includes('Si piden "18x24" o "45x60", asignar SIEMPRE tamaño "GRANDE" (Q125.00)'));
-      assert.ok(prompt.includes('Si piden "24x36" o "60x90", asignar SIEMPRE tamaño "GIGANTE" (Q180.00)'));
+      assert.ok(prompt.includes('Si piden "24x36" o "60x100", asignar SIEMPRE tamaño "GIGANTE" (Q210.00)'));
       assert.ok(prompt.includes('Si piden "12x18" o "30x45", asignar SIEMPRE tamaño "MEDIANO" (Q65.00)'));
       assert.ok(prompt.includes('Si piden "portada", "disco", "vinilo", "álbum" o "30x30", asignar SIEMPRE tamaño "PORTADA_ALBUM" (Q55.00)'));
     });

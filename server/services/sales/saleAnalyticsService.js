@@ -71,7 +71,7 @@ const SIZES_DEF = [
   { sizeId: 'PORTADA_ALBUM', name: 'Portada de Álbum', re: /\b(?:portada(?:\s+de)?\s+[aá]lbum|[aá]lbum|vinilo|vinil|disco|30\s*x\s*30(?:\s*cm)?)\b/i, price: 55 },
   { sizeId: 'PEQUENO', name: 'Pequeño', re: /\b(?:peque[ñn][oa]|21\s*x\s*27(?:\s*cm)?)\b/i, price: 35 },
   { sizeId: 'MINI', name: 'Mini', re: /\b(?:mini|14\s*x\s*21(?:\s*cm)?)\b/i, price: 25 },
-  { sizeId: 'GIGANTE', name: 'Gigante', re: /\b(?:gigante|60\s*x\s*90(?:\s*cm)?)\b/i, price: 180 },
+  { sizeId: 'GIGANTE', name: 'Gigante', re: /\b(?:gigante|60\s*x\s*100(?:\s*cm)?)\b/i, price: 210 },
 ];
 const CANONICAL_SIZE_ORDER = { MEDIANO: 1, GRANDE: 2, PORTADA_ALBUM: 3, PEQUENO: 4, MINI: 5, GIGANTE: 6 };
 

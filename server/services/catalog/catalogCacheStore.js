@@ -77,7 +77,7 @@ export async function getCachedProducts(tenantId) {
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
-          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 210 },
         ],
       },
       {
@@ -94,7 +94,7 @@ export async function getCachedProducts(tenantId) {
           { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
           { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
           { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
-          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+          { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 210 },
         ],
       },
     ];

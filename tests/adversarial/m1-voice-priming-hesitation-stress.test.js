@@ -120,7 +120,7 @@ describe('🥊 Adversarial Priming, Hesitation & Size Normalization Challenge Ha
       { id: 'PORTADA_ALBUM', name: 'Portada de Álbum', promptPrice: 'Q55', testInputs: ['Portada de Álbum', 'portada de album', 'album', '30x30', 'vinilo'] },
       { id: 'MEDIANO', name: 'Mediano', promptPrice: 'Q65', testInputs: ['Mediano', 'mediano', '30x45', '30 x 45 cm', '12x18'] },
       { id: 'GRANDE', name: 'Grande', promptPrice: 'Q125', testInputs: ['Grande', 'grande', '45x60', '45 x 60 cm', '18x24'] },
-      { id: 'GIGANTE', name: 'Gigante', promptPrice: 'Q180', testInputs: ['Gigante', 'gigante', '60x90', '60 x 90 cm', '24x36'] },
+      { id: 'GIGANTE', name: 'Gigante', promptPrice: 'Q210', testInputs: ['Gigante', 'gigante', '60x100', '60 x 100 cm', '24x36'] },
     ];
 
     it('3.1. buildVoiceSalePrompt lists all 6 standard sizes with exact ferial prices', () => {

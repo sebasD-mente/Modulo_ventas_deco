@@ -90,10 +90,10 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
       }
     });
 
-    it('3.2 Mapeo estricto de medidas en pulgadas a GIGANTE (Q180)', () => {
+    it('3.2 Mapeo estricto de medidas en pulgadas a GIGANTE (Q210)', () => {
       const inputs = [
         '24x36', '24 x 36', '24*36', '24 por 36', '24 x 36 pulgadas',
-        '24x36"', '36x24', '60x90', '60 x 90 cm', '90x60'
+        '24x36"', '36x24', '60x100', '60 x 100 cm', '100x60'
       ];
       for (const val of inputs) {
         assert.equal(normalizeCatalogSizeId(val), 'GIGANTE', `Fallo mapeando "${val}" a GIGANTE`);

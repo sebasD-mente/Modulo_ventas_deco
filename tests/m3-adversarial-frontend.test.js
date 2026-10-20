@@ -526,7 +526,8 @@ describe('⚔️ ADVERSARIAL CHALLENGER SUITE: Milestone 3 Frontend & State Arch
 
       assert.equal(normalizeCatalogSizeId('24x36'), 'GIGANTE');
       assert.equal(normalizeCatalogSizeId('36x24'), 'GIGANTE');
-      assert.equal(normalizeCatalogSizeId('60x90'), 'GIGANTE');
+      assert.equal(normalizeCatalogSizeId('60x100'), 'GIGANTE');
+      assert.equal(normalizeCatalogSizeId('100x60'), 'GIGANTE');
 
       assert.equal(normalizeCatalogSizeId('12x18'), 'MEDIANO');
       assert.equal(normalizeCatalogSizeId('18x12'), 'MEDIANO');

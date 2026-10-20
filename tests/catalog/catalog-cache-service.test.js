@@ -49,7 +49,7 @@ describe('Catalog Cache Service & Audio Satellite Suite (M2)', () => {
       assert.equal(CANONICAL_PRICE_MAP.PORTADA_ALBUM, 55);
       assert.equal(CANONICAL_PRICE_MAP.MEDIANO, 65);
       assert.equal(CANONICAL_PRICE_MAP.GRANDE, 125);
-      assert.equal(CANONICAL_PRICE_MAP.GIGANTE, 180);
+      assert.equal(CANONICAL_PRICE_MAP.GIGANTE, 210);
     });
 
     it('1.3. Cada elemento de CANONICAL_SIZES concuerda con CANONICAL_PRICE_MAP', () => {

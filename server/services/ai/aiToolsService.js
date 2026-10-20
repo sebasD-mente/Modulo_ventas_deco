@@ -25,7 +25,7 @@ export const discardSaleDraftDeclaration = {
 };
 export const salesAssistantTools = [{ functionDeclarations: [prepareSaleDraftDeclaration, discardSaleDraftDeclaration, searchCatalogDeclaration, getEventKPIsDeclaration, getHourlySalesAnalyticsDeclaration, getTopSellingPostersDeclaration, getCashDrawerStatusDeclaration, getSellerShiftReportDeclaration, getProductionQueueStatusDeclaration, checkInventoryStockDeclaration] }];
 
-const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 }];
+const DEFAULT_SIZES = [{ sizeId: 'MINI', nombre: 'Mini', dimensiones: '14 x 21 cm', precio: 25 }, { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 }, { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65, badge: '⭐ Más vendido' }, { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 }, { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 100 cm', precio: 210 }];
 const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 async function resolveActiveEvent(tenantId, eventId) {
   if (eventId && eventId !== 'current' && eventId !== 'activo') return eventId;
@@ -50,7 +50,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
   const extractSizeFromText = (text) => {
     if (!text || typeof text !== 'string') return null;
     const str = text.toLowerCase();
-    if (/\b(extra\s*grandes?|gigantes?|xl|60x90|24x36)\b/i.test(str)) return 'GIGANTE';
+    if (/\b(extra\s*grandes?|gigantes?|xl|60x100|100x60|24x36)\b/i.test(str)) return 'GIGANTE';
     if (/\b(grandes?|large|18x24|45x60)\b/i.test(str)) return 'GRANDE';
     if (/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/i.test(str)) return 'PORTADA_ALBUM';
     if (/\b(peque[ñn]os?|chicos?|small|8\.?5?x1[01]|21x27)\b/i.test(str)) return 'PEQUENO';
@@ -66,7 +66,7 @@ export async function constructDraftPayload(tenantId, args, userMessage = '', pe
     const nameExtractedSize = extractSizeFromText(rawName);
     if (nameExtractedSize) {
       rawName = rawName
-        .replace(/\b(extra\s*grandes?|gigantes?|xl|60x90|24x36)\b/gi, '')
+        .replace(/\b(extra\s*grandes?|gigantes?|xl|60x100|100x60|24x36)\b/gi, '')
         .replace(/\b(grandes?|large|18x24|45x60)\b/gi, '')
         .replace(/\b(portada|album|[aá]lbum|vinilo|disco|30x30)\b/gi, '')
         .replace(/\b(peque[ñn]os?|chicos?|small|8\.?5?x1[01]|21x27)\b/gi, '')

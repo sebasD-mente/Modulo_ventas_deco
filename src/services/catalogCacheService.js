@@ -3,7 +3,7 @@ export const STANDARD_POSTER_SIZES = [
   { sizeId: 'PEQUENO', nombre: 'Pequeño', dimensiones: '21 x 27 cm', precio: 35 },
   { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', precio: 65 },
   { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', precio: 125 },
-  { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', precio: 180 },
+  { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 100 cm', precio: 210 },
 ];
 export const ALBUM_POSTER_SIZES = [
   { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', dimensiones: '30 x 30 cm', precio: 55, badge: '🎵 Vinilo' },
@@ -16,7 +16,7 @@ export const CANONICAL_SIZES = [
   STANDARD_POSTER_SIZES[3],
   STANDARD_POSTER_SIZES[4],
 ];
-export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 180 };
+export const CANONICAL_PRICE_MAP = { MINI: 25, PEQUENO: 35, PORTADA_ALBUM: 55, MEDIANO: 65, GRANDE: 125, GIGANTE: 210 };
 const STORAGE_KEY = 'deko_local_catalog_snapshot_v1';
 export const TIMEOUT_MS = 2500;
 const MAX_LOCAL_CATALOG_ITEMS = 1000;

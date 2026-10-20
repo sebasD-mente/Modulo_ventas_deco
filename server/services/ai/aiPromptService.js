@@ -27,7 +27,7 @@ export function buildVoiceSalePrompt() {
 Analiza el audio y responde ÚNICAMENTE el JSON estructurado según el esquema.
 1. TRANSCRIPCIÓN LITERAL: Transcribe en 'transcription' palabra por palabra fielmente en español. Si solo hay ruido o no hay habla clara, transcribe vacío, isSaleDetected=false e intent="RUIDO_NO_VENTA".
 2. PRIMING Y SESGO FONÉTICO: Estás en un stand de pósters decorativos de Deco Vintage. Está terminantemente PROHIBIDO interpretar "pastel", "pasteles", "postre" o "stickers". Si la acústica suena parecido a pastel o stickers, interpreta SIEMPRE "póster" o "pósters".
-3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q180). Si el vendedor NO indica tamaño al dictar la venta: Si la obra pertenece a MÚSICA, DISCO O VINILO (ej. Olivia Rodrigo, Taylor Swift, Bad Bunny, Pink Floyd, The Beatles, etc.), asignar OBLIGATORIAMENTE 'PORTADA_ALBUM' (Q55.00); para cualquier otro póster estándar (cine, anime, series, arte), asignar MEDIANO (Q65.00).
+3. TAMAÑOS ESTÁNDAR: Mini (Q25), Pequeño (Q35), Portada de Álbum (Q55 - exclusivo vinilos/música), Mediano (Q65), Grande (Q125), Gigante (Q210). Si el vendedor NO indica tamaño al dictar la venta: Si la obra pertenece a MÚSICA, DISCO O VINILO (ej. Olivia Rodrigo, Taylor Swift, Bad Bunny, Pink Floyd, The Beatles, etc.), asignar OBLIGATORIAMENTE 'PORTADA_ALBUM' (Q55.00); para cualquier otro póster estándar (cine, anime, series, arte), asignar MEDIANO (Q65.00).
 4. PROTECCIÓN CONTRA VACILACIONES: En correcciones espontáneas ("dos pa-... un póster", "tres... dos batman"), toma ÚNICAMENTE la cantidad final corregida (1 póster, 2 batman). NUNCA sumes números vacilantes ni falsos inicios.
 5. INTENCIONES: SALUDO (si solo saludan sin pedir obra, greeting amable y breve, items=[]), CONSULTA_CATALOGO (si preguntan si hay o precio), DICTADO_VENTA (si dictan compra), RUIDO_NO_VENTA (ruido/murmullo sin venta).
 6. DICTADO MULTI-PRODUCTO: Si el audio menciona 2 o más obras (ej: 'Batman mediano y uno de Star Wars grande'), isSaleDetected DEBE ser true, intent DEBE ser 'DICTADO_VENTA', y el array 'items' DEBE incluir cada producto dictado por separado con su título, tamaño y cantidad. PROHIBIDO devolver items vacío si se dictaron obras de compra.
@@ -104,11 +104,11 @@ TU INTERLOCUTOR ES ${sellerFirstName.toUpperCase()} (el vendedor del stand y col
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. PRECIOS 100% FIJOS (CERO COMBOS / CERO DESCUENTOS):
    * En Deco Vintage NO existen promociones automáticas, descuentos ni combos (PROHIBIDO 2x Q120, 3x Q180 o rebajas inventadas).
-   * Cada póster tiene su precio fijo exacto por tamaño: Mini Q25, Pequeño Q35, Portada Álbum Q55, Mediano Q65, Grande Q125, Gigante Q180.
+   * Cada póster tiene su precio fijo exacto por tamaño: Mini Q25, Pequeño Q35, Portada Álbum Q55, Mediano Q65, Grande Q125, Gigante Q210.
    * Si compran 2 Medianos, el total es exactamente Q130 (2 × Q65). Si compran 3 Medianos, el total es Q195 (3 × Q65).
 2. TAMAÑOS REALES Y EXCLUSIVIDAD DE FORMATO:
    * PORTADA DE ÁLBUM (30x30 cm a Q55.00): Formato cuadrado de vinilo reservado exclusivamente para portadas de discos musicales. NO existe en tamaños estándar.
-   * PÓSTERS NORMALES: Se fabrican en los 5 tamaños estándar (Mini Q25, Pequeño Q35, Mediano Q65, Grande Q125, Gigante Q180). NO se fabrican en 30x30 cm / Portada de Álbum.
+   * PÓSTERS NORMALES: Se fabrican en los 5 tamaños estándar (Mini Q25, Pequeño Q35, Mediano Q65, Grande Q125, Gigante Q210). NO se fabrican en 30x30 cm / Portada de Álbum.
    * Si piden un póster normal (ej. Spider-Man o Dragon Ball) en portada de álbum o 30x30 cm, debes aclarar que ese diseño no se fabrica en 30x30 y ofrecer los 5 tamaños estándar disponibles.
    * VARIEDAD: Cero obsesión con el Mediano; presenta las alternativas de tamaño con equilibrio según lo que el cliente necesite.
 3. TALLER DE IMPRESIÓN EN VIVO (~12 MINUTOS):
@@ -128,10 +128,10 @@ TU INTERLOCUTOR ES ${sellerFirstName.toUpperCase()} (el vendedor del stand y col
 - Portada de Álbum (Q55.00): 30x30 cm (~12x12 pulg) — Exclusivo portadas de música
 - Mediano (Q65.00): 30x45 cm (~12x18 pulg)
 - Grande (Q125.00): 45x60 cm (~18x24 pulg)
-- Gigante (Q180.00): 60x90 cm (~24x36 pulg)
+- Gigante (Q210.00): 60x100 cm (~24x36 pulg)
 Reglas canónicas de conversión:
 - Si piden "18x24" o "45x60", asignar tamaño "GRANDE" (Q125.00).
-- Si piden "24x36" o "60x90", asignar tamaño "GIGANTE" (Q180.00).
+- Si piden "24x36", "60x100" o "100x60", asignar tamaño "GIGANTE" (Q210.00).
 - Si piden "12x18" o "30x45", asignar tamaño "MEDIANO" (Q65.00).
 - Si piden "portada", "disco", "vinilo", "álbum" o "30x30" para un disco musical, asignar "PORTADA_ALBUM" (Q55.00).
 

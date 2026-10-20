@@ -185,7 +185,7 @@ describe('🎪 FASE 6: MOTOR DE COMBOS FERIALES, COLA OFFLINE Y ACELERADORES (HA
       assert.equal(getItemAreaCm2({ size: 'PORTADA_ALBUM' }), 900);
       assert.equal(getItemAreaCm2({ size: 'MEDIANO' }), 1200);
       assert.equal(getItemAreaCm2({ size: 'GRANDE' }), 2000);
-      assert.equal(getItemAreaCm2({ size: 'GIGANTE' }), 4800);
+      assert.equal(getItemAreaCm2({ size: 'GIGANTE' }), 6000);
     });
 
     it('3.2: Calcula la ocupación total y porcentaje en un pliego de 7,000 cm²', () => {
@@ -207,14 +207,14 @@ describe('🎪 FASE 6: MOTOR DE COMBOS FERIALES, COLA OFFLINE Y ACELERADORES (HA
 
     it('3.3: Detecta cuando un lote excede la capacidad de un pliego individual', () => {
       const bigBatch = [
-        { id: '1', size: 'GIGANTE' }, // 4800 cm²
+        { id: '1', size: 'GIGANTE' }, // 6000 cm²
         { id: '2', size: 'GRANDE' },  // 2000 cm²
         { id: '3', size: 'MEDIANO' }, // 1200 cm²
       ];
 
       const totalOccupied = bigBatch.reduce((acc, it) => acc + getItemAreaCm2(it), 0);
-      // 4800 + 2000 + 1200 = 8000 cm²
-      assert.equal(totalOccupied, 8000);
+      // 6000 + 2000 + 1200 = 9200 cm²
+      assert.equal(totalOccupied, 9200);
       assert.ok(totalOccupied > STANDARD_SHEET_AREA);
     });
   });

@@ -17,13 +17,13 @@ import { deltaSyncRecentPosters } from '../../server/services/catalog/liveCatalo
 
 describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ, EMBEDDINGS, FINANZAS)', () => {
   describe('1. Unificación de Tallas y Precios Canónicos (Hallazgos #17, #34, #39)', () => {
-    it('1.1 GIGANTE debe ser Q180.00 y medir 60 x 90 cm en manualSaleConstants', () => {
+    it('1.1 GIGANTE debe ser Q210.00 y medir 60 x 100 cm en manualSaleConstants', () => {
       const gigante = OFFICIAL_SIZES.find((s) => s.sizeId === 'GIGANTE');
       assert.ok(gigante, 'Debe existir GIGANTE en OFFICIAL_SIZES');
-      assert.strictEqual(gigante.precio, 180.00);
-      assert.strictEqual(gigante.dimensiones, '60 x 90 cm');
+      assert.strictEqual(gigante.precio, 210.00);
+      assert.strictEqual(gigante.dimensiones, '60 x 100 cm');
       assert.strictEqual(gigante.anchoCm, 60);
-      assert.strictEqual(gigante.altoCm, 90);
+      assert.strictEqual(gigante.altoCm, 100);
     });
 
     it('1.2 DEFAULT_MEDIUM_SIZE debe resolver MEDIANO a Q65', () => {
@@ -32,16 +32,16 @@ describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ
       assert.strictEqual(DEFAULT_MEDIUM_SIZE.precio, 65.00);
     });
 
-    it('1.3 Backend catalogSizeResolver debe tener GIGANTE a Q180 (60 x 90 cm)', () => {
+    it('1.3 Backend catalogSizeResolver debe tener GIGANTE a Q210 (60 x 100 cm)', () => {
       const gigante = SIZE_CATALOG_MAP.GIGANTE;
       assert.ok(gigante, 'GIGANTE debe existir en SIZE_CATALOG_MAP');
-      assert.strictEqual(gigante.precio, 180);
-      assert.strictEqual(gigante.dimensiones, '60 x 90 cm');
+      assert.strictEqual(gigante.precio, 210);
+      assert.strictEqual(gigante.dimensiones, '60 x 100 cm');
     });
 
     it('1.4 normalizeCatalogSizeId debe resolver variantes correctamente', () => {
       assert.strictEqual(normalizeCatalogSizeId('gigante'), 'GIGANTE');
-      assert.strictEqual(normalizeCatalogSizeId('60x90'), 'GIGANTE');
+      assert.strictEqual(normalizeCatalogSizeId('60x100'), 'GIGANTE');
       assert.strictEqual(normalizeCatalogSizeId('24x36'), 'GIGANTE');
       assert.strictEqual(normalizeCatalogSizeId('mediano'), 'MEDIANO');
       assert.strictEqual(normalizeCatalogSizeId('portada vinilo'), 'PORTADA_ALBUM');
@@ -113,7 +113,7 @@ describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ
         validateOfficialItemPrice({ description: 'Spider-Man (Mediano)', unitPrice: 65.00 });
       });
       assert.doesNotThrow(() => {
-        validateOfficialItemPrice({ description: 'Chainsaw Man (Gigante)', unitPrice: 180.00 });
+        validateOfficialItemPrice({ description: 'Chainsaw Man (Gigante)', unitPrice: 210.00 });
       });
       assert.doesNotThrow(() => {
         validateOfficialItemPrice({ description: 'Bad Bunny (Portada de Álbum)', unitPrice: 55.00 });
@@ -126,7 +126,7 @@ describe('🗡️ BATERÍA DE PRUEBAS UNITARIAS - FASE 3 DE 6 (CATÁLOGO, CACHÉ
       }, /no coincide con el precio oficial/);
 
       assert.throws(() => {
-        validateOfficialItemPrice({ description: 'Spider-Man (Gigante)', unitPrice: 210.00 });
+        validateOfficialItemPrice({ description: 'Spider-Man (Gigante)', unitPrice: 180.00 });
       }, /no coincide con el precio oficial/);
     });
 

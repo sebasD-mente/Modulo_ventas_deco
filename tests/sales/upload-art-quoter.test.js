@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   OFFICIAL_SIZES,
   DEFAULT_SIZES,
@@ -123,5 +125,43 @@ describe('📦 Cotizador Personalizado & Pipeline de Arte (Fases 1 y 2)', () => 
     assert.equal(statusCode, 400);
     assert.equal(jsonResponse.success, false);
     assert.match(jsonResponse.error, /supera el límite máximo permitido de 15MB/);
+  });
+
+  it('🛡️ TEST GUARDIÁN: Ningún archivo en src/ ni server/ debe contener medidas o precios fantasmas (60x90, 60 x 90, GIGANTE.*180)', () => {
+    function scanDir(dir, fileList = []) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanDir(fullPath, fileList);
+        } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
+          fileList.push(fullPath);
+        }
+      }
+      return fileList;
+    }
+
+    const srcFiles = scanDir(path.resolve('src'));
+    const serverFiles = scanDir(path.resolve('server'));
+    const allFiles = [...srcFiles, ...serverFiles];
+
+    const violations = [];
+    const ghostPattern = /(?:60\s*[xX]\s*90|90\s*[xX]\s*60|GIGANTE[^\n]*180)/;
+
+    for (const filePath of allFiles) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split('\n');
+      lines.forEach((line, idx) => {
+        if (ghostPattern.test(line)) {
+          violations.push(`${filePath}:${idx + 1} -> ${line.trim()}`);
+        }
+      });
+    }
+
+    assert.equal(
+      violations.length,
+      0,
+      `Se encontraron residuos prohibidos de la medida inexistente 60x90 o precio 180 en el código:\n${violations.join('\n')}`
+    );
   });
 });

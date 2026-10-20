@@ -226,11 +226,11 @@ describe('📎 Suite de Metadatos, Adjuntos y Transferencia de Borradores (M2)',
       { sizeId: 'PEQUENO', nombre: 'Pequeño', precio: 35 },
       { sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 },
       { sizeId: 'GRANDE', nombre: 'Grande', precio: 125 },
-      { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 180 },
+      { sizeId: 'GIGANTE', nombre: 'Gigante', precio: 210 },
       { sizeId: 'PORTADA_ALBUM', nombre: 'Portada Álbum', precio: 55 },
     ];
 
-    it('DEFAULT_SIZES incluye PORTADA_ALBUM a Q55 y GIGANTE a Q180', () => {
+    it('DEFAULT_SIZES incluye PORTADA_ALBUM a Q55 y GIGANTE a Q210', () => {
       const portada = DEFAULT_SIZES.find((s) => s.sizeId === 'PORTADA_ALBUM');
       const gigante = DEFAULT_SIZES.find((s) => s.sizeId === 'GIGANTE');
 
@@ -238,7 +238,7 @@ describe('📎 Suite de Metadatos, Adjuntos y Transferencia de Borradores (M2)',
       assert.strictEqual(portada.precio, 55);
 
       assert.ok(gigante, 'GIGANTE debe estar en DEFAULT_SIZES');
-      assert.strictEqual(gigante.precio, 180);
+      assert.strictEqual(gigante.precio, 210);
     });
 
     it('La expresión regular de changeTicketItemSize limpia limpiamente variaciones de portada sin duplicación', () => {

@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Palette,
-  X,
-  Plus,
-  Upload,
-  CheckCircle2,
-  Loader2,
-  Ruler,
-  Sparkles,
-  Scissors,
-} from 'lucide-react';
+import { Palette, X, Plus, Upload, CheckCircle2, Loader2, Ruler, Sparkles, Scissors } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { compressImage } from '../../utils/imageCompression';
 import {
@@ -19,6 +9,7 @@ import {
   PVC_SURCHARGE,
   VINYL_DISCOUNT_FACTOR,
 } from './manualSaleConstants';
+import { getLocalCatalog } from '../../services/catalogCacheService';
 
 const MATERIALS = [
   { id: 'MDF_5_5MM', label: 'MDF 5.5mm', desc: 'Madera oficial' },
@@ -28,6 +19,19 @@ const MATERIALS = [
 
 export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   const { authFetch } = useAuth();
+  const availableSizes = React.useMemo(() => {
+    try {
+      const cat = getLocalCatalog();
+      const ref = Array.isArray(cat) ? cat.find((p) => Array.isArray(p.sizes) && p.sizes.length >= 5 && p.categoria !== 'MUSICA') : null;
+      if (ref?.sizes?.length) {
+        return OFFICIAL_SIZES.map((off) => {
+          const m = ref.sizes.find((s) => (s.sizeId || s.id) === off.sizeId);
+          return m ? { ...off, precio: Number(m.precio || m.price) || off.precio, dimensiones: m.dimensiones || m.dimensions || off.dimensiones } : off;
+        });
+      }
+    } catch (_) {}
+    return OFFICIAL_SIZES;
+  }, []);
   const [mode, setMode] = useState('STANDARD');
   const [material, setMaterial] = useState('MDF_5_5MM');
   const [selectedSize, setSelectedSize] = useState(OFFICIAL_SIZES[3]);
@@ -158,27 +162,20 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
             <label className="block text-neutral-400 font-semibold mb-1">Material de Fabricación</label>
             <div className="grid grid-cols-3 gap-1.5">
               {MATERIALS.map((m) => (
-                <button key={m.id} type="button" onClick={() => setMaterial(m.id)} className={`min-h-[44px] p-2 rounded-xl text-left border transition-colors cursor-pointer ${material === m.id ? 'bg-amber-400/10 border-amber-400 text-amber-300' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white'}`}>
-                  <span className="block font-bold text-xs">{m.label}</span>
-                  <span className="text-[10px] text-neutral-500 block truncate">{m.desc}</span>
-                </button>
+                <button key={m.id} type="button" onClick={() => setMaterial(m.id)} className={`min-h-[44px] p-2 rounded-xl text-left border transition-colors cursor-pointer ${material === m.id ? 'bg-amber-400/10 border-amber-400 text-amber-300' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white'}`}><span className="block font-bold text-xs">{m.label}</span><span className="text-[10px] text-neutral-500 block truncate">{m.desc}</span></button>
               ))}
             </div>
           </div>
 
           <div>
             <div className="flex bg-neutral-900 p-1 rounded-xl border border-neutral-800 mb-2">
-              <button type="button" onClick={() => setMode('STANDARD')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'STANDARD' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}>
-                <Sparkles className="w-3.5 h-3.5" /><span>Medidas Oficiales</span>
-              </button>
-              <button type="button" onClick={() => setMode('CUSTOM')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'CUSTOM' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}>
-                <Ruler className="w-3.5 h-3.5" /><span>Medida Especial (cm²)</span>
-              </button>
+              <button type="button" onClick={() => setMode('STANDARD')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'STANDARD' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}><Sparkles className="w-3.5 h-3.5" /><span>Medidas Oficiales</span></button>
+              <button type="button" onClick={() => setMode('CUSTOM')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'CUSTOM' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}><Ruler className="w-3.5 h-3.5" /><span>Medida Especial (cm²)</span></button>
             </div>
 
             {mode === 'STANDARD' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
-                {OFFICIAL_SIZES.map((sz) => {
+                {availableSizes.map((sz) => {
                   const isSel = selectedSize.sizeId === sz.sizeId;
                   const price = material === 'PVC_5MM' ? sz.precio + PVC_SURCHARGE : material === 'VINILO_SOLO' ? sz.precio * VINYL_DISCOUNT_FACTOR : sz.precio;
                   return (
@@ -247,22 +244,22 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleFileUpload(e.target.files?.[0])} className="hidden" />
                 </label>
               )}
-              {previewUrl && (
-                <div className="flex items-center gap-2 mt-1">
-                  <img src={previewUrl} alt="Preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
-                  <span className="text-[10px] text-neutral-400 truncate max-w-[200px]">{customImageUrl || 'Previsualización local'}</span>
-                </div>
-              )}
-              {uploadError && <span className="text-[10px] text-red-400 mt-1">⚠️ {uploadError}</span>}
-            </div>
-
-            <button type="button" onClick={() => setShowUrlInput(!showUrlInput)} className="text-[10px] text-neutral-500 hover:text-neutral-300 mt-1 underline cursor-pointer">
-              {showUrlInput ? 'Ocultar enlace manual' : '+ Ingresar enlace URL externo (Drive, Dropbox...)'}
-            </button>
-
-            {showUrlInput && (
-              <input type="url" value={customImageUrl} onChange={(e) => setCustomImageUrl(e.target.value)} placeholder="https://storage.googleapis.com/... o enlace de foto" className="w-full min-h-[44px] px-3.5 mt-1 bg-black border border-neutral-800 rounded-xl text-white font-mono text-[11px] focus:border-amber-400 focus:outline-none" />
+            {previewUrl && (
+              <div className="flex items-center gap-2 mt-1">
+                <img src={previewUrl} alt="Preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
+                <span className="text-[10px] text-neutral-400 truncate max-w-[200px]">{customImageUrl || 'Previsualización local'}</span>
+              </div>
             )}
+            {uploadError && <span className="text-[10px] text-red-400 mt-1">⚠️ {uploadError}</span>}
+          </div>
+
+          <button type="button" onClick={() => setShowUrlInput(!showUrlInput)} className="text-[10px] text-neutral-500 hover:text-neutral-300 mt-1 underline cursor-pointer">
+            {showUrlInput ? 'Ocultar enlace manual' : '+ Ingresar enlace URL externo (Drive, Dropbox...)'}
+          </button>
+
+          {showUrlInput && (
+            <input type="url" value={customImageUrl} onChange={(e) => setCustomImageUrl(e.target.value)} placeholder="https://storage.googleapis.com/... o enlace de foto" className="w-full min-h-[44px] px-3.5 mt-1 bg-black border border-neutral-800 rounded-xl text-white font-mono text-[11px] focus:border-amber-400 focus:outline-none" />
+          )}
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2 border-t border-neutral-800">

@@ -112,7 +112,7 @@ export function extractSizeIdFromSegment(segment) {
     return 'PORTADA_ALBUM';
   }
   // 2. Gigante
-  if (/\b(gigante|extra\s*grande|xl|24\s*x\s*36|36\s*x\s*24|60\s*x\s*90|90\s*x\s*60)\b/i.test(clean)) {
+  if (/\b(gigante|extra\s*grande|xl|24\s*x\s*36|36\s*x\s*24|60\s*x\s*100|100\s*x\s*60)\b/i.test(clean)) {
     return 'GIGANTE';
   }
   // 3. Grande
@@ -140,7 +140,7 @@ export const SIZE_STANDARD_PRICES = {
   PEQUENO: 35.0,
   MEDIANO: 65.0,
   GRANDE: 125.0,
-  GIGANTE: 180.0,
+  GIGANTE: 210.0,
   PORTADA_ALBUM: 55.0,
 };
 
@@ -188,7 +188,7 @@ export function parseStandIntent(text) {
       .replace(/\b([1-9]|10|un|uno|una|dos|tres|cuatro|cinco)\b/gi, '')
       .replace(/\b(de|el|la|los|las|un|una|en|a|por|poster|cuadro|obra)\b/gi, '')
       .replace(/\b(portada|portada\s*de\s*album|vinilo|disco|cuadrad[oa]|gigante|grande|mediano|pequeno|pequeño|mini)\b/gi, '')
-      .replace(/\b(18x24|12x18|24x36|30x45|45x60|60x90|14x21|21x27|12x12|30x30)\b/gi, '')
+      .replace(/\b(18x24|12x18|24x36|30x45|45x60|60x100|100x60|14x21|21x27|12x12|30x30)\b/gi, '')
       .replace(/\b(\d+(\.\d+)?\s*quetzales|q\s*\d+)\b/gi, '')
       .replace(/\s{2,}/g, ' ')
       .trim();

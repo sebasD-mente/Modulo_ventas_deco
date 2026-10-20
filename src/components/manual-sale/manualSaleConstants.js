@@ -4,7 +4,7 @@ export const OFFICIAL_SIZES = [
   { sizeId: 'PORTADA_ALBUM', nombre: 'Portada de Álbum', dimensiones: '30 x 30 cm', anchoCm: 30, altoCm: 30, precio: 55.00, badge: 'Formato vinilo cuadrado música' },
   { sizeId: 'MEDIANO', nombre: 'Mediano', dimensiones: '30 x 45 cm', anchoCm: 30, altoCm: 45, precio: 65.00, badge: '⭐ El más vendido para habitaciones' },
   { sizeId: 'GRANDE', nombre: 'Grande', dimensiones: '45 x 60 cm', anchoCm: 45, altoCm: 60, precio: 125.00, badge: 'Protagonista para salas y oficinas' },
-  { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 90 cm', anchoCm: 60, altoCm: 90, precio: 180.00, badge: 'Impacto visual monumental' },
+  { sizeId: 'GIGANTE', nombre: 'Gigante', dimensiones: '60 x 100 cm', anchoCm: 60, altoCm: 100, precio: 210.00, badge: 'Impacto visual monumental' },
 ];
 
 export const DEFAULT_SIZES = OFFICIAL_SIZES;

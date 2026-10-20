@@ -269,7 +269,7 @@ describe('⚔️ ADVERSARIAL STRESS HARNESS — HITO M1 (STAND {IA})', () => {
       assert.strictEqual(normalizeCatalogSizeId('18 x 24 pulgadas'), 'GRANDE');
       assert.strictEqual(normalizeCatalogSizeId('45x60 cm'), 'GRANDE');
       assert.strictEqual(normalizeCatalogSizeId('24x36 pulg'), 'GIGANTE');
-      assert.strictEqual(normalizeCatalogSizeId('60 x 90 centímetros'), 'GIGANTE');
+      assert.strictEqual(normalizeCatalogSizeId('60 x 100 centímetros'), 'GIGANTE');
       assert.strictEqual(normalizeCatalogSizeId('12x18 in'), 'MEDIANO');
       assert.strictEqual(normalizeCatalogSizeId('30 x 45'), 'MEDIANO');
       assert.strictEqual(normalizeCatalogSizeId('8.5 x 11 pulgadas'), 'PEQUENO');

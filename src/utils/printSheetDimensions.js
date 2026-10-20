@@ -9,7 +9,7 @@ export const SIZE_AREAS_CM2 = {
   PORTADA_ALBUM: 30 * 30, // 900 cm²
   MEDIANO: 30 * 40, // 1,200 cm²
   GRANDE: 40 * 50, // 2,000 cm²
-  GIGANTE: 60 * 80, // 4,800 cm²
+  GIGANTE: 60 * 100, // 6,000 cm²
 };
 
 export const STANDARD_SHEET_AREA_CM2 = 70 * 100; // 7,000 cm²
