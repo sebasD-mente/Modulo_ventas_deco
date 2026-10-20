@@ -59,7 +59,7 @@ export default function RemoteQuoterSummary({
       <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
         <label className="font-bold text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
           <Calculator className="w-4 h-4 text-amber-400" />
-          <span>3. Cotizador & Registro de Anticipo</span>
+          <span>4. Cotizador & Registro de Anticipo</span>
         </label>
         <span className="font-mono text-neutral-400 text-[11px]">Flete: Q {effectiveShippingCost.toFixed(2)}</span>
       </div>

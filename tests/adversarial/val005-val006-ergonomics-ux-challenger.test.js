@@ -63,8 +63,8 @@ describe('⚔️ EMPIRICAL ADVERSARIAL CHALLENGER 2: Frontend Ergonomics (VAL-00
       const content = fs.readFileSync(filePath, 'utf-8');
 
       // Locate button with logout
-      const logoutBtnMatch = content.match(/<button[^>]*onClick=\{logout\}[^>]*>([\s\S]*?)<\/button>/);
-      assert.ok(logoutBtnMatch, 'Header.jsx must contain button with onClick={logout}');
+      const logoutBtnMatch = content.match(/<button[^>]*onClick=\{[^}]*logout[^}]*\}[^>]*>([\s\S]*?)<\/button>/);
+      assert.ok(logoutBtnMatch, 'Header.jsx must contain button with onClick={...logout...}');
 
       const logoutBtnCode = logoutBtnMatch[0];
       assert.ok(

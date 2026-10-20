@@ -179,19 +179,15 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
                 Catálogo Físico o Personalizado
               </label>
-              <div className="flex items-center gap-2">
-                {renderSyncControl('Sincronizar')}
-                <button
-                  type="button"
-                  onClick={() => setIsCustomModalOpen(true)}
-                  className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Palette className="w-4 h-4" />
-                  <span>+ Personalizado</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomModalOpen(true)}
+                className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Palette className="w-4 h-4" />
+                <span>+ Personalizado</span>
+              </button>
             </div>
-            {renderSyncFeedback()}
 
             <CatalogSearchInput
               {...search}
@@ -214,6 +210,13 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             />
           )}
 
+          {/* Lista de Pósters en la Orden */}
+          <SaleCartList
+            cartItems={cart.cartItems} attachments={cart.attachments} inputChannel={cart.inputChannel}
+            onUnlinkAttachments={cart.unlinkAttachments} onUpdateQty={cart.updateItemQty}
+            onChangeSize={cart.changeItemSize} onRemoveItem={cart.removeItem} onClearCart={cart.clearCart}
+          />
+
           {/* Selector de Entrega y Logística */}
           <DeliveryMethodSelector
             deliveryMethod={remoteForm.deliveryMethod} setDeliveryMethod={remoteForm.setDeliveryMethod}
@@ -222,13 +225,6 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             shippingTrackingNumber={remoteForm.shippingTrackingNumber} setShippingTrackingNumber={remoteForm.setShippingTrackingNumber}
             pickupEventId={remoteForm.pickupEventId} setPickupEventId={remoteForm.setPickupEventId}
             availablePickupEvents={remoteForm.availablePickupEvents}
-          />
-
-          {/* Lista de Pósters en la Orden */}
-          <SaleCartList
-            cartItems={cart.cartItems} attachments={cart.attachments} inputChannel={cart.inputChannel}
-            onUnlinkAttachments={cart.unlinkAttachments} onUpdateQty={cart.updateItemQty}
-            onChangeSize={cart.changeItemSize} onRemoveItem={cart.removeItem} onClearCart={cart.clearCart}
           />
 
           {/* Cotizador 50/50 y Registro de Anticipo */}

@@ -31,7 +31,7 @@ export default function DeliveryMethodSelector({
     <div className="space-y-3 p-4 rounded-2xl bg-black border border-neutral-800 text-xs">
       <label className="font-bold text-neutral-200 uppercase tracking-wider flex items-center gap-1.5">
         <Truck className="w-3.5 h-3.5 text-cyan-400" />
-        <span>2. Método de Entrega & Logística</span>
+        <span>3. Método de Entrega & Logística</span>
       </label>
 
       {/* Grid de Métodos de Entrega */}

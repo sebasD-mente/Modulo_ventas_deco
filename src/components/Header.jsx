@@ -119,7 +119,7 @@ export default function Header({
             <div
               data-testid="header-online-pos-badge"
               className="min-h-[44px] px-2.5 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-bold flex items-center gap-1.5"
-              title="Punto de Venta Digital Permanente (24/7)"
+              title="Punto de Venta Digital Permanente"
             >
               <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse shrink-0" />
               <span className="truncate">📱 Redes / Online</span>
@@ -167,16 +167,9 @@ export default function Header({
                 </div>
               )}
             </div>
-          ) : null}
-
-          {user ? (
-            <div className="flex items-center gap-1 py-1 px-1 rounded-2xl bg-neutral-50 border border-neutral-200/80 shadow-xs shrink-0">
-              {renderAvatar('w-8 h-8', 'text-xs')}
-              <button type="button" onClick={logout} title="Cerrar Sesión" className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-200 text-neutral-400 hover:text-black cursor-pointer shrink-0">
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : <div className="min-w-[44px] min-h-[44px]" />}
+          ) : (
+            <div className="min-w-[44px] min-h-[44px]" />
+          )}
         </div>
       </div>
 
@@ -195,7 +188,7 @@ export default function Header({
               {isVendedorRedes && !isSuperAdmin && !isVendedor ? (
                 <div className="bg-purple-50 border border-purple-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-purple-900">
                   <span className="shrink-0 text-sm">📱</span>
-                  <span className="truncate">Punto de Venta: <strong className="font-bold">Redes / Online (24/7)</strong></span>
+                  <span className="truncate">Punto de Venta: <strong className="font-bold">Redes / Online</strong></span>
                 </div>
               ) : activeEvent ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-900">
@@ -239,8 +232,15 @@ export default function Header({
                     <span key={roleLabel} className="bg-black text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-neutral-800 leading-none">{roleLabel}</span>
                   ))}
                 </div>
-                <button type="button" onClick={() => { setIsMenuOpen(false); logout(); }} className="min-h-[44px] w-full flex items-center justify-center gap-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-colors cursor-pointer">
-                  <LogOut className="w-4 h-4" /><span>Cerrar Sesión</span>
+                <button
+                  type="button"
+                  onClick={() => { setIsMenuOpen(false); logout(); }}
+                  aria-label="Cerrar Sesión"
+                  title="Cerrar Sesión"
+                  className="min-h-[44px] min-w-[44px] w-full flex items-center justify-center gap-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Cerrar Sesión</span>
                 </button>
               </div>
             )}

@@ -28,29 +28,45 @@ export default function CatalogSearchInput({
         )}
       </label>
 
-      <div className="relative flex items-center">
-        <Search className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          ref={searchInputRef} type="text"
-          placeholder="Escribe el nombre o personaje... (ej. Chainsaw, Spider-Man, Batman, Van Gogh)"
-          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={() => { if (searchResults?.length > 0 && !hasSelectedPoster && setShowDropdown) setShowDropdown(true); }}
-          className="w-full bg-black border border-neutral-700/90 rounded-full pl-11 pr-24 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
-        />
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Escribe el nombre o personaje... (ej. Chainsaw, Spider-Man, Batman, Van Gogh)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => { if (searchResults?.length > 0 && !hasSelectedPoster && setShowDropdown) setShowDropdown(true); }}
+            className="w-full bg-black border border-neutral-700/90 rounded-2xl pl-11 pr-10 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
+          />
           {searchQuery && (
-            <button type="button" onClick={onClearSearch} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-400 hover:text-white cursor-pointer" title="Limpiar">
+            <button
+              type="button"
+              onClick={onClearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 min-h-[36px] min-w-[36px] flex items-center justify-center text-neutral-400 hover:text-white cursor-pointer"
+              title="Limpiar"
+            >
               <X className="w-4 h-4" />
             </button>
           )}
-          <button
-            type="button" data-testid="catalog-camera-btn" onClick={() => fileInputRef.current?.click()} disabled={isRecognizingPhoto}
-            title="Buscar póster por foto" aria-label="Buscar póster por foto"
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {isRecognizingPhoto ? <Loader2 className="w-4 h-4 animate-spin text-cyan-400" /> : <Camera className="w-4 h-4 text-cyan-400" />}
-          </button>
         </div>
+
+        <button
+          type="button"
+          data-testid="catalog-camera-btn"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isRecognizingPhoto}
+          title="Buscar póster por foto"
+          aria-label="Buscar póster por foto"
+          className="min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+        >
+          {isRecognizingPhoto ? (
+            <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+          ) : (
+            <Camera className="w-4 h-4 text-cyan-400" />
+          )}
+        </button>
       </div>
 
       {photoError && (
