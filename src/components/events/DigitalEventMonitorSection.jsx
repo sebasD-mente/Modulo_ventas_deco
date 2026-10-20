@@ -106,6 +106,8 @@ export default function DigitalEventMonitorSection({ eventId }) {
             mode="event"
             transactions={eventDetail.transactions}
             totalSold={eventDetail.totalSold}
+            totalCollected={eventDetail.totalCollected}
+            pendingBalanceTotal={eventDetail.pendingBalanceTotal}
             lastSale={eventDetail.lastSale}
           />
           <PaymentMethodsBreakdown

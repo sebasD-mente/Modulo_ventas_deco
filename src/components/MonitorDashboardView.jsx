@@ -123,7 +123,13 @@ export default function MonitorDashboardView({ activeEvent = null, onPopulateMan
           <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
             <span>🏆</span> Resumen general de la jornada
           </label>
-          <MonitorKpiGrid mode="general" transactions={resumenGeneral.totalTransactions} totalSold={resumenGeneral.totalSold} />
+          <MonitorKpiGrid
+            mode="general"
+            transactions={resumenGeneral.totalTransactions}
+            totalSold={resumenGeneral.totalSold}
+            totalCollected={resumenGeneral.totalCollected}
+            pendingBalanceTotal={resumenGeneral.pendingBalanceTotal}
+          />
           <PaymentMethodsBreakdown payments={resumenGeneral.payments} chartSize={250} variant="general" />
         </div>
       )}

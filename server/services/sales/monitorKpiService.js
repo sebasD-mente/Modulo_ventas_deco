@@ -96,11 +96,17 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       });
     });
 
-    if (evTotal > 0) {
-      payments.TARJETA.percentage = Number(((payments.TARJETA.amount / evTotal) * 100).toFixed(1));
-      payments.TRANSFERENCIA.percentage = Number(((payments.TRANSFERENCIA.amount / evTotal) * 100).toFixed(1));
-      payments.EFECTIVO.percentage = Number(((payments.EFECTIVO.amount / evTotal) * 100).toFixed(1));
-      payments.OTRO.percentage = Number(((payments.OTRO.amount / evTotal) * 100).toFixed(1));
+    evTotal = Number(evTotal.toFixed(2));
+    const evCollected = Number(
+      (payments.TARJETA.amount + payments.TRANSFERENCIA.amount + payments.EFECTIVO.amount + payments.OTRO.amount).toFixed(2)
+    );
+    const evPendingBalance = Number(Math.max(0, Number((evTotal - evCollected).toFixed(2))).toFixed(2));
+
+    if (evCollected > 0) {
+      payments.TARJETA.percentage = Number(((payments.TARJETA.amount / evCollected) * 100).toFixed(1));
+      payments.TRANSFERENCIA.percentage = Number(((payments.TRANSFERENCIA.amount / evCollected) * 100).toFixed(1));
+      payments.EFECTIVO.percentage = Number(((payments.EFECTIVO.amount / evCollected) * 100).toFixed(1));
+      payments.OTRO.percentage = Number(((payments.OTRO.amount / evCollected) * 100).toFixed(1));
     }
 
     const lastSale = evSales[0]
@@ -136,7 +142,9 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
       assignedSellerEmail: ev.assignedSellerEmail,
       assignedSellers: ev.assignedSellers || [],
       transactions: evSales.length,
-      totalSold: Number(evTotal.toFixed(2)),
+      totalSold: evTotal,
+      totalCollected: evCollected,
+      pendingBalanceTotal: evPendingBalance,
       cumulativeSold: Number(evCumulativeSold.toFixed(2)),
       financials,
       lastSale,
@@ -161,11 +169,17 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
     });
   });
 
-  if (grandTotal > 0) {
-    globalPayments.TARJETA.percentage = Number(((globalPayments.TARJETA.amount / grandTotal) * 100).toFixed(1));
-    globalPayments.TRANSFERENCIA.percentage = Number(((globalPayments.TRANSFERENCIA.amount / grandTotal) * 100).toFixed(1));
-    globalPayments.EFECTIVO.percentage = Number(((globalPayments.EFECTIVO.amount / grandTotal) * 100).toFixed(1));
-    globalPayments.OTRO.percentage = Number(((globalPayments.OTRO.amount / grandTotal) * 100).toFixed(1));
+  grandTotal = Number(grandTotal.toFixed(2));
+  const grandCollected = Number(
+    (globalPayments.TARJETA.amount + globalPayments.TRANSFERENCIA.amount + globalPayments.EFECTIVO.amount + globalPayments.OTRO.amount).toFixed(2)
+  );
+  const grandPendingBalance = Number(Math.max(0, Number((grandTotal - grandCollected).toFixed(2))).toFixed(2));
+
+  if (grandCollected > 0) {
+    globalPayments.TARJETA.percentage = Number(((globalPayments.TARJETA.amount / grandCollected) * 100).toFixed(1));
+    globalPayments.TRANSFERENCIA.percentage = Number(((globalPayments.TRANSFERENCIA.amount / grandCollected) * 100).toFixed(1));
+    globalPayments.EFECTIVO.percentage = Number(((globalPayments.EFECTIVO.amount / grandCollected) * 100).toFixed(1));
+    globalPayments.OTRO.percentage = Number(((globalPayments.OTRO.amount / grandCollected) * 100).toFixed(1));
   }
 
   // Consolidado Financiero Global de Stands Activos
@@ -243,7 +257,9 @@ export async function getMonitorDashboardMetrics({ tenantId, date = null, eventI
     ),
     resumenGeneral: {
       totalTransactions: allSales.length,
-      totalSold: Number(grandTotal.toFixed(2)),
+      totalSold: grandTotal,
+      totalCollected: grandCollected,
+      pendingBalanceTotal: grandPendingBalance,
       payments: globalPayments,
       globalFinancials,
     },

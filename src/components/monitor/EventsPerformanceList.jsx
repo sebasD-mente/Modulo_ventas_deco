@@ -61,6 +61,8 @@ export default function EventsPerformanceList({
                       mode="event"
                       transactions={ev.transactions}
                       totalSold={ev.totalSold}
+                      totalCollected={ev.totalCollected}
+                      pendingBalanceTotal={ev.pendingBalanceTotal}
                       lastSale={ev.lastSale}
                     />
                     <PaymentMethodsBreakdown

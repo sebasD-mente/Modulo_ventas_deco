@@ -89,10 +89,23 @@ export default function EventDayCard({ dayData, isExpanded, onToggleExpand }) {
                     <span className="text-neutral-400 text-[11px]">{timeStr}</span>
                     <span className="text-neutral-400 text-[11px]">• {sale.seller?.fullName || 'Vendedor'}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">
-                      {sale.payments?.[0]?.method || 'EFECTIVO'}
-                    </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {sale.payments && sale.payments.length > 1 ? (
+                      sale.payments.map((p, pIdx) => (
+                        <span key={pIdx} className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">
+                          {p.method}: Q {Number(p.amount).toFixed(2)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">
+                        {sale.payments?.[0]?.method || 'EFECTIVO'}{Number(sale.balanceDue || 0) > 0 ? ` (Abono: Q ${Number(sale.payments?.[0]?.amount || 0).toFixed(2)})` : ''}
+                      </span>
+                    )}
+                    {Number(sale.balanceDue || 0) > 0 && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                        ⏳ Saldo: Q {Number(sale.balanceDue).toFixed(2)}
+                      </span>
+                    )}
                     <span className="font-mono font-black text-emerald-400 text-xs">
                       Q {Number(sale.totalAmount).toFixed(2)}
                     </span>
@@ -121,6 +134,18 @@ export default function EventDayCard({ dayData, isExpanded, onToggleExpand }) {
                       </div>
                     );
                   })}
+                  {Number(sale.shippingCost || 0) > 0 && (
+                    <div className="flex items-center justify-between gap-2 text-xs text-neutral-400 pt-1 border-t border-neutral-900">
+                      <span>🚚 Envío ({sale.deliveryMethod || 'Mensajería'}):</span>
+                      <span className="font-mono shrink-0">Q {Number(sale.shippingCost).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {Number(sale.discount || 0) > 0 && (
+                    <div className="flex items-center justify-between gap-2 text-xs text-amber-400/90 pt-0.5">
+                      <span>🏷️ Descuento aplicado:</span>
+                      <span className="font-mono shrink-0">-Q {Number(sale.discount).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -54,7 +54,7 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                   </div>
                   {(m.digitalPos?.totalSold !== undefined || digitalEvent?.totalSold !== undefined) && (
                     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl px-4 py-2.5 text-right shrink-0">
-                      <div className="text-[10px] uppercase font-bold text-neutral-400">Total Vendido</div>
+                      <div className="text-[10px] uppercase font-bold text-neutral-400">Acumulado Histórico</div>
                       <div className="text-base font-black text-amber-400">Q {Number(m.digitalPos?.totalSold ?? digitalEvent?.totalSold ?? 0).toFixed(2)}</div>
                     </div>
                   )}
@@ -110,7 +110,7 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                     <div className="flex items-center gap-2">
                       {m.digitalPos.totalSold !== undefined && (
                         <div className="bg-black border border-neutral-800 rounded-xl px-3 py-1.5 text-right">
-                          <div className="text-[10px] uppercase font-bold text-neutral-400">Total Vendido</div>
+                          <div className="text-[10px] uppercase font-bold text-neutral-400">Acumulado Histórico</div>
                           <div className="text-sm font-black text-amber-400">Q {Number(m.digitalPos.totalSold).toFixed(2)}</div>
                         </div>
                       )}

@@ -4,6 +4,8 @@ export default function MonitorKpiGrid({
   mode = 'event',
   transactions = 0,
   totalSold = 0,
+  totalCollected,
+  pendingBalanceTotal = 0,
   lastSale = null,
 }) {
   if (mode === 'general') {
@@ -22,9 +24,19 @@ export default function MonitorKpiGrid({
           <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
             Total vendido general
           </span>
-          <span className="text-2xl font-black text-emerald-400 font-mono">
+          <span className="text-2xl font-black text-emerald-400 font-mono block">
             Q {Number(totalSold || 0).toFixed(2)}
           </span>
+          <div className="mt-2 pt-2 border-t border-neutral-800/80 space-y-0.5 text-xs font-mono">
+            <div className="text-neutral-300">
+              ✅ Cobrado en caja: <span className="text-emerald-400 font-bold">Q {Number(totalCollected ?? totalSold ?? 0).toFixed(2)}</span>
+            </div>
+            {Number(pendingBalanceTotal || 0) > 0 && (
+              <div className="text-amber-400 font-bold">
+                ⏳ Saldo por cobrar: Q {Number(pendingBalanceTotal).toFixed(2)}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -45,9 +57,19 @@ export default function MonitorKpiGrid({
         <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
           Total Vendido
         </span>
-        <span className="text-xl font-black text-emerald-400 font-mono">
+        <span className="text-xl font-black text-emerald-400 font-mono block">
           Q {Number(totalSold || 0).toFixed(2)}
         </span>
+        <div className="mt-2 pt-2 border-t border-neutral-800/80 space-y-0.5 text-[11px] font-mono">
+          <div className="text-neutral-300">
+            ✅ Cobrado en caja: <span className="text-emerald-400 font-bold">Q {Number(totalCollected ?? totalSold ?? 0).toFixed(2)}</span>
+          </div>
+          {Number(pendingBalanceTotal || 0) > 0 && (
+            <div className="text-amber-400 font-bold">
+              ⏳ Saldo por cobrar: Q {Number(pendingBalanceTotal).toFixed(2)}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="p-3.5 rounded-xl bg-[#181818] border border-neutral-800">

@@ -18,10 +18,59 @@ function formatSaleTime(dateStr) {
   return `${dayStr}, ${timeStr}`;
 }
 
-function getPaymentBadge(method) {
-  if (method === 'TARJETA') return <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-bold text-[10px] flex items-center gap-1"><CreditCard className="w-3 h-3" /> Tarjeta</span>;
-  if (method === 'TRANSFERENCIA') return <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1"><Smartphone className="w-3 h-3" /> Transferencia</span>;
-  return <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1"><Banknote className="w-3 h-3" /> Efectivo</span>;
+function getPaymentMethodInfo(method) {
+  if (method === 'TARJETA') return { label: 'Tarjeta', icon: CreditCard, colorClass: 'bg-blue-500/10 border-blue-500/30 text-blue-400' };
+  if (method === 'TRANSFERENCIA') return { label: 'Transferencia', icon: Smartphone, colorClass: 'bg-purple-500/10 border-purple-500/30 text-purple-400' };
+  return { label: 'Efectivo', icon: Banknote, colorClass: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' };
+}
+
+function renderPaymentBadges(sale, hasBalance) {
+  if (sale.paymentStatus === 'PENDIENTE_PAGO') {
+    return (
+      <span className="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1">
+        <AlertTriangle className="w-3 h-3 text-rose-400" />
+        <span>⚠️ Pendiente de Pago (Q {Number(sale.totalAmount).toFixed(2)})</span>
+      </span>
+    );
+  }
+
+  const payments = sale.payments || [];
+  if (payments.length > 1 || hasBalance) {
+    if (payments.length === 0) {
+      const info = getPaymentMethodInfo('EFECTIVO');
+      const Icon = info.icon;
+      return (
+        <span className={`px-2 py-0.5 rounded-full border font-bold text-[10px] flex items-center gap-1 ${info.colorClass}`}>
+          <Icon className="w-3 h-3" />
+          <span>{info.label}</span>
+        </span>
+      );
+    }
+
+    return payments.map((p, idx) => {
+      const info = getPaymentMethodInfo(p.method);
+      const Icon = info.icon;
+      const tag = hasBalance ? ' (Abono)' : '';
+      return (
+        <span
+          key={p.id || idx}
+          className={`px-2 py-0.5 rounded-full border font-bold text-[10px] flex items-center gap-1 ${info.colorClass}`}
+        >
+          <Icon className="w-3 h-3" />
+          <span>{info.label}{tag}: Q {Number(p.amount).toFixed(2)}</span>
+        </span>
+      );
+    });
+  }
+
+  const info = getPaymentMethodInfo(payments[0]?.method);
+  const Icon = info.icon;
+  return (
+    <span className={`px-2 py-0.5 rounded-full border font-bold text-[10px] flex items-center gap-1 ${info.colorClass}`}>
+      <Icon className="w-3 h-3" />
+      <span>{info.label}</span>
+    </span>
+  );
 }
 
 export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareWhatsApp }) {
@@ -36,14 +85,7 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
             <Clock className="w-3 h-3 text-slate-500" />
             {formatSaleTime(sale.createdAt)}
           </span>
-          {sale.paymentStatus === 'PENDIENTE_PAGO' ? (
-            <span className="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3 text-rose-400" />
-              <span>⚠️ Pendiente de Pago (Q {Number(sale.totalAmount).toFixed(2)})</span>
-            </span>
-          ) : (
-            getPaymentBadge(sale.payments?.[0]?.method)
-          )}
+          {renderPaymentBadges(sale, hasBalance)}
           {sale.orderType === 'REDES_PERSONALIZADO' && (
             <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1">
               📱 Redes
@@ -86,6 +128,18 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
               </div>
             );
           })}
+          {Number(sale.shippingCost || 0) > 0 && (
+            <div className="flex items-center justify-between gap-2 text-slate-300 pt-1 border-t border-slate-800/40">
+              <span className="text-slate-400">🚚 Envío ({sale.deliveryMethod || 'Mensajería'}):</span>
+              <span className="font-mono text-slate-400 shrink-0">Q {Number(sale.shippingCost).toFixed(2)}</span>
+            </div>
+          )}
+          {Number(sale.discount || 0) > 0 && (
+            <div className="flex items-center justify-between gap-2 text-amber-400/90 pt-0.5">
+              <span>🏷️ Descuento aplicado:</span>
+              <span className="font-mono shrink-0">-Q {Number(sale.discount).toFixed(2)}</span>
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0 flex-wrap">

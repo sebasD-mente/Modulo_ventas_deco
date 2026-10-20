@@ -36,7 +36,7 @@ export default function PaymentMethodsBreakdown({
             Q {(payments?.TARJETA?.amount || 0).toFixed(2)}
           </div>
           <span className="text-[10px] text-blue-400 font-bold block mt-0.5">
-            ↑ {payments?.TARJETA?.count || 0} ventas
+            ↑ {payments?.TARJETA?.count || 0} {(payments?.TARJETA?.count || 0) === 1 ? 'pago / abono' : 'pagos / abonos'}
           </span>
         </div>
 
@@ -48,7 +48,7 @@ export default function PaymentMethodsBreakdown({
             Q {(payments?.TRANSFERENCIA?.amount || 0).toFixed(2)}
           </div>
           <span className="text-[10px] text-purple-400 font-bold block mt-0.5">
-            ↑ {payments?.TRANSFERENCIA?.count || 0} ventas
+            ↑ {payments?.TRANSFERENCIA?.count || 0} {(payments?.TRANSFERENCIA?.count || 0) === 1 ? 'pago / abono' : 'pagos / abonos'}
           </span>
         </div>
 
@@ -60,7 +60,7 @@ export default function PaymentMethodsBreakdown({
             Q {(payments?.EFECTIVO?.amount || 0).toFixed(2)}
           </div>
           <span className="text-[10px] text-emerald-400 font-bold block mt-0.5">
-            ↑ {payments?.EFECTIVO?.count || 0} ventas
+            ↑ {payments?.EFECTIVO?.count || 0} {(payments?.EFECTIVO?.count || 0) === 1 ? 'pago / abono' : 'pagos / abonos'}
           </span>
         </div>
       </div>
