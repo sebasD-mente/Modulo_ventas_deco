@@ -103,7 +103,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
               {isVendedorRedesOnly ? (
                 <>
-                  <Smartphone className="w-4 h-4 text-amber-400" />
+                  <Smartphone className="w-4 h-4 text-cyan-400" />
                   <span>📱 Gestión de Pedidos de Redes</span>
                 </>
               ) : (
@@ -143,7 +143,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               onClick={() => setSaleMode('REDES_PERSONALIZADO')}
               className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 saleMode === 'REDES_PERSONALIZADO'
-                  ? 'bg-amber-400 text-black shadow-md font-black'
+                  ? 'bg-white text-black shadow-md font-black'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
               }`}
             >
@@ -182,7 +182,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               <button
                 type="button"
                 onClick={() => setIsCustomModalOpen(true)}
-                className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
               >
                 <Palette className="w-4 h-4" />
                 <span>+ Personalizado</span>

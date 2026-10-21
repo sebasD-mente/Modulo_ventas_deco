@@ -2,13 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Palette, X, Plus, Upload, CheckCircle2, Loader2, Ruler, Sparkles, Scissors } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { compressImage } from '../../utils/imageCompression';
-import {
-  OFFICIAL_SIZES,
-  CUSTOM_CM2_RATE,
-  WOOD_CUSTOM_CUT_SURCHARGE,
-  PVC_SURCHARGE,
-  VINYL_DISCOUNT_FACTOR,
-} from './manualSaleConstants';
+import { OFFICIAL_SIZES, CUSTOM_CM2_RATE, WOOD_CUSTOM_CUT_SURCHARGE, PVC_SURCHARGE, VINYL_DISCOUNT_FACTOR } from './manualSaleConstants';
 import { getLocalCatalog } from '../../services/catalogCacheService';
 
 const MATERIALS = [
@@ -34,10 +28,10 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   }, []);
   const [mode, setMode] = useState('STANDARD');
   const [material, setMaterial] = useState('MDF_5_5MM');
-  const [selectedSize, setSelectedSize] = useState(OFFICIAL_SIZES[3]);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [customWidth, setCustomWidth] = useState('');
   const [customHeight, setCustomHeight] = useState('');
-  const [unitPrice, setUnitPrice] = useState('65');
+  const [unitPrice, setUnitPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [description, setDescription] = useState('');
   const [customImageUrl, setCustomImageUrl] = useState('');
@@ -48,14 +42,16 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Cálculo paramétrico reactivo del precio sugerido
+  // Cálculo paramétrico reactivo del precio sugerido (solo al seleccionar tamaño o medidas)
   useEffect(() => {
     let price = 0;
     if (mode === 'STANDARD') {
-      const base = selectedSize?.precio || 65;
-      if (material === 'PVC_5MM') price = base + PVC_SURCHARGE;
-      else if (material === 'VINILO_SOLO') price = base * VINYL_DISCOUNT_FACTOR;
-      else price = base;
+      if (selectedSize) {
+        const base = selectedSize.precio || 0;
+        if (material === 'PVC_5MM') price = base + PVC_SURCHARGE;
+        else if (material === 'VINILO_SOLO') price = base * VINYL_DISCOUNT_FACTOR;
+        else price = base;
+      }
     } else {
       const w = Number(customWidth) || 0;
       const h = Number(customHeight) || 0;
@@ -114,11 +110,14 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
     if (mode === 'CUSTOM' && (!Number(customWidth) || !Number(customHeight))) {
       return setErrorMsg('Ingresa un ancho y alto válidos en centímetros.');
     }
+    if (mode === 'STANDARD' && !selectedSize) {
+      return setErrorMsg('Selecciona una medida estándar para el cuadro o cambia a Medida Especial.');
+    }
     const priceNum = Number(unitPrice);
-    if (isNaN(priceNum) || priceNum <= 0) return setErrorMsg('Ingresa un precio válido mayor a Q 0.');
+    if (isNaN(priceNum) || priceNum <= 0) return setErrorMsg('Ingresa un precio acordado válido mayor a Q 0.');
 
     const dims = mode === 'STANDARD'
-      ? `Estándar: ${selectedSize.nombre} (${selectedSize.dimensiones})`
+      ? `Estándar: ${selectedSize?.nombre || 'Personalizado'} (${selectedSize?.dimensiones || 'N/A'})`
       : `Especial: ${customWidth.trim()} x ${customHeight.trim()} cm (Corte Taller)`;
 
     onAddCustomItem({
@@ -142,7 +141,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
       <div className="bg-[#121212] border border-neutral-800 rounded-[28px] p-5 max-w-lg w-full shadow-2xl text-white space-y-3.5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar">
         <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800">
           <div className="flex items-center gap-2">
-            <Palette className="w-5 h-5 text-amber-400" />
+            <Palette className="w-5 h-5 text-white" />
             <h3 className="font-bold text-sm uppercase tracking-wider">Cotizador de Pedido Personalizado</h3>
           </div>
           <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer">
@@ -155,32 +154,35 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
             <label className="block text-neutral-400 font-semibold mb-1">Descripción del Cuadro / Obra *</label>
-            <input type="text" value={description} onChange={(e) => { setDescription(e.target.value); setErrorMsg(''); }} placeholder="Ej. Retrato Anime Personalizado, Foto de Boda..." className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white focus:border-amber-400 text-xs focus:outline-none" />
+            <input type="text" value={description} onChange={(e) => { setDescription(e.target.value); setErrorMsg(''); }} placeholder="Ej. Retrato Anime Personalizado, Foto de Boda..." className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white focus:border-white text-xs focus:outline-none" />
           </div>
 
           <div>
             <label className="block text-neutral-400 font-semibold mb-1">Material de Fabricación</label>
             <div className="grid grid-cols-3 gap-1.5">
               {MATERIALS.map((m) => (
-                <button key={m.id} type="button" onClick={() => setMaterial(m.id)} className={`min-h-[44px] p-2 rounded-xl text-left border transition-colors cursor-pointer ${material === m.id ? 'bg-amber-400/10 border-amber-400 text-amber-300' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white'}`}><span className="block font-bold text-xs">{m.label}</span><span className="text-[10px] text-neutral-500 block truncate">{m.desc}</span></button>
+                <button key={m.id} type="button" onClick={() => setMaterial(m.id)} className={`min-h-[44px] p-2 rounded-xl text-left border transition-colors cursor-pointer ${material === m.id ? 'bg-white text-black border-white font-bold shadow-sm' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white'}`}>
+                  <span className="block font-bold text-xs">{m.label}</span>
+                  <span className={`text-[10px] block truncate ${material === m.id ? 'text-neutral-700' : 'text-neutral-500'}`}>{m.desc}</span>
+                </button>
               ))}
             </div>
           </div>
 
           <div>
             <div className="flex bg-neutral-900 p-1 rounded-xl border border-neutral-800 mb-2">
-              <button type="button" onClick={() => setMode('STANDARD')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'STANDARD' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}><Sparkles className="w-3.5 h-3.5" /><span>Medidas Oficiales</span></button>
-              <button type="button" onClick={() => setMode('CUSTOM')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'CUSTOM' ? 'bg-amber-400 text-black shadow' : 'text-neutral-400 hover:text-white'}`}><Ruler className="w-3.5 h-3.5" /><span>Medida Especial (cm²)</span></button>
+              <button type="button" onClick={() => setMode('STANDARD')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'STANDARD' ? 'bg-white text-black shadow font-bold' : 'text-neutral-400 hover:text-white'}`}><Sparkles className="w-3.5 h-3.5" /><span>Medidas Oficiales</span></button>
+              <button type="button" onClick={() => setMode('CUSTOM')} className={`flex-1 min-h-[44px] rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${mode === 'CUSTOM' ? 'bg-white text-black shadow font-bold' : 'text-neutral-400 hover:text-white'}`}><Ruler className="w-3.5 h-3.5" /><span>Medida Especial (cm²)</span></button>
             </div>
 
             {mode === 'STANDARD' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
                 {availableSizes.map((sz) => {
-                  const isSel = selectedSize.sizeId === sz.sizeId;
+                  const isSel = selectedSize?.sizeId === sz.sizeId;
                   const price = material === 'PVC_5MM' ? sz.precio + PVC_SURCHARGE : material === 'VINILO_SOLO' ? sz.precio * VINYL_DISCOUNT_FACTOR : sz.precio;
                   return (
-                    <button key={sz.sizeId} type="button" onClick={() => setSelectedSize(sz)} className={`p-2 rounded-xl border text-left transition-all min-h-[44px] cursor-pointer ${isSel ? 'border-amber-400 bg-amber-400/10 text-white' : 'border-neutral-800 bg-black text-neutral-300 hover:border-neutral-700'}`}>
-                      <div className="flex justify-between items-center"><span className="font-bold">{sz.nombre}</span><span className="font-mono text-amber-400 font-black">Q{price}</span></div>
+                    <button key={sz.sizeId} type="button" onClick={() => setSelectedSize(sz)} className={`p-2 rounded-xl border text-left transition-all min-h-[44px] cursor-pointer ${isSel ? 'border-white bg-white/10 text-white font-bold ring-1 ring-white' : 'border-neutral-800 bg-black text-neutral-300 hover:border-neutral-700'}`}>
+                      <div className="flex justify-between items-center"><span className="font-bold">{sz.nombre}</span><span className="font-mono text-emerald-400 font-black">Q{price}</span></div>
                       <span className="text-[10px] text-neutral-400 block">{sz.dimensiones}</span>
                       <span className="text-[9px] text-neutral-500 block truncate">{sz.badge}</span>
                     </button>
@@ -192,19 +194,19 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[11px] text-neutral-400 block mb-1">Ancho (cm) *</label>
-                    <input type="number" min="5" max="300" placeholder="Ej. 48" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-amber-400 focus:outline-none" />
+                    <input type="number" min="5" max="300" placeholder="Ej. 48" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-white focus:outline-none" />
                   </div>
                   <div>
                     <label className="text-[11px] text-neutral-400 block mb-1">Alto (cm) *</label>
-                    <input type="number" min="5" max="300" placeholder="Ej. 68" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-amber-400 focus:outline-none" />
+                    <input type="number" min="5" max="300" placeholder="Ej. 68" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-white focus:outline-none" />
                   </div>
                 </div>
                 {area > 0 && (
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-between text-[11px]">
                     <span className="text-neutral-400">Área: <strong className="text-white font-mono">{area.toLocaleString()} cm²</strong></span>
                     {material === 'MDF_5_5MM' && (
-                      <span className="text-amber-400 flex items-center gap-1 font-semibold">
-                        <Scissors className="w-3.5 h-3.5" />Base Q{basePrint.toFixed(2)} + Q25 corte taller
+                      <span className="text-neutral-300 flex items-center gap-1 font-semibold">
+                        <Scissors className="w-3.5 h-3.5 text-cyan-400" />Base Q{basePrint.toFixed(2)} + Q25 corte taller
                       </span>
                     )}
                     {material === 'PVC_5MM' && <span className="text-sky-400 font-semibold">Base Q{basePrint.toFixed(2)} + Q15 PVC</span>}
@@ -218,11 +220,11 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="block text-neutral-400 font-semibold mb-1">Precio Acordado (Q) *</label>
-              <input type="number" min="1" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-amber-400 focus:outline-none" />
+              <input type="number" min="1" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} placeholder="0.00" className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-white focus:outline-none" />
             </div>
             <div>
               <label className="block text-neutral-400 font-semibold mb-1">Cantidad</label>
-              <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-amber-400 focus:outline-none" />
+              <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-white focus:outline-none" />
             </div>
           </div>
 
@@ -234,12 +236,12 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
               className={`p-3 rounded-2xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-1 text-center min-h-[70px] ${uploadSuccess ? 'border-emerald-500 bg-emerald-500/10' : 'border-neutral-800 hover:border-neutral-600 bg-black/40'}`}
             >
               {isUploading ? (
-                <div className="flex items-center gap-2 text-amber-400 font-semibold"><Loader2 className="w-4 h-4 animate-spin" /><span>Subiendo a Cloud Storage...</span></div>
+                <div className="flex items-center gap-2 text-white font-semibold"><Loader2 className="w-4 h-4 animate-spin text-cyan-400" /><span>Subiendo a Cloud Storage...</span></div>
               ) : uploadSuccess ? (
                 <div className="flex items-center gap-2 text-emerald-400 font-bold"><CheckCircle2 className="w-4 h-4" /><span>✓ Arte en la nube listo para taller</span></div>
               ) : (
                 <label className="cursor-pointer flex items-center gap-2 text-neutral-400 hover:text-white">
-                  <Upload className="w-4 h-4 text-amber-400" />
+                  <Upload className="w-4 h-4 text-white" />
                   <span className="text-[11px]">Arrastra imagen o haz clic para subir (JPEG, PNG, WebP max 15MB)</span>
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleFileUpload(e.target.files?.[0])} className="hidden" />
                 </label>
@@ -258,13 +260,13 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
           </button>
 
           {showUrlInput && (
-            <input type="url" value={customImageUrl} onChange={(e) => setCustomImageUrl(e.target.value)} placeholder="https://storage.googleapis.com/... o enlace de foto" className="w-full min-h-[44px] px-3.5 mt-1 bg-black border border-neutral-800 rounded-xl text-white font-mono text-[11px] focus:border-amber-400 focus:outline-none" />
+            <input type="url" value={customImageUrl} onChange={(e) => setCustomImageUrl(e.target.value)} placeholder="https://storage.googleapis.com/... o enlace de foto" className="w-full min-h-[44px] px-3.5 mt-1 bg-black border border-neutral-800 rounded-xl text-white font-mono text-[11px] focus:border-white focus:outline-none" />
           )}
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2 border-t border-neutral-800">
             <button type="button" onClick={onClose} className="min-h-[44px] px-4 rounded-xl text-neutral-400 hover:text-white font-semibold cursor-pointer">Cancelar</button>
-            <button type="submit" className="min-h-[44px] px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md">
+            <button type="submit" className="min-h-[44px] px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20">
               <Plus className="w-4 h-4" /><span>Agregar al Pedido</span>
             </button>
           </div>

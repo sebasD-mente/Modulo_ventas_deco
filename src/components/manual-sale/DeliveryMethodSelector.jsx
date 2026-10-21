@@ -8,12 +8,6 @@ const COURIERS = [
   { id: 'OTRO', label: 'Otro Courier' },
 ];
 
-const SHIPPING_PRESETS = [
-  { label: 'Q35 (Capital / Mixco)', amount: 35 },
-  { label: 'Q40 (Departamental)', amount: 40 },
-  { label: 'Q0 (Envío Gratis)', amount: 0 },
-];
-
 export default function DeliveryMethodSelector({
   deliveryMethod,
   setDeliveryMethod,
@@ -38,10 +32,7 @@ export default function DeliveryMethodSelector({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => {
-            setDeliveryMethod('ENVIO_COURIER');
-            if (shippingCost === 0) setShippingCost(35);
-          }}
+          onClick={() => setDeliveryMethod('ENVIO_COURIER')}
           className={`min-h-[48px] px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
             deliveryMethod === 'ENVIO_COURIER'
               ? 'bg-cyan-500 text-black shadow-md'
@@ -88,35 +79,16 @@ export default function DeliveryMethodSelector({
       {/* Opciones según método */}
       {deliveryMethod === 'ENVIO_COURIER' && (
         <div className="p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 space-y-3">
-          <div>
-            <label className="block text-[11px] font-semibold text-neutral-400 mb-1.5">Tarifas de Flete Sugeridas</label>
-            <div className="flex flex-wrap gap-1.5">
-              {SHIPPING_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => setShippingCost(preset.amount)}
-                  className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                    Number(shippingCost) === preset.amount
-                      ? 'bg-white text-black'
-                      : 'bg-black text-neutral-300 border border-neutral-800 hover:border-neutral-700'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-400 mb-1">Costo Flete Personalizado (Q)</label>
+              <label className="block text-[11px] font-semibold text-neutral-400 mb-1">Costo Flete Courier (Q)</label>
               <input
                 type="number"
                 min="0"
                 step="5"
                 value={shippingCost}
                 onChange={(e) => setShippingCost(Number(e.target.value) || 0)}
+                placeholder="0.00"
                 className="w-full min-h-[44px] px-3 py-2 bg-black border border-neutral-800 rounded-xl text-white font-mono focus:outline-none focus:border-cyan-500"
               />
             </div>

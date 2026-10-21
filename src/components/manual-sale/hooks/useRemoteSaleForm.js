@@ -3,11 +3,9 @@ import { useAuth } from '../../../context/AuthContext';
 import confetti from 'canvas-confetti';
 
 const GUATEMALA_DEPARTMENTS = [
-  'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso',
-  'Escuintla', 'Guatemala', 'Huehuetenango', 'Izabal', 'Jalapa',
-  'Jutiapa', 'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu',
-  'Sacatepéquez', 'San Marcos', 'Santa Rosa', 'Sololá', 'Suchitepéquez',
-  'Totonicapán', 'Zacapa'
+  'Alta Verapaz', 'Baja Verapaz', 'Chimaltenango', 'Chiquimula', 'El Progreso', 'Escuintla', 'Guatemala', 'Huehuetenango',
+  'Izabal', 'Jalapa', 'Jutiapa', 'Petén', 'Quetzaltenango', 'Quiché', 'Retalhuleu', 'Sacatepéquez', 'San Marcos',
+  'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa'
 ];
 
 export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
@@ -33,7 +31,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
 
   // Logística y Flete
   const [deliveryMethod, setDeliveryMethod] = useState('ENVIO_COURIER');
-  const [shippingCost, setShippingCost] = useState(35);
+  const [shippingCost, setShippingCost] = useState(0);
   const [shippingCourier, setShippingCourier] = useState('GUATEX');
   const [shippingTrackingNumber, setShippingTrackingNumber] = useState('');
   const [pickupEventId, setPickupEventId] = useState(
@@ -310,6 +308,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       setShowShareModal(true);
       clearCart();
       clearSelectedCustomer();
+      setShippingCost(0);
       setIsPendingPaymentOnly(false);
       setDepositInput('');
       setDepositReference('');
