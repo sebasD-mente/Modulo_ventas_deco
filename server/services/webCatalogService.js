@@ -74,6 +74,11 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       const alphaFullText = alphaOnly(fullText);
       const titleTokensSet = new Set(normTitleText.split(/\s+/)), fullTokensSet = new Set(normFullText.split(/\s+/));
       const titleStemmedSet = new Set([...titleTokensSet].map(stem)), fullStemmedSet = new Set([...fullTokensSet].map(stem));
+      const tagTokens = Array.isArray(p.tags)
+        ? p.tags.flatMap((t) => normalize(String(t)).split(/\s+/)).filter(Boolean)
+        : [];
+      const tagsTokensSet = new Set(tagTokens);
+      const tagsStemmedSet = new Set(tagTokens.map(stem));
       const productTitleCondensed = getCondensed(titleText);
 
       let score = 0;
@@ -145,10 +150,13 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
       if (meaningfulTokens.length === 1) {
         const singleToken = meaningfulTokens[0], singleStem = stem(singleToken);
+        const matchesTag = tagsTokensSet.has(singleToken) || tagsStemmedSet.has(singleStem);
+        if (tagsTokensSet.has(singleToken)) score += 120;
+        else if (tagsStemmedSet.has(singleStem)) score += 60;
         const matchesTitle = titleTokensSet.has(singleToken) || titleStemmedSet.has(singleStem) || normTitleText.split(/\s+/).some((t) => t.startsWith(singleToken) || stem(t).startsWith(singleStem)) || (singleStem.length >= 4 && normTitleText.replace(/\s+/g, '').includes(singleStem)) || hasTitleFuzzy(singleToken);
         const hasAliasMatch = Boolean(aliasRes.exactMatch && aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasExactTitle = normTitleText === singleToken || normTitleText.startsWith(singleToken) || normTitleText.split(/\s+/).map(stem).includes(singleStem) || (singleStem.length >= 4 && normTitleText.replace(/\s+/g, '').startsWith(singleStem));
-        if (!matchesTitle && !hasAliasMatch && !hasExactTitle && !hasFuzzyMatch) score = 0;
+        if (!matchesTitle && !hasAliasMatch && !hasExactTitle && !hasFuzzyMatch && !matchesTag) score = 0;
       } else if (meaningfulTokens.length >= 2) {
         const matchedMeaningful = meaningfulTokens.filter((t) => isTitleTokenMatch(t) || isTokenMatch(t));
         const hasAliasMatch = Boolean((aliasRes.exactMatch || aliasRes.matched) && aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
@@ -171,7 +179,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
     const targetMeaningful = (aliasRes.matched && aliasRes.exactMatch && aliasTokens.length > 0) ? aliasTokens.slice(0, 2) : meaningfulTokens;
     const hasMissingTokens = targetMeaningful.length >= 2 && !deduplicated.some((p) => {
-      const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto].filter(Boolean).join(' '));
+      const pNorm = normalize([p.titulo, p.subtitulo, p.nombreCompleto, ...(Array.isArray(p.tags) ? p.tags : [])].filter(Boolean).join(' '));
       return targetMeaningful.every((tok) => pNorm.includes(tok) || pNorm.includes(stem(tok)) || pNorm.split(/\s+/).some((pt) => isFuzzyTokenMatch(tok, pt)));
     });
 

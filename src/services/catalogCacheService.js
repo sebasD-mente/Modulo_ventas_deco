@@ -74,6 +74,7 @@ export function saveCatalogSnapshot(posters, options = {}) {
           sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : fallbackSizes,
           destacado: isTop,
           totalVentas: salesCount,
+          tags: Array.isArray(p.tags) ? p.tags.map((t) => String(t).toLowerCase().trim()).filter(Boolean) : [],
         };
         existingMap.set(sanitized.id, sanitized);
       }
@@ -125,7 +126,7 @@ export function searchLocalCatalog(query = '', limit = 8) {
   if (!q) return catalog.slice(0, limit);
   const words = q.split(/\s+/).filter(Boolean);
   return catalog.filter((p) => {
-    const raw = `${p.titulo} ${p.subtitulo || ''} ${p.categoria || ''}`.toLowerCase();
+    const raw = `${p.titulo} ${p.subtitulo || ''} ${p.categoria || ''} ${(p.tags || []).join(' ')}`.toLowerCase();
     const clean = raw.replace(/[-_]/g, ' ');
     const compact = raw.replace(/[^a-z0-9]/g, '');
     return words.every((w) => raw.includes(w) || clean.includes(w) || compact.includes(w.replace(/[^a-z0-9]/g, '')));
