@@ -117,10 +117,10 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     let isMounted = true;
     async function loadEvents() {
       try {
-        const res = await authFetch('/api/events');
+        const res = await authFetch('/api/events?forPickup=true');
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {
-          const pickupStands = json.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online');
+          const pickupStands = json.data.filter((e) => e.status !== 'ARCHIVADO' && e.id !== 'evt-ventas-redes-online');
           setAvailablePickupEvents(pickupStands);
           if (pickupStands.length > 0) {
             setPickupEventId((prev) => {
@@ -130,7 +130,9 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
             });
           }
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn('⚠️ Error al cargar eventos para retiro en stand:', err);
+      }
     }
     loadEvents();
     return () => { isMounted = false; };

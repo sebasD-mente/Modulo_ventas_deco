@@ -133,9 +133,13 @@ export async function getEventsList(req, res) {
       ? req.user.roles : [req.user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
     const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
+    const { forPickup } = req.query;
 
     const whereClause = { tenantId: req.tenantId };
-    if (isVendedorRedes && !isSuperAdmin) {
+    if (forPickup === 'true') {
+      whereClause.id = { not: 'evt-ventas-redes-online' };
+      whereClause.status = { not: 'ARCHIVADO' };
+    } else if (isVendedorRedes && !isSuperAdmin) {
       whereClause.id = 'evt-ventas-redes-online';
     } else if (!isSuperAdmin) {
       whereClause.id = { not: 'evt-ventas-redes-online' };

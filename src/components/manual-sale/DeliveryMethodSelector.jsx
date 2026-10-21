@@ -137,7 +137,7 @@ export default function DeliveryMethodSelector({
               <option value="">-- Selecciona el evento ferial de retiro --</option>
               {availablePickupEvents.map((evt) => (
                 <option key={evt.id} value={evt.id}>
-                  {evt.name} ({evt.location || 'Feria'})
+                  {evt.name} ({evt.location || 'Feria'}){evt.status === 'CONFIRMADO' ? ' [Próximo]' : ''}
                 </option>
               ))}
             </select>
