@@ -74,12 +74,21 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       const alphaFullText = alphaOnly(fullText);
       const titleTokensSet = new Set(normTitleText.split(/\s+/)), fullTokensSet = new Set(normFullText.split(/\s+/));
       const titleStemmedSet = new Set([...titleTokensSet].map(stem)), fullStemmedSet = new Set([...fullTokensSet].map(stem));
-      const tagTokens = Array.isArray(p.tags)
-        ? p.tags.flatMap((t) => normalize(String(t)).split(/\s+/)).filter(Boolean)
-        : [];
-      const tagsTokensSet = new Set(tagTokens);
-      const tagsStemmedSet = new Set(tagTokens.map(stem));
+      const rawTagsList = Array.isArray(p.tags) ? p.tags.map((t) => normalize(String(t))).filter(Boolean) : [];
+      const tagTokens = rawTagsList.flatMap((t) => t.split(/\s+/)).filter(Boolean);
+      const allTagEntries = Array.from(new Set([...rawTagsList, ...tagTokens]));
+      const tagsTokensSet = new Set(allTagEntries);
+      const tagsStemmedSet = new Set(allTagEntries.map(stem));
       const productTitleCondensed = getCondensed(titleText);
+
+      const isTagMatch = (tok) => {
+        const sTok = stem(tok);
+        return (
+          tagsTokensSet.has(tok) ||
+          tagsStemmedSet.has(sTok) ||
+          allTagEntries.some((t) => t.startsWith(tok) || tok.startsWith(t) || stem(t) === sTok || (tok.length >= 4 && t.includes(tok)))
+        );
+      };
 
       let score = 0;
       if (normTitleText === normQuery) score += 350;
@@ -126,7 +135,7 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
       };
 
       const isExactTitleToken = (t) => titleTokensSet.has(t) || titleStemmedSet.has(stem(t));
-      const isTokenMatch = (t) => fullTokensSet.has(t) || fullStemmedSet.has(stem(t)) || normFullText.startsWith(t) || (stem(t).length >= 4 && normFullText.replace(/\s+/g, '').includes(stem(t))) || hasFullFuzzy(t);
+      const isTokenMatch = (t) => fullTokensSet.has(t) || fullStemmedSet.has(stem(t)) || normFullText.startsWith(t) || (stem(t).length >= 4 && normFullText.replace(/\s+/g, '').includes(stem(t))) || hasFullFuzzy(t) || isTagMatch(t);
       const isTitleTokenMatch = (t) => isExactTitleToken(t) || (stem(t).length >= 4 && normTitleText.replace(/\s+/g, '').includes(stem(t))) || hasTitleFuzzy(t);
 
       let hasFuzzyMatch = false;
@@ -150,9 +159,15 @@ export async function searchWebPosters({ tenantId, query = '', category = null, 
 
       if (meaningfulTokens.length === 1) {
         const singleToken = meaningfulTokens[0], singleStem = stem(singleToken);
-        const matchesTag = tagsTokensSet.has(singleToken) || tagsStemmedSet.has(singleStem);
-        if (tagsTokensSet.has(singleToken)) score += 120;
-        else if (tagsStemmedSet.has(singleStem)) score += 60;
+        const matchesTag = isTagMatch(singleToken);
+        if (tagsTokensSet.has(singleToken)) score += 150;
+        else if (tagsStemmedSet.has(singleStem)) score += 120;
+        else if (matchesTag) score += 100;
+
+        if (matchesTag) {
+          score += 100;
+        }
+
         const matchesTitle = titleTokensSet.has(singleToken) || titleStemmedSet.has(singleStem) || normTitleText.split(/\s+/).some((t) => t.startsWith(singleToken) || stem(t).startsWith(singleStem)) || (singleStem.length >= 4 && normTitleText.replace(/\s+/g, '').includes(singleStem)) || hasTitleFuzzy(singleToken);
         const hasAliasMatch = Boolean(aliasRes.exactMatch && aliasCondensed.length >= 2 && (productTitleCondensed === aliasCondensed || productTitleCondensed.startsWith(aliasCondensed) || productTitleCondensed.includes(aliasCondensed)));
         const hasExactTitle = normTitleText === singleToken || normTitleText.startsWith(singleToken) || normTitleText.split(/\s+/).map(stem).includes(singleStem) || (singleStem.length >= 4 && normTitleText.replace(/\s+/g, '').startsWith(singleStem));

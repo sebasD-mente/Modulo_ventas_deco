@@ -126,10 +126,17 @@ export function searchLocalCatalog(query = '', limit = 8) {
   if (!q) return catalog.slice(0, limit);
   const words = q.split(/\s+/).filter(Boolean);
   return catalog.filter((p) => {
-    const raw = `${p.titulo} ${p.subtitulo || ''} ${p.categoria || ''} ${(p.tags || []).join(' ')}`.toLowerCase();
+    const tagList = Array.isArray(p.tags) ? p.tags.map((t) => String(t).toLowerCase().trim()).filter(Boolean) : [];
+    const tagTokens = tagList.flatMap((t) => t.split(/\s+/)).filter(Boolean);
+    const allTags = Array.from(new Set([...tagList, ...tagTokens]));
+    const raw = `${p.titulo || ''} ${p.subtitulo || ''} ${p.categoria || ''} ${allTags.join(' ')}`.toLowerCase();
     const clean = raw.replace(/[-_]/g, ' ');
     const compact = raw.replace(/[^a-z0-9]/g, '');
-    return words.every((w) => raw.includes(w) || clean.includes(w) || compact.includes(w.replace(/[^a-z0-9]/g, '')));
+
+    return words.every((w) => {
+      if (raw.includes(w) || clean.includes(w) || compact.includes(w.replace(/[^a-z0-9]/g, ''))) return true;
+      return allTags.some((t) => t.startsWith(w) || w.startsWith(t) || (w.length >= 4 && t.includes(w)) || (t.length >= 4 && w.includes(t)));
+    });
   }).slice(0, limit);
 }
 

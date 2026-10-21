@@ -42,6 +42,36 @@ describe('🏷️ STAND {IA} — Suite de Búsqueda por Tags en Catálogo (Ticke
       tags: ['rock', 'vocalista', 'estadio', 'wimbley'],
       sku: 'MUS-003',
     },
+    {
+      id: 'poster-spiderman-verse',
+      titulo: 'Spider-Man',
+      subtitulo: 'Spider-Verse Amazing Spider-Man',
+      categoria: 'COMICS',
+      imageUrl: '/images/spiderman.jpg',
+      thumbUrl: '/images/spiderman-thumb.jpg',
+      tags: ['marvel', 'spider-verse', 'brincolin', 'peter parker'],
+      sku: 'COM-004',
+    },
+    {
+      id: 'poster-godfather',
+      titulo: 'The Godfather',
+      subtitulo: 'Homenaje Ilustrado a la Dinastía Corleone',
+      categoria: 'CINE',
+      imageUrl: '/images/godfather.jpg',
+      thumbUrl: '/images/godfather-thumb.jpg',
+      tags: ['mafia', 'don vito', 'corleone', 'padrino vintage'],
+      sku: 'CIN-005',
+    },
+    {
+      id: 'poster-zelda',
+      titulo: 'The Legend of Zelda',
+      subtitulo: 'El Salto del Destino',
+      categoria: 'VIDEOJUEGOS',
+      imageUrl: '/images/zelda.jpg',
+      thumbUrl: '/images/zelda-thumb.jpg',
+      tags: ['nintendo', 'link', 'hyrule', 'zelda cayendo'],
+      sku: 'VID-006',
+    },
   ];
 
   let memoryStore = {};
@@ -129,6 +159,39 @@ describe('🏷️ STAND {IA} — Suite de Búsqueda por Tags en Catálogo (Ticke
       assert.ok(results.length >= 1);
       assert.equal(results[0].id, 'poster-pink-floyd');
     });
+
+    it('1.6. [DEKO-STANDIA-063] Coincidencia por prefijo de tag ("brincoli" -> tag "brincolin")', async () => {
+      const results = await searchWebPosters({
+        tenantId: TEST_TENANT,
+        query: 'brincoli',
+        skipLiveParachute: true,
+      });
+
+      assert.ok(results.length >= 1, 'Debe retornar el póster de Spider-Man Amazing por prefijo de tag "brincoli"');
+      assert.equal(results[0].id, 'poster-spiderman-verse');
+    });
+
+    it('1.7. [DEKO-STANDIA-063] Coincidencia por tag compuesto desglosado ("cayendo" -> tag "zelda cayendo")', async () => {
+      const results = await searchWebPosters({
+        tenantId: TEST_TENANT,
+        query: 'cayendo',
+        skipLiveParachute: true,
+      });
+
+      assert.ok(results.length >= 1, 'Debe retornar el póster de Zelda por palabra desglosada "cayendo"');
+      assert.equal(results[0].id, 'poster-zelda');
+    });
+
+    it('1.8. [DEKO-STANDIA-063] Coincidencia por tag temático ("vintage" -> tag "padrino vintage")', async () => {
+      const results = await searchWebPosters({
+        tenantId: TEST_TENANT,
+        query: 'vintage',
+        skipLiveParachute: true,
+      });
+
+      assert.ok(results.length >= 1, 'Debe retornar el póster de El Padrino por tag "padrino vintage"');
+      assert.equal(results[0].id, 'poster-godfather');
+    });
   });
 
   describe('2. Frontend Local (catalogCacheService) — Preservación y Búsqueda por Tags', () => {
@@ -136,7 +199,7 @@ describe('🏷️ STAND {IA} — Suite de Búsqueda por Tags en Catálogo (Ticke
       saveCatalogSnapshot(mockPosters, { sync: true });
 
       const storedCatalog = getLocalCatalog();
-      assert.equal(storedCatalog.length, 3);
+      assert.equal(storedCatalog.length, mockPosters.length);
 
       const pink = storedCatalog.find((p) => p.id === 'poster-pink-floyd');
       assert.ok(pink, 'Debe existir el póster en localStorage');
@@ -172,6 +235,30 @@ describe('🏷️ STAND {IA} — Suite de Búsqueda por Tags en Catálogo (Ticke
       const ids = results.map((r) => r.id);
       assert.ok(ids.includes('poster-pink-floyd'));
       assert.ok(ids.includes('poster-queen'));
+    });
+
+    it('2.5. [DEKO-STANDIA-063] searchLocalCatalog encuentra por prefijo de tag ("brincoli")', () => {
+      saveCatalogSnapshot(mockPosters, { sync: true });
+
+      const results = searchLocalCatalog('brincoli');
+      assert.ok(results.length >= 1, 'Debe encontrar póster por prefijo de tag "brincoli"');
+      assert.equal(results[0].id, 'poster-spiderman-verse');
+    });
+
+    it('2.6. [DEKO-STANDIA-063] searchLocalCatalog encuentra por tag compuesto desglosado ("cayendo")', () => {
+      saveCatalogSnapshot(mockPosters, { sync: true });
+
+      const results = searchLocalCatalog('cayendo');
+      assert.ok(results.length >= 1, 'Debe encontrar póster por tag desglosado "cayendo"');
+      assert.equal(results[0].id, 'poster-zelda');
+    });
+
+    it('2.7. [DEKO-STANDIA-063] searchLocalCatalog encuentra por tag temático ("vintage")', () => {
+      saveCatalogSnapshot(mockPosters, { sync: true });
+
+      const results = searchLocalCatalog('vintage');
+      assert.ok(results.length >= 1, 'Debe encontrar póster por tag "vintage"');
+      assert.equal(results[0].id, 'poster-godfather');
     });
   });
 });
