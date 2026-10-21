@@ -283,10 +283,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
-                Catálogo Ferial
-              </span>
+            <div className="flex items-center justify-end gap-2">
               {renderSyncControl('Sincronizar catálogo')}
             </div>
             {renderSyncFeedback()}
@@ -322,6 +319,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             setPaymentMethod={cart.setPaymentMethod}
             discount={cart.effectiveDiscount || cart.discount}
             setDiscount={cart.setDiscount}
+            notes={cart.notes}
+            setNotes={cart.setNotes}
             subtotal={cart.subtotal}
             grandTotal={cart.grandTotal}
             hasActiveCombo={cart.hasActiveCombo}

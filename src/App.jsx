@@ -25,11 +25,20 @@ function ViewLoadingFallback() {
   );
 }
 
+const isOnlinePointOfSale = (ev) => Boolean(
+  !ev ||
+  ev.id === 'evt-ventas-redes-online' ||
+  ev.name?.toLowerCase().includes('redes') ||
+  ev.name?.toLowerCase().includes('ventas en línea')
+);
+
 const getTodayGuatemalaStr = () =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
 
 function SalesTerminalMain() {
   const { user, token, authFetch, isLoading: isAuthLoading, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2, logout } = useAuth();
+  const isExclusiveVendedorRedes = Boolean(isVendedorRedes && !isVendedor && !isSuperAdmin);
+
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_auth_user') : null;
@@ -54,7 +63,9 @@ function SalesTerminalMain() {
   const [activeEvent, setActiveEvent] = useState(() => {
     try {
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('deko_active_event') : null;
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      return parsed;
     } catch (_) {
       return null;
     }
@@ -88,24 +99,26 @@ function SalesTerminalMain() {
       const eventsRes = await authFetch('/api/events');
       const eventsJson = await eventsRes.json();
       const allActive = eventsJson.success && Array.isArray(eventsJson.data)
-        ? eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online')
+        ? eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online' && !isOnlinePointOfSale(e))
         : [];
       setActiveEventsList(allActive);
 
       // Evento para VENDEDOR_REDES exclusivo
-      if (isVendedorRedes && !isVendedor && !isSuperAdmin) {
+      if (isExclusiveVendedorRedes) {
         selectedEvent = (eventsJson.success && Array.isArray(eventsJson.data)
-          ? eventsJson.data.find((e) => e.id === 'evt-ventas-redes-online' || e.name?.toLowerCase().includes('redes'))
+          ? eventsJson.data.find((e) => isOnlinePointOfSale(e))
           : null) || null;
       }
 
-      // Si es SUPER_ADMIN, verificar si tiene stand seleccionado en localStorage
+      // Si es SUPER_ADMIN, verificar si tiene stand ferial seleccionado en localStorage
       const savedAdminEventId = isSuperAdmin && typeof localStorage !== 'undefined'
         ? localStorage.getItem('deko_admin_selected_event_id')
         : null;
 
       if (!selectedEvent) {
-        const query = savedAdminEventId ? `?eventId=${savedAdminEventId}` : '';
+        const query = savedAdminEventId && savedAdminEventId !== 'evt-ventas-redes-online'
+          ? `?eventId=${savedAdminEventId}`
+          : '';
         const activeRes = await authFetch(`/api/events/active${query}`);
         const activeJson = await activeRes.json();
 
@@ -121,10 +134,22 @@ function SalesTerminalMain() {
         }
       }
 
+      // Si no es vendedor exclusivo de redes y el evento es digital, descartarlo como stand ferial
+      if (!isExclusiveVendedorRedes && isOnlinePointOfSale(selectedEvent)) {
+        selectedEvent = allActive[0] || null;
+      }
+
       if (selectedEvent) {
         setActiveEvent(selectedEvent);
         try {
-          localStorage.setItem('deko_active_event', JSON.stringify(selectedEvent));
+          if (isSuperAdmin && !isOnlinePointOfSale(selectedEvent)) {
+            localStorage.setItem('deko_admin_selected_event_id', selectedEvent.id);
+          }
+          if (isExclusiveVendedorRedes || !isOnlinePointOfSale(selectedEvent)) {
+            localStorage.setItem('deko_active_event', JSON.stringify(selectedEvent));
+          } else {
+            localStorage.removeItem('deko_active_event');
+          }
         } catch (_) {}
 
         if (isSuperAdmin || isVendedor || isVendedorRedes) {
@@ -135,13 +160,19 @@ function SalesTerminalMain() {
             setLiveMetrics(metricsData.data);
           }
         }
+      } else {
+        setActiveEvent(null);
+        try {
+          localStorage.removeItem('deko_active_event');
+          if (isSuperAdmin) localStorage.removeItem('deko_admin_selected_event_id');
+        } catch (_) {}
       }
     } catch (err) {
       console.error('Error cargando datos iniciales:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, token, isVendedorRedes, isVendedor, isSuperAdmin]);
+  }, [authFetch, token, isExclusiveVendedorRedes, isVendedor, isSuperAdmin]);
 
   const refreshMetrics = useCallback(async (override = null) => {
     const targetId = (typeof override === 'object' && override !== null)
@@ -168,19 +199,26 @@ function SalesTerminalMain() {
       const eventsRes = await authFetch('/api/events');
       const eventsJson = await eventsRes.json();
       if (!eventsJson.success || !Array.isArray(eventsJson.data)) return;
-      const allActive = eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online');
+      const allActive = eventsJson.data.filter((e) => e.status === 'ACTIVO' && e.id !== 'evt-ventas-redes-online' && !isOnlinePointOfSale(e));
       setActiveEventsList(allActive);
 
-      const nextEvent = preferredEvent
-        || allActive.find((e) => e.id === activeEvent?.id)
-        || allActive.find((e) => e.id !== 'evt-ventas-redes-online')
-        || allActive[0]
-        || null;
+      let nextEvent = preferredEvent;
+      if (nextEvent && isOnlinePointOfSale(nextEvent) && !isExclusiveVendedorRedes) {
+        nextEvent = null;
+      }
+
+      if (!nextEvent) {
+        nextEvent = allActive.find((e) => e.id === activeEvent?.id && !isOnlinePointOfSale(e))
+          || allActive[0]
+          || null;
+      }
 
       setActiveEvent(nextEvent);
       if (nextEvent) {
         try {
-          localStorage.setItem('deko_admin_selected_event_id', nextEvent.id);
+          if (isSuperAdmin && !isOnlinePointOfSale(nextEvent)) {
+            localStorage.setItem('deko_admin_selected_event_id', nextEvent.id);
+          }
           localStorage.setItem('deko_active_event', JSON.stringify(nextEvent));
         } catch (_) {}
         await refreshMetrics(nextEvent);
@@ -188,17 +226,20 @@ function SalesTerminalMain() {
     } catch (err) {
       console.error('Error sincronizando lista de stands activos:', err);
     }
-  }, [token, authFetch, activeEvent?.id, refreshMetrics]);
+  }, [token, authFetch, activeEvent?.id, refreshMetrics, isExclusiveVendedorRedes, isSuperAdmin]);
 
   const handleSelectEvent = useCallback((ev) => {
     if (!ev) return;
+    if (!isExclusiveVendedorRedes && isOnlinePointOfSale(ev)) return;
     setActiveEvent(ev);
     try {
-      localStorage.setItem('deko_admin_selected_event_id', ev.id);
+      if (isSuperAdmin) {
+        localStorage.setItem('deko_admin_selected_event_id', ev.id);
+      }
       localStorage.setItem('deko_active_event', JSON.stringify(ev));
     } catch (_) {}
     refreshMetrics(ev);
-  }, [refreshMetrics]);
+  }, [refreshMetrics, isSuperAdmin, isExclusiveVendedorRedes]);
 
   useEffect(() => {
     if (user) {

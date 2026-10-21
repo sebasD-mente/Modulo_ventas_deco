@@ -66,48 +66,40 @@ export async function getActiveEvent(req, res) {
         }
       } else {
         const requestedEventId = req.query?.eventId;
-        if (requestedEventId) {
+        if (requestedEventId && requestedEventId !== 'evt-ventas-redes-online') {
           event = await prisma.event.findFirst({
-            where: { id: requestedEventId, tenantId },
+            where: { id: requestedEventId, tenantId, status: 'ACTIVO' },
             include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
           });
         }
         if (!event) {
           event = await prisma.event.findFirst({
-            where: { tenantId, status: 'ACTIVO', id: { not: 'evt-ventas-redes-online' } },
+            where: {
+              tenantId,
+              status: 'ACTIVO',
+              id: { not: 'evt-ventas-redes-online' },
+              NOT: [
+                { name: { contains: 'redes', mode: 'insensitive' } },
+                { name: { contains: 'ventas en línea', mode: 'insensitive' } },
+                { location: { contains: 'redes', mode: 'insensitive' } },
+                { location: { contains: 'en línea', mode: 'insensitive' } },
+              ],
+            },
             include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
             orderBy: { startDate: 'desc' },
-          });
-        }
-        if (!event) {
-          event = await prisma.event.findFirst({
-            where: { tenantId, status: 'ACTIVO' },
-            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
-            orderBy: { startDate: 'desc' },
-          });
-        }
-        if (!event) {
-          event = await prisma.event.findFirst({
-            where: { tenantId },
-            include: { tenant: selectTenant, assignedSellers: { select: SELLER_SELECT } },
-            orderBy: { createdAt: 'desc' },
           });
         }
       }
     } catch (dbErr) {
-      if (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test') {
+      if (ENV.NODE_ENV === 'development') {
         event = getDevFallbackEvent(tenantId);
       } else {
         throw dbErr;
       }
     }
 
-    if (!event && (ENV.NODE_ENV === 'development' || ENV.NODE_ENV === 'test')) {
-      event = getDevFallbackEvent(tenantId);
-    }
-
     if (!event) {
-      return res.status(404).json({ success: false, error: 'No hay eventos configurados para este negocio.' });
+      return res.json({ success: true, data: null, message: 'No hay stands feriales activos configurados.' });
     }
 
     let financials = null;

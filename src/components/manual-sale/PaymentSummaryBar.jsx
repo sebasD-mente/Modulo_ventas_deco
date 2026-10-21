@@ -6,6 +6,8 @@ export default function PaymentSummaryBar({
   setPaymentMethod,
   discount = 0,
   setDiscount,
+  notes = '',
+  setNotes,
   subtotal = 0,
   grandTotal = 0,
   hasActiveCombo = false,
@@ -51,12 +53,12 @@ export default function PaymentSummaryBar({
         </div>
       </div>
 
-      {/* 2. Sección de Descuento Ferial (Input Directo Limpio >= 44px) */}
+      {/* 2. Sección de Descuento (Campos Duales Táctiles >= 44px) */}
       <div className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-neutral-300 flex items-center gap-1.5">
             <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-            Descuento Ferial
+            Descuento
           </span>
           {Number(discount) > 0 && (
             <span className="text-amber-400 font-bold font-mono">
@@ -72,29 +74,41 @@ export default function PaymentSummaryBar({
             </span>
           </div>
         )}
-        <div className="flex items-center bg-black border border-neutral-800 focus-within:border-amber-400/60 rounded-xl px-3 transition-colors">
-          <span className="text-xs text-neutral-500 font-mono font-bold">Q</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Campo 1 — Monto de Descuento */}
+          <div className="flex items-center bg-black border border-neutral-800 focus-within:border-amber-400/60 rounded-xl px-3 transition-colors">
+            <span className="text-xs text-neutral-500 font-mono font-bold">Q</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Monto de descuento (ej. 10)"
+              value={discount === 0 ? '' : discount}
+              onChange={(e) => {
+                const val = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0);
+                if (setDiscount) setDiscount(val);
+              }}
+              className="w-full min-h-[44px] bg-transparent text-white font-mono text-xs sm:text-sm font-bold px-2 focus:outline-none placeholder-neutral-600"
+            />
+            {Number(discount) > 0 && (
+              <button
+                type="button"
+                onClick={() => setDiscount && setDiscount(0)}
+                className="text-[11px] text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 cursor-pointer shrink-0 transition-colors"
+              >
+                Borrar
+              </button>
+            )}
+          </div>
+
+          {/* Campo 2 — Motivo / Autorización */}
           <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Monto de descuento (ej. 10)"
-            value={discount === 0 ? '' : discount}
-            onChange={(e) => {
-              const val = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0);
-              if (setDiscount) setDiscount(val);
-            }}
-            className="w-full min-h-[44px] bg-transparent text-white font-mono text-xs sm:text-sm font-bold px-2 focus:outline-none placeholder-neutral-600"
+            type="text"
+            placeholder="Motivo / Autorización"
+            value={notes || ''}
+            onChange={(e) => setNotes && setNotes(e.target.value)}
+            className="w-full min-h-[44px] bg-black border border-neutral-800 focus:border-amber-400/60 rounded-xl px-3 text-xs sm:text-sm text-white placeholder-neutral-600 font-medium focus:outline-none transition-colors"
           />
-          {Number(discount) > 0 && (
-            <button
-              type="button"
-              onClick={() => setDiscount && setDiscount(0)}
-              className="text-[11px] text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-800 cursor-pointer shrink-0 transition-colors"
-            >
-              Borrar
-            </button>
-          )}
         </div>
       </div>
 

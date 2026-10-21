@@ -99,6 +99,15 @@ export default function Header({
     )
   );
 
+  const isOnlinePointOfSale = (ev) => Boolean(
+    !ev ||
+    ev.id === 'evt-ventas-redes-online' ||
+    ev.name?.toLowerCase().includes('redes') ||
+    ev.name?.toLowerCase().includes('ventas en línea')
+  );
+
+  const ferialStandsList = activeEventsList.filter((ev) => !isOnlinePointOfSale(ev));
+
   return (
     <header className="bg-white border-b border-neutral-200 text-black sticky top-0 z-40 px-3 py-2 sm:py-2.5 sm:px-6 select-none shadow-sm">
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
@@ -124,9 +133,9 @@ export default function Header({
               <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse shrink-0" />
               <span className="truncate">📱 Redes / Online</span>
             </div>
-          ) : activeEvent ? (
+          ) : (activeEvent && !isOnlinePointOfSale(activeEvent)) ? (
             <div className="relative" ref={standSelectorRef}>
-              {isSuperAdmin && activeEventsList.length > 1 ? (
+              {isSuperAdmin && ferialStandsList.length > 1 ? (
                 <div>
                   <button
                     type="button"
@@ -144,9 +153,9 @@ export default function Header({
                       data-testid="header-stand-selector-menu"
                       className="absolute right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in duration-150"
                     >
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2 py-1 block">Stands ({activeEventsList.length})</span>
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2 py-1 block">Stands ({ferialStandsList.length})</span>
                       <div className="space-y-1">
-                        {activeEventsList.map((ev) => (
+                        {ferialStandsList.map((ev) => (
                           <button
                             key={ev.id} type="button"
                             onClick={() => { onSelectEvent?.(ev); setIsStandSelectorOpen(false); }}
@@ -190,7 +199,7 @@ export default function Header({
                   <span className="shrink-0 text-sm">📱</span>
                   <span className="truncate">Punto de Venta: <strong className="font-bold">Redes / Online</strong></span>
                 </div>
-              ) : activeEvent ? (
+              ) : (activeEvent && !isOnlinePointOfSale(activeEvent)) ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-900">
                   <span className="shrink-0 text-sm">📍</span>
                   <span className="truncate">Stand: <strong className="font-bold">{activeEvent.name}</strong></span>
