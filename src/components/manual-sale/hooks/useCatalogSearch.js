@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { searchPostersWithFallback } from '../../../services/catalogCacheService.js';
+import { useAiVoiceRecorder } from '../../ai-chat/hooks/useAiVoiceRecorder.js';
 
 export function useCatalogSearch(options = {}) {
   const { authFetch } = useAuth();
   const eventIdFromOptions = typeof options === 'string' ? options : options?.eventId;
   const onSelectFromOptions = typeof options === 'object' ? options?.onSelectPoster : undefined;
+  const onClearSelectionFromOptions = typeof options === 'object' ? options?.onClearSelection : undefined;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isRecognizingPhoto, setIsRecognizingPhoto] = useState(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
   const [photoError, setPhotoError] = useState(null);
 
   const searchInputRef = useRef(null);
@@ -86,6 +89,9 @@ export function useCatalogSearch(options = {}) {
   const clearSearch = () => {
     activeAbortRef.current?.abort();
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (typeof onClearSelectionFromOptions === 'function') {
+      onClearSelectionFromOptions();
+    }
     setSearchQuery(''); setSearchResults([]); setIsSearching(false); setShowDropdown(false);
   };
 
@@ -164,12 +170,61 @@ export function useCatalogSearch(options = {}) {
     }
   };
 
+  const handleVoiceSearch = async (audioBlob, meta = {}) => {
+    if (!audioBlob || meta?.empty) return;
+    setIsTranscribingVoice(true);
+    setPhotoError(null);
+    if (photoErrorTimerRef.current) clearTimeout(photoErrorTimerRef.current);
+
+    try {
+      const ext = (audioBlob.type || '').includes('mp4') ? 'mp4' : 'webm';
+      const formData = new FormData();
+      formData.append('audio', audioBlob, `voice-search.${ext}`);
+
+      const res = await authFetch('/api/ai/voice-search', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (json.success && json.query && json.query.trim()) {
+        const cleanQ = json.query.trim();
+        isSelectingRef.current = false;
+        if (typeof onClearSelectionFromOptions === 'function') {
+          onClearSelectionFromOptions();
+        }
+        setSearchQuery(cleanQ);
+        setShowDropdown(true);
+      } else {
+        setPhotoError('No se escuchó un nombre de póster claro. Intenta de nuevo.');
+        photoErrorTimerRef.current = setTimeout(() => setPhotoError(null), 4500);
+      }
+    } catch (err) {
+      console.error('Error en búsqueda por voz:', err);
+      setPhotoError('Error de conexión al procesar la voz.');
+      photoErrorTimerRef.current = setTimeout(() => setPhotoError(null), 4500);
+    } finally {
+      setIsTranscribingVoice(false);
+    }
+  };
+
+  const voiceRecorder = useAiVoiceRecorder({
+    onRecordingComplete: handleVoiceSearch,
+    silenceThresholdMs: 1100,
+    maxDurationMs: 8000,
+  });
+
   return {
     searchQuery, setSearchQuery, searchResults, setSearchResults,
     isSearching, setIsSearching, showDropdown, setShowDropdown,
     searchInputRef, searchContainerRef, isSelectingRef, clearSearch, selectPoster,
     isRecognizingPhoto, photoError, setPhotoError, handlePhotoSearch,
     recognizeByPhoto: handlePhotoSearch,
+    isRecordingVoice: voiceRecorder.isRecording,
+    isTranscribingVoice,
+    startVoiceSearch: voiceRecorder.startRecording,
+    stopVoiceSearch: voiceRecorder.stopRecording,
+    handleVoiceSearch,
   };
 }
 

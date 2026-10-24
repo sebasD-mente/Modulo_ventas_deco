@@ -275,3 +275,88 @@ export async function processPostersBatchPhoto({ imageBuffer, mimeType = 'image/
     return parsed;
   } catch (err) { throwMediaError('processPostersBatchPhoto', err, 'Error al procesar lote de fotos'); }
 }
+
+const VOICE_SEARCH_FILLER_REGEX = /\b(buscame|b[uú]scame|buscar|busca|el\s+p[oó]ster\s+de|los\s+p[oó]sters?\s+de|p[oó]sters?\s+de|el\s+cuadro\s+de|cuadros?\s+de|quiero\s+ver|mostrar|mu[eé]strame|dame|un\s+p[oó]ster\s+de|una?\s+de|por\s+favor)\b/gi;
+
+export function cleanVoiceCatalogQuery(rawText = '') {
+  const stripped = String(rawText || '')
+    .replace(/\[.*?\]/g, ' ')
+    .replace(VOICE_SEARCH_FILLER_REGEX, ' ')
+    .replace(/[¿?¡!.,;:"]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!stripped) return '';
+  const aliasRes = resolveEntityAlias(stripped);
+  if (aliasRes?.matched) {
+    const canonBase = (aliasRes.canonicalTitle || '').split(/\s+-\s+/)[0].replace(/\s*\(.*?\)\s*/g, '').trim();
+    const sq = (aliasRes.searchQuery || '').trim();
+    if (canonBase && sq) {
+      return sq.length <= canonBase.length ? sq : canonBase;
+    }
+    return canonBase || sq || stripped;
+  }
+  return stripped;
+}
+
+export async function transcribeVoiceSearchQuery({ audioBuffer, mimeType = 'audio/webm', tenantId, geminiClient = null }) {
+  const cleanMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+  const voiceSearchSchema = {
+    type: 'OBJECT',
+    properties: {
+      searchQuery: {
+        type: 'STRING',
+        description: 'Término de búsqueda limpio y canónico del póster, personaje, anime, película, álbum o artista (ej. "Spider-Man", "Chainsaw Man", "Batman", "Van Gogh"). Sin muletillas.',
+      },
+      transcription: {
+        type: 'STRING',
+        description: 'Transcripción literal de lo dicho en el audio.',
+      },
+    },
+    required: ['searchQuery', 'transcription'],
+  };
+
+  const prompt = [
+    'Eres el motor de búsqueda por voz del catálogo de pósters y cuadros decorativos de Deco Vintage Guate.',
+    'Escucha el audio corto y extrae ÚNICAMENTE el nombre del personaje, anime, película, serie, banda, artista o temática que el usuario desea buscar en el catálogo.',
+    'Reglas estrictas:',
+    '1. Elimina cualquier muletilla como "búscame", "el póster de", "quiero ver", "cuadro de".',
+    '2. Corrige la ortografía oficial de nombres en inglés, japonés o artistas (ej. si suena "espiderman" -> "Spider-Man", "chenso man" u "hombre motosierra" -> "Chainsaw Man", "bad buni" -> "Bad Bunny", "van gog" -> "Van Gogh").',
+    '3. Si el audio es solo ruido o silencio sin palabras inteligibles, devuelve searchQuery: "" y transcription: "".',
+  ].join('\n');
+
+  try {
+    const { result: response, model: usedModel } = await executeWithModelFallback({
+      client: geminiClient,
+      models: getActivePool(),
+      actionName: 'VOICE_CATALOG_SEARCH',
+      tenantId,
+      taskFn: async ({ model, client }) => client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inlineData: { data: audioBuffer.toString('base64'), mimeType: cleanMime } },
+            ],
+          },
+        ],
+        config: { responseMimeType: 'application/json', responseSchema: voiceSearchSchema },
+      }),
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || '{}');
+    const rawTranscription = (parsed.transcription || '').replace(/\s+/g, ' ').trim();
+    const candidate = parsed.searchQuery || rawTranscription;
+    const query = cleanVoiceCatalogQuery(candidate);
+
+    return {
+      query,
+      transcription: rawTranscription,
+      usedModel: usedModel || 'gemini-3.8-flash',
+    };
+  } catch (err) {
+    throwMediaError('transcribeVoiceSearchQuery', err, 'Error al transcribir búsqueda por voz');
+  }
+}
+

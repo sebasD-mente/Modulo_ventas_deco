@@ -73,11 +73,10 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
     </div>
   ) : null;
 
-  const search = useCatalogSearch(eventId);
+  const [selectedPoster, setSelectedPoster] = useState(null);
+  const search = useCatalogSearch({ eventId, onClearSelection: () => setSelectedPoster(null) });
   const cart = useManualSaleCart({ eventId, onSaleRegistered, initialDraft });
   const remoteForm = useRemoteSaleForm({ eventId, onSaleRegistered, cart });
-
-  const [selectedPoster, setSelectedPoster] = useState(null);
   const [selectedSize, setSelectedSize] = useState(DEFAULT_MEDIUM_SIZE);
   const [itemQuantity, setItemQuantity] = useState(1);
 

@@ -87,6 +87,7 @@ import {
   handleArtworkRecognition,
   handleVideoRecognition,
   handleVerifyReceipt,
+  handleVoiceCatalogSearch,
 } from '../controllers/aiController.js';
 
 import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
@@ -307,6 +308,12 @@ router.post(
   upload.single('audio'),
   requireEventAccess,
   handleVoiceSale
+);
+router.post(
+  '/ai/voice-search',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
+  upload.single('audio'),
+  handleVoiceCatalogSearch
 );
 router.post(
   '/ai/batch-photo',

@@ -1,11 +1,12 @@
 import React, { useRef } from 'react';
-import { Search, X, Loader2, Camera } from 'lucide-react';
+import { Search, X, Loader2, Camera, Mic, Square } from 'lucide-react';
 
 export default function CatalogSearchInput({
   searchQuery, setSearchQuery, searchResults = [], isSearching = false,
   showDropdown = false, setShowDropdown, searchInputRef, searchContainerRef,
   onSelectPoster, onClearSearch, hasSelectedPoster = false,
   isRecognizingPhoto = false, photoError = null, handlePhotoSearch, onPhotoSelected, eventId,
+  isRecordingVoice = false, isTranscribingVoice = false, startVoiceSearch, stopVoiceSearch,
 }) {
   const fileInputRef = useRef(null);
   const handleFileChange = (e) => {
@@ -19,13 +20,18 @@ export default function CatalogSearchInput({
   return (
     <div ref={searchContainerRef} className="relative space-y-1.5">
       <input ref={fileInputRef} data-testid="catalog-camera-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-      <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+      <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block mb-1.5 flex items-center justify-between gap-2">
         <span>1. Buscar póster en catálogo</span>
-        {(isSearching || isRecognizingPhoto) && (
-          <span className="text-[10px] text-neutral-400 font-normal flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin text-white" /> {isRecognizingPhoto ? 'Escaneando foto IA...' : 'Buscando...'}
+        {isRecordingVoice ? (
+          <span className="text-[10px] text-red-400 font-bold flex items-center gap-1.5 animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-red-500" /> Escuchando... di el nombre del póster
           </span>
-        )}
+        ) : (isSearching || isRecognizingPhoto || isTranscribingVoice) ? (
+          <span className="text-[10px] text-neutral-400 font-normal flex items-center gap-1">
+            <Loader2 className="w-3 h-3 animate-spin text-white" />
+            {isRecognizingPhoto ? 'Escaneando foto IA...' : isTranscribingVoice ? 'Procesando voz IA...' : 'Buscando...'}
+          </span>
+        ) : null}
       </label>
 
       <div className="flex items-center gap-2">
@@ -34,11 +40,13 @@ export default function CatalogSearchInput({
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Escribe el nombre o personaje... (ej. Chainsaw, Spider-Man, Batman, Van Gogh)"
+            placeholder={isRecordingVoice ? 'Escuchando nombre del póster...' : 'Escribe el nombre o personaje... (ej. Chainsaw, Spider-Man, Batman, Van Gogh)'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => { if (searchResults?.length > 0 && !hasSelectedPoster && setShowDropdown) setShowDropdown(true); }}
-            className="w-full bg-black border border-neutral-700/90 rounded-2xl pl-11 pr-10 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white font-medium shadow-inner"
+            className={`w-full bg-black border rounded-2xl pl-11 pr-10 py-3 text-xs sm:text-sm text-white placeholder:text-neutral-500 focus:outline-none font-medium shadow-inner transition-colors ${
+              isRecordingVoice ? 'border-red-500/80' : 'border-neutral-700/90 focus:border-white'
+            }`}
           />
           {searchQuery && (
             <button
@@ -56,7 +64,7 @@ export default function CatalogSearchInput({
           type="button"
           data-testid="catalog-camera-btn"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isRecognizingPhoto}
+          disabled={isRecognizingPhoto || isRecordingVoice || isTranscribingVoice}
           title="Buscar póster por foto"
           aria-label="Buscar póster por foto"
           className="min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
@@ -67,6 +75,30 @@ export default function CatalogSearchInput({
             <Camera className="w-4 h-4 text-cyan-400" />
           )}
         </button>
+
+        {startVoiceSearch && (
+          <button
+            type="button"
+            data-testid="catalog-mic-btn"
+            onClick={isRecordingVoice ? stopVoiceSearch : startVoiceSearch}
+            disabled={isTranscribingVoice || isRecognizingPhoto}
+            title={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
+            aria-label={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
+            className={`min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl border transition-all cursor-pointer shrink-0 disabled:opacity-50 ${
+              isRecordingVoice
+                ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 animate-pulse shadow-lg shadow-red-600/30'
+                : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700/80'
+            }`}
+          >
+            {isTranscribingVoice ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+            ) : isRecordingVoice ? (
+              <Square className="w-4 h-4 fill-current text-white" />
+            ) : (
+              <Mic className="w-4 h-4 text-emerald-400" />
+            )}
+          </button>
+        )}
       </div>
 
       {photoError && (

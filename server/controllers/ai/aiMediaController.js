@@ -1,4 +1,4 @@
-import { processVoiceSaleAudio, processPostersBatchPhoto, recognizePosterArtworkFromImage, recognizePostersFromVideo } from '../../services/aiMultimodalService.js';
+import { processVoiceSaleAudio, processPostersBatchPhoto, recognizePosterArtworkFromImage, recognizePostersFromVideo, transcribeVoiceSearchQuery } from '../../services/aiMultimodalService.js';
 import { verifyDepositReceipt } from '../../services/ai/aiReceiptOcrService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
@@ -216,3 +216,38 @@ export async function handleVerifyReceipt(req, res) {
     return res.status(500).json({ success: false, error: err.message || 'Error verificando comprobante bancario.' });
   }
 }
+
+export async function handleVoiceCatalogSearch(req, res) {
+  try {
+    const { file, tenantId } = req;
+    if (!file || !file.buffer) {
+      return res.status(400).json({ success: false, error: 'No se recibió ningún archivo de audio.' });
+    }
+    const t0 = Date.now();
+    const result = await transcribeVoiceSearchQuery({
+      audioBuffer: file.buffer,
+      mimeType: file.mimetype || 'audio/webm',
+      tenantId,
+    });
+    recordLlmInteraction({
+      tenantId,
+      userId: req.userId || null,
+      action: 'AI_VOICE_CATALOG_SEARCH',
+      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+      tokensIn: null,
+      tokensOut: null,
+      latencyMs: Date.now() - t0,
+      ipAddress: req.ip,
+      details: { query: result.query, transcription: result.transcription },
+    });
+    return res.json({
+      success: true,
+      query: result.query || '',
+      transcription: result.transcription || '',
+    });
+  } catch (err) {
+    console.error('❌ Error en handleVoiceCatalogSearch:', err);
+    return res.status(500).json({ success: false, error: 'No se pudo procesar el audio de búsqueda.' });
+  }
+}
+

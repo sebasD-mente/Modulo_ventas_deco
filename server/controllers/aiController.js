@@ -18,4 +18,5 @@ export {
   handleArtworkRecognition,
   handleVideoRecognition,
   handleVerifyReceipt,
+  handleVoiceCatalogSearch,
 } from './ai/aiMediaController.js';

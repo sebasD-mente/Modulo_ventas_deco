@@ -8,7 +8,7 @@ import {
 
 export { getSupportedAudioMimeType };
 
-export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
+export function useAiVoiceRecorder({ onRecordingComplete, silenceThresholdMs = 1600, maxDurationMs = 15000 } = {}) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [vadActive, setVadActive] = useState(false);
@@ -79,7 +79,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
       mediaRecorder.start(250);
       setIsRecording(true); setVadActive(false); setRecordingSeconds(0); setAudioLevel(0);
       recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
-      hardTimeoutRef.current = setTimeout(() => stopRecording(), 15000);
+      hardTimeoutRef.current = setTimeout(() => stopRecording(), maxDurationMs);
 
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -108,7 +108,7 @@ export function useAiVoiceRecorder({ onRecordingComplete } = {}) {
               hasSpokenRef.current = true; lastSoundAt = Date.now(); setVadActive(false);
             } else if (hasSpokenRef.current) {
               const silence = Date.now() - lastSoundAt; const silentMs = silence;
-              if (silentMs > 1600 || silence > 3800) { stopRecording(); return; }
+              if (silentMs > silenceThresholdMs || silence > 3800) { stopRecording(); return; }
               else if (silentMs > 900 || silence > 2500) setVadActive(true);
             }
           }, 100);

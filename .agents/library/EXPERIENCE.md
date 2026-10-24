@@ -37,3 +37,9 @@ evidence: Cirugía [DEKO-STANDIA-065] y suite unitaria tests/adversarial/surgery
 confidence: high
 </experience>
 
+<experience>
+cue: Búsqueda por voz en el catálogo de pósters (CatalogSearchInput / useCatalogSearch / POST /api/ai/voice-search)
+lesson: Para búsqueda rápida de obras por voz en mostrador (ej. nombres en inglés, anime o artistas como "Spider-Man", "Chainsaw Man", "Van Gogh"), usar `useAiVoiceRecorder` con umbral VAD rápido (`silenceThresholdMs: 1100`, `maxDurationMs: 8000`) conectado a `POST /api/ai/voice-search` (`transcribeVoiceSearchQuery` en `aiMediaService.js` + `cleanVoiceCatalogQuery` + `resolveEntityAlias`) sin subir audio a GCS ni generar `draftSale`. Al recibir `query`, limpiar cualquier póster previamente seleccionado (`onClearSelection`), inyectar `setSearchQuery(cleanQ)` y abrir `setShowDropdown(true)` para desplegar la lista completa de variantes del póster.
+evidence: Cirugía [DEKO-STANDIA-066] y suite unitaria tests/adversarial/surgery-066-voice-catalog-search.test.js.
+confidence: high
+</experience>
