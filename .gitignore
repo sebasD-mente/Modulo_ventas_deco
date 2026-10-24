@@ -29,7 +29,9 @@ build/
 .parcel-cache/
 
 # IDE, Editor, and AI agent local caches
-.agents/
+.agents/*
+!.agents/library/
+!.agents/library/**
 .gemini/
 .idea/
 .vscode/
