@@ -77,17 +77,13 @@ export default function CatalogSearchInput({
         <div className="absolute z-30 left-0 right-0 mt-1.5 bg-black border border-neutral-800 rounded-2xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar">
           {searchResults.map((poster) => (
             <div key={poster.id} onClick={() => onSelectPoster && onSelectPoster(poster)} className="p-2.5 hover:bg-neutral-900 flex items-center justify-between gap-3 cursor-pointer border-b border-neutral-800/60 transition-colors">
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <img src={poster.thumbUrl || poster.imageUrl} alt="" className="w-9 h-12 object-cover rounded-lg border border-neutral-700 shrink-0 bg-neutral-900" />
                 <div className="truncate">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">{poster.categoria || 'ARTE'}</span>
                   <span className="font-bold text-xs text-white block truncate">{poster.titulo}</span>
                   <span className="text-[10px] text-neutral-400 block truncate">{poster.subtitulo || ''}</span>
                 </div>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[10px] text-neutral-400 block">Desde</span>
-                <span className="text-xs font-black text-emerald-400">Q{poster.precioMinimo || 25}</span>
               </div>
             </div>
           ))}

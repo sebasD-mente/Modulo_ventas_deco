@@ -209,7 +209,7 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
                 const Icon = m.icon;
                 const isSel = method === m.id;
                 return (
-                  <button key={m.id} type="button" onClick={() => { setMethod(m.id); setErrorMsg(null); }} className={`min-h-[44px] px-2.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border ${isSel ? 'bg-emerald-500 text-black border-emerald-500 shadow-md' : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'}`}>
+                  <button key={m.id} type="button" onClick={() => { setMethod(m.id); setErrorMsg(null); }} className={`min-h-[44px] px-2.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border ${isSel ? 'bg-white text-black border-white shadow-sm font-bold' : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'}`}>
                     <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{m.label}</span>
                   </button>
@@ -234,7 +234,7 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
                 <label className="block text-neutral-400 text-[11px] font-semibold mb-1">Método 2</label>
                 <div className="grid grid-cols-3 gap-2">
                   {PAYMENT_METHODS.map((m) => (
-                    <button key={m.id} type="button" onClick={() => setSplitMethod2(m.id)} className={`min-h-[44px] px-2 py-1.5 rounded-xl text-[11px] font-bold border cursor-pointer ${splitMethod2 === m.id ? 'bg-amber-400 text-black border-amber-400' : 'bg-black text-neutral-400 border-neutral-800'}`}>{m.label}</button>
+                    <button key={m.id} type="button" onClick={() => setSplitMethod2(m.id)} className={`min-h-[44px] px-2 py-1.5 rounded-xl text-[11px] font-bold border cursor-pointer ${splitMethod2 === m.id ? 'bg-white text-black border-white shadow-sm font-bold' : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'}`}>{m.label}</button>
                   ))}
                 </div>
               </div>

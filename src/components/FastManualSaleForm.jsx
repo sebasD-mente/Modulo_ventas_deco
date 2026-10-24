@@ -136,7 +136,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               }`}
             >
               <Store className="w-4 h-4 shrink-0" />
-              <span>Mostrador (Feria 100%)</span>
+              <span>Venta Directa en Stand</span>
             </button>
             <button
               type="button"
@@ -148,7 +148,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               }`}
             >
               <Smartphone className="w-4 h-4 shrink-0" />
-              <span>Redes / 50-50 (WhatsApp)</span>
+              <span>Ventas de Redes Sociales</span>
             </button>
           </div>
         )}

@@ -42,7 +42,7 @@ export default function PaymentSummaryBar({
               onClick={() => setPaymentMethod && setPaymentMethod(id)}
               className={`min-h-[44px] py-2 px-2.5 sm:px-3 flex items-center justify-center gap-1.5 rounded-xl border font-semibold text-xs transition-all cursor-pointer ${
                 paymentMethod === id
-                  ? 'bg-amber-400 text-black border-amber-400 shadow-sm font-bold'
+                  ? 'bg-white text-black border-white shadow-sm font-bold'
                   : 'bg-black border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
               }`}
             >

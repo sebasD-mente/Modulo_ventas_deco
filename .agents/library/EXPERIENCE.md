@@ -22,3 +22,10 @@ lesson: Todo control táctil debe medir al menos 44x44px (min-h-[44px] min-w-[44
 evidence: Estándar de ergonomía ferial y pruebas unitarias financieras en npm run harness:check.
 confidence: high
 </experience>
+
+<experience>
+cue: Edición de ítems de una venta existente (cambio de diseño de póster en EditSaleModal / saleUpdateService) y selectores de método de pago
+lesson: En el backend (saleUpdateService.js), al actualizar un ítem cuya descripción cambió (designChanged) por un póster del catálogo web sin UUID local (productId: null), NUNCA usar `item.productId || existingItem.productId` porque hereda el productId del póster viejo y muestra su miniatura antigua; debe limpiarse `resolvedProductId = null` y persistir `customImageUrl`. En la UI de modales estrechos, separar cada ítem en tarjeta de 2 niveles con `whitespace-nowrap` en montos (`Q25.00`) y usar estado activo blanco (`bg-white text-black border-white`) en todos los selectores de método de pago.
+evidence: Cirugía [DEKO-STANDIA-064] y suite unitaria tests/adversarial/surgery-064-ui-sales-edit-design-and-white-selectors.test.js.
+confidence: high
+</experience>

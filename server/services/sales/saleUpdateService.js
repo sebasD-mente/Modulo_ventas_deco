@@ -80,15 +80,20 @@ export async function updateSaleTransaction({
 
         if (existingItem) {
           matchedExistingIds.add(existingItem.id);
+          const designChanged = trimmedDesc.toLowerCase() !== existingItem.description.trim().toLowerCase();
+          const resolvedProductId = item.productId !== undefined
+            ? (item.productId || (designChanged ? null : existingItem.productId))
+            : (designChanged ? null : (existingItem.productId || null));
+
           await tx.saleItem.update({
             where: { id: existingItem.id },
             data: {
-              productId: item.productId || existingItem.productId || null,
+              productId: resolvedProductId,
               description: trimmedDesc,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
               subtotal,
-              customImageUrl: item.customImageUrl !== undefined ? item.customImageUrl : (existingItem.customImageUrl || null),
+              customImageUrl: item.customImageUrl !== undefined ? item.customImageUrl : (designChanged ? null : (existingItem.customImageUrl || null)),
               productionStatus: existingItem.productionStatus || 'PENDIENTE',
               printSheetId: existingItem.printSheetId || null,
               productionNotes: item.productionNotes !== undefined ? item.productionNotes : (existingItem.productionNotes || null),
