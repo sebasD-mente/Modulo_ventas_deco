@@ -1,10 +1,13 @@
 import React from 'react';
 import { Archive, Trash2, X, MapPin, AlertTriangle, Loader2 } from 'lucide-react';
+import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
 export default function EventActionModals({
   eventToArchive, onCloseArchive, onConfirmArchive, isSubmittingArchive, isArchiving,
   eventToDelete, onCloseDelete, onConfirmDelete, isSubmittingDelete, isDeleting, deleteErrorMsg,
 }) {
+  useModalBackHandler(Boolean(eventToArchive), onCloseArchive);
+  useModalBackHandler(Boolean(eventToDelete), onCloseDelete);
   const archiving = isArchiving || isSubmittingArchive;
   const deleting = isDeleting || isSubmittingDelete;
 

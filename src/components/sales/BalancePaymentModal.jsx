@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Banknote, CreditCard, Smartphone, X, Loader2, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useModalBackHandler } from '../../hooks/useSpaBackNavigation';
 
 const PAYMENT_METHODS = [
   { id: 'EFECTIVO', label: 'Efectivo', icon: Banknote },
@@ -33,6 +34,7 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
       : `bal-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   );
 
+  useModalBackHandler(Boolean(sale), onClose);
   if (!sale) return null;
 
   const totalAmount = Number(sale.totalAmount || 0).toFixed(2);

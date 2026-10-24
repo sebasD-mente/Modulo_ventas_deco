@@ -2,10 +2,12 @@ import React from 'react';
 import { X, CheckCircle2, AlertCircle, Banknote, CreditCard, Smartphone, Loader2, FileEdit } from 'lucide-react';
 import useEditSaleForm from './sales/edit/hooks/useEditSaleForm';
 import EditSaleItemsTable from './sales/edit/EditSaleItemsTable';
+import { useModalBackHandler } from '../hooks/useSpaBackNavigation';
 
 const METHODS = [{ id: 'EFECTIVO', label: 'Efectivo', icon: Banknote }, { id: 'TARJETA', label: 'Tarjeta', icon: CreditCard }, { id: 'TRANSFERENCIA', label: 'Transfer', icon: Smartphone }];
 
 export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated }) {
+  useModalBackHandler(Boolean(sale), onClose);
   if (!sale) return null;
   const { paymentMethod, setPaymentMethod, items, discount, setDiscount, notes, setNotes,
     isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleReplaceItem, handleRemoveItem, handleSaveChanges, handleCancelSale } = useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated });

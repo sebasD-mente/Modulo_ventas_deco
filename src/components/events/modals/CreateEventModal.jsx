@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calendar, X, Users, Check } from 'lucide-react';
+import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
 export default function CreateEventModal({
   isOpen,
@@ -9,6 +10,7 @@ export default function CreateEventModal({
   onSubmit,
   usersList = [],
 }) {
+  useModalBackHandler(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
   const selectedIds = newEventData.assignedUserIds || [];

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Eye, X, Loader2 } from 'lucide-react';
 import EventDayCard from '../daily/EventDayCard.jsx';
+import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
 const getGuatemalaDateStr = (dateInput) => {
   if (!dateInput) return '';
@@ -18,6 +19,7 @@ const formatSpanishDate = (dateStr) => {
 };
 
 export default function EventSalesModal({ event, salesList, closingsList = [], sales, isLoading, onClose }) {
+  useModalBackHandler(Boolean(event), onClose);
   if (!event) return null;
   const list = salesList || sales || [];
   const [expandedDate, setExpandedDate] = useState(null);

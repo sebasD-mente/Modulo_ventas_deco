@@ -29,3 +29,11 @@ lesson: En el backend (saleUpdateService.js), al actualizar un ítem cuya descri
 evidence: Cirugía [DEKO-STANDIA-064] y suite unitaria tests/adversarial/surgery-064-ui-sales-edit-design-and-white-selectors.test.js.
 confidence: high
 </experience>
+
+<experience>
+cue: Creación de modales emergentes (.fixed.inset-0), navegación entre pestañas SPA y diseño de tarjetas de eventos
+lesson: Toda ventana emergente (modal) en la SPA debe registrarse con `useModalBackHandler(isOpen, onClose)` (de `src/hooks/useSpaBackNavigation.js`) antes de cualquier `return null` temprano para que el botón "Atrás" físico/navegador (`popstate`) cierre primero el modal activo o regrese de pestañas secundarias a la vista principal (`venta`) sin expulsar al usuario fuera del sitio web. En las tarjetas de eventos, mantener densidad compacta (vendedores en 1 fila horizontal y las 4 métricas financieras en una sola franja `UnifiedMetricsStrip`), archivados contraídos por defecto (`showArchivedSection = false`) y cero controles de asignación manual de vendedores en la tarjeta permanente de Redes Sociales.
+evidence: Cirugía [DEKO-STANDIA-065] y suite unitaria tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js.
+confidence: high
+</experience>
+

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Pencil, X, Users, Check, Loader2 } from 'lucide-react';
+import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
 export default function EditEventModal({
   isOpen,
@@ -44,6 +45,7 @@ export default function EditEventModal({
     }
   }, [event]);
 
+  useModalBackHandler(Boolean(isOpen && event), onClose);
   if (!isOpen || !event) return null;
 
   const selectedIds = formData.assignedUserIds || [];

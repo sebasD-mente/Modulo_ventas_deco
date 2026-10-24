@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Receipt, Plus, Trash2, AlertCircle, MapPin } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
 const QUICK_TEMPLATES = [
   { category: 'ARRENDAMIENTO_STAND', label: '🎪 Arriendo Stand', desc: 'Arrendamiento de espacio / stand' },
@@ -38,6 +39,7 @@ export default function EventExpensesModal({ isOpen, event, onClose, onExpensesU
     }
   }, [isOpen, event?.id, fetchExpenses]);
 
+  useModalBackHandler(Boolean(isOpen && event), onClose);
   if (!isOpen || !event) return null;
 
   const handleApplyTemplate = (tmpl) => {

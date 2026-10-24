@@ -5,6 +5,7 @@ import LoginView from './components/LoginView';
 import FastManualSaleForm from './components/FastManualSaleForm';
 import RecentSalesList from './components/RecentSalesList';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import useSpaBackNavigation from './hooks/useSpaBackNavigation';
 
 const EventsManagementView = lazy(() => import('./components/EventsManagementView'));
 const MonitorDashboardView = lazy(() => import('./components/MonitorDashboardView'));
@@ -77,6 +78,17 @@ function SalesTerminalMain() {
   const [manualDraft, setManualDraft] = useState(null);
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+
+  const homeTab = (isOperario1 || isOperario2) && !isSuperAdmin && !isVendedor && !isVendedorRedes
+    ? 'produccion'
+    : 'venta';
+
+  useSpaBackNavigation({
+    activeTab,
+    setActiveTab,
+    homeTab,
+    enabled: Boolean(user),
+  });
 
   useEffect(() => {
     if (user) {

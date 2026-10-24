@@ -23,7 +23,7 @@ export function useEventsManager({ onEventActivated, onEventsChanged } = {}) {
   const [isCreatingEvent, setIsCreatingEvent] = useState(false), [newEventData, setNewEventData] = useState(INITIAL_EVENT_DATA);
   const [eventToEdit, setEventToEdit] = useState(null), [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const [eventForExpenses, setEventForExpenses] = useState(null);
-  const [archivedSearchQuery, setArchivedSearchQuery] = useState(''), [archivedDateFilter, setArchivedDateFilter] = useState(''), [showArchivedSection, setShowArchivedSection] = useState(true);
+  const [archivedSearchQuery, setArchivedSearchQuery] = useState(''), [archivedDateFilter, setArchivedDateFilter] = useState(''), [showArchivedSection, setShowArchivedSection] = useState(false);
 
   const loadEvents = async () => {
     setIsLoading(true); setErrorMsg(null);

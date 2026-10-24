@@ -13,18 +13,19 @@ export default function EventsFilterBar({
 
   return (
     <div className="space-y-3 pb-3 border-b border-neutral-800">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-white" /> Gestión de eventos
+            <Calendar className="w-4 h-4 text-white shrink-0" /> <span>Gestión de eventos</span>
           </h3>
-          <p className="text-xs text-neutral-400">Control de eventos activos, confirmados, archivados y asignación de vendedores</p>
+          <p className="text-xs text-neutral-400 truncate">Control de eventos activos, confirmados y archivados</p>
         </div>
         <button
           type="button" onClick={onOpenCreateModal}
-          className="min-h-[44px] px-5 py-2.5 rounded-full bg-white hover:bg-neutral-200 text-black font-black text-xs sm:text-sm flex items-center gap-2 shadow-md cursor-pointer transition-transform active:scale-95 self-start sm:self-auto"
+          data-testid="create-event-btn"
+          className="shrink-0 whitespace-nowrap min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-transform active:scale-95"
         >
-          <Plus className="w-4 h-4" /> <span>Nuevo evento</span>
+          <Plus className="w-4 h-4 shrink-0" /> <span>Nuevo evento</span>
         </button>
       </div>
 
