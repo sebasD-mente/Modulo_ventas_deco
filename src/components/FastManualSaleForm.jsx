@@ -173,29 +173,24 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           />
 
           {/* Búsqueda Catálogo + Botón Personalizado */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
-                Catálogo Físico o Personalizado
-              </label>
+          <CatalogSearchInput
+            {...search}
+            eventId={eventId}
+            onSelectPoster={handleSelectPoster}
+            onClearSearch={search.clearSearch}
+            hasSelectedPoster={Boolean(selectedPoster)}
+            customAction={
               <button
                 type="button"
+                data-testid="custom-item-btn"
                 onClick={() => setIsCustomModalOpen(true)}
-                className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                className="min-h-[44px] min-w-[96px] px-4 py-3 rounded-2xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 whitespace-nowrap"
               >
-                <Palette className="w-4 h-4" />
+                <Palette className="w-4 h-4 shrink-0" />
                 <span>+ Personalizado</span>
               </button>
-            </div>
-
-            <CatalogSearchInput
-              {...search}
-              eventId={eventId}
-              onSelectPoster={handleSelectPoster}
-              onClearSearch={search.clearSearch}
-              hasSelectedPoster={Boolean(selectedPoster)}
-            />
-          </div>
+            }
+          />
 
           {selectedPoster && (
             <PosterConfigurator

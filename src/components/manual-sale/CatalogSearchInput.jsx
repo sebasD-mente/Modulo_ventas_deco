@@ -7,6 +7,7 @@ export default function CatalogSearchInput({
   onSelectPoster, onClearSearch, hasSelectedPoster = false,
   isRecognizingPhoto = false, photoError = null, handlePhotoSearch, onPhotoSelected, eventId,
   isRecordingVoice = false, isTranscribingVoice = false, startVoiceSearch, stopVoiceSearch,
+  customAction = null,
 }) {
   const fileInputRef = useRef(null);
   const handleFileChange = (e) => {
@@ -60,44 +61,50 @@ export default function CatalogSearchInput({
           )}
         </div>
 
-        <button
-          type="button"
-          data-testid="catalog-camera-btn"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isRecognizingPhoto || isRecordingVoice || isTranscribingVoice}
-          title="Buscar póster por foto"
-          aria-label="Buscar póster por foto"
-          className="min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-        >
-          {isRecognizingPhoto ? (
-            <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-          ) : (
-            <Camera className="w-4 h-4 text-cyan-400" />
-          )}
-        </button>
+        {customAction ? (
+          customAction
+        ) : (
+          <>
+            <button
+              type="button"
+              data-testid="catalog-camera-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRecognizingPhoto || isRecordingVoice || isTranscribingVoice}
+              title="Buscar póster por foto"
+              aria-label="Buscar póster por foto"
+              className="min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              {isRecognizingPhoto ? (
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+              ) : (
+                <Camera className="w-4 h-4 text-cyan-400" />
+              )}
+            </button>
 
-        {startVoiceSearch && (
-          <button
-            type="button"
-            data-testid="catalog-mic-btn"
-            onClick={isRecordingVoice ? stopVoiceSearch : startVoiceSearch}
-            disabled={isTranscribingVoice || isRecognizingPhoto}
-            title={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
-            aria-label={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
-            className={`min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl border transition-all cursor-pointer shrink-0 disabled:opacity-50 ${
-              isRecordingVoice
-                ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 animate-pulse shadow-lg shadow-red-600/30'
-                : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700/80'
-            }`}
-          >
-            {isTranscribingVoice ? (
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-            ) : isRecordingVoice ? (
-              <Square className="w-4 h-4 fill-current text-white" />
-            ) : (
-              <Mic className="w-4 h-4 text-emerald-400" />
+            {startVoiceSearch && (
+              <button
+                type="button"
+                data-testid="catalog-mic-btn"
+                onClick={isRecordingVoice ? stopVoiceSearch : startVoiceSearch}
+                disabled={isTranscribingVoice || isRecognizingPhoto}
+                title={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
+                aria-label={isRecordingVoice ? 'Detener y buscar' : 'Buscar póster por voz'}
+                className={`min-h-[44px] min-w-[44px] px-3 flex items-center justify-center rounded-2xl border transition-all cursor-pointer shrink-0 disabled:opacity-50 ${
+                  isRecordingVoice
+                    ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 animate-pulse shadow-lg shadow-red-600/30'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700/80'
+                }`}
+              >
+                {isTranscribingVoice ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                ) : isRecordingVoice ? (
+                  <Square className="w-4 h-4 fill-current text-white" />
+                ) : (
+                  <Mic className="w-4 h-4 text-emerald-400" />
+                )}
+              </button>
             )}
-          </button>
+          </>
         )}
       </div>
 
