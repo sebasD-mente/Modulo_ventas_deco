@@ -2,7 +2,7 @@
   "project": "deko-eventsales",
   "features": [
     {
-      "id": "feat-001",
+      "id": "feat-000",
       "name": "Aterrizaje Brownfield del Arnés Certificado, Higiene de Raíz y Unificación con Candados Deko Labs",
       "description": "Purgar el arnés anterior (.agents/library), ordenar capturas y reportes históricos en la raíz, instalar los 28 artefactos certificados desde Plantilla-Maestra-Arnes con 0 CRLF, adaptar ARCHITECTURE.md, docs/QUALITY_SCORE.md y el verificador dual de capas en scripts/check-architecture.sh (con LEGACY_SERVER_ALLOWLIST de 13 tuplas) y unificar init.sh y scripts/audit-harness.js con los candados físicos de Deko Labs sin tocar código de producción ni .env.",
       "area": "harness-brownfield-governance",
@@ -49,7 +49,102 @@
         "npm run harness:check"
       ],
       "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, 8863ms Maker / 8947ms Checker offline, Overall: 100/100, 25/25 PASS, audit-secrets 185 files OK, verify-gemini-models PASS, zero-trust 12/12, vite build 1566 modules); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (262 JS syntax OK, 253/253 unit tests across 104 suites, vite build PASS); os.tmpdir() adversarial suite -> PASS (< 2s, 28/28 0-CRLF, Prisma destructive locks DENIED, 3/3 14th-import cases REJECTED with Red-Pen, 0 residues); Independent One-Shot Checker R2 (27bb88dc) -> 12/12 ACEPTAR in evaluator-rubric.md.",
-      "notes": "Ejecución quirúrgica Brownfield bajo WIP = 1: cero lectura de .env y cero modificación en src/, server/, prisma/, Dockerfile, docker-compose.yml, .dockerignore o entrypoint.sh."
+      "notes": "Hito fundacional Brownfield sellado bajo WIP = 1: cero lectura de .env y cero modificación en src/, server/, prisma/, Dockerfile, docker-compose.yml, .dockerignore o entrypoint.sh."
+    },
+    {
+      "id": "feat-001",
+      "name": "Ola 1: Desacoplamiento de Config IA y Lecturas de Entorno en Controladores (LEGACY_SERVER_ALLOWLIST 13 -> 9)",
+      "description": "Eliminar las primeras 4 tuplas de LEGACY_SERVER_ALLOWLIST sin alterar contratos HTTP ni mocks de pruebas: (1) extraer el pool puro de rotación de llaves Gemini a server/config/geminiKeyPool.js para que server/config/gemini.js dependa únicamente de capa Config manteniendo intacto getGeminiClient y dejando re-exportación compatible en server/services/ai/aiKeyPoolService.js; (2) exponer desde capa Service el modelo Gemini por defecto para eliminar el import directo a server/config/env.js en aiChatController.js y aiMediaController.js; y (3) encapsular la verificación/lectura de secretos del webhook de catálogo (CATALOG_WEBHOOK_SECRET / JWT_SECRET) en server/services/catalog/liveCatalogSyncService.js eliminando el salto a env.js en catalogWebhookController.js. Reducir LEGACY_SERVER_ALLOWLIST de 13 a 9 tuplas y elevar la capa Config de B a A en docs/QUALITY_SCORE.md.",
+      "area": "backend-architecture-config-ai",
+      "user_visible_behavior": "El copiloto multimodal STAND {IA} (chat SSE, voz VAD y visión) y el webhook en tiempo real del catálogo operan sin cambios funcionales ni visuales, mientras la capa Config sube a calificación A con 0 dependencias hacia arriba y LEGACY_SERVER_ALLOWLIST baja de 13 a 9 entradas.",
+      "priority": "P1",
+      "status": "not-started",
+      "dependencies": [
+        "feat-000"
+      ],
+      "required_files": [
+        "server/config/geminiKeyPool.js",
+        "server/config/gemini.js",
+        "server/services/ai/aiKeyPoolService.js",
+        "server/services/geminiPoolService.js",
+        "server/services/catalog/liveCatalogSyncService.js",
+        "server/controllers/ai/aiChatController.js",
+        "server/controllers/ai/aiMediaController.js",
+        "server/controllers/catalogWebhookController.js",
+        "scripts/check-architecture.sh",
+        "ARCHITECTURE.md",
+        "docs/QUALITY_SCORE.md"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "notes": "Cero lectura de .env, cero cambios en prisma/ o src/, cero git push / npm run deploy. Guardarraíles de suites existentes: preservar export getGeminiClient en server/config/gemini.js (importado por 12 suites IA/SSE), re-exportar getNextClient/getClientForKey y demás símbolos públicos desde server/services/ai/aiKeyPoolService.js, mantener handleCatalogWebhook en catalogWebhookController.js (tests/security/zero-trust.test.js) y no incrementar líneas en aiMediaController.js."
+    },
+    {
+      "id": "feat-002",
+      "name": "Ola 2: Extracción a Capa Service en Cierres, Catálogo, Auth y Usuarios (LEGACY_SERVER_ALLOWLIST 9 -> 3)",
+      "description": "Eliminar 6 tuplas de salto directo Controller -> Config (env.js / prisma.js) delegando acceso a datos y variables de entorno hacia servicios de dominio: (1) trasladar las 2 consultas prisma.cashClosing de cashClosingController.js a server/services/sales/cashClosingService.js; (2) trasladar las 2 consultas prisma.product de catalogController.js a server/services/catalogSyncService.js; (3) crear server/services/authService.js para encapsular OAuth/JWT, ENV y las 8 consultas prisma.{tenant,user} de authController.js; y (4) crear server/services/userService.js para encapsular ENV.SUPER_ADMIN_EMAILS y las 10 consultas prisma.user de userController.js. Reducir LEGACY_SERVER_ALLOWLIST de 9 a 3 tuplas y actualizar ARCHITECTURE.md y docs/QUALITY_SCORE.md.",
+      "area": "backend-architecture-auth-catalog-closing",
+      "user_visible_behavior": "El inicio de sesión Google OAuth Zero-Trust, la gestión multi-rol de usuarios, el listado paginado de productos y los cierres de caja conservan exactamente sus códigos HTTP y contratos JSON, reduciendo LEGACY_SERVER_ALLOWLIST de 9 a 3 entradas.",
+      "priority": "P1",
+      "status": "not-started",
+      "dependencies": [
+        "feat-001"
+      ],
+      "required_files": [
+        "server/services/sales/cashClosingService.js",
+        "server/services/catalogSyncService.js",
+        "server/services/authService.js",
+        "server/services/userService.js",
+        "server/controllers/cashClosingController.js",
+        "server/controllers/catalogController.js",
+        "server/controllers/authController.js",
+        "server/controllers/userController.js",
+        "scripts/check-architecture.sh",
+        "ARCHITECTURE.md",
+        "docs/QUALITY_SCORE.md"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "notes": "Cero lectura de .env, cero cambios en prisma/ o src/, cero git push / npm run deploy. Guardarraíl estricto de capas: middleware tiene rango 4 y services rango 3, por lo que invalidateUserAuthCache (server/middleware/authMiddleware.js) debe seguir invocándose en userController.js y NUNCA importarse desde server/services/. Preservar invariantes auditadas con readFileSync en tests/m2-forensic-audit.test.js (A-12 en authController), tests/security/m2-zero-trust-challenger.test.js y tests/m2-hardening-verification.test.js (userController)."
+    },
+    {
+      "id": "feat-003",
+      "name": "Ola 3: Desacoplamiento de Ventas y Eventos y Eliminación Total de LEGACY_SERVER_ALLOWLIST (3 -> 0)",
+      "description": "Cerrar las últimas 3 tuplas heredadas de LEGACY_SERVER_ALLOWLIST bajo Modo Crítico (/goal) con auditoría independiente Maker-Checker one-shot: (1) trasladar las 14 consultas prisma.{event,sale,auditLog} de saleController.js hacia server/services/saleService.js y server/services/sales/; (2) crear server/services/eventService.js (apoyado en eventFinanceService.js) para encapsular ENV.NODE_ENV, prisma.$transaction y las 37 consultas prisma.{event,sale,eventExpense,user,cashClosing} de eventController.js; y (3) eliminar por completo LEGACY_SERVER_ALLOWLIST en scripts/check-architecture.sh (0 excepciones permitidas), actualizando ARCHITECTURE.md y elevando Runtime Backend y Eventos a calificación A en docs/QUALITY_SCORE.md.",
+      "area": "backend-architecture-sales-events-zero-debt",
+      "user_visible_behavior": "Las ventas POS en mostrador, el aislamiento por vendedor/evento, la inmutabilidad post-cierre y la administración financiera de ferias operan sin cambios visuales ni de API, dejando el backend de STAND {IA} con 0 excepciones arquitectónicas y calificación A integral.",
+      "priority": "P1",
+      "status": "not-started",
+      "dependencies": [
+        "feat-002"
+      ],
+      "required_files": [
+        "server/services/saleService.js",
+        "server/services/eventService.js",
+        "server/services/eventFinanceService.js",
+        "server/controllers/saleController.js",
+        "server/controllers/eventController.js",
+        "scripts/check-architecture.sh",
+        "ARCHITECTURE.md",
+        "docs/QUALITY_SCORE.md",
+        "evaluator-rubric.md",
+        "loop-state.md"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "notes": "Ejecutar en Modo Crítico (/goal) con sub-agente Checker one-shot aislado (zero-inheritance) antes de sellar en done. Cero lectura de .env, cero cambios en prisma/ o src/, cero debilitamiento de pruebas, cero git push / npm run deploy. Guardarraíl estricto de capas: mantener invalidateUserAuthCache en eventController.js (rango 5 -> 4), nunca en server/services/ (rango 3). Preservar códigos HTTP 400/403/404/409 e invariantes verificadas por tests/unit/counter-seller-isolation.test.js, tests/unit/digital-event-monitor.test.js, tests/adversarial/m4-closing-immutability-thumbnails.test.js y tests/adversarial/surgery-{053,056,060}."
     }
   ]
 }
