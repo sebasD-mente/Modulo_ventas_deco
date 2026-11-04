@@ -2,6 +2,8 @@
  * server/services/catalog/liveCatalogSyncService.js
  * Sincronización en tiempo real, delta-sync, paracaídas web y sync completa.
  */
+import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/prisma.js';
 import { ENV } from '../../config/env.js';
 import { resolvePosterSizes } from './catalogSizeResolver.js';
@@ -27,6 +29,49 @@ export function getCatalogCandidateUrls() {
   return [configuredUrl, 'https://decovintage.online'].filter((url, idx, arr) => 
     url && typeof url === 'string' && !url.includes('decovintageguate.com') && arr.indexOf(url) === idx
   );
+}
+
+export function isCatalogWebhookAuthorized(req) {
+  const headers = req?.headers || {};
+  const authHeader = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+  const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+  const incomingSecret = String(
+    headers['x-webhook-secret'] ||
+    headers['x-catalog-webhook-secret'] ||
+    bearerToken ||
+    ''
+  ).trim();
+
+  if (!incomingSecret) return false;
+
+  const expectedSecret = String(
+    ENV.CATALOG_WEBHOOK_SECRET ||
+    process.env.CATALOG_WEBHOOK_SECRET ||
+    ENV.JWT_SECRET ||
+    process.env.JWT_SECRET ||
+    ''
+  ).trim();
+
+  if (expectedSecret) {
+    const incomingBuf = Buffer.from(incomingSecret, 'utf8');
+    const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+    if (incomingBuf.length === expectedBuf.length && crypto.timingSafeEqual(incomingBuf, expectedBuf)) {
+      return true;
+    }
+  }
+
+  const jwtSecret = ENV.JWT_SECRET || process.env.JWT_SECRET;
+  if (bearerToken && jwtSecret) {
+    try {
+      const decoded = jwt.verify(bearerToken, jwtSecret);
+      const roles = Array.isArray(decoded?.roles) ? decoded.roles : (decoded?.role ? [decoded.role] : []);
+      if (roles.includes('SUPER_ADMIN')) {
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
 }
 
 export function buildNormalizedPosterData(poster, targetTenantId) {

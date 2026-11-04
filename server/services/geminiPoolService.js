@@ -5,8 +5,13 @@
  * and transient network errors across Gen 3 priority pool with multi-key rotation.
  */
 
+import { ENV } from '../config/env.js';
 import { getGeminiClient } from '../config/gemini.js';
 import { getNextClient, markKeyCooldown, getAvailableKeys, isKeyInCooldown } from './ai/aiKeyPoolService.js';
+
+export function getDefaultGeminiModel() {
+  return ENV.GEMINI_MODEL || 'gemini-3.8-flash';
+}
 
 export function withAttemptTimeout(promise, timeoutMs = 8500) {
   let timerId;

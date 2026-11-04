@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { ENV } from './env.js';
-import { getNextClient, getClientForKey } from '../services/ai/aiKeyPoolService.js';
+import { getNextClient, getClientForKey } from './geminiKeyPool.js';
 
 export function getGeminiClient(model = null) {
   const pooled = getNextClient(model);

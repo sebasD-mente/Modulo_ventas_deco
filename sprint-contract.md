@@ -4,15 +4,15 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-000` Certificada y Cola `feat-001 -> feat-003` Declarada)
-- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; hito base `feat-000` sellado en `done` con `12/12 ACEPTAR`).
-- **Siguiente tarea secuencial lista para iniciar:** `feat-001` (*Ola 1: Desacoplamiento de Config IA y Lecturas de Entorno en Controladores, `LEGACY_SERVER_ALLOWLIST 13 -> 9`*), cuyas dependencias (`["feat-000"]`) están en `done` con todos sus entregables físicos en disco. Al abrir la nueva sesión, el agente debe formalizar aquí el contrato específico de `feat-001` antes de pasarla a `in-progress` (`WIP = 1`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-001` Sellada y `feat-002` Lista en Cola)
+- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000` y `feat-001` selladas en `done`).
+- **Siguiente tarea secuencial lista para iniciar:** `feat-002` (*Ola 2: Extracción a Capa Service en Cierres, Catálogo, Auth y Usuarios, `LEGACY_SERVER_ALLOWLIST 9 -> 3`*), cuyas dependencias (`["feat-001"]`) están en `done` con todos sus entregables físicos en disco. Al abrir la siguiente sesión, el agente debe formalizar aquí el contrato específico de `feat-002` antes de pasarla a `in-progress` (`WIP = 1`).
 
-## Alcance Incluido del Último Hito Cerrado (`feat-000` — `Fair game`)
-- **Purga e higiene de raíz (Fase 1)**: `git rm -rf .agents/library`, `git rm -f phase3_live_verified.png`, reubicación de las 84 capturas `.png` sueltas de la raíz hacia `test_evidence/root_archive/` (preservando intacto `test_evidence/prod_*.png`), movimiento con `git mv` de los 4 reportes históricos (`AUDITORIA_360_STAND_IA.md`, `VALKYRIA_FINAL_REPORT.md`, `PROMPTS_QUIRURGICOS_COTIZADOR_FRED.md`, `PROMPT_CIRUGIA_2_TALLER_WHATSAPP_FRED.md`) hacia `docs/exec-plans/completed/`, eliminación de `scratch/` local y fusión de `.gitignore` (incluyendo `!AGENTS.md` para anular `.git/info/exclude`) + `.gitattributes` (`text eol=lf` explícito en scripts y todos los artefactos `.md`/`.json` del arnés bajo `core.autocrlf=true`).
-- **Instalación y adaptación Brownfield de los 28 artefactos (Fase 2)**: copia certificada con `0 CRLF` desde `Plantilla-Maestra-Arnes`, adaptación real de `ARCHITECTURE.md` (9 dominios + equivalencia de las 6 capas + puntos calientes + `LEGACY_SERVER_ALLOWLIST`), `docs/QUALITY_SCORE.md` y Sección 2 de `scripts/check-architecture.sh` (aislamiento Fullstack `src <-> server`, orden direccional en `src/` y orden direccional + prohibición de salto `controllers -> config` en `server/` salvo las 13 tuplas congeladas).
-- **Unificación con candados Deko Labs y hooks nativos (Fase 3)**: integración en `init.sh` (`~8.8s` / `< 10s` offline en Windows Git Bash con `vite build` sobre `1,566` módulos), actualización de `scripts/audit-harness.js` (`STAND-IA-UNIFIED-HARNESS`), script `harness:validate` en `package.json`, sincronización de artefactos de estado (`feature_list.json`, `sprint-contract.md`, `progress.md`, `loop-state.md`, `session-handoff.md`) y activación final de `.agents/hooks.json`.
-- **Planificación DAG de reducción de deuda arquitectónica (`feat-001` -> `feat-002` -> `feat-003`)**: declaración formal de las 3 olas quirúrgicas en `feature_list.json` para llevar `LEGACY_SERVER_ALLOWLIST` de `13` a `0` excepciones (`13 -> 9 -> 3 -> 0`).
+## Alcance Incluido del Último Hito Cerrado (`feat-001` — `Fair game`)
+- **Extracción del pool de llaves Gemini a capa `Config` (`server/config/geminiKeyPool.js`)**: reubicación del pool puro de rotación y cooldown de llaves (`getAvailableKeys`, `isKeyInCooldown`, `markKeyCooldown`, `getClientForKey`, `getNextClient`, `resetKeyPool`) en `server/config/geminiKeyPool.js` dependiendo solo de `@google/genai` y `./env.js`, actualización de `server/config/gemini.js` conservando intacto `getGeminiClient` y re-exportación 100% compatible del mismo singleton en `server/services/ai/aiKeyPoolService.js`.
+- **Exposición de modelo Gemini por defecto en capa `Service` (`server/services/geminiPoolService.js`)**: exportación de `getDefaultGeminiModel()` en `geminiPoolService.js` y eliminación de `import { ENV } from '../../config/env.js'` en `server/controllers/ai/aiChatController.js` y `server/controllers/ai/aiMediaController.js` (`+7/-7`, `0` líneas netas agregadas).
+- **Encapsulamiento de autorización del webhook de catálogo (`server/services/catalog/liveCatalogSyncService.js`)**: extracción de `isCatalogWebhookAuthorized(req)` (`timingSafeEqual` sobre `CATALOG_WEBHOOK_SECRET` / `JWT_SECRET` + verificación JWT `SUPER_ADMIN`) a `liveCatalogSyncService.js`, eliminando el salto a `env.js` en `server/controllers/catalogWebhookController.js` y manteniendo `handleCatalogWebhook`.
+- **Reducción de deuda arquitectónica y observabilidad (`13 -> 9`)**: retiro de las 4 tuplas resueltas en `LEGACY_SERVER_ALLOWLIST` (`scripts/check-architecture.sh`), actualización de `ARCHITECTURE.md` y elevación de la capa `Config` de `B` a `A` en `docs/QUALITY_SCORE.md`.
 
 ## Exclusiones Explícitas (Qué NO se va a tocar bajo ninguna circunstancia)
 - **Cero lectura o impresión de `.env`** (contiene credenciales reales de producción).
@@ -21,7 +21,7 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 - **Cero auto-calificación o reutilización de Checker**: el *Maker* tiene prohibido rellenar puntajes en `evaluator-rubric.md` o enviar `send_message` a un *Checker* ya consumido (`1 Checker = 1 sola auditoría / one-shot`).
 
 ## Estándares de Verificación ("Hecho" significa exactamente esto)
-1. Los 28 artefactos del arnés existen físicamente en disco con `0 CRLF` (`AGENTS.md` en `100` líneas exactas y `scripts/harness-hooks.mjs` en `279 <= 280` líneas con bloqueo destructivo de Prisma activo).
-2. `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` termina con `Exit code 0` en `~8.8s` (`< 10s`, `100%` offline sin tocar `DATABASE_URL` remota) y `Overall: 100/100` (`25/25 PASS`).
-3. `npm run harness:check` termina en `HARNESS_PASS` (`STAND-IA-UNIFIED-HARNESS`) con arquitectura, `validate-harness`, `audit-secrets`, `audit-syntax`, `verify-gemini-models`, `zero-trust`, `test:unit` y `vite build` en verde.
-4. `feature_list.json` valida al `100%` contra `scripts/feature-list.schema.json` y el DAG secuencial (`feat-000` en `done`, `feat-001 -> feat-002 -> feat-003` en `not-started`, `WIP = 0`).
+1. Los 11 `required_files` de `feat-001` existen físicamente en disco con `0 CRLF` y `LEGACY_SERVER_ALLOWLIST` se redujo de `13` a `9` tuplas (`0` dependencias hacia arriba en `server/config/`).
+2. `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` termina con `Exit code 0` (`100%` offline) y `Overall: 100/100` (`25/25 PASS`).
+3. `npm run harness:check` termina en `HARNESS_PASS` (`STAND-IA-UNIFIED-HARNESS`) con `263` archivos JS verificados, `12/12` pruebas Zero-Trust, `253/253` pruebas unitarias en `104` suites y `vite build` en verde.
+4. `feature_list.json` valida al `100%` contra `scripts/feature-list.schema.json` y el DAG secuencial (`feat-000` y `feat-001` en `done`, `feat-002 -> feat-003` en `not-started`, `WIP = 0`).

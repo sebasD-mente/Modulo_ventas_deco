@@ -4,7 +4,7 @@ import { getOrCreateSession, saveSessionState, clearSessionDraft, getSessionById
 import { searchWebPosters } from '../../services/webCatalogService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
 import { normalizeArtworkQuery } from '../../services/semanticParserService.js';
-import { ENV } from '../../config/env.js';
+import { getDefaultGeminiModel } from '../../services/geminiPoolService.js';
 
 export async function handleChatQuery(req, res) {
   try {
@@ -45,7 +45,7 @@ export async function handleChatQuery(req, res) {
       });
       recordLlmInteraction({
         tenantId, userId: req.userId || null, action: 'AI_CHAT',
-        model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+        model: result.usedModel || getDefaultGeminiModel(),
         modelUsed: result.usedModel || 'gemini-3.8-flash',
         initialModel: result.initialModel || 'gemini-3.8-flash',
         fallbackActivated: Boolean(result.fallbackOccurred),
@@ -152,7 +152,7 @@ export async function handleChatQuery(req, res) {
 
       recordLlmInteraction({
         tenantId, userId: req.userId || null, action: 'AI_CHAT_STREAM',
-        model: ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+        model: getDefaultGeminiModel(),
         modelUsed: 'gemini-3.8-flash',
         initialModel: 'gemini-3.8-flash',
         fallbackActivated: false,

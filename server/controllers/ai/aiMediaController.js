@@ -3,7 +3,7 @@ import { verifyDepositReceipt } from '../../services/ai/aiReceiptOcrService.js';
 import { uploadBufferToStorage } from '../../services/gcsStorageService.js';
 import { recordLlmInteraction } from '../../services/llmObservabilityService.js';
 import { getSessionState, saveSessionState } from '../../services/ai/aiSessionService.js';
-import { ENV } from '../../config/env.js';
+import { getDefaultGeminiModel } from '../../services/geminiPoolService.js';
 
 async function safePersistMedia(file, defaultName, defaultMime, folder) {
   let timerId;
@@ -48,7 +48,7 @@ export async function handleVoiceSale(req, res) {
     ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_VOICE_SALE',
-      model: draft.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: draft.usedModel || getDefaultGeminiModel(), tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Voice, ipAddress: req.ip,
       details: { eventId, confidence: draft.confidence },
     });
@@ -92,7 +92,7 @@ export async function handleBatchPhoto(req, res) {
     ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_BATCH_QR_SCAN',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: getDefaultGeminiModel(), tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Batch, ipAddress: req.ip,
       details: { eventId, codesDetected: analysis.detectedCodes?.length || 0 },
     });
@@ -130,7 +130,7 @@ export async function handleArtworkRecognition(req, res) {
     ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_ARTWORK_RECOGNITION',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: getDefaultGeminiModel(), tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Art, ipAddress: req.ip,
       details: { eventId, detected: analysis.isArtworkDetected, title: analysis.primaryTitle },
     });
@@ -174,7 +174,7 @@ export async function handleVideoRecognition(req, res) {
     ]);
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_VIDEO_RECOGNITION',
-      model: ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: getDefaultGeminiModel(), tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Vid, ipAddress: req.ip,
       details: { eventId, count: analysis.items?.length || 0 },
     });
@@ -206,7 +206,7 @@ export async function handleVerifyReceipt(req, res) {
     const result = await verifyDepositReceipt({ imageUrl: receiptUrl, expectedAmount: Number(expectedAmount) || 0, tenantId });
     recordLlmInteraction({
       tenantId, userId: req.userId || null, action: 'AI_RECEIPT_OCR',
-      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash', tokensIn: null, tokensOut: null,
+      model: result.usedModel || getDefaultGeminiModel(), tokensIn: null, tokensOut: null,
       latencyMs: Date.now() - t0Ocr, ipAddress: req.ip,
       details: { isMatch: result.isMatch, bank: result.bank, referenceNumber: result.referenceNumber },
     });
@@ -233,7 +233,7 @@ export async function handleVoiceCatalogSearch(req, res) {
       tenantId,
       userId: req.userId || null,
       action: 'AI_VOICE_CATALOG_SEARCH',
-      model: result.usedModel || ENV.GEMINI_MODEL || 'gemini-3.8-flash',
+      model: result.usedModel || getDefaultGeminiModel(),
       tokensIn: null,
       tokensOut: null,
       latencyMs: Date.now() - t0,
