@@ -1,0 +1,55 @@
+{
+  "project": "deko-eventsales",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "Aterrizaje Brownfield del Arnés Certificado, Higiene de Raíz y Unificación con Candados Deko Labs",
+      "description": "Purgar el arnés anterior (.agents/library), ordenar capturas y reportes históricos en la raíz, instalar los 28 artefactos certificados desde Plantilla-Maestra-Arnes con 0 CRLF, adaptar ARCHITECTURE.md, docs/QUALITY_SCORE.md y el verificador dual de capas en scripts/check-architecture.sh (con LEGACY_SERVER_ALLOWLIST de 13 tuplas) y unificar init.sh y scripts/audit-harness.js con los candados físicos de Deko Labs sin tocar código de producción ni .env.",
+      "area": "harness-brownfield-governance",
+      "user_visible_behavior": "El repositorio deko-eventsales (STAND {IA}) opera con raíz limpia, 3 Puertas deterministas en init.sh (~8.8s / < 10s offline en Windows Git Bash incluyendo vite build, 100/100), linter arquitectónico Fullstack dual, hooks nativos Fail-Closed (<= 280L con candado Prisma) y compuerta unificada STAND-IA-UNIFIED-HARNESS en verde.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [],
+      "required_files": [
+        ".gitignore",
+        ".gitattributes",
+        ".agents/hooks.json",
+        ".agents/skills/maker-checker/SKILL.md",
+        "AGENTS.md",
+        "ARCHITECTURE.md",
+        "init.sh",
+        "package.json",
+        "scripts/audit-harness.js",
+        "scripts/check-architecture.sh",
+        "scripts/feature-list.schema.json",
+        "scripts/harness-hooks.mjs",
+        "scripts/lib/harness-utils.mjs",
+        "scripts/validate-harness.mjs",
+        "docs/GOTCHAS.md",
+        "docs/QUALITY_SCORE.md",
+        "docs/RELIABILITY.md",
+        "docs/SECURITY.md",
+        "memory/INDEX.md",
+        "memory/topics/harness-rules.md",
+        "clean-state-checklist.md",
+        "evaluator-rubric.md",
+        "goal.md",
+        "graph.md",
+        "loop-state.md",
+        "maker-prompt.md",
+        "checker-prompt.md",
+        "sprint-contract.md",
+        "progress.md",
+        "session-handoff.md"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, 8863ms Maker / 8947ms Checker offline, Overall: 100/100, 25/25 PASS, audit-secrets 185 files OK, verify-gemini-models PASS, zero-trust 12/12, vite build 1566 modules); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (262 JS syntax OK, 253/253 unit tests across 104 suites, vite build PASS); os.tmpdir() adversarial suite -> PASS (< 2s, 28/28 0-CRLF, Prisma destructive locks DENIED, 3/3 14th-import cases REJECTED with Red-Pen, 0 residues); Independent One-Shot Checker R2 (27bb88dc) -> 12/12 ACEPTAR in evaluator-rubric.md.",
+      "notes": "Ejecución quirúrgica Brownfield bajo WIP = 1: cero lectura de .env y cero modificación en src/, server/, prisma/, Dockerfile, docker-compose.yml, .dockerignore o entrypoint.sh."
+    }
+  ]
+}

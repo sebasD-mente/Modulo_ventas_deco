@@ -29,9 +29,12 @@ build/
 .parcel-cache/
 
 # IDE, Editor, and AI agent local caches
+!AGENTS.md
 .agents/*
-!.agents/library/
-!.agents/library/**
+!.agents/hooks.json
+!.agents/skills/
+!.agents/skills/**
+*.local.md
 .gemini/
 .idea/
 .vscode/
@@ -40,6 +43,9 @@ build/
 *.njsproj
 *.sln
 *.sw?
+*.tmp
+*.bak
+*.swp
 
 # Uploads directory (stateless storage in GCS; keep directory structure only)
 public/uploads/*

@@ -16,6 +16,7 @@
     "test:voice": "node --test tests/ai/voice-lexical-priming-hesitation.test.js tests/ai/voice-vad-reengineering.test.js tests/adversarial/m1-voice-priming-hesitation-stress.test.js",
     "test:latency": "node --test tests/benchmarks/latency-audit.test.js",
     "audit:secrets": "node scripts/audit-secrets.js",
+    "harness:validate": "node scripts/validate-harness.mjs --min-score 100",
     "harness:check": "node scripts/audit-harness.js",
     "deploy": "node scripts/deploy-dokploy.js",
     "verify:prod": "node scripts/verify-production-live.js",

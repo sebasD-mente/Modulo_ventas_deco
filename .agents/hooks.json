@@ -1,0 +1,36 @@
+{
+  "harness-safety-gate": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file|Write|Edit|MultiEdit|run_command|Bash|send_message",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../scripts/harness-hooks.mjs pre-tool-use",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "write_file|edit_file|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../scripts/harness-hooks.mjs post-tool-use",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ../scripts/harness-hooks.mjs stop",
+        "timeout": 60
+      }
+    ]
+  }
+}

@@ -19,6 +19,8 @@ const args = process.argv.slice(2);
 const skipUnit = args.includes('--skip-unit');
 
 const results = {
+  architecture: 'SKIPPED',
+  harness: 'SKIPPED',
   secrets: 'SKIPPED',
   syntax: 'SKIPPED',
   models: 'SKIPPED',
@@ -26,6 +28,28 @@ const results = {
   tests: 'SKIPPED',
   build: 'SKIPPED',
 };
+
+function resolveBashRuntime() {
+  if (process.platform === 'win32') {
+    const candidates = [
+      process.env.GIT_BASH_PATH,
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+      process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'bin', 'bash.exe') : '',
+    ].filter(Boolean);
+    const hit = candidates.find((c) => fs.existsSync(c));
+    if (hit) {
+      const gitRoot = path.resolve(path.dirname(hit), '..');
+      const extraDirs = [path.join(gitRoot, 'bin'), path.join(gitRoot, 'usr', 'bin')].filter((d) => fs.existsSync(d));
+      const basePath = process.env.PATH || process.env.Path || '';
+      return {
+        bashBin: hit,
+        env: { ...process.env, PATH: [...extraDirs, basePath].filter(Boolean).join(path.delimiter) },
+      };
+    }
+  }
+  return { bashBin: 'bash', env: process.env };
+}
 
 function runStep(name, cmd, cmdArgs = [], options = {}) {
   console.log(`▶️ Ejecutando: ${name}...`);
@@ -39,7 +63,7 @@ function runStep(name, cmd, cmdArgs = [], options = {}) {
   const res = spawnSync(resolvedCmd, cmdArgs, {
     stdio: 'inherit',
     encoding: 'utf-8',
-    env: process.env,
+    env: options.env || process.env,
     cwd: rootDir,
     shell: useShell,
   });
@@ -50,6 +74,17 @@ function runStep(name, cmd, cmdArgs = [], options = {}) {
     process.exit(1);
   }
   console.log(`✅ [OK] '${name}' (${duration}s).\n`);
+}
+
+if (fs.existsSync(path.join(rootDir, 'scripts', 'check-architecture.sh'))) {
+  const { bashBin, env: bashEnv } = resolveBashRuntime();
+  runStep('0a. Vigilante Arquitectónico y 6 Capas (scripts/check-architecture.sh)', bashBin, ['scripts/check-architecture.sh'], { env: bashEnv, shell: false });
+  results.architecture = 'PASS';
+}
+
+if (fs.existsSync(path.join(rootDir, 'scripts', 'validate-harness.mjs'))) {
+  runStep('0b. Validación Matemática del Arnés 100/100 (scripts/validate-harness.mjs)', process.execPath, ['scripts/validate-harness.mjs', '--min-score', '100']);
+  results.harness = 'PASS';
 }
 
 if (fs.existsSync(path.join(rootDir, 'scripts', 'audit-secrets.js'))) {
@@ -116,7 +151,7 @@ try {
 const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
 console.log(JSON.stringify({
   status: 'HARNESS_PASS',
-  framework: 'DEKO-HARNESS2-CORE',
+  framework: 'STAND-IA-UNIFIED-HARNESS',
   results,
   totalTimeSeconds: parseFloat(totalTime),
 }, null, 2));
