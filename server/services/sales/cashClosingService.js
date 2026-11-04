@@ -146,3 +146,13 @@ export async function createCashClosingTransaction({
 
   return closing;
 }
+
+export async function listEventCashClosings({ tenantId, eventId }) {
+  return prisma.cashClosing.findMany({
+    where: { tenantId, eventId },
+    include: {
+      closedBy: { select: { fullName: true } },
+    },
+    orderBy: { closingDate: 'desc' },
+  });
+}

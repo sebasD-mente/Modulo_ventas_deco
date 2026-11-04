@@ -91,7 +91,7 @@
       "area": "backend-architecture-auth-catalog-closing",
       "user_visible_behavior": "El inicio de sesión Google OAuth Zero-Trust, la gestión multi-rol de usuarios, el listado paginado de productos y los cierres de caja conservan exactamente sus códigos HTTP y contratos JSON, reduciendo LEGACY_SERVER_ALLOWLIST de 9 a 3 entradas.",
       "priority": "P1",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-001"
       ],
@@ -114,6 +114,7 @@
         "node scripts/validate-harness.mjs --min-score 100",
         "npm run harness:check"
       ],
+      "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations with LEGACY_SERVER_ALLOWLIST reduced 9->3, audit-secrets 188 files OK, verify-gemini-models PASS, zero-trust 12/12, vite build 1566 modules); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.42s: check-architecture PASS, validate-harness 100/100, audit-secrets 188 files PASS, audit-syntax 265 JS files PASS, verify-gemini-models PASS, zero-trust 12/12 PASS, test:unit 253/253 tests across 104 suites PASS, vite build PASS); forensic & behavioral assertions -> PASS (A-12 in m2-forensic-audit & m2-zero-trust-challenger & sales-adversarial, 5.2 tenantId in m2-hardening-verification, #5 in catalog-sync-spider, catalogSyncService 22L <= 25L, catalogController 83L <= 90L, authService 183L <= 200L, userService 157L <= 200L, Red-Pen 4th-tuple rejection in os.tmpdir(), 0 CRLF).",
       "notes": "Cero lectura de .env, cero cambios en prisma/ o src/, cero git push / npm run deploy. Guardarraíl estricto de capas: middleware tiene rango 4 y services rango 3, por lo que invalidateUserAuthCache (server/middleware/authMiddleware.js) debe seguir invocándose en userController.js y NUNCA importarse desde server/services/. Preservar invariantes auditadas con readFileSync en tests/m2-forensic-audit.test.js (A-12 en authController), tests/security/m2-zero-trust-challenger.test.js y tests/m2-hardening-verification.test.js (userController)."
     },
     {

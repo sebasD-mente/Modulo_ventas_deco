@@ -1,5 +1,7 @@
-import { createCashClosingTransaction } from '../services/saleService.js';
-import { prisma } from '../config/prisma.js';
+import {
+  createCashClosingTransaction,
+  listEventCashClosings,
+} from '../services/sales/cashClosingService.js';
 
 export async function postCashClosing(req, res) {
   try {
@@ -61,13 +63,7 @@ export async function getCashClosingsList(req, res) {
     const { eventId } = req.params;
     const tenantId = req.tenantId;
 
-    const closings = await prisma.cashClosing.findMany({
-      where: { tenantId, eventId },
-      include: {
-        closedBy: { select: { fullName: true } },
-      },
-      orderBy: { closingDate: 'desc' },
-    });
+    const closings = await listEventCashClosings({ tenantId, eventId });
 
     return res.json({ success: true, data: closings });
   } catch (err) {

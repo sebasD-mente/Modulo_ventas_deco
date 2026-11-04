@@ -83,15 +83,9 @@ if [ -d "src" ] || [ -d "server" ]; then
     };
 
     const LEGACY_SERVER_ALLOWLIST = new Set([
-      "server/controllers/authController.js->server/config/env.js",
-      "server/controllers/authController.js->server/config/prisma.js",
-      "server/controllers/cashClosingController.js->server/config/prisma.js",
-      "server/controllers/catalogController.js->server/config/prisma.js",
       "server/controllers/eventController.js->server/config/prisma.js",
       "server/controllers/eventController.js->server/config/env.js",
-      "server/controllers/saleController.js->server/config/prisma.js",
-      "server/controllers/userController.js->server/config/prisma.js",
-      "server/controllers/userController.js->server/config/env.js"
+      "server/controllers/saleController.js->server/config/prisma.js"
     ]);
 
     function stripJsComments(code) {
@@ -344,7 +338,7 @@ if [ -d "src" ] || [ -d "server" ]; then
         ;;
       "SERVER_SKIP_CONFIG")
         red_pen_error \
-          "Salto ilegal de capas Backend en '$v_file': '$v_src' importa directamente '$v_spec' hacia '$v_dst' (tupla '$v_extra' fuera de las 9 congeladas en LEGACY_SERVER_ALLOWLIST)." \
+          "Salto ilegal de capas Backend en '$v_file': '$v_src' importa directamente '$v_spec' hacia '$v_dst' (tupla '$v_extra' fuera de las 3 congeladas en LEGACY_SERVER_ALLOWLIST)." \
           "ARCHITECTURE.md prohíbe que controladores en 'server/controllers/' salten 'server/services/' para acoplarse directamente a 'server/config/*' (prisma/env)." \
           "Encapsula el acceso a Prisma o configuración dentro de un servicio en 'server/services/' y consúmelo desde '$v_file'."
         ;;
