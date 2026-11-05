@@ -9,8 +9,8 @@
 - **Started At:** `2026-11-04T17:36:00-06:00`
 - **Current Round:** `5 / 15 (Max — Candado 1)`
 - **Current Status:** `Completed` (`Idle` | `In Progress` | `Completed` | `BLOCKED - Circuit Breaker Tripped`)
-- **Elapsed Time / Cap:** `59m / 90m Max (15m Max per Round / $5 USD / 250,000 tokens — Candado 2)`
-- **Net Passing Checks (Ratchet):** `Baseline: 0/25 -> Round 1: 25/25 (9/12 REVISAR) -> Round 2: 25/25 (12/12 ACEPTAR, 52d7c3c) -> Round 3: 25/25 (10/12 REVISAR en 87669f83 vs 8567e58; fix Zero-Trust 13/13 en 833d5af) -> Round 4: 25/25 (10/12 REVISAR en af936337 por desincronización de estado) -> Round 5: 25/25 (100/100, Checker 12/12 ACEPTAR en 9199e5d7, HEAD->commit(feat-003))`
+- **Elapsed Time / Cap:** `63m / 90m Max (15m Max per Round / $5 USD / 250,000 tokens — Candado 2)`
+- **Net Passing Checks (Ratchet):** `Baseline: 0/25 -> Round 1: 25/25 (9/12 REVISAR) -> Round 2: 25/25 (12/12 ACEPTAR, 52d7c3c) -> Round 3: 25/25 (10/12 REVISAR en 87669f83 vs 8567e58; fix Zero-Trust 13/13 en 833d5af) -> Round 4: 25/25 (10/12 REVISAR en af936337 por desincronización de estado) -> Round 5: 25/25 + 13/13 Zero-Trust (100/100, Checkers 9199e5d7 en 136c260 y 15a71c9f 12/12 ACEPTAR, HEAD->commit(feat-003))`
 - **Consecutive Stagnant Rounds:** `0 / 3 Max (Candado 3)`
 - **Oscillating Tests Detected (`PASS -> FAIL -> PASS -> FAIL`):** `None (Candado 4)`
 
@@ -58,14 +58,14 @@
 - **Git Action (Ratchet):** `Caso B — Iteración correctiva acotada in-place ((revised-in-place) / revised; 0 git reset destructivo)`
 - **Next Round Adjustment:** `Restablecer feat-003 a status "in-progress" (WIP = 1), incluir tests/security/zero-trust.test.js en required_files, alinear métricas reales (13/13 Zero-Trust, eventController.js 185L y hashes 8567e58 / 833d5af) en todos los artefactos de estado y lanzar un nuevo Checker one-shot virgen en Round 5.`
 
-### Round 5 (Cierre Certificado de Gobernanza y Tolerancia Cero — Auditada por Nuevo Checker `One-Shot` `9199e5d7`)
-- **Maker Approach:** Sin tocar código de producción ya certificado (`0` diffs en `server/` y `tests/` respecto a `833d5af`), se sincronizaron `feature_list.json` (`12/12` `required_files` con `0 CRLF`), `loop-state.md` (con los hashes reales `8567e58` y `833d5af`), `docs/QUALITY_SCORE.md`, `sprint-contract.md`, `progress.md` y `session-handoff.md` (`13/13` Zero-Trust, `253/253` unit tests, `saleService.js 19L`, `saleController.js 154L`, `eventController.js 185L`) antes de someter `Round 5` a una instancia `Checker` `one-shot` virgen.
-- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — 9261ms Checker R5 offline, Overall: 100/100, 25/25 PASS, HARNESS_PASS en 31.13s)`
-- **Independent Checker Verdict:** `✅ Pass — 12 / 12 ACEPTAR` (instancia `one-shot` virgen `9199e5d7-a214-4bd9-8530-d7c10f8534ae`, cerrada definitivamente sin `send_message`)
-- **Net Passing Checks Count:** `25 / 25 (Overall: 100/100)`
+### Round 5 (Cierre Certificado de Gobernanza y Tolerancia Cero — Auditada por Checkers `One-Shot` `15a71c9f` y `9199e5d7`)
+- **Maker Approach:** Sin tocar código de producción ya certificado (`0` diffs en `server/` y `tests/` respecto a `833d5af`), se sincronizaron `feature_list.json` (`12/12` `required_files` con `0 CRLF`), `loop-state.md` (con los hashes reales `8567e58` y `833d5af`), `docs/QUALITY_SCORE.md`, `sprint-contract.md`, `progress.md` y `session-handoff.md` (`13/13` Zero-Trust, `253/253` unit tests, `saleService.js 19L`, `saleController.js 154L`, `eventController.js 185L`) antes de someter `Round 5` a auditoría `one-shot` virgen.
+- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — 9187ms Checker 15a71c9f / 9261ms Checker 9199e5d7 offline, Overall: 100/100, 25/25 PASS, HARNESS_PASS en 33.41s)`
+- **Independent Checker Verdict:** `✅ Pass — 12 / 12 ACEPTAR` (instancia `one-shot` virgen `15a71c9f-e6eb-4053-b897-97f6df198f8c`, convergente con instancia paralela `9199e5d7-a214-4bd9-8530-d7c10f8534ae` en `136c260`; ambas cerradas definitivamente sin `send_message`)
+- **Net Passing Checks Count:** `25 / 25 (Overall: 100/100; Zero-Trust 13/13 PASS)`
 - **Issues Found by Checker:** `None (0)`
 - **Human intervention needed:** `No`
-- **Git Action (Ratchet):** `Atomic local commit advancing the Ratchet (HEAD->commit(feat-003), kept; 0 git push / 0 deploy)`
+- **Git Action (Ratchet):** `Atomic local commit advancing the Ratchet (136c260 + HEAD->commit(feat-003), kept; 0 git push / 0 deploy)`
 - **Next Round Adjustment:** `Hoja de ruta feat-000..003 completada al 100% en CLEAN STATE (WIP = 0, 0 excepciones arquitectónicas).`
 
 ---
@@ -100,7 +100,8 @@ timestamp	commit_hash	harness_score	checks_passed	ratchet_status	description
 2026-11-04T18:04	8567e58	100/100	25/25	kept	round-3a: desacoplamiento LEGACY_SERVER_ALLOWLIST 3->0; Checker 87669f83 detecto ...req.body en eventController (10/12 REVISAR)
 2026-11-04T18:07	833d5af	100/100	25/25	kept	round-3b: cierre Zero-Trust en eventController (185L) sin ...req.body y 13a prueba en zero-trust.test.js (13/13 PASS)
 2026-11-04T18:16	(revised-in-place)	100/100	25/25	revised	round-4: Checker one-shot af936337 reporto 10/12 REVISAR por cierre prematuro done y desincronizacion de artefactos de estado
-2026-11-04T18:28	HEAD->commit(feat-003)	100/100	25/25	kept	round-5: Checker one-shot 9199e5d7 otorgo 12/12 ACEPTAR; gobernanza sincronizada al 100% y feat-003 sellada en done con WIP=0
+2026-11-04T18:30	136c260	100/100	25/25	kept	round-5a: Checker one-shot 9199e5d7 otorgo 12/12 ACEPTAR; sellado de gobernanza feat-003 en done con WIP=0
+2026-11-04T18:39	HEAD->commit(feat-003)	100/100	25/25	kept	round-5b: Checker one-shot 15a71c9f otorgo 12/12 ACEPTAR convergente en evaluator-rubric.md (6/6 Red-Pen + 6/6 PoCs Zero-Trust, 53/53 0 CRLF)
 ```
 
 *(Nota operativa: si una ronda futura falla la verificación o recibe `❌ Fail` irreversible del Checker `one-shot`, se restaura el árbol limpio al último commit verde mediante `git restore --worktree --staged .` o `git checkout -- .` —compatible con `PreToolUse`— y se añade aquí una fila con `commit_hash = (reverted)` y `ratchet_status = reverted` documentando qué enfoque falló).*
@@ -115,8 +116,8 @@ timestamp	commit_hash	harness_score	checks_passed	ratchet_status	description
 ## Final Result
 
 - **Final status:** `Completed` (`Completed` | `Failed` | `Manually stopped` | `In Progress` | `Idle`)
-- **Finished at:** `2026-11-04T18:28:33-06:00`
-- **Summary:** `Completadas y certificadas las 3 olas quirúrgicas (feat-001, feat-002 y feat-003) reduciendo LEGACY_SERVER_ALLOWLIST de 13 a 0 excepciones, blindando Zero-Trust 13/13 en eventController y sellando Round 5 con dictamen 12/12 ACEPTAR del Checker independiente (9199e5d7), 10/10 dominios y 6/6 capas en calificación A.`
+- **Finished at:** `2026-11-04T18:39:00-06:00`
+- **Summary:** `Completadas y certificadas las 3 olas quirúrgicas (feat-001, feat-002 y feat-003) reduciendo LEGACY_SERVER_ALLOWLIST de 13 a 0 excepciones, blindando Zero-Trust 13/13 en eventController y sellando Round 5 con dictamen convergente 12/12 ACEPTAR de los Checkers independientes (15a71c9f y 9199e5d7), 10/10 dominios y 6/6 capas en calificación A.`
 
 ---
 

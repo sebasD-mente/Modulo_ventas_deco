@@ -23,10 +23,10 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 - **Cero lectura o impresión de `.env`**.
 - **Cero modificaciones fuera de alcance (`Hands off`)**: `0` cambios en `src/`, `prisma/`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `entrypoint.sh`, `init.sh`, `scripts/validate-harness.mjs`, `scripts/lib/harness-utils.mjs`, `goal.md` o `AGENTS.md`.
 - **Cero despliegue remoto sin autorización explícita**: prohibido ejecutar `git push` o `npm run deploy` hasta orden expresa del usuario.
-- **Separación estricta Maker-Checker**: prohibido que el Maker edite `evaluator-rubric.md` o envíe `send_message` a cualquier `Checker` previo (`046edf88`, `27bb88dc`, `87669f83`, `29a7daf5`, `af936337`); `Round 5` debe ser calificada por un nuevo `invoke_subagent` `one-shot` virgen.
+- **Separación estricta Maker-Checker**: prohibido que el Maker edite `evaluator-rubric.md` o envíe `send_message` a cualquier `Checker` previo (`046edf88`, `27bb88dc`, `87669f83`, `29a7daf5`, `af936337`, `9199e5d7`, `15a71c9f`).
 
 ## Criterios Verificables Cumplidos (`Round 5`)
 1. Los `12` `required_files` de `feat-003` existen físicamente en disco con `0 CRLF` y cumplen todos los techos de líneas (`saleService.js 19L < 35L`, `saleController.js 154L <= 160L`, `eventController.js 185L <= 190L`).
 2. `bash ./init.sh`, `bash scripts/check-architecture.sh` y `node scripts/validate-harness.mjs --min-score 100` finalizan con `Exit code 0` (`Overall: 100/100`, `25/25 PASS`, `WIP = 0`).
 3. `npm run harness:check` finaliza en `HARNESS_PASS` (`STAND-IA-UNIFIED-HARNESS`: `190` archivos sin secretos, `267` JS sintaxis OK, `13/13` Zero-Trust, `253/253` unit tests en `104` suites y `vite build` en verde).
-4. Sub-agente *Checker* `one-shot` virgen de `Round 5` (`9199e5d7-a214-4bd9-8530-d7c10f8534ae`) otorgó `✅ Pass — 12 / 12 ACEPTAR` en `evaluator-rubric.md`.
+4. Sub-agente *Checker* `one-shot` virgen de `Round 5` (`15a71c9f-e6eb-4053-b897-97f6df198f8c`, convergente con `9199e5d7-a214-4bd9-8530-d7c10f8534ae` en `136c260`) otorgó `✅ Pass — 12 / 12 ACEPTAR` en `evaluator-rubric.md`.
