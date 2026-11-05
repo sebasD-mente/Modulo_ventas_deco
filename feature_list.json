@@ -176,6 +176,36 @@
       ],
       "evidence": "npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites, 0 fail in 324.72ms: domain cohesion & 6-layer contracts verified for aiMediaController.js [6 handlers, 6 recordLlmInteraction calls, 0 config/prisma.js or config/env.js imports] and aiMediaService.js [7 multimodal/query exports, 5 fallback actionNames, 0 upward HTTP layer imports], parameterized maxDurationMs=15000 verified in useAiVoiceRecorder.js, [DEKO-STANDIA-063] title+tag ranking & unrelated exclusion verified in webCatalogService.js, and normalizeCatalogSizeId('extra grande') === 'GIGANTE' verified); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations / 0 exceptions, audit-secrets 190 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS); bash scripts/check-architecture.sh -> Exit code 0; node scripts/validate-harness.mjs --min-score 100 -> Overall: 100/100 (25/25 PASS); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (34.43s: 190 secrets OK, 267 JS syntax OK, 13/13 zero-trust, 253/253 unit tests across 104 suites, vite build PASS); git diff server/ src/ -> 0 lines modified, 0 CRLF.",
       "notes": "Autorización arquitectónica explícita del usuario (Opción A: Cohesión de Dominio sobre micro-techos arbitrarios 220/280, cero código ravioli). REGLA INQUEBRANTABLE DE ALCANCE (Hands off) cumplida al 100%: cero lectura de .env, 0 líneas modificadas en server/, src/, prisma/, scripts/, package.json, Dockerfile, docker-compose.yml, .dockerignore o entrypoint.sh, 0 git push / npm run deploy, y 0 CRLF."
+    },
+    {
+      "id": "feat-005",
+      "name": "Segregación Estricta de Ventas de Mostrador vs Con Saldo y Contabilización por Saldo Cobrado en Nueva Venta",
+      "description": "En Nueva Venta para stands físicos y vendedores de mostrador: (1) eliminar la pestaña 'Todas' en RecentSalesList.jsx dejando únicamente la pestaña conmutable '⏳ Con Saldo', de modo que el listado por defecto siempre muestre exclusivamente las ventas registradas y cobradas en mostrador por ese vendedor (excluyendo cualquier orden con balanceDue > 0); (2) aislar estrictamente en '⏳ Con Saldo' las órdenes con saldo pendiente asignadas para entrega en ese punto de venta específico (pickupEventId === eventId, balanceDue > 0); y (3) al cobrar el saldo restante de una orden con saldo en el punto de venta (saleKpiService.js, remoteSaleService.js, RecentSalesList.jsx y RecentSaleRow.jsx), pasarla al listado por defecto de mostrador relacionándola por el valor exacto cobrado del saldo restante, el método de pago de dicho cobro y el vendedor cobrador.",
+      "area": "pos-counter-sales-and-pickup-balance",
+      "user_visible_behavior": "En Nueva Venta el vendedor de mostrador ve por defecto únicamente sus ventas cobradas del día sin mezclarse con pedidos de redes pendientes, cuenta con una sola pestaña conmutable '⏳ Con Saldo' para los retiros pendientes de su punto de venta y, al cobrar un saldo restante, el registro pasa al listado de mostrador mostrando el monto exacto cobrado por ese saldo.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-004"
+      ],
+      "required_files": [
+        "server/services/sales/saleKpiService.js",
+        "server/services/sales/remoteSaleService.js",
+        "src/utils/counterSalesFilter.js",
+        "src/components/RecentSalesList.jsx",
+        "src/components/sales/RecentSaleRow.jsx",
+        "tests/sales/counter-sales-pending-balance-segregation.test.js",
+        "package.json"
+      ],
+      "verification": [
+        "node --test tests/sales/counter-sales-pending-balance-segregation.test.js",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "evidence": "node --test tests/sales/counter-sales-pending-balance-segregation.test.js -> Exit code 0 (12/12 PASS across 5 suites in 144.11ms: partitionEventSalesForPos counter-seller & SUPER_ADMIN isolation, resolveStandSaleDisplay remaining-balance amount & [SALDO] payment badges, getEventSalesList & registerBalancePayment AuditLog/SALDO enrichment, RecentSalesList single toggle aria-pressed & min-h-[44px] without Todas tab); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations / 0 exceptions, audit-secrets 191 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1567 modules PASS); bash scripts/check-architecture.sh -> Exit code 0; node scripts/validate-harness.mjs --min-score 100 -> Overall: 100/100 (25/25 PASS); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.35s: 191 secrets OK, 269 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build PASS); npm run test:voice -> 53/53 PASS, 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Preservados intactos todos los contratos existentes en surgery-056 y surgery-058, ergonomía táctil >= 44px, accesibilidad aria-pressed y 0 CRLF."
     }
   ]
 }

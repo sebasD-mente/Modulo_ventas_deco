@@ -4,25 +4,29 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-004` Completada en `done`)
-- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000..004` selladas en `done` con evidencia ejecutable verificada).
-- **Decisión arquitectónica humana vigente (`Opción A`):** Privilegiar la **cohesión de dominio real** y los límites de 6 capas (`check-architecture.sh` con `0` excepciones) por encima de los antiguos micro-techos artificiales de líneas (`<= 220` en `aiMediaController.js` y `<= 280` en `aiMediaService.js`), prohibiendo fragmentar `server/` o `src/` en código ravioli.
+## Estado Actual del Contrato (`WIP = 0` — `feat-005` completada en `done`)
+- **Última tarea cerrada (`done`):** `feat-005` — Segregación Estricta de Ventas de Mostrador vs Con Saldo y Contabilización por Saldo Cobrado en Nueva Venta.
+- **Marcha de trabajo:** `Modo Diario Ágil` (`WIP = 0`).
 
-## Alcance Verificado de `feat-004` (`done`)
-- **`tests/ai/voice-lexical-priming-hesitation.test.js` (sección `5`) y `tests/ai/voice-vad-reengineering.test.js` (`Archivo D` y `Archivo F`)**:
-  - Sustituir los antiguos micro-techos rígidos (`aiMediaController.js <= 220` y `aiMediaService.js <= 280`) por verificaciones contractuales de cohesión de dominio y arquitectura limpia (`0` imports directos a `config/prisma.js` o `config/env.js` en `aiMediaController.js`, exportación de sus 6 handlers multimodales con `recordLlmInteraction` y preservación de contratos de inferencia en `aiMediaService.js`), manteniendo intactas todas las demás aserciones de ambas suites.
-- **`tests/ai/voice-vad-reengineering.test.js` (`Archivo A` y `Archivo G`)**:
-  - Alinear `Archivo A` (`useAiVoiceRecorder.js`) al timeout parametrizado real (`maxDurationMs = 15000` + `setTimeout(() => stopRecording(), maxDurationMs)`).
-  - Alinear `Archivo G` (`webCatalogService.js`) al contrato vigente de búsqueda por `tags` (`[DEKO-STANDIA-063]`): verificar que coinciden pósters con el token en título o `tags` y que un póster sin el token en título/subtítulo ni `tags` queda excluido.
-- **`tests/adversarial/m1-voice-priming-hesitation-stress.test.js` (caso `3.3`)**:
-  - Actualizar el antiguo test de bug (`'GRANDE'`) para validar el comportamiento ya corregido `normalizeCatalogSizeId('extra grande') === 'GIGANTE'`.
+## Alcance Incluido (`Scope` de `feat-005`)
+1. **Eliminación de la pestaña `"Todas"` y pestaña única conmutable `"⏳ Con Saldo"` (`src/components/RecentSalesList.jsx`)**:
+   - Retirar el botón `"Todas (...)"` y conservar únicamente el botón conmutable (`aria-pressed`) `"⏳ Con Saldo ({pendingCount})"` (`min-h-[44px]`).
+   - Cuando `"⏳ Con Saldo"` está inactivo (vista por defecto), el listado y el contador `"Ventas de Hoy (...)"` en stands físicos muestran **únicamente** las ventas realizadas y cobradas en mostrador (del vendedor activo si su rol es `VENDEDOR` sin `SUPER_ADMIN`, o del stand si es `SUPER_ADMIN`), excluyendo estrictamente cualquier venta con `balanceDue > 0`.
+   - Cuando `"⏳ Con Saldo"` está activo, el listado muestra **estrictamente** las ventas con `balanceDue > 0` pendientes para entrega en ese punto de venta específico (`pickupEventId === eventId`). Al pulsar nuevamente `"⏳ Con Saldo"`, regresa al listado por defecto de mostrador.
+2. **Transición al cobrar saldo restante y visualización por el monto cobrado (`server/services/sales/saleKpiService.js`, `server/services/sales/remoteSaleService.js`, `src/utils/counterSalesFilter.js`, `src/components/RecentSalesList.jsx`, `src/components/sales/RecentSaleRow.jsx`)**:
+   - Enriquecer en `getEventSalesList` y `registerBalancePayment` los metadatos de liquidación en stand (`standCollectedAmount`, `standCollectedAt`, `standCollectedPayments`, `balanceCollectedById` vía `AuditLog` `SALDO_VENTA_COBRADO`), sellando también con `[SALDO]` pagos completos en stand sobre órdenes `PENDIENTE_PAGO` y ordenando cronológicamente por instante real de cobro en mostrador.
+   - Al liquidar el saldo pendiente (`balanceDue === 0`), retirar la orden de `"⏳ Con Saldo"`, volver al listado por defecto de mostrador y mostrarla en `RecentSaleRow.jsx` por el **valor exacto cobrado del saldo restante** (`Saldo cobrado: Q ...`), con los badges de pago del cobro en mostrador, desglose transparente del anticipo previo de redes y hora del cobro.
+3. **Pruebas deterministas de regresión (`tests/sales/counter-sales-pending-balance-segregation.test.js` + `package.json`)**:
+   - Cubrir aislamiento por rol de vendedor de mostrador, exclusión total de `balanceDue > 0` en vista por defecto, pestaña única `"⏳ Con Saldo"` sin botón `"Todas"` y transición contable por el monto del saldo restante cobrado.
 
 ## Exclusiones Explícitas (`Hands off`)
-- **Cero lectura o impresión de `.env`**.
-- **Cero toque a código productivo o infraestructura (`Hands off` absoluto)**: prohibido modificar ni una sola línea en `server/`, `src/`, `prisma/`, `scripts/`, `package.json`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `entrypoint.sh`, `init.sh` o `AGENTS.md`.
-- **Cero despliegue remoto**: prohibido ejecutar `git push` o `npm run deploy`; al cerrar `feat-004`, dejar únicamente commit atómico local con `0 CRLF` para auditoría independiente en la sesión principal.
+- **Cero lectura o modificación de `.env`** y **cero cambios en `prisma/schema.prisma`** o migraciones SQL.
+- **Cero alteración de módulos ajenos** (taller de pliegos, liquidación de comisiones 20% del vendedor de redes original `sale.sellerId`, IA/voz o Docker).
+- **Cero debilitamiento de suites existentes** (`surgery-056`, `surgery-058`, `val005` ergonomía `>= 44px`, `zero-trust`).
+- **Cero nuevas dependencias NPM** y **cero despliegue remoto (`git push` / `npm run deploy`)** sin autorización explícita del usuario.
 
-## Criterios Verificables de Cierre para `feat-004`
-1. Solo los `3` archivos de `tests/` en `required_files` (más los artefactos de estado del arnés) presentan cambios respecto al commit previo, con `0` cambios en `server/` y `src/` y `0 CRLF`.
-2. `npm run test:voice` pasa al `100%` (`53/53 PASS`, `0 fail`).
-3. `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` finalizan en verde (`Overall: 100/100`, `25/25 PASS`, `HARNESS_PASS`).
+## Criterios Verificables de Cierre para `feat-005`
+1. `RecentSalesList.jsx` no renderiza el botón `"Todas"` y opera con la pestaña única conmutable `"⏳ Con Saldo"` (`aria-pressed`, `min-h-[44px]`).
+2. En vista por defecto de mostrador jamás aparece ninguna orden con `balanceDue > 0`, y las ventas mostradas para un `VENDEDOR` de mostrador corresponden únicamente a las ventas registradas o saldos cobrados por ese vendedor en ese stand.
+3. Al cobrarse el saldo restante de un pedido para entrega en el stand, pasa al listado por defecto de mostrador reflejando exactamente `standCollectedAmount` (el saldo restante cobrado por el vendedor) en lugar del `totalAmount` histórico de redes.
+4. `node --test tests/sales/counter-sales-pending-balance-segregation.test.js`, `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` pasan en verde con `0 CRLF`.

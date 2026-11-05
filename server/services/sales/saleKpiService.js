@@ -195,9 +195,11 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
     ...(tenantId ? { tenantId } : {}),
   };
 
+  let dayWindow = null;
   if (date) {
     const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
     if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
+      dayWindow = { startOfDay, endOfDay };
       if (isStand) {
         where.OR = [
           // 1. Ventas propias del stand creadas en esa fecha
@@ -207,6 +209,7 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
           // 3. Pedidos remotos liquidados en este stand con pagos registrados en esa fecha
           {
             pickupEventId: eventId,
+            balanceDue: { lte: 0 },
             payments: {
               some: {
                 reference: { contains: '[SALDO]' },
@@ -231,7 +234,7 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
     }
   }
 
-  const [total, sales] = await Promise.all([
+  const [total, rawSales] = await Promise.all([
     prisma.sale.count({ where }),
     prisma.sale.findMany({
       where,
@@ -245,6 +248,62 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
       take: parsedLimit,
     }),
   ]);
+
+  let sales = rawSales || [];
+  if (isStand && sales.length > 0) {
+    const settledPickupIds = sales
+      .filter((s) => Number(s.balanceDue || 0) <= 0 && s.eventId !== eventId && s.pickupEventId === eventId)
+      .map((s) => s.id);
+
+    const collectorBySaleId = new Map();
+    if (settledPickupIds.length > 0 && typeof prisma.auditLog?.findMany === 'function') {
+      try {
+        const logs = await prisma.auditLog.findMany({
+          where: {
+            ...(tenantId ? { tenantId } : {}),
+            entity: 'sale',
+            action: { in: ['SALDO_VENTA_COBRADO', 'ANTICIPO_VENTA_REGISTRADO'] },
+            entityId: { in: settledPickupIds },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { entityId: true, userId: true },
+        });
+        (logs || []).forEach((l) => {
+          if (l.entityId && l.userId && !collectorBySaleId.has(l.entityId)) {
+            collectorBySaleId.set(l.entityId, l.userId);
+          }
+        });
+      } catch (_) {}
+    }
+
+    sales = sales.map((s) => {
+      if (Number(s.balanceDue || 0) > 0 || s.eventId === eventId || s.pickupEventId !== eventId) return s;
+      const allSaldo = (s.payments || []).filter((p) => String(p.reference || '').includes('[SALDO]'));
+      const daySaldo = dayWindow
+        ? allSaldo.filter((p) => {
+            const ms = p.createdAt ? new Date(p.createdAt).getTime() : NaN;
+            return !Number.isNaN(ms) && ms >= dayWindow.startOfDay.getTime() && ms <= dayWindow.endOfDay.getTime();
+          })
+        : allSaldo;
+      const effectivePayments = daySaldo.length > 0 ? daySaldo : allSaldo;
+      const standCollectedAmount = Number(effectivePayments.reduce((acc, p) => acc + Number(p.amount || 0), 0).toFixed(2));
+      const latestMs = effectivePayments.reduce((mx, p) => {
+        const ms = p.createdAt ? new Date(p.createdAt).getTime() : 0;
+        return ms > mx ? ms : mx;
+      }, 0);
+      return {
+        ...s,
+        standCollectedAmount,
+        standCollectedAt: latestMs > 0 ? new Date(latestMs).toISOString() : (s.updatedAt || s.createdAt),
+        standCollectedPayments: effectivePayments,
+        balanceCollectedById: collectorBySaleId.get(s.id) || s.balanceCollectedById || null,
+      };
+    });
+
+    sales.sort(
+      (a, b) => new Date(b.standCollectedAt || b.createdAt).getTime() - new Date(a.standCollectedAt || a.createdAt).getTime()
+    );
+  }
 
   return {
     sales,

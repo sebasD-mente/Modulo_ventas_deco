@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, Edit, CreditCard, Smartphone, Banknote, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { resolveStandSaleDisplay } from '../../utils/counterSalesFilter.js';
 
 function isSaleFromToday(dateStr) {
   if (!dateStr) return false;
@@ -24,8 +25,8 @@ function getPaymentMethodInfo(method) {
   return { label: 'Efectivo', icon: Banknote, colorClass: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' };
 }
 
-function renderPaymentBadges(sale, hasBalance) {
-  if (sale.paymentStatus === 'PENDIENTE_PAGO') {
+function renderPaymentBadges(sale, hasBalance, overridePayments = null, isStandBalanceCollection = false) {
+  if (sale.paymentStatus === 'PENDIENTE_PAGO' && !isStandBalanceCollection) {
     return (
       <span className="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1">
         <AlertTriangle className="w-3 h-3 text-rose-400" />
@@ -34,8 +35,8 @@ function renderPaymentBadges(sale, hasBalance) {
     );
   }
 
-  const payments = sale.payments || [];
-  if (payments.length > 1 || hasBalance) {
+  const payments = Array.isArray(overridePayments) ? overridePayments : (sale.payments || []);
+  if (payments.length > 1 || hasBalance || isStandBalanceCollection) {
     if (payments.length === 0) {
       const info = getPaymentMethodInfo('EFECTIVO');
       const Icon = info.icon;
@@ -50,7 +51,8 @@ function renderPaymentBadges(sale, hasBalance) {
     return payments.map((p, idx) => {
       const info = getPaymentMethodInfo(p.method);
       const Icon = info.icon;
-      const tag = hasBalance ? ' (Abono)' : '';
+      let tag = hasBalance ? ' (Abono)' : '';
+      if (!hasBalance && isStandBalanceCollection) tag = ' (Saldo)';
       return (
         <span
           key={p.id || idx}
@@ -73,8 +75,15 @@ function renderPaymentBadges(sale, hasBalance) {
   );
 }
 
-export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareWhatsApp }) {
-  const hasBalance = Number(sale.balanceDue || 0) > 0;
+export default function RecentSaleRow({ sale, standEventId = null, onEdit, onBalancePayment, onShareWhatsApp }) {
+  const {
+    hasBalance,
+    isStandBalanceCollection,
+    displayedAmount,
+    previousDepositAmount,
+    displayedPayments,
+    displayedTimestamp,
+  } = resolveStandSaleDisplay(sale, standEventId);
 
   return (
     <div className="p-3.5 rounded-2xl bg-black border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -83,12 +92,17 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
           <span className="font-mono font-black text-amber-400 text-xs">{sale.saleNumber}</span>
           <span className="text-slate-500 flex items-center gap-1 text-[11px]">
             <Clock className="w-3 h-3 text-slate-500" />
-            {formatSaleTime(sale.createdAt)}
+            {formatSaleTime(displayedTimestamp)}
           </span>
-          {renderPaymentBadges(sale, hasBalance)}
+          {renderPaymentBadges(sale, hasBalance, displayedPayments, isStandBalanceCollection)}
           {sale.orderType === 'REDES_PERSONALIZADO' && (
             <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] flex items-center gap-1">
               📱 Redes
+            </span>
+          )}
+          {isStandBalanceCollection && (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+              ✅ Saldo cobrado
             </span>
           )}
           {hasBalance && sale.paymentStatus !== 'PENDIENTE_PAGO' && (
@@ -140,13 +154,21 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
               <span className="font-mono shrink-0">-Q {Number(sale.discount).toFixed(2)}</span>
             </div>
           )}
+          {isStandBalanceCollection && previousDepositAmount > 0 && (
+            <div className="flex items-center justify-between gap-2 text-cyan-400/90 pt-1 border-t border-slate-800/40">
+              <span>💳 Anticipo previo (Redes):</span>
+              <span className="font-mono shrink-0">-Q {previousDepositAmount.toFixed(2)}</span>
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 shrink-0 flex-wrap">
         <div className="text-left sm:text-right mr-1">
-          <span className="text-[10px] text-slate-500 block sm:inline mr-1">Total:</span>
-          <span className="font-mono font-black text-emerald-400 text-sm">
-            Q {Number(sale.totalAmount).toFixed(2)}
+          <span className="text-[10px] text-slate-500 block sm:inline mr-1">
+            {isStandBalanceCollection ? 'Saldo cobrado:' : 'Total:'}
+          </span>
+          <span className="font-mono font-black text-emerald-400 text-sm whitespace-nowrap">
+            Q {displayedAmount.toFixed(2)}
           </span>
         </div>
 
@@ -187,7 +209,11 @@ export default function RecentSaleRow({ sale, onEdit, onBalancePayment, onShareW
           </button>
         )}
 
-        {isSaleFromToday(sale.createdAt) ? (
+        {isStandBalanceCollection ? (
+          <span className="min-h-[44px] px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center select-none" title="Saldo liquidado en mostrador">
+            Liquidada
+          </span>
+        ) : isSaleFromToday(sale.createdAt) ? (
           <button
             type="button"
             onClick={() => onEdit(sale)}

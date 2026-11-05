@@ -4,17 +4,18 @@ import {
   CheckCircle,
   Loader2,
   Receipt,
-  Filter,
+  X,
 } from 'lucide-react';
+import { partitionEventSalesForPos } from '../utils/counterSalesFilter.js';
 import EditSaleModal from './EditSaleModal.jsx';
 import RecentSaleRow from './sales/RecentSaleRow.jsx';
 import BalancePaymentModal from './sales/BalancePaymentModal.jsx';
 import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal.jsx';
 
 export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated }) {
-  const { authFetch } = useAuth();
+  const { authFetch, user, isVendedor, isSuperAdmin } = useAuth();
   const [sales, setSales] = useState([]);
-  const [filterMode, setFilterMode] = useState('TODAS');
+  const [showPendingOnly, setShowPendingOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
   const [balancePayingSale, setBalancePayingSale] = useState(null);
@@ -38,6 +39,10 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
   };
 
   useEffect(() => {
+    setShowPendingOnly(false);
+  }, [eventId]);
+
+  useEffect(() => {
     fetchSales();
   }, [eventId, refreshTrigger]);
 
@@ -56,20 +61,54 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
   };
 
   const handleBalancePaid = (updatedSale) => {
+    const nextBalance = updatedSale.balanceDue !== undefined ? Number(updatedSale.balanceDue) : 0;
+    const nextPaymentStatus = updatedSale.paymentStatus || (nextBalance <= 0 ? 'PAGADO_TOTAL' : 'ANTICIPO_PAGADO');
+
     setSales((prev) =>
-      prev.map((s) => (s.id === updatedSale.id ? { ...s, ...updatedSale, balanceDue: 0, paymentStatus: 'PAGADO_TOTAL' } : s))
+      prev.map((s) => {
+        if (s.id !== updatedSale.id) return s;
+        const mergedItems = Array.isArray(updatedSale.items) && Array.isArray(s.items)
+          ? updatedSale.items.map((it, idx) => ({
+              ...(s.items.find((prevIt) => prevIt.id === it.id) || s.items[idx] || {}),
+              ...it,
+            }))
+          : (updatedSale.items || s.items);
+        return {
+          ...s,
+          ...updatedSale,
+          items: mergedItems,
+          balanceDue: nextBalance,
+          paymentStatus: nextPaymentStatus,
+          ...(nextBalance <= 0
+            ? {
+                balanceCollectedById: updatedSale.balanceCollectedById || user?.id || null,
+                standCollectedAt: updatedSale.standCollectedAt || new Date().toISOString(),
+              }
+            : {}),
+        };
+      })
     );
     setBalancePayingSale(null);
-    setSuccessToast(`Saldo de orden #${updatedSale.saleNumber} liquidado exitosamente.`);
+    if (nextBalance <= 0) {
+      setShowPendingOnly(false);
+      setSuccessToast(`Saldo de orden #${updatedSale.saleNumber} liquidado exitosamente.`);
+    } else {
+      setSuccessToast(`Anticipo de orden #${updatedSale.saleNumber} registrado exitosamente.`);
+    }
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setSuccessToast(null), 3500);
     if (onSaleUpdated) onSaleUpdated();
   };
 
-  const pendingCount = sales.filter((s) => Number(s.balanceDue || 0) > 0).length;
-  const displayedSales = filterMode === 'CON_SALDO'
-    ? sales.filter((s) => Number(s.balanceDue || 0) > 0)
-    : sales;
+  const { isStandPos, defaultSales, pendingSales } = partitionEventSalesForPos({
+    sales,
+    eventId,
+    user,
+    isVendedor,
+    isSuperAdmin,
+  });
+  const pendingCount = pendingSales.length;
+  const displayedSales = showPendingOnly ? pendingSales : defaultSales;
 
   return (
     <div className="bg-[#121212] p-5 sm:p-7 rounded-[32px] sm:rounded-[36px] border border-neutral-800 shadow-2xl space-y-4 text-white max-w-2xl mx-auto">
@@ -77,35 +116,27 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
         <div className="flex items-center gap-2">
           <Receipt className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white uppercase tracking-wider">
-            Ventas de Hoy ({sales.length})
+            Ventas de Hoy ({defaultSales.length})
           </h3>
         </div>
 
-        {/* Filtro Rápido de Saldo */}
+        {/* Pestaña Única Conmutable de Ventas con Saldo Pendiente */}
         <div className="flex items-center gap-1.5 self-start sm:self-auto">
           <button
             type="button"
-            onClick={() => setFilterMode('TODAS')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-              filterMode === 'TODAS'
-                ? 'bg-white text-black'
-                : 'bg-black text-neutral-400 hover:text-white border border-neutral-800'
-            }`}
-          >
-            Todas ({sales.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterMode('CON_SALDO')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-              filterMode === 'CON_SALDO'
-                ? 'bg-amber-400 text-black border-amber-400'
+            aria-pressed={showPendingOnly}
+            onClick={() => setShowPendingOnly((prev) => !prev)}
+            title={showPendingOnly ? 'Volver al listado de ventas de mostrador' : 'Ver ventas con saldo pendiente de entrega en este punto de venta'}
+            className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center gap-1.5 ${
+              showPendingOnly
+                ? 'bg-amber-400 text-black border-amber-400 shadow-sm'
                 : pendingCount > 0
                 ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-                : 'bg-black text-neutral-500 border-neutral-800'
+                : 'bg-black text-neutral-500 border-neutral-800 hover:text-neutral-300'
             }`}
           >
-            ⏳ Con Saldo ({pendingCount})
+            <span>⏳ Con Saldo ({pendingCount})</span>
+            {showPendingOnly && <X className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -124,8 +155,8 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
         </div>
       ) : displayedSales.length === 0 ? (
         <div className="py-8 text-center text-neutral-500 text-xs">
-          {filterMode === 'CON_SALDO'
-            ? 'No hay ventas con saldo pendiente de cobro.'
+          {showPendingOnly
+            ? 'No hay ventas con saldo pendiente de cobro en este punto de venta.'
             : 'Aún no se han registrado ventas hoy en este evento. Realiza una venta arriba para verla aquí.'}
         </div>
       ) : (
@@ -134,6 +165,7 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
             <RecentSaleRow
               key={sale.id}
               sale={sale}
+              standEventId={isStandPos ? eventId : null}
               onEdit={setEditingSale}
               onBalancePayment={setBalancePayingSale}
               onShareWhatsApp={setSharingSale}

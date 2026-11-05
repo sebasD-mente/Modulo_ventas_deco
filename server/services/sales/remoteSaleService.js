@@ -437,10 +437,16 @@ export async function registerBalancePayment({
       }
     }
 
+    const isStandPickupCollection = Boolean(
+      newBalanceDue <= 0 &&
+      ((assignedEventId && assignedEventId !== 'evt-ventas-redes-online') ||
+        (sale.pickupEventId && sale.pickupEventId !== 'evt-ventas-redes-online'))
+    );
+
     await client.salePayment.createMany({
       data: payments.map((p, idx) => {
         let paymentRef = p.reference ? p.reference.trim() : null;
-        if (!isPendingPayment) {
+        if (!isPendingPayment || isStandPickupCollection) {
           paymentRef = paymentRef ? `${paymentRef} [SALDO]` : '[SALDO]';
         }
         return {
@@ -481,6 +487,17 @@ export async function registerBalancePayment({
         },
       },
     });
+
+    if (newBalanceDue <= 0) {
+      const standPayments = (updatedSale?.payments || []).filter((p) => String(p.reference || '').includes('[SALDO]'));
+      return {
+        ...updatedSale,
+        balanceCollectedById: sellerId || null,
+        standCollectedAmount: newPaymentsTotal,
+        standCollectedAt: standPayments[standPayments.length - 1]?.createdAt || new Date().toISOString(),
+        standCollectedPayments: standPayments.length > 0 ? standPayments : payments,
+      };
+    }
 
     return updatedSale;
   };
