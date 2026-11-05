@@ -225,4 +225,95 @@ describe('🔒 Suite de Seguridad Zero-Trust & Aislamiento Estricto', () => {
       'La configuración CORS en server/index.js debe permitir Idempotency-Key y X-Idempotency-Key'
     );
   });
+
+  it('Zero-Trust Multi-Tenant (feat-003): createEvent y updateEvent jamás permiten sobrescribir req.tenantId ni req.params.id desde req.body', async () => {
+    const { prisma } = await import('../../server/config/prisma.js');
+    const { createEvent, updateEvent } = await import('../../server/controllers/eventController.js');
+
+    const origTransaction = prisma.$transaction;
+    const origEventFindFirst = prisma.event.findFirst;
+    const captured = { createTenantId: null, createUserTenantId: null, findWhere: null, updateWhereId: null };
+
+    const makeRes = () => ({
+      statusCode: 200,
+      payload: null,
+      status(code) { this.statusCode = code; return this; },
+      json(data) { this.payload = data; return this; },
+    });
+
+    try {
+      prisma.$transaction = async (fn) => fn({
+        user: {
+          findMany: async ({ where }) => {
+            captured.createUserTenantId = where.tenantId;
+            return [];
+          },
+          updateMany: async () => ({ count: 0 }),
+        },
+        event: {
+          create: async ({ data }) => {
+            captured.createTenantId = data.tenantId;
+            return { id: 'evt-created-safe', ...data };
+          },
+          update: async ({ where }) => {
+            captured.updateWhereId = where.id;
+            return { id: where.id };
+          },
+          findUnique: async ({ where }) => ({
+            id: where.id,
+            name: 'Stand Seguro',
+            assignedSellers: [],
+            _count: { sales: 0 },
+            sales: [],
+          }),
+        },
+      });
+      prisma.event.findFirst = async ({ where }) => {
+        captured.findWhere = where;
+        return { id: where.id, tenantId: where.tenantId, name: 'Stand Seguro' };
+      };
+
+      const resCreate = makeRes();
+      await createEvent({
+        tenantId: 'tenant-deco-legit',
+        body: {
+          name: 'Expo Segura',
+          location: 'Zona 10',
+          tenantId: 'tenant-ATTACKER-SPOOFED',
+          id: 'evt-ventas-redes-online',
+          assignedUserIds: ['u-1'],
+        },
+      }, resCreate);
+      assert.equal(resCreate.statusCode, 201);
+      assert.equal(captured.createTenantId, 'tenant-deco-legit', 'createEvent no debe permitir suplantar tenantId por req.body');
+      assert.equal(captured.createUserTenantId, 'tenant-deco-legit', 'createEvent debe filtrar usuarios bajo req.tenantId legítimo');
+
+      const resUpdate = makeRes();
+      await updateEvent({
+        params: { id: 'evt-legit-param-id' },
+        tenantId: 'tenant-deco-legit',
+        body: {
+          id: 'evt-ventas-redes-online',
+          tenantId: 'tenant-ATTACKER-SPOOFED',
+          name: 'Stand Actualizado',
+        },
+      }, resUpdate);
+      assert.equal(resUpdate.statusCode, 200);
+      assert.deepEqual(captured.findWhere, { id: 'evt-legit-param-id', tenantId: 'tenant-deco-legit' });
+      assert.equal(captured.updateWhereId, 'evt-legit-param-id', 'updateEvent no debe permitir sobrescribir req.params.id por req.body');
+
+      const resUndefinedId = makeRes();
+      await updateEvent({
+        params: { id: 'evt-legit-param-id' },
+        tenantId: 'tenant-deco-legit',
+        body: { id: undefined, tenantId: undefined, name: 'Formulario con id undefined' },
+      }, resUndefinedId);
+      assert.equal(resUndefinedId.statusCode, 200);
+      assert.deepEqual(captured.findWhere, { id: 'evt-legit-param-id', tenantId: 'tenant-deco-legit' });
+      assert.equal(captured.updateWhereId, 'evt-legit-param-id');
+    } finally {
+      prisma.$transaction = origTransaction;
+      prisma.event.findFirst = origEventFindFirst;
+    }
+  });
 });
