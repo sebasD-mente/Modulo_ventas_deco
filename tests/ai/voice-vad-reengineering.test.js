@@ -17,7 +17,8 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
     assert.ok(lines < 140, `useAiVoiceRecorder.js must be < 140 lines, got ${lines}`);
     assert.match(content, /hasSpokenRef\s*=\s*useRef\(false\)/, 'Must initialize hasSpokenRef');
     assert.match(content, /voiceThreshold\s*=\s*Math\.max\(0\.012,\s*(Math\.min\(0\.028,\s*)?noiseFloor\s*\*\s*1\.6\)?\)/, 'Must calculate dynamic voice threshold');
-    assert.match(content, /setTimeout\(\(\)\s*=>\s*stopRecording\(\),\s*15000\)/, 'Must set hard timeout to 15000ms');
+    assert.match(content, /maxDurationMs\s*=\s*15000/, 'Must default maxDurationMs parameter to 15000ms');
+    assert.match(content, /setTimeout\(\(\)\s*=>\s*stopRecording\(\),\s*maxDurationMs\)/, 'Must pass maxDurationMs to hard timeout setTimeout');
     assert.match(content, /(silence|silentMs)\s*>\s*(1400|1600|3500|3800|4000)/, 'Must have 1600ms/3800ms silence threshold for stop');
     assert.match(content, /(silence|silentMs)\s*>\s*(800|900|1000|2500|2800|3000)/, 'Must have 900ms/2500ms silence threshold for vadActive');
     assert.match(content, /empty:\s*isEmpty/, 'Must filter empty recordings onstop');
@@ -52,12 +53,23 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
     assert.match(content, /data\.intent\s*===\s*'SALUDO'/, 'Must handle SALUDO intent without blank draft');
   });
 
-  test('Archivo D: aiMediaController.js strictly satisfies line limits (<= 220), greeting response, and empty items contract', () => {
+  test('Archivo D: aiMediaController.js strictly satisfies 6-layer isolation, multimodal handler cohesion, greeting response, and empty items contract', () => {
     const filePath = path.resolve('server/controllers/ai/aiMediaController.js');
     const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n').length;
+    const expectedHandlers = [
+      'handleVoiceSale',
+      'handleBatchPhoto',
+      'handleArtworkRecognition',
+      'handleVideoRecognition',
+      'handleVerifyReceipt',
+      'handleVoiceCatalogSearch',
+    ];
 
-    assert.ok(lines <= 220, `aiMediaController.js must be <= 220 lines, got ${lines}`);
+    assert.doesNotMatch(content, /config\/(?:prisma|env)\.js/, 'aiMediaController.js must not import config/prisma.js or config/env.js directly');
+    for (const fn of expectedHandlers) {
+      assert.match(content, new RegExp(`export\\s+async\\s+function\\s+${fn}\\b`), `Must export cohesive multimodal handler ${fn}`);
+    }
+    assert.strictEqual((content.match(/recordLlmInteraction\s*\(/g) || []).length, 6, 'All 6 multimodal handlers must record telemetry via recordLlmInteraction');
     assert.match(content, /!draft\.items\s*\|\|\s*draft\.items\.length\s*===\s*0/, 'Must check empty draft items');
     assert.match(content, /itemsDetected:\s*false/, 'Must return itemsDetected: false');
     assert.match(content, /draftSale:\s*null/, 'Must return draftSale: null');
@@ -80,26 +92,37 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
     assert.ok(!voiceSaleResponseSchema.required.includes('paymentMethod'), 'paymentMethod must NOT be required');
   });
 
-  test('Archivo F: aiMediaService.js direct multimodal inference and line limits (<= 280)', () => {
+  test('Archivo F: aiMediaService.js direct multimodal inference and domain cohesion contracts', () => {
     const filePath = path.resolve('server/services/ai/aiMediaService.js');
     const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n').length;
+    const expectedServiceExports = [
+      'normalizeCatalogSizeId',
+      'processVoiceSaleAudio',
+      'recognizePosterArtworkFromImage',
+      'recognizePostersFromVideo',
+      'processPostersBatchPhoto',
+      'transcribeVoiceSearchQuery',
+    ];
 
-    assert.ok(lines <= 280, `aiMediaService.js must be <= 280 lines, got ${lines}`);
+    assert.doesNotMatch(content, /from\s+['"][^'"]*(?:controllers|routes|middleware)\//, 'Service layer must not import upward HTTP layers');
+    for (const fn of expectedServiceExports) {
+      assert.match(content, new RegExp(`export\\s+(?:async\\s+)?function\\s+${fn}\\b`), `Must export cohesive inference contract ${fn}`);
+    }
+    assert.match(content, /executeWithModelFallback/, 'Must execute multimodal inference via executeWithModelFallback');
     assert.match(content, /DIRECT_VOICE_SALE_INFERENCE/, 'Must have direct multimodal voice inference');
     assert.match(content, /buildVoiceSalePrompt/, 'Must use centralized buildVoiceSalePrompt');
     assert.match(content, /resolveEntityAlias/, 'Must connect to resolveEntityAlias');
     assert.match(content, /searchHybridPosters/, 'Must connect to searchHybridPosters');
   });
 
-  test('Archivo G: webCatalogService.js single-token protection ("mundo" != Bad Bunny) and line limits (< 350)', async () => {
+  test('Archivo G: webCatalogService.js single-token title + tag matching ([DEKO-STANDIA-063]) and line limits (< 350)', async () => {
     const filePath = path.resolve('server/services/webCatalogService.js');
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n').length;
 
     assert.ok(lines < 350, `webCatalogService.js must be < 350 lines, got ${lines}`);
 
-    // Test single-token protection with cached products
+    // Verify single-token matching across title and tags ([DEKO-STANDIA-063]) while excluding unrelated posters
     const tenantId = 'test-vad-single-token';
     invalidateCatalogCache(tenantId);
     productCache.set(tenantId, {
@@ -125,14 +148,25 @@ describe('🎤 Voice & VAD Reengineering Validation Suite', () => {
           tags: ['mapa', 'mundo', 'vintage', 'tierra'],
           sizes: [{ sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 }],
         },
+        {
+          id: 'poster-batman-noir',
+          titulo: 'Batman Caballero Oscuro',
+          subtitulo: 'Arte nocturno de Gotham',
+          categoria: 'CINE',
+          imageUrl: 'https://storage.googleapis.com/deko-eventsales-media/batman.jpg',
+          thumbUrl: 'https://storage.googleapis.com/deko-eventsales-media/batman.jpg',
+          tags: ['batman', 'dc', 'gotham', 'superheroe'],
+          sizes: [{ sizeId: 'MEDIANO', nombre: 'Mediano', precio: 65 }],
+        },
       ],
     });
 
-    const results = await searchWebPosters({ tenantId, query: 'mundo' });
+    const results = await searchWebPosters({ tenantId, query: 'mundo', skipLiveParachute: true });
     assert.ok(Array.isArray(results), 'Results must be an array');
     const titles = results.map((r) => r.titulo);
-    assert.ok(titles.includes('Mapa del Mundo Vintage'), 'Must match poster with "Mundo" in title');
-    assert.ok(!titles.includes('Bad Bunny Un Verano Sin Ti'), 'Must NOT match Bad Bunny when querying "mundo"');
+    assert.strictEqual(titles[0], 'Mapa del Mundo Vintage', 'Poster with "Mundo" in title must rank first');
+    assert.ok(titles.includes('Bad Bunny Un Verano Sin Ti'), 'Must match poster containing "mundo" in tags ([DEKO-STANDIA-063])');
+    assert.ok(!titles.includes('Batman Caballero Oscuro'), 'Must exclude unrelated poster without "mundo" in title/subtitle or tags');
     invalidateCatalogCache(tenantId);
   });
 

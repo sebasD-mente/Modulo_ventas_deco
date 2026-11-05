@@ -139,25 +139,70 @@ describe('🎙️ Voice Lexical Priming, Hesitation Guard & VAD Shielding Suite'
     });
   });
 
-  describe('5. Techos Monolíticos de Líneas & Cero Deuda Arquitectónica', () => {
-    const files = [
-      { name: 'aiPromptService.js', path: 'server/services/ai/aiPromptService.js', limit: 180, op: '<' },
-      { name: 'aiMediaService.js', path: 'server/services/ai/aiMediaService.js', limit: 280, op: '<=' },
-      { name: 'aiMediaController.js', path: 'server/controllers/ai/aiMediaController.js', limit: 220, op: '<=' },
-      { name: 'useAiVoiceRecorder.js', path: 'src/components/ai-chat/hooks/useAiVoiceRecorder.js', limit: 140, op: '<' },
-    ];
+  describe('5. Cohesión de Dominio, Límites de Capas & Techos Focalizados', () => {
+    it('5.1. aiPromptService.js cumple techo estricto (< 180 líneas)', () => {
+      const fullPath = path.resolve('server/services/ai/aiPromptService.js');
+      const count = fs.readFileSync(fullPath, 'utf8').split('\n').length;
+      assert.ok(count < 180, `aiPromptService.js tiene ${count} líneas, debe ser < 180`);
+    });
 
-    for (const f of files) {
-      it(`5.x. ${f.name} cumple techo estricto (${f.op} ${f.limit} líneas)`, () => {
-        const fullPath = path.resolve(f.path);
-        const count = fs.readFileSync(fullPath, 'utf8').split('\n').length;
-        if (f.op === '<') {
-          assert.ok(count < f.limit, `${f.name} tiene ${count} líneas, debe ser < ${f.limit}`);
-        } else {
-          assert.ok(count <= f.limit, `${f.name} tiene ${count} líneas, debe ser <= ${f.limit}`);
-        }
-      });
-    }
+    it('5.2. aiMediaService.js preserva cohesión de dominio multimodal, contratos de inferencia y aislamiento de capa Service', () => {
+      const fullPath = path.resolve('server/services/ai/aiMediaService.js');
+      const content = fs.readFileSync(fullPath, 'utf8');
+      assert.doesNotMatch(
+        content,
+        /from\s+['"][^'"]*(?:controllers|routes|middleware)\//,
+        'aiMediaService.js no debe importar capas superiores (controllers/routes/middleware)'
+      );
+      for (const fn of [
+        'normalizeCatalogSizeId',
+        'processVoiceSaleAudio',
+        'recognizePosterArtworkFromImage',
+        'recognizePostersFromVideo',
+        'processPostersBatchPhoto',
+        'cleanVoiceCatalogQuery',
+        'transcribeVoiceSearchQuery',
+      ]) {
+        assert.match(content, new RegExp(`export\\s+(?:async\\s+)?function\\s+${fn}\\b`), `Debe exportar ${fn}`);
+      }
+      for (const action of [
+        'DIRECT_VOICE_SALE_INFERENCE',
+        'RECOGNIZE_ARTWORK_IMAGE',
+        'RECOGNIZE_POSTERS_VIDEO',
+        'PROCESS_BATCH_PHOTO',
+        'VOICE_CATALOG_SEARCH',
+      ]) {
+        assert.match(content, new RegExp(`actionName:\\s*['"]${action}['"]`), `Debe instrumentar acción ${action} en executeWithModelFallback`);
+      }
+    });
+
+    it('5.3. aiMediaController.js preserva cohesión de 6 handlers multimodales, telemetría recordLlmInteraction y 0 imports directos a config/', () => {
+      const fullPath = path.resolve('server/controllers/ai/aiMediaController.js');
+      const content = fs.readFileSync(fullPath, 'utf8');
+      assert.doesNotMatch(
+        content,
+        /config\/(?:prisma|env)\.js/,
+        'aiMediaController.js tiene prohibido importar config/prisma.js o config/env.js directamente'
+      );
+      for (const handler of [
+        'handleVoiceSale',
+        'handleBatchPhoto',
+        'handleArtworkRecognition',
+        'handleVideoRecognition',
+        'handleVerifyReceipt',
+        'handleVoiceCatalogSearch',
+      ]) {
+        assert.match(content, new RegExp(`export\\s+async\\s+function\\s+${handler}\\b`), `Debe exportar el handler multimodal ${handler}`);
+      }
+      const telemetryCalls = (content.match(/recordLlmInteraction\s*\(/g) || []).length;
+      assert.strictEqual(telemetryCalls, 6, `Los 6 handlers multimodales deben registrar telemetría recordLlmInteraction (encontrados: ${telemetryCalls})`);
+    });
+
+    it('5.4. useAiVoiceRecorder.js cumple techo estricto (< 140 líneas)', () => {
+      const fullPath = path.resolve('src/components/ai-chat/hooks/useAiVoiceRecorder.js');
+      const count = fs.readFileSync(fullPath, 'utf8').split('\n').length;
+      assert.ok(count < 140, `useAiVoiceRecorder.js tiene ${count} líneas, debe ser < 140`);
+    });
   });
 
 });

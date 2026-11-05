@@ -4,11 +4,11 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-004` Declarada en `not-started` para Siguiente Sesión)
-- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000..003` selladas en `done`; `feat-004` registrada en `not-started` lista para activarse bajo `WIP = 1` en la siguiente sesión).
+## Estado Actual del Contrato (`WIP = 0` — `feat-004` Completada en `done`)
+- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000..004` selladas en `done` con evidencia ejecutable verificada).
 - **Decisión arquitectónica humana vigente (`Opción A`):** Privilegiar la **cohesión de dominio real** y los límites de 6 capas (`check-architecture.sh` con `0` excepciones) por encima de los antiguos micro-techos artificiales de líneas (`<= 220` en `aiMediaController.js` y `<= 280` en `aiMediaService.js`), prohibiendo fragmentar `server/` o `src/` en código ravioli.
 
-## Alcance Pre-Acordado para `feat-004` (`Fair game` al pasar a `in-progress`)
+## Alcance Verificado de `feat-004` (`done`)
 - **`tests/ai/voice-lexical-priming-hesitation.test.js` (sección `5`) y `tests/ai/voice-vad-reengineering.test.js` (`Archivo D` y `Archivo F`)**:
   - Sustituir los antiguos micro-techos rígidos (`aiMediaController.js <= 220` y `aiMediaService.js <= 280`) por verificaciones contractuales de cohesión de dominio y arquitectura limpia (`0` imports directos a `config/prisma.js` o `config/env.js` en `aiMediaController.js`, exportación de sus 6 handlers multimodales con `recordLlmInteraction` y preservación de contratos de inferencia en `aiMediaService.js`), manteniendo intactas todas las demás aserciones de ambas suites.
 - **`tests/ai/voice-vad-reengineering.test.js` (`Archivo A` y `Archivo G`)**:

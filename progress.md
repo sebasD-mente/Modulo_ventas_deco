@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-05 06:30
-**Session ID:** sesion-006 (Análisis de Cohesión de Dominio y Declaración de `feat-004` Pre-Despliegue)
-**Active Feature:** Ninguna (`WIP = 0`; `feat-000..003` en `done`; `feat-004` declarada en `not-started` para ejecución en sesión dedicada)
+**Last Updated:** 2026-11-05 06:44
+**Session ID:** sesion-007 (Ejecución y Cierre de `feat-004`: `npm run test:voice` `53/53 PASS` sin Código Ravioli)
+**Active Feature:** Ninguna (`WIP = 0`; `feat-000..004` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -16,17 +16,17 @@
 - [x] **Ola 2 `feat-002` (`b1bcf2f` — `LEGACY_SERVER_ALLOWLIST 9 -> 3`, `catalog: A`)**: Trasladado `listEventCashClosings` a `cashClosingService.js`, expuesto `queryCatalogProducts` en `catalogSyncService.js` (`22L`), y creados `authService.js` (`183L`) y `userService.js` (`157L`) conservando `invalidateUserAuthCache` en `userController.js`.
 - [x] **Ola 3 `feat-003` (`LEGACY_SERVER_ALLOWLIST 3 -> 0`, Zero-Trust `13/13`, Checkers R5 `15a71c9f` y `9199e5d7` `12/12 ACEPTAR`)**: Extraído `orderTrackingService.js` (`189L`) re-exportado desde `saleService.js` (`19L < 35L`), creado `eventService.js` (`274L`) apoyado en `eventFinanceService.js` (`314L`), reducidos `saleController.js` (`154L <= 160L`) y `eventController.js` (`185L <= 190L`, `0` imports a `config/`, desestructuración explícita sin `...req.body`), añadida la 13.ª prueba en `tests/security/zero-trust.test.js` (`319L`, `13/13 PASS`), eliminada `LEGACY_SERVER_ALLOWLIST` en `scripts/check-architecture.sh` (`767L`, `0` excepciones) y certificado con **`12 / 12 ACEPTAR`** en `evaluator-rubric.md`.
 - [x] **Verificación en Vivo sobre `localhost:3001` + `localhost:5173`**: Probados endpoints de salud IA, configuración OAuth, webhooks protegidos, catálogo web en vivo, las 17 rutas HTTP del backend y las 8 vistas SPA en Chrome real (`0` crashes `ErrorBoundary`, `0` errores JS en consola), cerrando ambos demonios locales sin residuos.
-- [x] **Auditoría Forense Post-Colisión (`0e696c1`) y Declaración de `feat-004` (`not-started`)**: Confirmada integridad al `100%` tras la ventana concurrente de gobernanza (`0` daños en `server/` o `src/`) y declarada `feat-004` bajo autorización arquitectónica explícita del usuario (`Opción A`: cohesión de dominio sin código ravioli).
+- [x] **Alineación de Suites de Voz `feat-004` (`npm run test:voice` `53/53 PASS`, `0` cambios en `server/` y `src/`)**: Reemplazados los micro-techos artificiales `<= 220` / `<= 280` por invariantes contractuales de cohesión de dominio y aislamiento de 6 capas en `tests/ai/voice-lexical-priming-hesitation.test.js` y `tests/ai/voice-vad-reengineering.test.js`, alineados el timeout parametrizado `maxDurationMs = 15000`, la búsqueda por `tags` (`[DEKO-STANDIA-063]`) con exclusión de pósters ajenos y `normalizeCatalogSizeId('extra grande') === 'GIGANTE'` en `tests/adversarial/m1-voice-priming-hesitation-stress.test.js`.
 
 ### What's In Progress
-- Ninguna tarea en curso (`WIP = 0`; `feat-004` lista en `not-started`).
+- Ninguna tarea en curso (`WIP = 0`; `feat-000..004` completadas en `done`).
 
 ### What's Next
-1. En la nueva sesión dedicada, activar `feat-004` a `in-progress` (`WIP = 1`), actualizar únicamente los 3 archivos históricos de `tests/` sin tocar `server/` ni `src/`, verificar `npm run test:voice` (`53/53 PASS`), `bash ./init.sh` y `npm run harness:check`, y cerrar con commit atómico local (`0` `git push`).
-2. Auditar el resultado de `feat-004` en esta sesión principal antes de proceder al despliegue a producción.
+1. Auditar el commit atómico local de `feat-004` en la sesión principal antes de proceder al despliegue controlado a producción cuando el usuario lo autorice.
+2. Si surgen nuevos requerimientos de negocio, registrar `feat-005` en `feature_list.json` respetando el DAG secuencial y `WIP = 1`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `0` excepciones arquitectónicas en `src/` y `server/`; `13/13` Zero-Trust y `253/253` pruebas unitarias en verde).
+- Ninguno activo (`0` lectura de `.env`; `0` cambios en `server/` y `src/`; `0` excepciones arquitectónicas; `53/53` voz, `13/13` Zero-Trust y `253/253` pruebas unitarias en verde).
 
 ## Decisions Made
 - **Submódulo `server/services/sales/orderTrackingService.js` re-exportado desde `server/services/saleService.js` (`feat-003`)**:
@@ -43,11 +43,14 @@
   - Alternatives considered: Fragmentar `aiMediaController.js`/`aiMediaService.js` para bajar de `220/280` líneas (descartado con el usuario por generar código ravioli y tocar `server/` sin necesidad funcional); desplegar dejando `test:voice` en rojo (descartado para dejar toda la batería de pruebas limpia antes del despliegue). Con autorización explícita del usuario se declaró `feat-004` para alinear únicamente los 3 archivos en `tests/` sin tocar `server/` ni `src/`.
 
 ## Files Modified This Session
-- `feature_list.json` — Declarada `feat-004` en estado `not-started` (`dependencies: ["feat-003"]`, `WIP = 0`, `0 CRLF`).
-- `sprint-contract.md`, `progress.md`, `session-handoff.md` — Alcance pre-acordado, exclusiones `Hands off` (`0` cambios en `server/` y `src/`) y entrega de turno para la sesión ejecutora de `feat-004` (`0 CRLF`).
+- `tests/ai/voice-lexical-priming-hesitation.test.js` — Reemplazados micro-techos rígidos `<= 280` / `<= 220` en `5.2` y `5.3` por invariantes contractuales de cohesión de dominio, telemetría `recordLlmInteraction` (6/6 handlers) y aislamiento de 6 capas (`0 CRLF`).
+- `tests/ai/voice-vad-reengineering.test.js` — Alineados `Archivo A` (`maxDurationMs = 15000`), `Archivo D` (`aiMediaController.js`), `Archivo F` (`aiMediaService.js`) y `Archivo G` (`[DEKO-STANDIA-063]` ranking por título + `tags` y exclusión de póster ajeno) (`0 CRLF`).
+- `tests/adversarial/m1-voice-priming-hesitation-stress.test.js` — Actualizado caso `3.3` validando `normalizeCatalogSizeId('extra grande') === 'GIGANTE'` (`0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Cierre de `feat-004` en `done` (`WIP = 0`) con evidencia real (`0 CRLF`).
 
 ## Verification Evidence
-- [x] Auditoría Independiente `Checker` `One-Shot` Virgen (`15a71c9f`, convergente con `9199e5d7`, `Round 5` / `feat-003`): `evaluator-rubric.md` -> `command and output verified: 12 / 12 ACEPTAR (CHECKER_15A71C9F_INIT_EXIT=0 ELAPSED_MS=9187, Overall: 100/100, 25/25 PASS, HARNESS_PASS in 33.41s across 253/253 unit tests & 13/13 zero-trust, os.tmpdir() 6/6 Red-Pen + 6/6 Zero-Trust/accounting PoCs PASS, TEMP_RESIDUES=0)`
+- [x] Suite Completa de Voz y VAD (`feat-004`): `npm run test:voice` -> `command and output verified: Exit code 0 (53/53 PASS across 12 suites, 0 fail in 324.72ms)`
+- [x] Compuerta Unificada Deko Labs (`feat-004`): `npm run harness:check` -> `command and output verified: status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (34.43s: check-architecture PASS, validate-harness 100/100, audit-secrets 190 files OK, audit-syntax 267 JS files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, test:unit 253/253 tests across 104 suites PASS, vite build 1566 modules PASS)`
 - [x] Puertas 1-3 de cierre `CLEAN STATE` (`WIP = 0`): `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` -> `command and output verified: Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations / 0 exceptions, zero-trust 13/13 PASS, vite build 1566 modules PASS)`
 
 ## Notes for Next Session

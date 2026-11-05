@@ -151,17 +151,16 @@ describe('🥊 Adversarial Priming, Hesitation & Size Normalization Challenge Ha
       });
     }
 
-    it('3.3. [EMPIRICAL FINDING BUG] "extra grande" is shadowed by GRANDE before reaching GIGANTE', () => {
-      // In normalizeCatalogSizeId:
-      // Line 22: if (/18x24|.../.test(compact) || /\b(grande|large|l)\b/i.test(raw)) return 'GRANDE';
-      // Line 23: if (/24x36|.../.test(compact) || /\b(gigante|extra\s*grande|xl)\b/i.test(raw)) return 'GIGANTE';
-      // "extra grande" triggers line 22 because \bgrande\b matches in "extra grande"!
-      const result = normalizeCatalogSizeId('extra grande');
-      // Documenting the actual behavior to prove the empirical flaw:
+    it('3.3. "extra grande" resolves to GIGANTE without being shadowed by GRANDE', () => {
       assert.strictEqual(
-        result,
-        'GRANDE',
-        'Demonstrates BUG: "extra grande" incorrectly yields GRANDE instead of GIGANTE due to regex evaluation order'
+        normalizeCatalogSizeId('extra grande'),
+        'GIGANTE',
+        '"extra grande" must resolve to GIGANTE before GRANDE regex evaluation'
+      );
+      assert.strictEqual(
+        normalizeCatalogSizeId('Extra Grande'),
+        'GIGANTE',
+        '"Extra Grande" (mixed case) must also resolve to GIGANTE'
       );
     });
 
