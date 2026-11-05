@@ -82,12 +82,6 @@ if [ -d "src" ] || [ -d "server" ]; then
       "index.js": 7
     };
 
-    const LEGACY_SERVER_ALLOWLIST = new Set([
-      "server/controllers/eventController.js->server/config/prisma.js",
-      "server/controllers/eventController.js->server/config/env.js",
-      "server/controllers/saleController.js->server/config/prisma.js"
-    ]);
-
     function stripJsComments(code) {
       let out = "", i = 0, quote = "";
       while (i < code.length) {
@@ -289,15 +283,11 @@ if [ -d "src" ] || [ -d "server" ]; then
           if (!sLayer || !tLayer) continue;
           const tupleKey = sourceRel + "->" + targetRel;
           if (SERVER_LAYER_RANKS[sLayer] < SERVER_LAYER_RANKS[tLayer]) {
-            if (!LEGACY_SERVER_ALLOWLIST.has(tupleKey)) {
-              console.log(["SERVER_BACKWARD", sourceRel, sLayer + " (" + SERVER_LAYER_RANKS[sLayer] + ")", tLayer + " (" + SERVER_LAYER_RANKS[tLayer] + ")", rawSpec, tupleKey].join("|"));
-              process.exit(0);
-            }
+            console.log(["SERVER_BACKWARD", sourceRel, sLayer + " (" + SERVER_LAYER_RANKS[sLayer] + ")", tLayer + " (" + SERVER_LAYER_RANKS[tLayer] + ")", rawSpec, tupleKey].join("|"));
+            process.exit(0);
           } else if (sLayer === "controllers" && tLayer === "config") {
-            if (!LEGACY_SERVER_ALLOWLIST.has(tupleKey)) {
-              console.log(["SERVER_SKIP_CONFIG", sourceRel, "controllers (5)", "config (2)", rawSpec, tupleKey].join("|"));
-              process.exit(0);
-            }
+            console.log(["SERVER_SKIP_CONFIG", sourceRel, "controllers (5)", "config (2)", rawSpec, tupleKey].join("|"));
+            process.exit(0);
           }
         }
       }
@@ -332,14 +322,14 @@ if [ -d "src" ] || [ -d "server" ]; then
         ;;
       "SERVER_BACKWARD")
         red_pen_error \
-          "Violación direccional Backend en '$v_file': la capa '$v_src' importa '$v_spec' desde una capa superior '$v_dst' (tupla '$v_extra' no autorizada)." \
-          "ARCHITECTURE.md exige orden direccional estricto en 'server/': validators (1) -> config (2) -> services (3) -> middleware (4) -> controllers (5) -> routes (6) -> index.js (7)." \
-          "Mueve la dependencia hacia una capa inferior o inyecta el colaborador desde Runtime sin agregar nuevas entradas a LEGACY_SERVER_ALLOWLIST."
+          "Violación direccional Backend en '$v_file': la capa '$v_src' importa '$v_spec' desde una capa superior '$v_dst' (tupla '$v_extra'; 0 excepciones permitidas)." \
+          "ARCHITECTURE.md exige orden direccional estricto sin excepciones en 'server/': validators (1) -> config (2) -> services (3) -> middleware (4) -> controllers (5) -> routes (6) -> index.js (7)." \
+          "Mueve la dependencia hacia una capa inferior o inyecta el colaborador desde Runtime respetando el flujo unidireccional de capas."
         ;;
       "SERVER_SKIP_CONFIG")
         red_pen_error \
-          "Salto ilegal de capas Backend en '$v_file': '$v_src' importa directamente '$v_spec' hacia '$v_dst' (tupla '$v_extra' fuera de las 3 congeladas en LEGACY_SERVER_ALLOWLIST)." \
-          "ARCHITECTURE.md prohíbe que controladores en 'server/controllers/' salten 'server/services/' para acoplarse directamente a 'server/config/*' (prisma/env)." \
+          "Salto ilegal de capas Backend en '$v_file': '$v_src' importa directamente '$v_spec' hacia '$v_dst' (tupla '$v_extra'; 0 excepciones permitidas)." \
+          "ARCHITECTURE.md prohíbe sin excepciones que controladores en 'server/controllers/' salten 'server/services/' para acoplarse directamente a 'server/config/*' (prisma/env)." \
           "Encapsula el acceso a Prisma o configuración dentro de un servicio en 'server/services/' y consúmelo desde '$v_file'."
         ;;
     esac

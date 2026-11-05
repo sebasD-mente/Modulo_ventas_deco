@@ -1,8 +1,7 @@
-import { prisma } from '../config/prisma.js';
 import {
-  createSaleTransaction, updateSaleTransaction, getEventKPIs,
-  getMonitorDashboardMetrics,
+  createSaleTransaction, updateSaleTransaction, getEventKPIs, getMonitorDashboardMetrics,
   getEventSalesList as getEventSalesServiceList, purgeEventSalesTransaction,
+  isTargetEventArchived, queryOrderTrackingList, updateOrderDeliveryRecord,
 } from '../services/saleService.js';
 
 export { postCashClosing, getCashClosingsList } from './cashClosingController.js';
@@ -15,54 +14,27 @@ export async function createSale(req, res) {
     const rawKey = req.headers['idempotency-key'] || bodyKey || null;
     const idempotencyKey = typeof rawKey === 'string' && rawKey.trim() !== '' ? rawKey.trim() : null;
 
-    if (!sellerId || !tenantId) {
-      return res.status(400).json({ success: false, error: 'Contexto de usuario o empresa no válido.' });
-    }
+    if (!sellerId || !tenantId) return res.status(400).json({ success: false, error: 'Contexto de usuario o empresa no válido.' });
+    if (!eventId) return res.status(400).json({ success: false, error: 'El evento destino es obligatorio.' });
 
-    if (!eventId) {
-      return res.status(400).json({ success: false, error: 'El evento destino es obligatorio.' });
-    }
-
-    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0
-      ? req.user.roles
-      : [req.user?.role || 'VENDEDOR'];
+    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0 ? req.user.roles : [req.user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
     const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
     const isVendedor = userRoles.includes('VENDEDOR');
 
-    if (isVendedor && !isSuperAdmin && !isVendedorRedes && req.user?.assignedEventId) {
-      if (eventId !== req.user.assignedEventId) {
-        return res.status(403).json({
-          success: false,
-          error: 'No tienes autorización para registrar ventas en un evento diferente al asignado.',
-        });
-      }
+    if (isVendedor && !isSuperAdmin && !isVendedorRedes && req.user?.assignedEventId && eventId !== req.user.assignedEventId) {
+      return res.status(403).json({ success: false, error: 'No tienes autorización para registrar ventas en un evento diferente al asignado.' });
     }
-
-    if (prisma.event && typeof prisma.event.findFirst === 'function') {
-      try {
-        const targetEvent = await prisma.event.findFirst({
-          where: { id: eventId, tenantId },
-          select: { id: true, status: true },
-        });
-        if (targetEvent && targetEvent.status === 'ARCHIVADO') {
-          return res.status(400).json({ success: false, error: 'No se pueden registrar ventas en un evento archivado.' });
-        }
-      } catch (_) {}
+    if (await isTargetEventArchived({ tenantId, eventId })) {
+      return res.status(400).json({ success: false, error: 'No se pueden registrar ventas en un evento archivado.' });
     }
 
     const sale = await createSaleTransaction({
-      tenantId, sellerId, eventId, items, payments, discount, notes, inputChannel,
-      attachments: attachments || [], idempotencyKey,
+      tenantId, sellerId, eventId, items, payments, discount, notes, inputChannel, attachments: attachments || [], idempotencyKey,
     });
-
     if (sale.idempotentReplay) {
-      return res.status(200).json({
-        success: true, idempotentReplay: true,
-        message: 'Venta previamente registrada (Idempotent Replay).', data: sale,
-      });
+      return res.status(200).json({ success: true, idempotentReplay: true, message: 'Venta previamente registrada (Idempotent Replay).', data: sale });
     }
-
     return res.status(201).json({ success: true, message: 'Venta registrada exitosamente.', data: sale });
   } catch (err) {
     console.error('❌ Error creando venta:', err);
@@ -72,18 +44,12 @@ export async function createSale(req, res) {
 
 export async function updateSale(req, res) {
   try {
-    const { id } = req.params;
     const { items, payments, discount, notes, status } = req.body;
-    const userId = req.user?.id;
-    const tenantId = req.tenantId;
-    const userRole = req.user?.role;
-    const userRoles = req.user?.roles;
-    const assignedEventId = req.user?.assignedEventId;
-
     const updatedSale = await updateSaleTransaction({
-      saleId: id, tenantId, userId, userRole, userRoles, assignedEventId, items, payments, discount, notes, status,
+      saleId: req.params.id, tenantId: req.tenantId, userId: req.user?.id,
+      userRole: req.user?.role, userRoles: req.user?.roles, assignedEventId: req.user?.assignedEventId,
+      items, payments, discount, notes, status,
     });
-
     return res.json({ success: true, message: 'Venta actualizada exitosamente.', data: updatedSale });
   } catch (err) {
     console.error('❌ Error actualizando venta:', err);
@@ -94,16 +60,10 @@ export async function updateSale(req, res) {
 
 export async function getEventSalesList(req, res) {
   try {
-    const { eventId } = req.params;
     const { date, page, limit } = req.query;
-    const tenantId = req.tenantId;
-
-    const result = await getEventSalesServiceList({ tenantId, eventId, date, page, limit });
-
+    const result = await getEventSalesServiceList({ tenantId: req.tenantId, eventId: req.params.eventId, date, page, limit });
     return res.json({
-      success: true,
-      data: result.sales,
-      count: result.sales.length,
+      success: true, data: result.sales, count: result.sales.length,
       pagination: {
         total: result.total, page: result.page, limit: result.limit,
         totalPages: result.totalPages, hasNext: result.hasNext, hasPrev: result.hasPrev,
@@ -117,11 +77,7 @@ export async function getEventSalesList(req, res) {
 
 export async function getEventLiveMetrics(req, res) {
   try {
-    const { eventId } = req.params;
-    const { date } = req.query;
-    const tenantId = req.tenantId;
-
-    const kpis = await getEventKPIs({ tenantId, eventId, date: date || null });
+    const kpis = await getEventKPIs({ tenantId: req.tenantId, eventId: req.params.eventId, date: req.query.date || null });
     return res.json({ success: true, data: kpis });
   } catch (err) {
     console.error('❌ Error obteniendo métricas:', err);
@@ -134,30 +90,19 @@ export async function getMonitorMetrics(req, res) {
     const tenantId = req.tenantId;
     const { date, eventId } = req.query;
     const user = req.user;
-
-    const userRoles = Array.isArray(user?.roles) && user.roles.length > 0
-      ? user.roles
-      : [user?.role || 'VENDEDOR'];
+    const userRoles = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : [user?.role || 'VENDEDOR'];
     const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
     const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
     const isVendedor = userRoles.includes('VENDEDOR');
 
     let targetEventId = eventId || null;
-
-    // 1. Vendedor de redes exclusivo: anclado al canal digital
     if (isVendedorRedes && !isSuperAdmin && !isVendedor) {
       targetEventId = 'evt-ventas-redes-online';
-    }
-    // 2. Vendedor de mostrador ferial: anclado estrictamente a su evento presencial
-    else if (isVendedor && !isSuperAdmin && !isVendedorRedes) {
+    } else if (isVendedor && !isSuperAdmin && !isVendedorRedes) {
       targetEventId = user?.assignedEventId || 'none';
     }
 
-    const data = await getMonitorDashboardMetrics({
-      tenantId,
-      date: date || null,
-      eventId: targetEventId,
-    });
+    const data = await getMonitorDashboardMetrics({ tenantId, date: date || null, eventId: targetEventId });
     return res.json({ success: true, data });
   } catch (err) {
     console.error('❌ Error obteniendo métricas del monitor:', err);
@@ -168,18 +113,10 @@ export async function getMonitorMetrics(req, res) {
 export async function purgeEventSales(req, res) {
   try {
     const { eventId } = req.body;
-    const tenantId = req.tenantId;
-    const userId = req.user?.id;
-
-    if (!eventId) {
-      return res.status(400).json({ success: false, error: 'eventId es requerido.' });
-    }
-
-    const result = await purgeEventSalesTransaction({ tenantId, eventId, userId });
+    if (!eventId) return res.status(400).json({ success: false, error: 'eventId es requerido.' });
+    const result = await purgeEventSalesTransaction({ tenantId: req.tenantId, eventId, userId: req.user?.id });
     return res.json({
-      success: true,
-      message: `Ventas del evento "${result.eventName}" purgadas exitosamente. Secuencia reiniciada a 0.`,
-      data: result,
+      success: true, message: `Ventas del evento "${result.eventName}" purgadas exitosamente. Secuencia reiniciada a 0.`, data: result,
     });
   } catch (err) {
     console.error('❌ Error purgando ventas del evento:', err);
@@ -187,246 +124,31 @@ export async function purgeEventSales(req, res) {
   }
 }
 
-/**
- * Listado integral de pedidos de redes para logística y seguimiento
- */
 export async function getOrderTrackingList(req, res) {
   try {
-    const tenantId = req.tenantId;
-    const { paymentStatus, search, page, limit } = req.query;
-
-    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
-    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
-    const skip = (parsedPage - 1) * parsedLimit;
-
-    const whereClause = {
-      tenantId,
-      orderType: 'REDES_PERSONALIZADO',
-      status: { not: 'ANULADA' },
-    };
-
-    if (paymentStatus === 'CON_SALDO') {
-      whereClause.balanceDue = { gt: 0 };
-    } else if (paymentStatus === 'PAGADO_TOTAL') {
-      whereClause.balanceDue = { lte: 0 };
-    }
-
-    if (search && search.trim()) {
-      const term = search.trim();
-      whereClause.OR = [
-        { saleNumber: { contains: term, mode: 'insensitive' } },
-        { customer: { fullName: { contains: term, mode: 'insensitive' } } },
-        { customer: { phone: { contains: term, mode: 'insensitive' } } },
-      ];
-    }
-
-    const [total, orders] = await Promise.all([
-      prisma.sale.count({ where: whereClause }),
-      prisma.sale.findMany({
-        where: whereClause,
-        include: {
-          customer: {
-            select: {
-              id: true,
-              fullName: true,
-              phone: true,
-              email: true,
-              deliveryAddress: true,
-              department: true,
-              municipality: true,
-            },
-          },
-          items: {
-            select: {
-              id: true,
-              description: true,
-              quantity: true,
-              unitPrice: true,
-              subtotal: true,
-              material: true,
-              customDimensions: true,
-              customImageUrl: true,
-              productionStatus: true,
-            },
-          },
-          payments: {
-            select: {
-              id: true,
-              amount: true,
-              method: true,
-              reference: true,
-              receiptUrl: true,
-              createdAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
-          },
-          seller: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-            },
-          },
-          pickupEvent: {
-            select: {
-              id: true,
-              name: true,
-              location: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: parsedLimit,
-      }),
-    ]);
-
-    const metricsBase = {
-      tenantId,
-      orderType: 'REDES_PERSONALIZADO',
-      status: { not: 'ANULADA' },
-    };
-
-    const [totalCount, pendingBalanceAgg, deliveredCount, inWorkshopCount] = await Promise.all([
-      prisma.sale.count({ where: metricsBase }),
-      prisma.sale.aggregate({
-        where: { ...metricsBase, balanceDue: { gt: 0 } },
-        _sum: { balanceDue: true },
-        _count: { id: true },
-      }),
-      prisma.sale.count({ where: { ...metricsBase, status: 'ENTREGADO' } }),
-      prisma.sale.count({
-        where: {
-          ...metricsBase,
-          status: { not: 'ENTREGADO' },
-          items: {
-            some: {
-              productionStatus: { in: ['PENDIENTE', 'A_PRODUCCION'] },
-            },
-          },
-        },
-      }),
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      data: orders,
-      pagination: {
-        total,
-        page: parsedPage,
-        limit: parsedLimit,
-        totalPages: Math.ceil(total / parsedLimit),
-      },
-      metrics: {
-        totalOrders: totalCount,
-        withBalanceCount: pendingBalanceAgg._count.id || 0,
-        totalBalancePending: Number(pendingBalanceAgg._sum.balanceDue || 0),
-        deliveredCount,
-        inWorkshopCount,
-      },
+    const result = await queryOrderTrackingList({
+      tenantId: req.tenantId, paymentStatus: req.query.paymentStatus,
+      search: req.query.search, page: req.query.page, limit: req.query.limit,
     });
+    return res.status(200).json({ success: true, data: result.orders, pagination: result.pagination, metrics: result.metrics });
   } catch (err) {
     console.error('❌ Error obteniendo listado de seguimiento de pedidos:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Error consultando seguimiento de pedidos.',
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Error consultando seguimiento de pedidos.' });
   }
 }
 
-/**
- * Actualiza la información logística (guía, courier, entrega) de un pedido con trazabilidad forense
- */
 export async function updateOrderDelivery(req, res) {
   try {
-    const { id } = req.params;
     const { shippingCourier, shippingTrackingNumber, isDelivered, deliveryReceiptUrl, deliveryNotes } = req.body;
-    const tenantId = req.tenantId;
-
-    const sale = await prisma.sale.findFirst({
-      where: { id, tenantId, orderType: 'REDES_PERSONALIZADO' },
+    const auditAction = isDelivered ? 'PEDIDO_ENTREGADO' : 'LOGISTICA_ACTUALIZADA';
+    const updated = await updateOrderDeliveryRecord({
+      id: req.params.id, tenantId: req.tenantId,
+      shippingCourier, shippingTrackingNumber, isDelivered, deliveryReceiptUrl, deliveryNotes, user: req.user, auditAction,
     });
-
-    if (!sale) {
-      return res.status(404).json({ success: false, error: 'Pedido de redes no encontrado.' });
-    }
-
-    if (isDelivered === true && Number(sale.balanceDue || 0) > 0) {
-      return res.status(400).json({
-        success: false,
-        error: `No se puede marcar como ENTREGADO el pedido #${sale.saleNumber} porque aún tiene un saldo pendiente de Q ${Number(sale.balanceDue).toFixed(2)}. Registra primero el cobro del saldo.`,
-      });
-    }
-
-    const updateData = {};
-    if (shippingCourier !== undefined) updateData.shippingCourier = shippingCourier ? shippingCourier.trim() : null;
-    if (shippingTrackingNumber !== undefined) updateData.shippingTrackingNumber = shippingTrackingNumber ? shippingTrackingNumber.trim() : null;
-    if (isDelivered === true) {
-      updateData.status = 'ENTREGADO';
-    } else if (isDelivered === false && sale.status === 'ENTREGADO') {
-      updateData.status = Number(sale.balanceDue) > 0 ? 'PENDIENTE' : 'COMPLETADA';
-    }
-
-    const actorName = req.user?.fullName || req.user?.email || 'Usuario';
-    const userRoles = Array.isArray(req.user?.roles) && req.user.roles.length > 0 ? req.user.roles : [req.user?.role || 'STAFF'];
-    const actorRole = userRoles[0];
-    const logDetails = [
-      `Logística/Entrega registrada por: ${actorName} (${actorRole})`,
-      isDelivered ? 'ESTADO: ENTREGADO' : null,
-      deliveryReceiptUrl ? `Recibo: ${deliveryReceiptUrl}` : null,
-      deliveryNotes ? `Nota: ${deliveryNotes}` : null,
-    ].filter(Boolean).join(' • ');
-
-    const newStamp = `[${logDetails}]`;
-    updateData.notes = sale.notes ? `${sale.notes}\n${newStamp}` : newStamp;
-
-    const updated = await prisma.sale.update({
-      where: { id },
-      data: updateData,
-      include: {
-        customer: true,
-        items: true,
-        payments: true,
-      },
-    });
-
-    try {
-      if (prisma.auditLog?.create) {
-        await prisma.auditLog.create({
-          data: {
-            tenantId,
-            userId: req.user.id,
-            action: isDelivered ? 'PEDIDO_ENTREGADO' : 'LOGISTICA_ACTUALIZADA',
-            entity: 'sale',
-            entityId: sale.id,
-            details: {
-              saleId: sale.id,
-              saleNumber: sale.saleNumber,
-              isDelivered,
-              shippingCourier,
-              shippingTrackingNumber,
-              deliveryReceiptUrl,
-              deliveryNotes,
-              actorName,
-              actorRole,
-            },
-          },
-        });
-      }
-    } catch (auditErr) {
-      console.warn('[updateOrderDelivery] Error auditLog:', auditErr.message);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Logística de entrega actualizada exitosamente.',
-      data: updated,
-    });
+    return res.status(200).json({ success: true, message: 'Logística de entrega actualizada exitosamente.', data: updated });
   } catch (err) {
+    if (err.statusCode === 404 || err.statusCode === 400) return res.status(err.statusCode).json({ success: false, error: err.message });
     console.error('❌ Error actualizando logística del pedido:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || 'Error al actualizar logística de entrega.',
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Error al actualizar logística de entrega.' });
   }
 }

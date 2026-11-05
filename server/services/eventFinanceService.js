@@ -254,3 +254,61 @@ export async function deleteEventExpense({ tenantId, eventId, expenseId }) {
     financials: updated.financials,
   };
 }
+
+/**
+ * Calcula el resumen financiero de un único evento con fallback resiliente.
+ */
+export async function computeEventFinancialSummary({ tenantId, event }) {
+  try {
+    const salesAgg = await prisma.sale.aggregate({
+      where: { tenantId, eventId: event.id, status: { not: 'ANULADA' } },
+      _sum: { totalAmount: true },
+    });
+    const expenses = (prisma.eventExpense && typeof prisma.eventExpense.findMany === 'function')
+      ? await prisma.eventExpense.findMany({ where: { tenantId, eventId: event.id } })
+      : [];
+    return calculateEventFinancials({
+      event,
+      cumulativeSold: Number(salesAgg._sum?.totalAmount || 0),
+      expenses,
+    });
+  } catch (_fErr) {
+    return calculateEventFinancials({ event, cumulativeSold: 0, expenses: [] });
+  }
+}
+
+/**
+ * Carga mapas agregados de ventas y gastos por evento para todo un tenant.
+ */
+export async function loadTenantEventsFinancialMaps({ tenantId }) {
+  const salesByEvent = new Map();
+  try {
+    const salesAgg = await prisma.sale.groupBy({
+      by: ['eventId'],
+      where: { tenantId, status: { not: 'ANULADA' } },
+      _sum: { totalAmount: true },
+      _count: { id: true },
+    });
+    salesAgg.forEach((r) => {
+      if (r.eventId) {
+        salesByEvent.set(r.eventId, {
+          totalSold: Number(Number(r._sum?.totalAmount || 0).toFixed(2)),
+          salesCount: r._count?.id || 0,
+        });
+      }
+    });
+  } catch (_) {}
+
+  const expensesByEvent = new Map();
+  try {
+    if (prisma.eventExpense && typeof prisma.eventExpense.findMany === 'function') {
+      const allExpenses = await prisma.eventExpense.findMany({ where: { tenantId } });
+      allExpenses.forEach((exp) => {
+        if (!expensesByEvent.has(exp.eventId)) expensesByEvent.set(exp.eventId, []);
+        expensesByEvent.get(exp.eventId).push(exp);
+      });
+    }
+  } catch (_) {}
+
+  return { salesByEvent, expensesByEvent };
+}

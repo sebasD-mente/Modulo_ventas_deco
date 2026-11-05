@@ -14,3 +14,6 @@ export { getHourlySalesAnalytics, getTopSellingPosters } from './sales/saleAnaly
 export { createCashClosingTransaction } from './sales/cashClosingService.js';
 export { runMidnightClosingAudit } from './sales/midnightClosingService.js';
 export { purgeEventSalesTransaction } from './sales/salePurgeService.js';
+export {
+  isTargetEventArchived, queryOrderTrackingList, updateOrderDeliveryRecord,
+} from './sales/orderTrackingService.js';

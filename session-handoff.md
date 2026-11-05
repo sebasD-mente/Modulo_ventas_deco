@@ -1,52 +1,40 @@
 # Session Handoff
 
 ## Current Objective
-- **Goal:** Ola 2 (`feat-002`) completada y verificada (`LEGACY_SERVER_ALLOWLIST 9 -> 3`, dominio `catalog` en calificación `A`); repositorio listo en `clean-state` para iniciar el cierre final **`feat-003`** (`3 -> 0`) bajo `WIP = 1` y Modo Crítico (`/goal`).
-- **Current status:** `clean-state` (`WIP = 0`; `feat-000`, `feat-001` y `feat-002` en `done`; `feat-003` en `not-started`; `Overall: 100/100`)
-- **Branch / commit:** `main` (commits atómicos locales; `0` `git push` y `0` `npm run deploy`)
+- **Goal:** Hitos `feat-000`, `feat-001`, `feat-002` y `feat-003` completados, auditados (`12 / 12 ACEPTAR`) y sellados en `CLEAN STATE` (`WIP = 0`), con `0` excepciones arquitectónicas en todo el repositorio (`LEGACY_SERVER_ALLOWLIST` eliminada de `13 -> 0`).
+- **Current status:** `clean-state` (`WIP = 0`; `feat-000..003` en `done`; `Overall: 100/100`; `Checker R3: 12/12 ACEPTAR`)
+- **Branch / commit:** `main` (commits atómicos locales de las 3 olas listos; pendiente `git push` sujeto a revisión final en `localhost` y orden del usuario)
 
 ## Completed This Session
-- [x] Ejecutado el flujo completo de arranque de `AGENTS.md` (`pwd`, lectura de `AGENTS.md`, `progress.md`, `session-handoff.md`, `feature_list.json`, `git log` y `bash ./init.sh` en línea base `100/100`).
-- [x] Formalizado `sprint-contract.md` previo al código y ejecutada **`feat-002`** bajo `WIP = 1`: extraído `listEventCashClosings` a `server/services/sales/cashClosingService.js` para limpiar `cashClosingController.js`, expuesto `queryCatalogProducts` en `server/services/catalogSyncService.js` (`22L <= 25L`) para limpiar `catalogController.js` (`83L <= 90L`), creado `server/services/authService.js` (`183L <= 200L`) para limpiar `authController.js` y creado `server/services/userService.js` (`157L <= 200L`) para limpiar `userController.js` manteniendo `invalidateUserAuthCache` en capa `Controller` (`rango 5 -> 4`).
-- [x] Reducida `LEGACY_SERVER_ALLOWLIST` de `9` a `3` tuplas en `scripts/check-architecture.sh`, actualizados `ARCHITECTURE.md` y `docs/QUALITY_SCORE.md` (`catalog: B -> A`), y verificadas las 3 Puertas (`init.sh`), `npm run harness:check` (`HARNESS_PASS`) y pruebas forenses/sandbox `os.tmpdir()`.
+- [x] Revisión integral de código y diffs de las 3 olas (`feat-001`, `feat-002`, `feat-003`) y ejecución de suites unitarias, forenses y de seguridad (`0` regresiones introducidas).
+- [x] Lanzamiento de instancia virgen `Checker` `one-shot` (`29a7daf5-e1c0-47bc-9de9-18748529c807`) sobre `Round 3` (`feat-003`), obteniendo veredicto **`✅ Pass — 12 / 12 ACEPTAR`** en `evaluator-rubric.md`.
+- [x] Cierre formal de `feat-003` en `done` (`WIP = 0`), actualización del trinquete en `loop-state.md` (`Completed`, `HEAD->commit(feat-003)`), sincronización de `sprint-contract.md`, `progress.md` y `session-handoff.md` (`0 CRLF`), y consolidación en commit atómico local.
 
 ## Verification Evidence
 
 | Check | Command | Result | Notes |
 | :--- | :--- | :--- | :--- |
-| Vigilante Arquitectónico Dual (Puerta 1) | `bash scripts/check-architecture.sh` | `PASS (Exit code 0)` | `3` tuplas restantes en `LEGACY_SERVER_ALLOWLIST` (`eventController` y `saleController`), rechazo Bolígrafo Rojo verificado en `os.tmpdir()` |
-| Validación de los 5 Subsistemas y DAG (Puerta 2) | `node scripts/validate-harness.mjs --min-score 100` | `PASS (100/100)` | `25/25` checks PASS (`feat-000..002` en `done` con evidencia y `required_files` en disco, `WIP = 0`) |
-| Compuerta Unificada Deko Labs | `npm run harness:check` | `HARNESS_PASS (30.42s)` | `188` archivos sin secretos, `265` archivos JS válidos, `12/12` Zero-Trust, `253/253` tests en `104` suites y `vite build` |
-| Inicialización en 3 Puertas (`init.sh`) | `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` | `PASS (Exit code 0)` | `100%` offline: Puertas 1-3 superadas en estado limpio |
+| Vigilante Arquitectónico Tolerancia Cero (Puerta 1) | `bash scripts/check-architecture.sh` | `PASS (Exit code 0)` | `0` excepciones en `src/` y `server/` (`LEGACY_SERVER_ALLOWLIST` erradicada; `4/4` violaciones sintéticas rechazadas con Bolígrafo Rojo) |
+| Validación de los 5 Subsistemas y DAG (Puerta 2) | `node scripts/validate-harness.mjs --min-score 100` | `PASS (100/100)` | `25/25` checks PASS (`feat-000..003` en `done`, `Pass-State Gating` verificado en disco, `WIP = 0`) |
+| Compuerta Unificada Deko Labs | `npm run harness:check` | `HARNESS_PASS (30.55s)` | `190` archivos sin secretos, `267` JS sintaxis OK, `12/12` Zero-Trust, `253/253` unit tests (`104` suites) y `vite build` |
+| Auditoría Checker Independiente (`One-Shot` R3) | `invoke_subagent` virgen (`29a7daf5`) | `12 / 12 ACEPTAR` | `evaluator-rubric.md` actualizada con `0 CRLF` y evidencia medida en vivo (`9197 ms`) |
 
 ## Files Changed
-- `server/services/sales/cashClosingService.js`
-- `server/controllers/cashClosingController.js`
-- `server/services/catalogSyncService.js`
-- `server/controllers/catalogController.js`
-- `server/services/authService.js` (nuevo)
-- `server/controllers/authController.js`
-- `server/services/userService.js` (nuevo)
-- `server/controllers/userController.js`
-- `scripts/check-architecture.sh`
-- `ARCHITECTURE.md`
-- `docs/QUALITY_SCORE.md`
-- `feature_list.json`
-- `sprint-contract.md`
-- `progress.md`
-- `session-handoff.md`
+- `server/services/sales/orderTrackingService.js`, `server/services/saleService.js`, `server/controllers/saleController.js`
+- `server/services/eventFinanceService.js`, `server/services/eventService.js`, `server/controllers/eventController.js`
+- `scripts/check-architecture.sh`, `ARCHITECTURE.md`, `docs/QUALITY_SCORE.md`
+- `evaluator-rubric.md`, `feature_list.json`, `loop-state.md`, `sprint-contract.md`, `progress.md`, `session-handoff.md`
 
 ## Decisions Made
-- `authService.js` expone `authEnv` (adaptador inmutable de solo lectura para `GOOGLE_CLIENT_ID`) y `googleClient` mientras encapsula `JWT_SECRET`, `SUPER_ADMIN_EMAILS` y todas las consultas `prisma.{tenant,user}`, conservando validación criptográfica ejecutable real en `authController.js` compatible con las auditorías `A-12`.
-- `userController.js` conserva `invalidateUserAuthCache(id)` (`rango 5 -> 4`) y la cláusula explícita `where: { id, tenantId: req.tenantId }` al delegar a `userService.js` (`rango 3`), respetando tanto la jerarquía de capas como la auditoría `P0-7`.
+- Consolidar `feat-003` en commit local atómico tras recibir `12/12 ACEPTAR` del `Checker` independiente antes de levantar `localhost` para pruebas en vivo, garantizando que `/health` reporte el hash real del árbol limpio y que `git status` permanezca vacío.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `0` cambios en `src/` o `prisma/`).
+- Ninguno activo (`0` lectura de `.env`; `0` mutaciones destructivas en BD de producción).
 
 ## Next Session Startup
 1. Confirmar `pwd` y revisar `git log --oneline -5`.
 2. Leer `AGENTS.md`, `progress.md`, `session-handoff.md` y `feature_list.json`.
-3. Ejecutar `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` para confirmar línea base `100/100`.
+3. Ejecutar `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` antes de editar cualquier archivo.
 
 ## Recommended Next Step
-- Iniciar **`feat-003`** (*Ola 3: Desacoplamiento de Ventas y Eventos y Eliminación Total de `LEGACY_SERVER_ALLOWLIST 3 -> 0`*) en **Modo Crítico (`/goal`)**: actualizar `sprint-contract.md` y `loop-state.md`, pasar `feat-003` a `in-progress` (`WIP = 1`), extraer las consultas `prisma` y `ENV` de `saleController.js` y `eventController.js` hacia `saleService.js` y `eventService.js` (respetando `invalidateUserAuthCache` y `const hasRel = Array.isArray(ev.assignedSellers);` en `eventController.js`), eliminar por completo `LEGACY_SERVER_ALLOWLIST`, verificar `init.sh` + `npm run harness:check` y auditar con un sub-agente *Checker* `one-shot` virgen antes de sellar en `done`.
+- Tras completar las pruebas en vivo en `localhost` y contar con la confirmación del usuario, ejecutar `git push` (si el usuario lo autoriza) o registrar el próximo requerimiento funcional como `feat-004` bajo `WIP = 1`.

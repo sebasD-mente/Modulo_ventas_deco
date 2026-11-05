@@ -120,15 +120,16 @@
     {
       "id": "feat-003",
       "name": "Ola 3: Desacoplamiento de Ventas y Eventos y Eliminación Total de LEGACY_SERVER_ALLOWLIST (3 -> 0)",
-      "description": "Cerrar las últimas 3 tuplas heredadas de LEGACY_SERVER_ALLOWLIST bajo Modo Crítico (/goal) con auditoría independiente Maker-Checker one-shot: (1) trasladar las 14 consultas prisma.{event,sale,auditLog} de saleController.js hacia server/services/saleService.js y server/services/sales/; (2) crear server/services/eventService.js (apoyado en eventFinanceService.js) para encapsular ENV.NODE_ENV, prisma.$transaction y las 37 consultas prisma.{event,sale,eventExpense,user,cashClosing} de eventController.js; y (3) eliminar por completo LEGACY_SERVER_ALLOWLIST en scripts/check-architecture.sh (0 excepciones permitidas), actualizando ARCHITECTURE.md y elevando Runtime Backend y Eventos a calificación A en docs/QUALITY_SCORE.md.",
+      "description": "Cerrar las últimas 3 tuplas heredadas de LEGACY_SERVER_ALLOWLIST bajo Modo Crítico (/goal) con auditoría independiente Maker-Checker one-shot: (1) trasladar las 14 consultas prisma.{event,sale,auditLog} de saleController.js hacia server/services/saleService.js y server/services/sales/orderTrackingService.js; (2) crear server/services/eventService.js (apoyado en eventFinanceService.js) para encapsular ENV.NODE_ENV, prisma.$transaction y las 37 consultas prisma.{event,sale,eventExpense,user,cashClosing} de eventController.js; y (3) eliminar por completo LEGACY_SERVER_ALLOWLIST en scripts/check-architecture.sh (0 excepciones permitidas), actualizando ARCHITECTURE.md y elevando Runtime Backend y Eventos a calificación A en docs/QUALITY_SCORE.md.",
       "area": "backend-architecture-sales-events-zero-debt",
       "user_visible_behavior": "Las ventas POS en mostrador, el aislamiento por vendedor/evento, la inmutabilidad post-cierre y la administración financiera de ferias operan sin cambios visuales ni de API, dejando el backend de STAND {IA} con 0 excepciones arquitectónicas y calificación A integral.",
       "priority": "P1",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-002"
       ],
       "required_files": [
+        "server/services/sales/orderTrackingService.js",
         "server/services/saleService.js",
         "server/services/eventService.js",
         "server/services/eventFinanceService.js",
@@ -146,7 +147,8 @@
         "node scripts/validate-harness.mjs --min-score 100",
         "npm run harness:check"
       ],
-      "notes": "Ejecutar en Modo Crítico (/goal) con sub-agente Checker one-shot aislado (zero-inheritance) antes de sellar en done. Cero lectura de .env, cero cambios en prisma/ o src/, cero debilitamiento de pruebas, cero git push / npm run deploy. Guardarraíl estricto de capas: mantener invalidateUserAuthCache en eventController.js (rango 5 -> 4), nunca en server/services/ (rango 3). Preservar códigos HTTP 400/403/404/409 e invariantes verificadas por tests/unit/counter-seller-isolation.test.js, tests/unit/digital-event-monitor.test.js, tests/adversarial/m4-closing-immutability-thumbnails.test.js y tests/adversarial/surgery-{053,056,060}."
+      "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, 9197ms Checker offline, Overall: 100/100, 25/25 PASS, check-architecture 0 violations with LEGACY_SERVER_ALLOWLIST completely removed / 0 exceptions allowed, audit-secrets 190 files OK, verify-gemini-models PASS, zero-trust 12/12, vite build 1566 modules in 3.80s); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.55s: 267 JS syntax OK, 12/12 zero-trust, 253/253 unit tests across 104 suites, vite build PASS); os.tmpdir() adversarial zero-tolerance suite -> PASS (1755.5ms < 2s, 4/4 synthetic Controller->Config & Service->Middleware violations rejected with Red-Pen Exit code 1, 0 residues); Independent One-Shot Checker R3 (29a7daf5) -> 12/12 ACEPTAR in evaluator-rubric.md (0 CRLF).",
+      "notes": "Ejecutada y certificada en Modo Crítico (/goal) con sub-agente Checker one-shot aislado (29a7daf5, zero-inheritance). Cero lectura de .env, cero cambios en prisma/ o src/, cero debilitamiento de pruebas, cero git push / npm run deploy."
     }
   ]
 }
