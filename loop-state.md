@@ -5,12 +5,12 @@
 
 ## Basic Info & Circuit Breaker Monitor
 - **Loop Name:** `deko-eventsales-wave3-zero-allowlist`
-- **Active Target:** `feat-003 (Ola 3: Desacoplamiento de Ventas y Eventos y Eliminación Total de LEGACY_SERVER_ALLOWLIST 3 -> 0 — Completada)`
+- **Active Target:** `feat-003 (Ola 3: Desacoplamiento de Ventas y Eventos, Endurecimiento Zero-Trust y Eliminación Total de LEGACY_SERVER_ALLOWLIST 3 -> 0 — Completada)`
 - **Started At:** `2026-11-04T17:36:00-06:00`
-- **Current Round:** `3 / 15 (Max — Candado 1)`
+- **Current Round:** `5 / 15 (Max — Candado 1)`
 - **Current Status:** `Completed` (`Idle` | `In Progress` | `Completed` | `BLOCKED - Circuit Breaker Tripped`)
-- **Elapsed Time / Cap:** `48m / 90m Max (15m Max per Round / $5 USD / 250,000 tokens — Candado 2)`
-- **Net Passing Checks (Ratchet):** `Baseline: 0/25 -> Round 1: 25/25 (Checker 9/12 REVISAR) -> Round 2: 25/25 (100/100, Checker 12/12 ACEPTAR, 52d7c3c) -> Round 3: 25/25 (100/100, Checker 12/12 ACEPTAR, HEAD->commit(feat-003))`
+- **Elapsed Time / Cap:** `59m / 90m Max (15m Max per Round / $5 USD / 250,000 tokens — Candado 2)`
+- **Net Passing Checks (Ratchet):** `Baseline: 0/25 -> Round 1: 25/25 (9/12 REVISAR) -> Round 2: 25/25 (12/12 ACEPTAR, 52d7c3c) -> Round 3: 25/25 (10/12 REVISAR en 87669f83 vs 8567e58; fix Zero-Trust 13/13 en 833d5af) -> Round 4: 25/25 (10/12 REVISAR en af936337 por desincronización de estado) -> Round 5: 25/25 (100/100, Checker 12/12 ACEPTAR en 9199e5d7, HEAD->commit(feat-003))`
 - **Consecutive Stagnant Rounds:** `0 / 3 Max (Candado 3)`
 - **Oscillating Tests Detected (`PASS -> FAIL -> PASS -> FAIL`):** `None (Candado 4)`
 
@@ -38,10 +38,30 @@
 - **Git Action (Ratchet):** `Atomic local commit advancing the Ratchet (52d7c3c, kept; 0 git push / 0 deploy)`
 - **Next Round Adjustment:** `Loop base completado en CLEAN STATE (WIP = 0).`
 
-### Round 3 (Cierre Certificado `feat-003` Tolerancia Cero — Auditada por Nuevo Checker `One-Shot` `29a7daf5`)
-- **Maker Approach:** Extraídas las 14 consultas `prisma.{event,sale,auditLog}` de `saleController.js` (`154L <= 160L`) hacia `server/services/sales/orderTrackingService.js` (`189L`) re-exportado desde `saleService.js` (`19L < 35L`); creado `server/services/eventService.js` (`274L`) apoyado en `eventFinanceService.js` para encapsular `ENV.NODE_ENV`, `prisma.$transaction` y las 37 consultas Prisma fuera de `eventController.js` (`183L <= 190L`) manteniendo `invalidateUserAuthCache()` en capa `Controller` (`rango 5 -> 4`); y eliminada por completo `LEGACY_SERVER_ALLOWLIST` en `scripts/check-architecture.sh` (`3 -> 0` excepciones), elevando `events` y `Runtime Backend` a `A` en `docs/QUALITY_SCORE.md`.
-- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — 9197ms Checker offline, Overall: 100/100, 25/25 PASS, HARNESS_PASS en 30.55s)`
-- **Independent Checker Verdict:** `✅ Pass — 12 / 12 ACEPTAR` (instancia `one-shot` virgen `29a7daf5-e1c0-47bc-9de9-18748529c807`, cerrada definitivamente sin `send_message`)
+### Round 3 (Ola 3 `feat-003` — Desacoplamiento `3 -> 0` y Hallazgo Zero-Trust en `eventController`)
+- **Maker Approach:** Extraídas las 14 consultas `prisma.{event,sale,auditLog}` de `saleController.js` (`154L <= 160L`) hacia `server/services/sales/orderTrackingService.js` (`189L`) re-exportado desde `saleService.js` (`19L < 35L`), creado `server/services/eventService.js` (`274L`) apoyado en `eventFinanceService.js` (`314L`) y eliminada `LEGACY_SERVER_ALLOWLIST` en `scripts/check-architecture.sh` (`3 -> 0` excepciones, commit `8567e58`). Tras el hallazgo Zero-Trust de `87669f83` sobre `...req.body` en `createEvent`/`updateEvent`, se eliminó el spread desestructurando explícitamente campos permitidos en `eventController.js` (`185L <= 190L`) y se añadió la 13.ª prueba permanente en `tests/security/zero-trust.test.js` (`319L`, `13/13 PASS`, commit `833d5af`).
+- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — Overall: 100/100, 25/25 PASS, zero-trust 13/13 PASS)`
+- **Independent Checker Verdict:** `❌ Fail — 10 / 12 REVISAR` en Checker `87669f83` (por `...req.body` en `eventController.js`; corregido en `833d5af`, mientras sesión concurrente `29a7daf5` había sellado prematuramente `8567e58` en `done`)
+- **Net Passing Checks Count:** `25 / 25 (Overall: 100/100; Zero-Trust 12/12 -> 13/13)`
+- **Issues Found by Checker:** `1` (`Critical` Zero-Trust: `...req.body` en `createEvent`/`updateEvent` podía sobrescribir `tenantId`/`id`, cerrado y blindado en `833d5af`)
+- **Human intervention needed:** `No`
+- **Git Action (Ratchet):** `Commits locales 8567e58 y 833d5af conservados (kept; 0 git push / 0 deploy)`
+- **Next Round Adjustment:** `Auditar el cierre Zero-Trust con un nuevo Checker one-shot virgen en Round 4.`
+
+### Round 4 (Re-Auditoría Zero-Trust y Detección de Desincronización Documental — Checker `One-Shot` `af936337`)
+- **Maker Approach:** Presentación del árbol con `8567e58` + `833d5af` (`13/13` Zero-Trust y `0` excepciones arquitectónicas) ante una nueva instancia `Checker` virgen (`af936337-0d77-454d-9cfd-2dda31b83289`).
+- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — 9192ms Checker offline, Overall: 100/100, 25/25 PASS, HARNESS_PASS en 36.75s)`
+- **Independent Checker Verdict:** `❌ Fail — 10 / 12 REVISAR` (instancia `one-shot` virgen `af936337`, cerrada definitivamente sin `send_message`)
+- **Net Passing Checks Count:** `25 / 25 (Overall: 100/100; código y seguridad 2/2 en Corrección, Verificación, Fiabilidad y Mantenibilidad)`
+- **Issues Found by Checker:** `1` (`Medium` Gobernanza: el commit concurrente `8567e58` había dejado `feat-003` en `"status": "done"` antes del veredicto de `Round 4` y desincronizado `loop-state.md`, `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` frente a `docs/QUALITY_SCORE.md:59` y `git log`)
+- **Human intervention needed:** `No`
+- **Git Action (Ratchet):** `Caso B — Iteración correctiva acotada in-place ((revised-in-place) / revised; 0 git reset destructivo)`
+- **Next Round Adjustment:** `Restablecer feat-003 a status "in-progress" (WIP = 1), incluir tests/security/zero-trust.test.js en required_files, alinear métricas reales (13/13 Zero-Trust, eventController.js 185L y hashes 8567e58 / 833d5af) en todos los artefactos de estado y lanzar un nuevo Checker one-shot virgen en Round 5.`
+
+### Round 5 (Cierre Certificado de Gobernanza y Tolerancia Cero — Auditada por Nuevo Checker `One-Shot` `9199e5d7`)
+- **Maker Approach:** Sin tocar código de producción ya certificado (`0` diffs en `server/` y `tests/` respecto a `833d5af`), se sincronizaron `feature_list.json` (`12/12` `required_files` con `0 CRLF`), `loop-state.md` (con los hashes reales `8567e58` y `833d5af`), `docs/QUALITY_SCORE.md`, `sprint-contract.md`, `progress.md` y `session-handoff.md` (`13/13` Zero-Trust, `253/253` unit tests, `saleService.js 19L`, `saleController.js 154L`, `eventController.js 185L`) antes de someter `Round 5` a una instancia `Checker` `one-shot` virgen.
+- **Basic Check (`bash ./init.sh`):** `Pass (Exit code 0 — 9261ms Checker R5 offline, Overall: 100/100, 25/25 PASS, HARNESS_PASS en 31.13s)`
+- **Independent Checker Verdict:** `✅ Pass — 12 / 12 ACEPTAR` (instancia `one-shot` virgen `9199e5d7-a214-4bd9-8530-d7c10f8534ae`, cerrada definitivamente sin `send_message`)
 - **Net Passing Checks Count:** `25 / 25 (Overall: 100/100)`
 - **Issues Found by Checker:** `None (0)`
 - **Human intervention needed:** `No`
@@ -54,12 +74,12 @@
 
 | Metric | Value |
 | :--- | :--- |
-| **Rounds completed** | `3` |
-| **Passed rounds** | `2` (`Round 2`: `12/12 ACEPTAR`; `Round 3`: `12/12 ACEPTAR`) |
-| **Failed rounds** | `1` (`Round 1`: `9/12 REVISAR`) |
-| **Total issues found** | `3` (100% resueltos y verificados desde `Round 2`) |
+| **Rounds completed** | `5` |
+| **Passed rounds** | `2` (`Round 2`: `12/12 ACEPTAR`; `Round 5`: `12/12 ACEPTAR`) |
+| **Failed rounds** | `3` (`Round 1`: `9/12 REVISAR`; `Round 3`: `10/12 REVISAR` Zero-Trust; `Round 4`: `10/12 REVISAR` sincronización documental) |
+| **Total issues found** | `5` (`100%` resueltos y verificados al cierre de `Round 5`) |
 | **Human interventions** | `0` |
-| **Files changed** | `15` en `Round 3` (`orderTrackingService.js`, `saleService.js`, `saleController.js`, `eventFinanceService.js`, `eventService.js`, `eventController.js`, `check-architecture.sh`, `ARCHITECTURE.md`, `QUALITY_SCORE.md` y artefactos de estado/rúbrica) |
+| **Files changed** | `16` en `feat-003` (`orderTrackingService.js`, `saleService.js`, `saleController.js`, `eventFinanceService.js`, `eventService.js`, `eventController.js`, `zero-trust.test.js`, `check-architecture.sh`, `ARCHITECTURE.md`, `QUALITY_SCORE.md` y artefactos de estado/rúbrica) |
 
 ---
 
@@ -77,7 +97,10 @@
 timestamp	commit_hash	harness_score	checks_passed	ratchet_status	description
 2026-11-03T21:15	(revised-in-place)	100/100	25/25	revised	round-1: Checker one-shot 046edf88 reporto 9/12 REVISAR (!AGENTS.md, .gitattributes eol=lf y cota ~8.8s)
 2026-11-03T21:33	52d7c3c	100/100	25/25	kept	round-2: Checker one-shot 27bb88dc otorgo 12/12 ACEPTAR; hito base Brownfield sellado en done con WIP=0 y 0 CRLF
-2026-11-04T18:05	HEAD->commit(feat-003)	100/100	25/25	kept	round-3: Checker one-shot 29a7daf5 otorgo 12/12 ACEPTAR; LEGACY_SERVER_ALLOWLIST eliminada (3->0) y feat-003 sellada en done con WIP=0
+2026-11-04T18:04	8567e58	100/100	25/25	kept	round-3a: desacoplamiento LEGACY_SERVER_ALLOWLIST 3->0; Checker 87669f83 detecto ...req.body en eventController (10/12 REVISAR)
+2026-11-04T18:07	833d5af	100/100	25/25	kept	round-3b: cierre Zero-Trust en eventController (185L) sin ...req.body y 13a prueba en zero-trust.test.js (13/13 PASS)
+2026-11-04T18:16	(revised-in-place)	100/100	25/25	revised	round-4: Checker one-shot af936337 reporto 10/12 REVISAR por cierre prematuro done y desincronizacion de artefactos de estado
+2026-11-04T18:28	HEAD->commit(feat-003)	100/100	25/25	kept	round-5: Checker one-shot 9199e5d7 otorgo 12/12 ACEPTAR; gobernanza sincronizada al 100% y feat-003 sellada en done con WIP=0
 ```
 
 *(Nota operativa: si una ronda futura falla la verificación o recibe `❌ Fail` irreversible del Checker `one-shot`, se restaura el árbol limpio al último commit verde mediante `git restore --worktree --staged .` o `git checkout -- .` —compatible con `PreToolUse`— y se añade aquí una fila con `commit_hash = (reverted)` y `ratchet_status = reverted` documentando qué enfoque falló).*
@@ -92,8 +115,8 @@ timestamp	commit_hash	harness_score	checks_passed	ratchet_status	description
 ## Final Result
 
 - **Final status:** `Completed` (`Completed` | `Failed` | `Manually stopped` | `In Progress` | `Idle`)
-- **Finished at:** `2026-11-04T18:05:00-06:00`
-- **Summary:** `Completadas y certificadas las 3 olas quirúrgicas (feat-001, feat-002 y feat-003) reduciendo LEGACY_SERVER_ALLOWLIST de 13 a 0 excepciones con dictamen 12/12 ACEPTAR del Checker independiente (29a7daf5), 10/10 dominios y 6/6 capas en calificación A.`
+- **Finished at:** `2026-11-04T18:28:33-06:00`
+- **Summary:** `Completadas y certificadas las 3 olas quirúrgicas (feat-001, feat-002 y feat-003) reduciendo LEGACY_SERVER_ALLOWLIST de 13 a 0 excepciones, blindando Zero-Trust 13/13 en eventController y sellando Round 5 con dictamen 12/12 ACEPTAR del Checker independiente (9199e5d7), 10/10 dominios y 6/6 capas en calificación A.`
 
 ---
 
