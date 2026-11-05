@@ -150,6 +150,31 @@
       ],
       "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, 9187ms Checker 15a71c9f & 9261ms Checker 9199e5d7 offline, Overall: 100/100, 25/25 PASS, check-architecture 0 violations with LEGACY_SERVER_ALLOWLIST completely removed / 0 exceptions allowed, audit-secrets 190 files OK, verify-gemini-models PASS, zero-trust 13/13 including eventController createEvent/updateEvent tenantId & id isolation, vite build 1566 modules in 3.81s); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (33.41s: 267 JS syntax OK, 13/13 zero-trust, 253/253 unit tests across 104 suites, vite build PASS); os.tmpdir() adversarial & Zero-Trust suite -> PASS (6/6 synthetic layer violations rejected with Red-Pen Exit code 1 + 6/6 in-memory Zero-Trust/accounting PoCs PASS, 0 residues); line caps verified (saleService.js 19L < 35L, saleController.js 154L <= 160L, eventController.js 185L <= 190L, 53/53 governed files 0 CRLF); Independent One-Shot Checkers R5 (15a71c9f, convergent with 9199e5d7) -> 12/12 ACEPTAR in evaluator-rubric.md.",
       "notes": "Ejecutada y certificada en Modo Crítico (/goal, WIP = 0 tras cierre): endurecimiento Zero-Trust 13/13 en tests/security/zero-trust.test.js (833d5af) y sincronización integral certificada con 12/12 ACEPTAR por los Checkers one-shot vírgenes de Round 5 (15a71c9f, convergente con 9199e5d7 en 136c260). Cero lectura de .env, cero cambios en prisma/ o src/, cero git push / npm run deploy."
+    },
+    {
+      "id": "feat-004",
+      "name": "Alineación de Suites Históricas de Voz a Cohesión de Dominio Real (npm run test:voice 53/53 PASS sin Código Ravioli)",
+      "description": "Actualizar únicamente las 7 aserciones históricas desfasadas en las 3 suites de voz bajo autorización arquitectónica explícita del usuario (Opción A: privilegiar cohesión de dominio real sobre micro-techos arbitrarios de líneas, sin tocar server/ ni src/): (1) reemplazar los antiguos topes rígidos de conteo de líneas de aiMediaController.js (<= 220) y aiMediaService.js (<= 280) en tests/ai/voice-lexical-priming-hesitation.test.js y tests/ai/voice-vad-reengineering.test.js por invariantes reales de cohesión de dominio y respeto de capas (ausencia de imports directos a config/prisma.js o config/env.js en aiMediaController.js, preservación de sus 6 handlers multimodales con telemetría recordLlmInteraction y contratos de inferencia en aiMediaService.js), conservando intactos los demás contratos de ambas suites; (2) alinear en tests/ai/voice-vad-reengineering.test.js (Archivo A: useAiVoiceRecorder.js) la aserción del hard timeout parametrizado (maxDurationMs = 15000 pasado a setTimeout(() => stopRecording(), maxDurationMs)); (3) alinear en tests/ai/voice-vad-reengineering.test.js (Archivo G: webCatalogService.js) el caso de búsqueda de un solo token al contrato vigente de búsqueda por tags ([DEKO-STANDIA-063]), verificando que coinciden obras con el término en título o tags y se excluyen obras ajenas sin el término ni en título/subtítulo ni en tags; y (4) actualizar el caso 3.3 en tests/adversarial/m1-voice-priming-hesitation-stress.test.js para validar el comportamiento ya corregido normalizeCatalogSizeId('extra grande') === 'GIGANTE'.",
+      "area": "ai-voice-test-alignment",
+      "user_visible_behavior": "La suite completa de voz y VAD (npm run test:voice) pasa 53/53 en verde junto con init.sh y harness:check, manteniendo 100% intactos server/ y src/ con cohesión de dominio limpia y cero código ravioli antes del despliegue a producción.",
+      "priority": "P1",
+      "status": "not-started",
+      "dependencies": [
+        "feat-003"
+      ],
+      "required_files": [
+        "tests/ai/voice-lexical-priming-hesitation.test.js",
+        "tests/ai/voice-vad-reengineering.test.js",
+        "tests/adversarial/m1-voice-priming-hesitation-stress.test.js"
+      ],
+      "verification": [
+        "npm run test:voice",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "notes": "Autorización arquitectónica explícita del usuario (Opción A: Cohesión de Dominio sobre micro-techos arbitrarios 220/280, cero código ravioli). REGLA INQUEBRANTABLE DE ALCANCE (Hands off): PROHIBIDO leer .env y PROHIBIDO modificar ni una sola línea en server/, src/, prisma/, scripts/, package.json, Dockerfile, docker-compose.yml, .dockerignore o entrypoint.sh, ni ejecutar git push o npm run deploy. Tocar única y exclusivamente los 3 archivos de tests/ listados en required_files con 0 CRLF, sellar evidencia real y dejar commit atómico local listo para auditoría en la sesión principal."
     }
   ]
 }

@@ -4,29 +4,25 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-000..003` Completadas y Certificadas `12/12 ACEPTAR`)
-- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000`, `feat-001`, `feat-002` y `feat-003` selladas en `done`).
-- **Estado técnico y de seguridad alcanzado:** `0` excepciones en `scripts/check-architecture.sh` (`LEGACY_SERVER_ALLOWLIST` eliminada: `13 -> 9 -> 3 -> 0`), `13/13` pruebas Zero-Trust en `tests/security/zero-trust.test.js` (`319L`) y `10/10` dominios + `6/6` capas en calificación `A` dentro de `docs/QUALITY_SCORE.md`.
-- **Siguiente tarea secuencial:** Lista para registrar `feat-004` bajo `WIP = 1` cuando el usuario solicite una nueva mejora funcional.
+## Estado Actual del Contrato (`WIP = 0` — `feat-004` Declarada en `not-started` para Siguiente Sesión)
+- **Tarea activa (`in-progress`):** Ninguna (`WIP = 0`; `feat-000..003` selladas en `done`; `feat-004` registrada en `not-started` lista para activarse bajo `WIP = 1` en la siguiente sesión).
+- **Decisión arquitectónica humana vigente (`Opción A`):** Privilegiar la **cohesión de dominio real** y los límites de 6 capas (`check-architecture.sh` con `0` excepciones) por encima de los antiguos micro-techos artificiales de líneas (`<= 220` en `aiMediaController.js` y `<= 280` en `aiMediaService.js`), prohibiendo fragmentar `server/` o `src/` en código ravioli.
 
-## Alcance Incluido (`feat-003` — `Fair game`)
-- **Desacoplamiento de Ventas (`server/services/sales/orderTrackingService.js`, `server/services/saleService.js` y `server/controllers/saleController.js`)**:
-  - Extraídas las consultas de evento archivado (`prisma.event.findFirst`), listado/métricas de seguimiento de pedidos (`prisma.sale.{count,findMany,aggregate}`) y actualización logística con auditoría forense (`prisma.sale.{findFirst,update}` + `prisma.auditLog.create`) hacia `server/services/sales/orderTrackingService.js` (`189L`), re-exportadas desde `server/services/saleService.js` (`19L < 35L`).
-  - Eliminado `import { prisma } from '../config/prisma.js'` en `server/controllers/saleController.js` (`154L <= 160L`), preservando sus 10 símbolos exportados, códigos HTTP `200/201/400/403/404/500`, el aislamiento de `getMonitorMetrics` y los contratos `surgery-056`.
-- **Desacoplamiento de Eventos y Endurecimiento Zero-Trust (`server/services/eventFinanceService.js`, `server/services/eventService.js`, `server/controllers/eventController.js` y `tests/security/zero-trust.test.js`)**:
-  - Expuestos `computeEventFinancialSummary` y `loadTenantEventsFinancialMaps` en `server/services/eventFinanceService.js` (`314L`) y creado `server/services/eventService.js` (`274L`, `rango 3`) para encapsular `ENV.NODE_ENV`, `prisma.$transaction` y todas las consultas Prisma fuera de `eventController.js` (`185L <= 190L`), conservando `invalidateUserAuthCache()` en capa `Controller` (`rango 5 -> 4`).
-  - Eliminado todo spread `...req.body` en `createEvent` y `updateEvent` dentro de `server/controllers/eventController.js` mediante desestructuración explícita que preserva inmutables `req.tenantId` y `req.params.id`, blindado con la 13.ª prueba permanente en `tests/security/zero-trust.test.js` (`319L`, `13/13 PASS`).
-- **Eliminación total de deuda arquitectónica y sincronización de gobernanza (`LEGACY_SERVER_ALLOWLIST 3 -> 0`)**:
-  - Suprimida por completo `LEGACY_SERVER_ALLOWLIST` en `scripts/check-architecture.sh` (`767L`, `0` excepciones permitidas) y sincronizados `ARCHITECTURE.md` (`96L`), `docs/QUALITY_SCORE.md` (`70L`), `feature_list.json`, `loop-state.md`, `sprint-contract.md`, `progress.md` y `session-handoff.md`.
+## Alcance Pre-Acordado para `feat-004` (`Fair game` al pasar a `in-progress`)
+- **`tests/ai/voice-lexical-priming-hesitation.test.js` (sección `5`) y `tests/ai/voice-vad-reengineering.test.js` (`Archivo D` y `Archivo F`)**:
+  - Sustituir los antiguos micro-techos rígidos (`aiMediaController.js <= 220` y `aiMediaService.js <= 280`) por verificaciones contractuales de cohesión de dominio y arquitectura limpia (`0` imports directos a `config/prisma.js` o `config/env.js` en `aiMediaController.js`, exportación de sus 6 handlers multimodales con `recordLlmInteraction` y preservación de contratos de inferencia en `aiMediaService.js`), manteniendo intactas todas las demás aserciones de ambas suites.
+- **`tests/ai/voice-vad-reengineering.test.js` (`Archivo A` y `Archivo G`)**:
+  - Alinear `Archivo A` (`useAiVoiceRecorder.js`) al timeout parametrizado real (`maxDurationMs = 15000` + `setTimeout(() => stopRecording(), maxDurationMs)`).
+  - Alinear `Archivo G` (`webCatalogService.js`) al contrato vigente de búsqueda por `tags` (`[DEKO-STANDIA-063]`): verificar que coinciden pósters con el token en título o `tags` y que un póster sin el token en título/subtítulo ni `tags` queda excluido.
+- **`tests/adversarial/m1-voice-priming-hesitation-stress.test.js` (caso `3.3`)**:
+  - Actualizar el antiguo test de bug (`'GRANDE'`) para validar el comportamiento ya corregido `normalizeCatalogSizeId('extra grande') === 'GIGANTE'`.
 
 ## Exclusiones Explícitas (`Hands off`)
 - **Cero lectura o impresión de `.env`**.
-- **Cero modificaciones fuera de alcance (`Hands off`)**: `0` cambios en `src/`, `prisma/`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `entrypoint.sh`, `init.sh`, `scripts/validate-harness.mjs`, `scripts/lib/harness-utils.mjs`, `goal.md` o `AGENTS.md`.
-- **Cero despliegue remoto sin autorización explícita**: prohibido ejecutar `git push` o `npm run deploy` hasta orden expresa del usuario.
-- **Separación estricta Maker-Checker**: prohibido que el Maker edite `evaluator-rubric.md` o envíe `send_message` a cualquier `Checker` previo (`046edf88`, `27bb88dc`, `87669f83`, `29a7daf5`, `af936337`, `9199e5d7`, `15a71c9f`).
+- **Cero toque a código productivo o infraestructura (`Hands off` absoluto)**: prohibido modificar ni una sola línea en `server/`, `src/`, `prisma/`, `scripts/`, `package.json`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `entrypoint.sh`, `init.sh` o `AGENTS.md`.
+- **Cero despliegue remoto**: prohibido ejecutar `git push` o `npm run deploy`; al cerrar `feat-004`, dejar únicamente commit atómico local con `0 CRLF` para auditoría independiente en la sesión principal.
 
-## Criterios Verificables Cumplidos (`Round 5`)
-1. Los `12` `required_files` de `feat-003` existen físicamente en disco con `0 CRLF` y cumplen todos los techos de líneas (`saleService.js 19L < 35L`, `saleController.js 154L <= 160L`, `eventController.js 185L <= 190L`).
-2. `bash ./init.sh`, `bash scripts/check-architecture.sh` y `node scripts/validate-harness.mjs --min-score 100` finalizan con `Exit code 0` (`Overall: 100/100`, `25/25 PASS`, `WIP = 0`).
-3. `npm run harness:check` finaliza en `HARNESS_PASS` (`STAND-IA-UNIFIED-HARNESS`: `190` archivos sin secretos, `267` JS sintaxis OK, `13/13` Zero-Trust, `253/253` unit tests en `104` suites y `vite build` en verde).
-4. Sub-agente *Checker* `one-shot` virgen de `Round 5` (`15a71c9f-e6eb-4053-b897-97f6df198f8c`, convergente con `9199e5d7-a214-4bd9-8530-d7c10f8534ae` en `136c260`) otorgó `✅ Pass — 12 / 12 ACEPTAR` en `evaluator-rubric.md`.
+## Criterios Verificables de Cierre para `feat-004`
+1. Solo los `3` archivos de `tests/` en `required_files` (más los artefactos de estado del arnés) presentan cambios respecto al commit previo, con `0` cambios en `server/` y `src/` y `0 CRLF`.
+2. `npm run test:voice` pasa al `100%` (`53/53 PASS`, `0 fail`).
+3. `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` finalizan en verde (`Overall: 100/100`, `25/25 PASS`, `HARNESS_PASS`).

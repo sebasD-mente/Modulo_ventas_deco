@@ -1,14 +1,14 @@
 # Session Handoff
 
 ## Current Objective
-- **Goal:** Hitos `feat-000`, `feat-001`, `feat-002` y `feat-003` completados, auditados (`12 / 12 ACEPTAR` en `Round 5` por `15a71c9f`, convergente con `9199e5d7` en `136c260`) y sellados en `CLEAN STATE` (`WIP = 0`), con `0` excepciones arquitectónicas (`LEGACY_SERVER_ALLOWLIST` eliminada `13 -> 0`), `13/13` pruebas Zero-Trust y verificación en vivo completada sobre `localhost:3001` y `localhost:5173`.
-- **Current status:** `clean-state` (`WIP = 0`; `feat-000..003` en `done`; `Overall: 100/100`; `Checker R5: 12/12 ACEPTAR`)
-- **Branch / commit:** `main` (commits atómicos locales listos y árbol limpio; `0` `git push` ejecutados, en espera de confirmación del usuario)
+- **Goal:** Ejecutar `feat-004` bajo `WIP = 1` en una sesión dedicada para alinear únicamente las 3 suites históricas de voz en `tests/` (`npm run test:voice` `53/53 PASS`) respetando la cohesión de dominio real de `server/` y `src/` (`0` cambios en código productivo, cero código ravioli), y devolver el repositorio con commit atómico local para auditoría previa al despliegue.
+- **Current status:** `clean-state` (`WIP = 0`; `feat-000..003` en `done`; `feat-004` declarada en `not-started`; `Overall: 100/100`)
+- **Branch / commit:** `main` (árbol limpio, `feat-004` registrada en commit atómico local; `0` `git push` ejecutados)
 
 ## Completed This Session
-- [x] Revisión integral de las 3 olas (`feat-001` `84875f5`, `feat-002` `b1bcf2f`, `feat-003` `8567e58` + `833d5af`), confirmando `0` apariciones de `LEGACY_SERVER_ALLOWLIST`, `0` spreads `...req.(body|query|params)` en `server/controllers/**` y `13/13` pruebas Zero-Trust en `tests/security/zero-trust.test.js` (`319L`).
-- [x] Verificación en vivo end-to-end sobre `localhost:3001` (Express API) y `localhost:5173` (Vite React SPA + Chrome DevTools MCP en las 8 vistas, cotizador 50/50 de redes, buscador real de catálogo y carrito POS `Q 65.00` con `0` errores JS), más prueba HTTP integral de las 17 rutas del backend y cierre limpio de ambos demonios locales.
-- [x] Certificación independiente en `Round 5` por instancia `Checker` `one-shot` virgen (`15a71c9f-e6eb-4053-b897-97f6df198f8c`, convergente con `9199e5d7` en `136c260`) con veredicto **`✅ Pass — 12 / 12 ACEPTAR`** en `evaluator-rubric.md`, sellado de `feat-003` en `done` (`WIP = 0`) y commit atómico local limpio.
+- [x] Auditoría forense de sólo lectura post-colisión sobre `0e696c1` (`git fsck` OK, `65/65` rutas Express válidas, `13/13` Zero-Trust, `253/253` unit tests, `0` CRLF).
+- [x] Análisis arquitectónico de cohesión de dominio sobre `aiMediaController.js` (`253L`) y `aiMediaService.js` (`362L`), acordando con el usuario la **Opción A** (retirar micro-techos artificiales `220/280` en `tests/` en lugar de fragmentar `server/` en código ravioli).
+- [x] Declaración formal de `feat-004` (`not-started`) en `feature_list.json` y pre-contrato con límites estrictos `Hands off` en `sprint-contract.md`.
 
 ## Verification Evidence
 
@@ -20,21 +20,20 @@
 | Auditoría Checker Independiente (`One-Shot` R5) | `invoke_subagent` virgen (`15a71c9f`) | `12 / 12 ACEPTAR` | `evaluator-rubric.md` (`71L`, `0 CRLF`) sellada con `0` hallazgos abiertos (`9187 ms`, convergente con `9199e5d7`) |
 
 ## Files Changed
-- `server/services/sales/orderTrackingService.js` (`189L`), `server/services/saleService.js` (`19L`), `server/controllers/saleController.js` (`154L`)
-- `server/services/eventFinanceService.js` (`314L`), `server/services/eventService.js` (`274L`), `server/controllers/eventController.js` (`185L`)
-- `tests/security/zero-trust.test.js` (`319L`, `13/13 PASS`), `scripts/check-architecture.sh` (`767L`), `ARCHITECTURE.md` (`96L`), `docs/QUALITY_SCORE.md` (`70L`)
-- `evaluator-rubric.md`, `feature_list.json`, `loop-state.md`, `sprint-contract.md`, `progress.md`, `session-handoff.md`
+- `feature_list.json` — Añadida `feat-004` (`status: "not-started"`, `dependencies: ["feat-003"]`, `3` `required_files` en `tests/`)
+- `sprint-contract.md` — Alcance pre-acordado y exclusiones estrictas `Hands off` para `feat-004`
+- `progress.md` y `session-handoff.md` — Registro de decisión arquitectónica (`Opción A`) y acta de entrega a la siguiente sesión
 
 ## Decisions Made
-- Cerrar la sincronización documental en `Round 5` con auditoría `Checker` `one-shot` virgen (`15a71c9f`, convergente con `9199e5d7` en `136c260`) y consolidar el acta en commit atómico local con `WIP = 0`, dejando historial Git íntegro y árbol limpio.
+- Adoptar la **Opción A** autorizada por el usuario: mantener `100%` intactos `server/` y `src/` para preservar su cohesión de dominio real sin código ravioli, y actualizar en `feat-004` únicamente las 7 aserciones históricas desfasadas dentro de los 3 archivos de `tests/`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `0` procesos locales huérfanos; `0` mutaciones en BD de producción).
+- Ninguno activo (`0` lectura de `.env`; `0` procesos locales huérfanos; prohibido tocar fuera de los 3 archivos de `tests/` en `feat-004` y prohibido ejecutar `git push` o `npm run deploy`).
 
 ## Next Session Startup
 1. Confirmar `pwd` y revisar `git log --oneline -5`.
-2. Leer `AGENTS.md`, `progress.md`, `session-handoff.md` y `feature_list.json`.
+2. Leer `AGENTS.md`, `progress.md`, `session-handoff.md`, `sprint-contract.md` y `feature_list.json`.
 3. Ejecutar `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` antes de editar cualquier archivo.
 
 ## Recommended Next Step
-- Ejecutar `git push origin main` cuando el usuario lo autorice, o registrar el próximo requerimiento funcional como `feat-004` bajo `WIP = 1`.
+- Activar `feat-004` a `in-progress` (`WIP = 1`), actualizar únicamente `tests/ai/voice-lexical-priming-hesitation.test.js`, `tests/ai/voice-vad-reengineering.test.js` y `tests/adversarial/m1-voice-priming-hesitation-stress.test.js` (sin tocar `server/` ni `src/`), verificar `npm run test:voice` (`53/53 PASS`) + `bash ./init.sh` + `npm run harness:check`, marcar `feat-004` en `done` con evidencia real y dejar un `git commit` atómico local (`0` `git push`) para auditoría.
