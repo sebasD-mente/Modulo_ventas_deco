@@ -9,7 +9,12 @@ export default function EventFinancialRadar({
   onOpenExpenseModal,
 }) {
   const physicalEvents = useMemo(() => {
-    return eventDetails.filter((e) => e.eventId !== 'evt-ventas-redes-online');
+    return (eventDetails || [])
+      .map((e) => ({
+        ...e,
+        eventId: e.eventId || e.id,
+      }))
+      .filter((e) => e.eventId !== 'evt-ventas-redes-online');
   }, [eventDetails]);
 
   const [selectedStandId, setSelectedStandId] = useState(() => {
@@ -30,10 +35,65 @@ export default function EventFinancialRadar({
     return physicalEvents.find((e) => e.eventId === selectedStandId) || physicalEvents[0] || null;
   }, [selectedStandId, physicalEvents]);
 
+  const computedGlobalFinancials = useMemo(() => {
+    if (globalFinancials) return globalFinancials;
+    if (physicalEvents.length === 0) return null;
+    const totals = physicalEvents.reduce(
+      (acc, ev) => {
+        const f = ev.financials || {};
+        acc.standRentCost = Number((acc.standRentCost + Number(f.standRentCost || 0)).toFixed(2));
+        acc.otherOperationalCost = Number((acc.otherOperationalCost + Number(f.otherOperationalCost || 0)).toFixed(2));
+        acc.totalExpenses = Number((acc.totalExpenses + Number(f.totalExpenses || 0)).toFixed(2));
+        acc.cumulativeSold = Number((acc.cumulativeSold + Number(f.cumulativeSold || ev.totalSold || 0)).toFixed(2));
+        acc.dailySold = Number((acc.dailySold + Number(f.dailySold || 0)).toFixed(2));
+        const preBalance = f.preProductionBalance !== undefined
+          ? Number(f.preProductionBalance)
+          : (Number(f.cumulativeSold || ev.totalSold || 0) - Number(f.totalExpenses || 0));
+        acc.preProductionBalance = Number((acc.preProductionBalance + preBalance).toFixed(2));
+        acc.healthySalesTarget20Pct = Number((acc.healthySalesTarget20Pct + Number(f.healthySalesTarget20Pct || 0)).toFixed(2));
+        acc.totalEventDays = Math.max(acc.totalEventDays, Number(f.totalEventDays || 1));
+        acc.requiredDailyRunRate = Number((acc.requiredDailyRunRate + Number(f.requiredDailyRunRate || 0)).toFixed(2));
+        acc.requiredDailyMediumPosters += Number(f.requiredDailyMediumPosters || 0);
+        return acc;
+      },
+      {
+        standRentCost: 0,
+        otherOperationalCost: 0,
+        totalExpenses: 0,
+        cumulativeSold: 0,
+        dailySold: 0,
+        preProductionBalance: 0,
+        healthySalesTarget20Pct: 0,
+        totalEventDays: 1,
+        requiredDailyRunRate: 0,
+        requiredDailyMediumPosters: 0,
+      }
+    );
+    const standRentRatioPct = totals.standRentCost > 0 && totals.cumulativeSold > 0
+      ? Number(((totals.standRentCost / totals.cumulativeSold) * 100).toFixed(1))
+      : 0;
+    const healthyTargetProgress = totals.healthySalesTarget20Pct > 0
+      ? Math.min(100, Math.round((totals.cumulativeSold / totals.healthySalesTarget20Pct) * 100))
+      : (totals.totalExpenses > 0 ? Math.min(100, Math.round((totals.cumulativeSold / totals.totalExpenses) * 100)) : 0);
+    const healthPhase = totals.totalExpenses === 0
+      ? 'SIN_GASTOS'
+      : (totals.preProductionBalance < 0
+        ? 'EN_RECUPERACION'
+        : (totals.standRentCost > 0 && standRentRatioPct <= 20
+          ? 'EVENTO_SALUDABLE_20PCT'
+          : 'GASTOS_CUBIERTOS_RUMBO_20'));
+    return {
+      ...totals,
+      standRentRatioPct,
+      healthyTargetProgress,
+      healthPhase,
+    };
+  }, [globalFinancials, physicalEvents]);
+
   const fin = useMemo(() => {
     if (activeEvent) return activeEvent.financials || {};
-    return globalFinancials || physicalEvents[0]?.financials || {};
-  }, [activeEvent, globalFinancials, physicalEvents]);
+    return computedGlobalFinancials || physicalEvents[0]?.financials || {};
+  }, [activeEvent, computedGlobalFinancials, physicalEvents]);
 
   const totalExpenses = Number(fin.totalExpenses || 0);
   const standRentCost = Number(fin.standRentCost || 0);
@@ -73,10 +133,14 @@ export default function EventFinancialRadar({
 
   const handleOpenExpenses = () => {
     if (onOpenExpenseModal) {
-      const target = activeEvent ? { id: activeEvent.eventId, name: activeEvent.name, financials: fin } : (physicalEvents[0] ? { id: physicalEvents[0].eventId, name: physicalEvents[0].name } : null);
+      const target = activeEvent
+        ? { id: activeEvent.eventId || activeEvent.id, name: activeEvent.name, financials: fin }
+        : (physicalEvents[0] ? { id: physicalEvents[0].eventId || physicalEvents[0].id, name: physicalEvents[0].name, financials: physicalEvents[0].financials } : null);
       if (target) onOpenExpenseModal(target);
     }
   };
+
+  if (physicalEvents.length === 0) return null;
 
   return (
     <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4 shadow-xl">

@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
-import { RotateCcw, Calendar, Loader2, Tv, TrendingUp, Target, DollarSign, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { RotateCcw, Loader2, Tv, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useMonitorDashboard from './monitor/hooks/useMonitorDashboard';
 import MonitorKpiGrid from './monitor/MonitorKpiGrid';
 import PaymentMethodsBreakdown from './monitor/PaymentMethodsBreakdown';
 import EventsPerformanceList from './monitor/EventsPerformanceList';
-import EventFinancialRadar from './monitor/EventFinancialRadar';
-import EventExpensesModal from './events/modals/EventExpensesModal';
 import UnifiedAiChat from './UnifiedAiChat';
 
 export default function MonitorDashboardView({ activeEvent = null, onPopulateManualForm }) {
   const { isSuperAdmin } = useAuth();
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-  const [eventForExpenses, setEventForExpenses] = useState(null);
   const {
-    selectedDate, setSelectedDate, monitorData, isLoading,
+    selectedDate, monitorData, isLoading,
     isRefreshing, lastSyncTime, expandedEvents, toggleEvent, fetchMonitorData,
   } = useMonitorDashboard();
 
@@ -46,17 +43,33 @@ export default function MonitorDashboardView({ activeEvent = null, onPopulateMan
       </div>
 
       {/* 2. BARRA DE CONTROL */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-black border border-neutral-800">
-        <div className="flex items-center gap-2 flex-1">
-          <Calendar className="w-4 h-4 text-neutral-400 shrink-0" /><span className="text-xs font-bold text-neutral-300 shrink-0">Fecha:</span>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-[#181818] border border-neutral-700/90 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-white w-full max-w-[200px]" />
+      <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-black border border-neutral-800">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-neutral-300">Jornada en tiempo real</span>
+          <span className="text-[11px] text-neutral-400 font-mono hidden sm:inline">({selectedDate})</span>
         </div>
-        <button type="button" onClick={() => fetchMonitorData(true)} disabled={isRefreshing} className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer">
-          <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /><span>Actualizar</span>
+        <button
+          type="button"
+          onClick={() => fetchMonitorData(true)}
+          disabled={isRefreshing}
+          className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer min-h-[44px]"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span>Actualizar</span>
         </button>
       </div>
- 
-      {/* 2.1. COPILOTO GERENCIAL & AUDITORÍA IA (EXCLUSIVO SUPER_ADMIN) */}
+
+      {/* 3. DETALLE POR EVENTO */}
+      <EventsPerformanceList
+        eventDetails={eventDetails}
+        expandedEvents={expandedEvents}
+        onToggleEvent={toggleEvent}
+        selectedDate={selectedDate}
+        selectedEventId={activeEvent?.id}
+      />
+
+      {/* 4. COPILOTO GERENCIAL & AUDITORÍA IA (EXCLUSIVO SUPER_ADMIN) */}
       {isSuperAdmin && (
         <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-hidden">
           <button
@@ -96,28 +109,7 @@ export default function MonitorDashboardView({ activeEvent = null, onPopulateMan
         </div>
       )}
 
-      {/* 3. RADAR FINANCIERO FERIAL (REGLA DEL 20%) */}
-      <EventFinancialRadar
-        eventDetails={eventDetails}
-        globalFinancials={resumenGeneral?.globalFinancials}
-        isSuperAdmin={isSuperAdmin}
-        selectedEventId={activeEvent?.id}
-        onOpenExpenseModal={(ev) => setEventForExpenses(ev)}
-      />
-
-      {/* 4. DETALLE POR EVENTO */}
-      <EventsPerformanceList eventDetails={eventDetails} expandedEvents={expandedEvents} onToggleEvent={toggleEvent} selectedDate={selectedDate} />
-
-      {eventForExpenses && (
-        <EventExpensesModal
-          isOpen={Boolean(eventForExpenses)}
-          event={eventForExpenses}
-          onClose={() => setEventForExpenses(null)}
-          onExpensesUpdated={() => fetchMonitorData(true)}
-        />
-      )}
-
-      {/* 4. RESUMEN GENERAL DE LA JORNADA (Solo visible para Super Admin o cuando hay múltiples stands) */}
+      {/* 5. RESUMEN GENERAL DE LA JORNADA (Solo visible para Super Admin o cuando hay múltiples stands) */}
       {(isSuperAdmin || eventDetails.length > 1) && (
         <div className="space-y-4 pt-4 border-t border-neutral-800">
           <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">

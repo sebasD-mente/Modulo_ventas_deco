@@ -4,29 +4,38 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-005` completada en `done`)
-- **Última tarea cerrada (`done`):** `feat-005` — Segregación Estricta de Ventas de Mostrador vs Con Saldo y Contabilización por Saldo Cobrado en Nueva Venta.
-- **Marcha de trabajo:** `Modo Diario Ágil` (`WIP = 0`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-007` Completada y Verificada)
+- **Estado de sesión:** Tarea `feat-007` concluida con verificación 100/100, 265/265 unit tests PASS, 53/53 voice tests PASS, build PASS y 0 CRLF.
+- **Última tarea completada:** `feat-007` — Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos.
+- **Próxima tarea a ejecutar en DAG (`WIP = 1`):** Ninguna (`feat-000..007` cerradas en `done`).
+- **Marcha de trabajo acordada:** `Modo Diario Ágil`.
 
-## Alcance Incluido (`Scope` de `feat-005`)
-1. **Eliminación de la pestaña `"Todas"` y pestaña única conmutable `"⏳ Con Saldo"` (`src/components/RecentSalesList.jsx`)**:
-   - Retirar el botón `"Todas (...)"` y conservar únicamente el botón conmutable (`aria-pressed`) `"⏳ Con Saldo ({pendingCount})"` (`min-h-[44px]`).
-   - Cuando `"⏳ Con Saldo"` está inactivo (vista por defecto), el listado y el contador `"Ventas de Hoy (...)"` en stands físicos muestran **únicamente** las ventas realizadas y cobradas en mostrador (del vendedor activo si su rol es `VENDEDOR` sin `SUPER_ADMIN`, o del stand si es `SUPER_ADMIN`), excluyendo estrictamente cualquier venta con `balanceDue > 0`.
-   - Cuando `"⏳ Con Saldo"` está activo, el listado muestra **estrictamente** las ventas con `balanceDue > 0` pendientes para entrega en ese punto de venta específico (`pickupEventId === eventId`). Al pulsar nuevamente `"⏳ Con Saldo"`, regresa al listado por defecto de mostrador.
-2. **Transición al cobrar saldo restante y visualización por el monto cobrado (`server/services/sales/saleKpiService.js`, `server/services/sales/remoteSaleService.js`, `src/utils/counterSalesFilter.js`, `src/components/RecentSalesList.jsx`, `src/components/sales/RecentSaleRow.jsx`)**:
-   - Enriquecer en `getEventSalesList` y `registerBalancePayment` los metadatos de liquidación en stand (`standCollectedAmount`, `standCollectedAt`, `standCollectedPayments`, `balanceCollectedById` vía `AuditLog` `SALDO_VENTA_COBRADO`), sellando también con `[SALDO]` pagos completos en stand sobre órdenes `PENDIENTE_PAGO` y ordenando cronológicamente por instante real de cobro en mostrador.
-   - Al liquidar el saldo pendiente (`balanceDue === 0`), retirar la orden de `"⏳ Con Saldo"`, volver al listado por defecto de mostrador y mostrarla en `RecentSaleRow.jsx` por el **valor exacto cobrado del saldo restante** (`Saldo cobrado: Q ...`), con los badges de pago del cobro en mostrador, desglose transparente del anticipo previo de redes y hora del cobro.
-3. **Pruebas deterministas de regresión (`tests/sales/counter-sales-pending-balance-segregation.test.js` + `package.json`)**:
-   - Cubrir aislamiento por rol de vendedor de mostrador, exclusión total de `balanceDue > 0` en vista por defecto, pestaña única `"⏳ Con Saldo"` sin botón `"Todas"` y transición contable por el monto del saldo restante cobrado.
+---
 
-## Exclusiones Explícitas (`Hands off`)
-- **Cero lectura o modificación de `.env`** y **cero cambios en `prisma/schema.prisma`** o migraciones SQL.
-- **Cero alteración de módulos ajenos** (taller de pliegos, liquidación de comisiones 20% del vendedor de redes original `sale.sellerId`, IA/voz o Docker).
-- **Cero debilitamiento de suites existentes** (`surgery-056`, `surgery-058`, `val005` ergonomía `>= 44px`, `zero-trust`).
-- **Cero nuevas dependencias NPM** y **cero despliegue remoto (`git push` / `npm run deploy`)** sin autorización explícita del usuario.
+## Alcance Ejecutado (`Scope` de `feat-007` — COMPLETADO)
+1. **Reubicación de Métricas Financieras dentro de Eventos (`src/components/EventsManagementView.jsx`, `src/components/events/EventCard.jsx`, `src/components/events/modals/EventSalesModal.jsx` y `src/components/monitor/EventFinancialRadar.jsx`)**:
+   - Montado el Radar Financiero Ferial (regla del 20%, recuperación de costos y balance pre-producción) dentro de la sección de eventos (`EventsManagementView.jsx`), permitiendo auditar y navegar stands concurrentes y consolidado global con `onOpenExpenseModal`.
+   - En `EventCard.jsx`, `RentHealthPill` opera como disparador accesible para consultar de forma inmediata el radar y desglose ferial de cualquier stand (`ACTIVO`, `CONFIRMADO` o `ARCHIVADO`).
+   - En `EventSalesModal.jsx`, integrada la tarjeta completa de desglose financiero y radar ferial (indicadores contables, fase de salud, barra de progreso al 20%, ritmo diario requerido y consolidado de pagos y cortes de caja).
+2. **Consulta Integral de Histórico y Movimientos por Evento**:
+   - Garantizado que cualquier evento histórico o archivado permita auditar sus ventas, cortes de caja y movimientos asociados directamente desde su ficha/modal en eventos sin depender del monitor general.
+3. **Preservación Estricta de Contratos Existentes**:
+   - Preservado `selectedStandId` y `selectedEventId` en `EventFinancialRadar.jsx` (contrato de `surgery-053` 16/16 PASS).
+   - Preservado `data-testid="permanent-digital-pos-card"`, `toggle-archived-events-btn` y enlaces de `EventsManagementView.jsx` (contratos `surgery-056`, `surgery-058`, `surgery-065`).
+   - Mantenido `useModalBackHandler` en `EventSalesModal.jsx`.
 
-## Criterios Verificables de Cierre para `feat-005`
-1. `RecentSalesList.jsx` no renderiza el botón `"Todas"` y opera con la pestaña única conmutable `"⏳ Con Saldo"` (`aria-pressed`, `min-h-[44px]`).
-2. En vista por defecto de mostrador jamás aparece ninguna orden con `balanceDue > 0`, y las ventas mostradas para un `VENDEDOR` de mostrador corresponden únicamente a las ventas registradas o saldos cobrados por ese vendedor en ese stand.
-3. Al cobrarse el saldo restante de un pedido para entrega en el stand, pasa al listado por defecto de mostrador reflejando exactamente `standCollectedAmount` (el saldo restante cobrado por el vendedor) en lugar del `totalAmount` histórico de redes.
-4. `node --test tests/sales/counter-sales-pending-balance-segregation.test.js`, `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` pasan en verde con `0 CRLF`.
+---
+
+## Exclusiones Explícitas (`Hands off` cumplidas al 100%)
+- **Cero lectura o modificación de `.env`** y **cero modificaciones en `prisma/schema.prisma`** o migraciones de base de datos.
+- **Cero alteración de módulos ajenos** (POS de mostrador, cálculo de comisiones, contratos de sincronización de catálogo, endpoints de voz IA o infraestructura Docker).
+- **Cero debilitamiento de suites de prueba** (`surgery-056`, `surgery-058`, ergonomía `>= 44px`, `zero-trust`, `check-architecture`).
+- **Cero nuevas dependencias NPM** y **cero despliegue remoto (`git push` / `npm run deploy`)**.
+
+---
+
+## Criterios Verificables de Cierre Cumplidos para `feat-007`
+1. [x] `src/components/EventsManagementView.jsx` monta y renderiza `EventFinancialRadar` para la gestión ferial multi-stand.
+2. [x] `src/components/events/EventCard.jsx` ofrece acceso interactivo hacia el radar y auditoría ferial a través de `RentHealthPill` y `onViewSales`.
+3. [x] `src/components/events/modals/EventSalesModal.jsx` integra la auditoría del Radar Financiero Ferial junto con el desglose de transacciones y cortes de caja para cualquier evento activo o archivado.
+4. [x] `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` pasan al 100% con 0 violaciones y 0 CRLF.

@@ -55,10 +55,39 @@ function SellersSection({ event }) {
   );
 }
 
-function RentHealthPill({ financials }) {
+function RentHealthPill({ financials, onOpenRadar }) {
   if (!financials || !(financials.standRentCost > 0)) return null;
   const isHealthy = financials.standRentRatioPct > 0 && financials.standRentRatioPct <= 20;
   const isCovered = financials.preProductionBalance >= 0;
+
+  const content = (
+    <span className="truncate">
+      {isHealthy
+        ? `🟢 Arriendo: ${financials.standRentRatioPct}% (≤20% Saludable)`
+        : isCovered
+          ? `🟡 Arriendo: ${financials.standRentRatioPct}% (Meta: Q${financials.healthySalesTarget20Pct})`
+          : `🔴 Recuperando gastos (Faltan Q${financials.remainingForExpenseRecovery})`}
+    </span>
+  );
+
+  if (onOpenRadar) {
+    return (
+      <button
+        type="button"
+        onClick={onOpenRadar}
+        className={`w-full px-2.5 py-1 rounded-lg text-[10px] font-bold text-center border truncate transition-all cursor-pointer min-h-[36px] flex items-center justify-center gap-1 hover:opacity-90 active:scale-[0.99] ${
+          isHealthy
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+            : isCovered
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+              : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+        }`}
+        title="Ver Radar Financiero Ferial y movimientos históricos"
+      >
+        {content}
+      </button>
+    );
+  }
 
   return (
     <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold text-center border truncate ${
@@ -68,16 +97,12 @@ function RentHealthPill({ financials }) {
           ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
           : 'bg-red-500/10 border-red-500/30 text-red-400'
     }`}>
-      {isHealthy
-        ? `🟢 Arriendo: ${financials.standRentRatioPct}% (≤20% Saludable)`
-        : isCovered
-          ? `🟡 Arriendo: ${financials.standRentRatioPct}% (Meta: Q${financials.healthySalesTarget20Pct})`
-          : `🔴 Recuperando gastos (Faltan Q${financials.remainingForExpenseRecovery})`}
+      {content}
     </div>
   );
 }
 
-function UnifiedMetricsStrip({ event, soldLabel = 'Total Vendido' }) {
+function UnifiedMetricsStrip({ event, soldLabel = 'Total Vendido', onViewSales }) {
   const totalSold = Number(event.totalSold || 0);
   const salesCount = Number(event.salesCount || 0);
   const financials = event.financials;
@@ -114,7 +139,7 @@ function UnifiedMetricsStrip({ event, soldLabel = 'Total Vendido' }) {
           </>
         )}
       </div>
-      <RentHealthPill financials={financials} />
+      <RentHealthPill financials={financials} onOpenRadar={() => onViewSales?.(event)} />
     </div>
   );
 }
@@ -159,7 +184,7 @@ export default function EventCard({
         </div>
 
         <SellersSection event={event} />
-        <UnifiedMetricsStrip event={event} soldLabel="Total Vendido" />
+        <UnifiedMetricsStrip event={event} soldLabel="Total Vendido" onViewSales={onViewSales} />
 
         <div className="pt-1 flex items-center gap-1.5">
           <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-sm min-h-[44px]">
@@ -209,7 +234,7 @@ export default function EventCard({
         </div>
 
         <SellersSection event={event} />
-        <UnifiedMetricsStrip event={event} soldLabel="Total Facturado" />
+        <UnifiedMetricsStrip event={event} soldLabel="Total Facturado" onViewSales={onViewSales} />
 
         <div className="pt-1.5 border-t border-neutral-800/80 flex items-center gap-1.5">
           <button type="button" onClick={() => onViewSales?.(event)} className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer min-h-[44px]">
@@ -249,7 +274,7 @@ export default function EventCard({
 
       <SellersSection event={event} />
       {event.financials && (event.financials.totalExpenses > 0 || event.financials.cumulativeSold > 0) && (
-        <UnifiedMetricsStrip event={event} soldLabel="Total Vendido" />
+        <UnifiedMetricsStrip event={event} soldLabel="Total Vendido" onViewSales={onViewSales} />
       )}
 
       <div className="pt-1.5 border-t border-neutral-800/80 flex items-center gap-1.5">

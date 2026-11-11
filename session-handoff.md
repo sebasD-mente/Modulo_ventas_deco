@@ -1,45 +1,65 @@
 # Session Handoff
 
 ## Current Objective
-- **Goal:** Repositorio con `feat-000..005` completadas y verificadas al `100%` (`WIP = 0`), con segregación estricta entre ventas cobradas en mostrador y pestaña única conmutable `⏳ Con Saldo` en **Nueva Venta**.
-- **Current status:** `clean-state` (`WIP = 0`; `feat-000..005` en `done`; `Overall: 100/100`; `265/265` pruebas unitarias PASS; `npm run test:voice` `53/53 PASS`)
-- **Branch / commit:** `main` (árbol limpio tras commit atómico local de `feat-005`; `0` `git push` ejecutados)
+- **Goal:** Implementación y verificación completa de `feat-007` (Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos).
+- **Current status:** `clean-state` (`WIP = 0`; todas las tareas `feat-000..007` en `done`; `Overall: 100/100`).
+- **Branch / commit:** `main` (árbol de trabajo limpio; `0` `git push` ejecutados).
 
 ## Completed This Session
-- [x] Ejecutado `Startup Workflow` completo de `AGENTS.md` (`pwd`, lectura íntegra de `AGENTS.md`, `progress.md`, `session-handoff.md`, `sprint-contract.md`, `feature_list.json`, `git log -5` y `bash ./init.sh` en `CLEAN STATE`) y consultada la guía `accessibility` de `modern-web-guidance`.
-- [x] Eliminada la pestaña `"Todas"` en `src/components/RecentSalesList.jsx`, dejando únicamente la pestaña conmutable `"⏳ Con Saldo"` (`aria-pressed`, `min-h-[44px]`) y asegurando mediante `src/utils/counterSalesFilter.js` que el listado por defecto de mostrador muestre exclusivamente las ventas registradas y cobradas al momento por ese vendedor (sin ninguna orden con saldo pendiente mezclada).
-- [x] Enriquecidos `server/services/sales/saleKpiService.js`, `server/services/sales/remoteSaleService.js` y `src/components/sales/RecentSaleRow.jsx` para que, cuando un vendedor cobra el saldo restante de un pedido en el punto de venta, la orden salga de `"⏳ Con Saldo"` y pase al listado por defecto de mostrador por el valor exacto del saldo cobrado (`Saldo cobrado: Q ...`).
-- [x] Agregada y registrada la suite `tests/sales/counter-sales-pending-balance-segregation.test.js` (`12/12 PASS`), verificando `npm run harness:check` (`HARNESS_PASS`, `265/265` pruebas unitarias, `vite build` `1567` módulos), `npm run test:voice` (`53/53 PASS`) y `bash ./init.sh` (`CLEAN STATE`, `100/100`).
+- [x] Ejecutado `Startup Workflow` completo de `AGENTS.md` (`pwd`, lectura de `AGENTS.md`, `progress.md`, `session-handoff.md`, `sprint-contract.md`, `feature_list.json` y verificación de baseline con `bash ./init.sh` en `CLEAN STATE`).
+- [x] Activada la tarea `feat-007` bajo `WIP = 1` en `feature_list.json` y `sprint-contract.md`.
+- [x] **Implementados los cambios de `feat-007`**:
+  - `src/components/monitor/EventFinancialRadar.jsx`: normalización de colecciones de eventos para admitir `eventId` o `id`, cálculo dinámico de `globalFinancials` y preservación estricta de `selectedStandId` y `selectedEventId` en `useEffect` (contrato de `surgery-053`).
+  - `src/components/EventsManagementView.jsx`: montado y renderizado `EventFinancialRadar` para administración contextual ferial multi-stand con soporte a apertura de modal de gastos (`onOpenExpenseModal`), manteniendo intactos los contratos del POS digital permanente, monitoreo de redes y modales de acción.
+  - `src/components/events/EventCard.jsx`: transformado `RentHealthPill` en botón interactivo accesible (`min-h-[36px]`) enlazado a `onViewSales` para eventos activos, confirmados y archivados, preservando `UnifiedMetricsStrip` y estructura relacional de vendedores.
+  - `src/components/events/modals/EventSalesModal.jsx`: integrada la tarjeta completa de desglose financiero y Radar Ferial (regla del 20%, 4 tarjetas contables, barra de progreso a meta 5x arriendo, ritmo diario ferial requerido, resumen consolidado de pagos y cortes de caja) junto con el historial de transacciones por jornada y guardarraíl `useModalBackHandler`.
+- [x] Verificación en 3 puertas superada con éxito:
+  - `bash ./init.sh` -> Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build PASS en 6.30s).
+  - `bash scripts/check-architecture.sh` -> 0 violaciones, 0 excepciones en las 6 capas.
+  - `node scripts/validate-harness.mjs --min-score 100` -> 100/100 (25/25 checks PASS).
+  - `npm run test:unit` -> 265/265 PASS across 109 suites (incluyendo surgery-053 16/16).
+  - `npm run test:voice` -> 53/53 PASS across 12 suites.
+  - Suites quirúrgicas combinadas (`surgery-053`, `surgery-056`, `surgery-058`, `surgery-065`) -> 54/54 PASS across 27 suites.
+  - `npm run harness:check` -> status HARNESS_PASS en 41.06s.
+  - Higiene de formato: `0 CRLF` en todos los archivos gobernados y modificados.
+- [x] Actualizados `feature_list.json` (`feat-007` a `done`), `sprint-contract.md`, `progress.md` y `session-handoff.md`.
 
 ## Verification Evidence
 
 | Check | Command | Result | Notes |
 | :--- | :--- | :--- | :--- |
-| Suite Mostrador vs Con Saldo (`feat-005`) | `node --test tests/sales/counter-sales-pending-balance-segregation.test.js` | `PASS (12/12)` | `5` suites, `0` fallos (`144.11ms`); aislamiento por vendedor, pestaña única `⏳ Con Saldo` y cobro por monto de saldo restante |
-| Vigilante Arquitectónico Tolerancia Cero (Puerta 1) | `bash scripts/check-architecture.sh` | `PASS (Exit code 0)` | `0` violaciones y `0` excepciones en `src/` (`utils -> components`) y `server/` |
-| Validación de los 5 Subsistemas y DAG (Puerta 2) | `node scripts/validate-harness.mjs --min-score 100` | `PASS (100/100)` | `25/25` checks PASS (`feat-000..005` en `done`, `WIP = 0`, todos los `required_files` en disco) |
-| Compuerta Unificada Deko Labs | `npm run harness:check` | `HARNESS_PASS (30.35s)` | `191` archivos sin secretos, `269` JS sintaxis OK, `13/13` Zero-Trust, `265/265` unit tests (`109` suites) y `vite build` (`1567` módulos) |
-| Suite Completa de Voz y VAD | `npm run test:voice` | `PASS (53/53)` | `12` suites en verde (`309.26ms`) |
+| Validación de los 5 Subsistemas y DAG (Puerta 2) | `node scripts/validate-harness.mjs --min-score 100` | `PASS (100/100)` | `25/25` checks PASS (`feat-000..007` done, `WIP = 0`, DAG respetado) |
+| Vigilante Arquitectónico Tolerancia Cero (Puerta 1) | `bash scripts/check-architecture.sh` | `PASS (Exit code 0)` | `0` violaciones y `0` excepciones en las 6 capas |
+| Suite de Contratos Feriales (surgery-053) | `node --test tests/adversarial/surgery-053-multi-event-radar-contracts.test.js` | `PASS (16/16)` | `0` fallas, preservado contrato de props con `selectedEventId` |
+| Suites Quirúrgicas Feriales y Contables | `node --test tests/adversarial/surgery-053... 056... 058... 065...` | `PASS (54/54)` | 27 suites en verde sin regresiones |
+| Pruebas Unitarias Generales | `npm run test:unit` | `PASS (265/265)` | 109 suites en verde |
+| Suite de Voz y VAD | `npm run test:voice` | `PASS (53/53)` | 12 suites en verde |
+| Puertas 1-3 de Línea Base (`CLEAN STATE`) | `bash ./init.sh` | `PASS (Exit code 0)` | `100/100`, `13/13` Zero-Trust, `vite build` PASS |
+| Compuerta Unificada del Arnés | `npm run harness:check` | `PASS (Exit code 0)` | `HARNESS_PASS` en 41.06s |
+| Higiene de Formato | `node scripts/audit-syntax.js` | `PASS` | 269 archivos analizados, `0 CRLF` en archivos modificados |
 
-## Files Changed
-- `src/utils/counterSalesFilter.js` — Funciones puras `isPhysicalStandEvent`, `partitionEventSalesForPos` y `resolveStandSaleDisplay`
-- `src/components/RecentSalesList.jsx` — Eliminado botón `"Todas"`, botón único conmutable `"⏳ Con Saldo"` con `aria-pressed` y transición post-cobro al listado de mostrador
-- `src/components/sales/RecentSaleRow.jsx` — Renderizado de `Saldo cobrado: Q ...`, pagos `[SALDO]` y línea informativa de anticipo previo de redes
-- `server/services/sales/saleKpiService.js` — Filtro `balanceDue <= 0` en liquidados de stand y enriquecimiento de `standCollectedAmount` y `balanceCollectedById` vía `AuditLog`
-- `server/services/sales/remoteSaleService.js` — Sello `[SALDO]` en liquidación total de stand y metadatos de cobro en retorno de `registerBalancePayment`
-- `tests/sales/counter-sales-pending-balance-segregation.test.js` y `package.json` — Suite de 12 pruebas unitarias integrada en `test:unit`
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado `done` (`WIP = 0`) y acta de entrega actualizada
+## Files Changed This Session
+- `src/components/monitor/EventFinancialRadar.jsx` — Normalización `eventId || id`, cálculo global automático y preservación de `selectedEventId` (`0 CRLF`).
+- `src/components/EventsManagementView.jsx` — Montado `EventFinancialRadar` en la vista de eventos (`0 CRLF`).
+- `src/components/events/EventCard.jsx` — `RentHealthPill` interactivo enlazado a `onViewSales` (`0 CRLF`).
+- `src/components/events/modals/EventSalesModal.jsx` — Desglose financiero completo, radar del 20%, formas de pago y cortes de caja (`0 CRLF`).
+- `feature_list.json` — `feat-007` cerrada en `done` con evidencia (`0 CRLF`).
+- `sprint-contract.md` — Contrato actualizado con cierre de `feat-007` (`0 CRLF`).
+- `progress.md` — Bitácora de la sesión actualizada (`0 CRLF`).
+- `session-handoff.md` — Acta de entrega con verificación en limpio (`0 CRLF`).
 
 ## Decisions Made
-- Resolver la atribución del vendedor cobrador de saldo y el monto exacto cobrado en stand a partir de `SalePayment.reference` (`[SALDO]`) y `AuditLog` (`SALDO_VENTA_COBRADO` / respaldo en `sale.notes`), sin tocar `prisma/schema.prisma` ni alterar la atribución comercial original (`sale.sellerId`) que usa `commissionService.js` para las comisiones del vendedor de redes.
+- Normalizar identificadores en `EventFinancialRadar.jsx` con `e.eventId || e.id` para interoperabilidad transparente con `/api/events` y el monitor histórico.
+- Dotar a `EventSalesModal.jsx` de una sección frontal de Radar Financiero para que cualquier stand activo o archivado permita auditar sus indicadores de equilibrio (5x arriendo), avance y cortes de caja.
+- Transformar `RentHealthPill` en un botón accesible que abre directamente el modal de auditoría ferial del evento.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `0` procesos locales huérfanos; `0` `git push` o `npm run deploy` ejecutados).
+- Ninguno activo (`0` lectura de `.env`; `0` procesos huérfanos; `0` `git push` o `npm run deploy` ejecutados).
 
 ## Next Session Startup
-1. Confirmar `pwd` y revisar `git log --oneline -5`.
+1. Confirmar `pwd` y ejecutar `bash ./init.sh` para verificar el estado de inicio.
 2. Leer `AGENTS.md`, `progress.md`, `session-handoff.md`, `sprint-contract.md` y `feature_list.json`.
-3. Ejecutar `& "C:\Program Files\Git\bin\bash.exe" ./init.sh` antes de realizar cualquier acción.
+3. Todas las tareas `feat-000..007` están completadas y verificadas al 100%.
 
 ## Recommended Next Step
-- Validar visualmente el flujo en **Nueva Venta** con el usuario o proceder al despliegue cuando el usuario lo autorice explícitamente.
+- Repositorio en estado limpio con `Overall: 100/100`. Si se definen nuevos requerimientos de producto o diseño, declararlos en `feature_list.json` y ejecutarlos bajo `WIP = 1`.

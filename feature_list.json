@@ -206,6 +206,57 @@
       ],
       "evidence": "node --test tests/sales/counter-sales-pending-balance-segregation.test.js -> Exit code 0 (12/12 PASS across 5 suites in 144.11ms: partitionEventSalesForPos counter-seller & SUPER_ADMIN isolation, resolveStandSaleDisplay remaining-balance amount & [SALDO] payment badges, getEventSalesList & registerBalancePayment AuditLog/SALDO enrichment, RecentSalesList single toggle aria-pressed & min-h-[44px] without Todas tab); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations / 0 exceptions, audit-secrets 191 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1567 modules PASS); bash scripts/check-architecture.sh -> Exit code 0; node scripts/validate-harness.mjs --min-score 100 -> Overall: 100/100 (25/25 PASS); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.35s: 191 secrets OK, 269 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build PASS); npm run test:voice -> 53/53 PASS, 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Preservados intactos todos los contratos existentes en surgery-056 y surgery-058, ergonomía táctil >= 44px, accesibilidad aria-pressed y 0 CRLF."
+    },
+    {
+      "id": "feat-006",
+      "name": "Rediseño y Enfoque Inmediato del Monitor de Ventas en Vivo (Retiro de Radar Financiero, Eliminación de Selector de Fecha y Reposición del Copiloto IA)",
+      "description": "Limpieza y simplificación de la sección de monitor (src/components/MonitorDashboardView.jsx y src/components/monitor/hooks/useMonitorDashboard.js): (1) retirar el componente EventFinancialRadar de la vista de monitor ya que esta información financiera se traslada a la sección de eventos; (2) eliminar el selector de fecha (input date) de la barra de control del monitor, dejando la vista fijada en la jornada en vivo actual con su botón de actualización manual y badge de estado en tiempo real; (3) reubicar el Copiloto Gerencial & Auditoría IA (UnifiedAiChat) para que quede posicionado justo debajo del desglose de rendimiento por evento (EventsPerformanceList); y (4) asegurar una experiencia visual limpia, instantánea y efectiva para que tanto el gerente como los vendedores visualicen de inmediato los datos de venta al ingresar.",
+      "area": "ui-monitor-streamlining",
+      "user_visible_behavior": "Al entrar a la sección de monitor, el gerente o el vendedor visualizan inmediatamente los datos y métricas de stands en vivo sin selectores de fecha ni widgets de radar que saturen la pantalla; el Copiloto Gerencial IA se encuentra ordenado directamente debajo de los detalles por evento.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-005"
+      ],
+      "required_files": [
+        "src/components/MonitorDashboardView.jsx",
+        "src/components/monitor/hooks/useMonitorDashboard.js",
+        "src/components/monitor/EventsPerformanceList.jsx"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 191 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS in 4.50s); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (35.66s: 191 secrets OK, 269 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build PASS); npm run test:unit -> 265/265 PASS across 109 suites including surgery-053 16/16 PASS; npm run test:voice -> 53/53 PASS; git diff src/ -> EventFinancialRadar unmounted from monitor, input date replaced with real-time live indicator and refresh button, UnifiedAiChat relocated directly below EventsPerformanceList, 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Monitor simplificado, despejado y enfocado en la jornada en vivo actual, reduciendo el bundle de MonitorDashboardView de 160.26 kB a 141.61 kB (-18.65 kB), con cero impacto en módulos externos y 0 CRLF."
+    },
+    {
+      "id": "feat-007",
+      "name": "Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos",
+      "description": "Integración del análisis financiero y consulta ferial dentro de la sección de eventos (src/components/EventsManagementView.jsx, src/components/events/EventCard.jsx, src/components/events/modals/EventSalesModal.jsx y src/components/monitor/EventFinancialRadar.jsx): (1) reubicar la información del Radar Financiero Ferial (regla del 20%, recuperación de costos feriales y metas de equilibrio) dentro del contexto individual de cada evento en la gestión de eventos; (2) asegurar que las ventas, cortes de caja y movimientos históricos de cualquier evento —tanto activo como archivado— se consulten de forma integral y directa desde su tarjeta ferial o modal de ventas sin depender del monitor general; y (3) garantizar que la consulta de eventos archivados y sus movimientos históricos funcione de manera accesible, transparente y completa.",
+      "area": "events-financial-radar-and-history",
+      "user_visible_behavior": "En la sección de eventos, cualquier evento (activo o archivado) permite consultar directamente sus movimientos históricos y su desglose financiero/radar ferial, permitiendo auditar la rentabilidad y movimientos feriales sin saturar el monitor de ventas en vivo.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-006"
+      ],
+      "required_files": [
+        "src/components/EventsManagementView.jsx",
+        "src/components/events/EventCard.jsx",
+        "src/components/events/modals/EventSalesModal.jsx",
+        "src/components/monitor/EventFinancialRadar.jsx"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 191 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1567 modules PASS in 6.30s); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 41.06s (191 secrets OK, 269 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build PASS); targeted surgery suites (surgery-053 16/16, surgery-056 12/12, surgery-058 11/11, surgery-065 6/6) -> 54/54 PASS across 27 suites; npm run test:voice -> 53/53 PASS across 12 suites; git diff src/ -> EventFinancialRadar mounted in EventsManagementView, accessible via RentHealthPill in EventCard and fully integrated into EventSalesModal with 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Radar Financiero Ferial integrado dentro de la sección de eventos y consulta histórica completa de ventas, gastos y cortes de caja para eventos activos y archivados con 0 CRLF."
     }
   ]
 }

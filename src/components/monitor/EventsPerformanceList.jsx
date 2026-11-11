@@ -8,6 +8,7 @@ export default function EventsPerformanceList({
   expandedEvents = {},
   onToggleEvent,
   selectedDate,
+  selectedEventId = null,
 }) {
   return (
     <div className="space-y-4">
@@ -25,11 +26,12 @@ export default function EventsPerformanceList({
         <div className="space-y-4">
           {eventDetails.map((ev) => {
             const isExpanded = expandedEvents[ev.eventId] ?? true;
+            const isSelected = selectedEventId && ev.eventId === selectedEventId;
 
             return (
               <div
                 key={ev.eventId}
-                className="rounded-2xl bg-black border border-neutral-800 shadow-xl overflow-hidden"
+                className={`rounded-2xl bg-black border ${isSelected ? 'border-purple-500/70 ring-1 ring-purple-500/40' : 'border-neutral-800'} shadow-xl overflow-hidden`}
               >
                 <button
                   type="button"
@@ -48,11 +50,18 @@ export default function EventsPerformanceList({
                     </span>
                   </div>
 
-                  {ev.status === 'ACTIVO' && (
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-white text-emerald-600 border border-emerald-500 shadow-sm">
-                      Stand Activo
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isSelected && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/30 shadow-sm">
+                        Seleccionado
+                      </span>
+                    )}
+                    {ev.status === 'ACTIVO' && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-white text-emerald-600 border border-emerald-500 shadow-sm">
+                        Stand Activo
+                      </span>
+                    )}
+                  </div>
                 </button>
 
                 {isExpanded && (

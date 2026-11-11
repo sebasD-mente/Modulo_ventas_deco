@@ -11,6 +11,7 @@ import EventExpensesModal from './events/modals/EventExpensesModal';
 import EventSalesModal from './events/modals/EventSalesModal';
 import EventActionModals from './events/modals/EventActionModals';
 import DigitalEventMonitorSection from './events/DigitalEventMonitorSection';
+import EventFinancialRadar from './monitor/EventFinancialRadar';
 
 export default function EventsManagementView({ onEventActivated, onEventsChanged }) {
   const { isVendedorRedes, isSuperAdmin } = useAuth();
@@ -140,6 +141,16 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                     <span>Ver Ventas</span>
                   </button>
                 </div>
+              )}
+
+              {/* RADAR FINANCIERO FERIAL (REGLA DEL 20%) */}
+              {m.events && m.events.length > 0 && (
+                <EventFinancialRadar
+                  eventDetails={m.events}
+                  isSuperAdmin={isSuperAdmin}
+                  selectedEventId={m.activeEvents[0]?.id || m.events.find((e) => e.id !== 'evt-ventas-redes-online')?.id}
+                  onOpenExpenseModal={(ev) => m.setEventForExpenses(ev)}
+                />
               )}
 
               <div className="space-y-2.5">
