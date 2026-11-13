@@ -105,6 +105,39 @@ export function buildNormalizedPosterData(poster, targetTenantId) {
   return { posterId, sku, data };
 }
 
+function normalizeSizesSignature(sizes) {
+  if (!Array.isArray(sizes)) return '[]';
+  const normalized = sizes
+    .filter((s) => s && typeof s === 'object')
+    .map((s) => ({
+      sizeId: String(s.sizeId || s.id || '').trim().toUpperCase(),
+      nombre: String(s.nombre || s.name || '').trim(),
+      dimensiones: String(s.dimensiones || s.dimensions || '').trim(),
+      precio: Number(s.precio ?? s.price ?? 0),
+      badge: s.badge ? String(s.badge).trim() : null,
+    }))
+    .sort((a, b) => a.sizeId.localeCompare(b.sizeId));
+  return JSON.stringify(normalized);
+}
+
+/**
+ * Determina si un producto del catálogo cambió respecto a su estado en BD, incluyendo sus tallas (sizes).
+ */
+export function hasCatalogProductChanged(prev, data) {
+  if (!prev || !data) return true;
+  const prevTags = Array.isArray(prev.tags) ? [...prev.tags].sort().join('|') : '';
+  const newTags = Array.isArray(data.tags) ? [...data.tags].sort().join('|') : '';
+  if (prevTags !== newTags) return true;
+  if (normalizeSizesSignature(prev.sizes) !== normalizeSizesSignature(data.sizes)) return true;
+  return (
+    prev.name !== data.name ||
+    prev.category !== data.category ||
+    Math.abs(Number(prev.basePrice) - Number(data.basePrice)) > 0.01 ||
+    prev.imageUrl !== data.imageUrl ||
+    prev.isActive !== data.isActive
+  );
+}
+
 export async function normalizeAndUpsertPoster(poster, tenantId) {
   const targetTenantId = await resolveDefaultTenantId(tenantId);
   const normalized = buildNormalizedPosterData(poster, targetTenantId);
@@ -160,7 +193,7 @@ export async function deltaSyncRecentPosters(tenantId = null) {
     const skus = batch.map((p) => `WEB-${p.id || p._id || p.legacyId}`).filter((s) => s !== 'WEB-undefined');
     const existing = await prisma.product.findMany({
       where: { tenantId: targetTenantId, sku: { in: skus } },
-      select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true, tags: true },
+      select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true, tags: true, sizes: true },
     });
     const existingBySku = new Map(existing.map((e) => [e.sku, e]));
     let newCount = 0, updatedCount = 0;
@@ -174,21 +207,9 @@ export async function deltaSyncRecentPosters(tenantId = null) {
       if (!prev) {
         newCount++;
         toUpsert.push(data);
-      } else {
-        const prevTags = Array.isArray(prev.tags) ? [...prev.tags].sort().join('|') : '';
-        const newTags = Array.isArray(data.tags) ? [...data.tags].sort().join('|') : '';
-        const tagsChanged = prevTags !== newTags;
-        const changed =
-          prev.name !== data.name ||
-          prev.category !== data.category ||
-          Math.abs(Number(prev.basePrice) - Number(data.basePrice)) > 0.01 ||
-          prev.imageUrl !== data.imageUrl ||
-          prev.isActive !== data.isActive ||
-          tagsChanged;
-        if (changed) {
-          updatedCount++;
-          toUpsert.push(data);
-        }
+      } else if (hasCatalogProductChanged(prev, data)) {
+        updatedCount++;
+        toUpsert.push(data);
       }
     }
 
@@ -309,7 +330,7 @@ export async function syncCatalogFromWeb(tenantId) {
 
   const existing = await prisma.product.findMany({
     where: { tenantId: targetTenantId, isActive: true },
-    select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true, tags: true },
+    select: { sku: true, name: true, category: true, basePrice: true, imageUrl: true, isActive: true, tags: true, sizes: true },
   });
   const existingBySku = new Map(existing.map((p) => [p.sku, p]));
   const existingSkus = new Set(existingBySku.keys()), syncedSkus = new Set();
@@ -325,21 +346,9 @@ export async function syncCatalogFromWeb(tenantId) {
     if (!prev) {
       newCount++;
       toUpsert.push(data);
-    } else {
-      const prevTags = Array.isArray(prev.tags) ? [...prev.tags].sort().join('|') : '';
-      const newTags = Array.isArray(data.tags) ? [...data.tags].sort().join('|') : '';
-      const tagsChanged = prevTags !== newTags;
-      const changed =
-        prev.name !== data.name ||
-        prev.category !== data.category ||
-        Math.abs(Number(prev.basePrice) - Number(data.basePrice)) > 0.01 ||
-        prev.imageUrl !== data.imageUrl ||
-        prev.isActive !== data.isActive ||
-        tagsChanged;
-      if (changed) {
-        updatedCount++;
-        toUpsert.push(data);
-      }
+    } else if (hasCatalogProductChanged(prev, data)) {
+      updatedCount++;
+      toUpsert.push(data);
     }
   }
 

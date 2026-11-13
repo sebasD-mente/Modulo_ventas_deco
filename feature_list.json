@@ -257,6 +257,30 @@
       ],
       "evidence": "bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 191 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1567 modules PASS in 6.30s); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 41.06s (191 secrets OK, 269 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build PASS); targeted surgery suites (surgery-053 16/16, surgery-056 12/12, surgery-058 11/11, surgery-065 6/6) -> 54/54 PASS across 27 suites; npm run test:voice -> 53/53 PASS across 12 suites; git diff src/ -> EventFinancialRadar mounted in EventsManagementView, accessible via RentHealthPill in EventCard and fully integrated into EventSalesModal with 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Radar Financiero Ferial integrado dentro de la sección de eventos y consulta histórica completa de ventas, gastos y cortes de caja para eventos activos y archivados con 0 CRLF."
+    },
+    {
+      "id": "feat-008",
+      "name": "Detección de cambios en tamaños (sizes) durante la sincronización del catálogo web",
+      "description": "Corregir deltaSyncRecentPosters y syncCatalogFromWeb en server/services/catalog/liveCatalogSyncService.js para seleccionar el campo sizes desde prisma.product y comparar prev.sizes contra data.sizes mediante un helper compartido (hasCatalogProductChanged), de modo que agregar o quitar tallas (p. ej. agregar Pequeño Q35 a un póster que ya tenía Mini Q25) dispare el upsert en PostgreSQL e invalide la caché del catálogo y vectores.",
+      "area": "catalog-sync-sizes",
+      "user_visible_behavior": "Al agregar o modificar tamaños disponibles de un póster en Deco Vintage (aun sin cambiar el precio mínimo basePrice) y sincronizar el catálogo o recibir webhook, el buscador de Nueva Venta muestra inmediatamente todos los tamaños actualizados.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-007"
+      ],
+      "required_files": [
+        "server/services/catalog/liveCatalogSyncService.js",
+        "tests/catalog/catalog-sync-sizes.test.js"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run test:unit"
+      ],
+      "evidence": "node --test tests/catalog/catalog-sync-sizes.test.js -> 3/3 PASS; npm run test:unit -> 265/265 PASS across 109 suites; bash ./init.sh -> PASS (CLEAN STATE, Overall: 100/100, check-architecture 0 violations, zero-trust 13/13, vite build PASS).",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/, 0 CRLF."
     }
   ]
 }

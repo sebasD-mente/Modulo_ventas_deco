@@ -4,38 +4,33 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-007` Completada y Verificada)
-- **Estado de sesión:** Tarea `feat-007` concluida con verificación 100/100, 265/265 unit tests PASS, 53/53 voice tests PASS, build PASS y 0 CRLF.
-- **Última tarea completada:** `feat-007` — Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos.
-- **Próxima tarea a ejecutar en DAG (`WIP = 1`):** Ninguna (`feat-000..007` cerradas en `done`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-008` Completada y Verificada)
+- **Estado de sesión:** Tarea `feat-008` concluida bajo `Modo Diario Ágil` (`WIP = 0`).
+- **Última tarea completada:** `feat-008` — Detección de cambios en tamaños (`sizes`) durante la sincronización del catálogo web.
+- **Próxima tarea a ejecutar en DAG (`WIP = 1`):** Ninguna (`feat-000..008` cerradas en `done`).
 - **Marcha de trabajo acordada:** `Modo Diario Ágil`.
 
 ---
 
-## Alcance Ejecutado (`Scope` de `feat-007` — COMPLETADO)
-1. **Reubicación de Métricas Financieras dentro de Eventos (`src/components/EventsManagementView.jsx`, `src/components/events/EventCard.jsx`, `src/components/events/modals/EventSalesModal.jsx` y `src/components/monitor/EventFinancialRadar.jsx`)**:
-   - Montado el Radar Financiero Ferial (regla del 20%, recuperación de costos y balance pre-producción) dentro de la sección de eventos (`EventsManagementView.jsx`), permitiendo auditar y navegar stands concurrentes y consolidado global con `onOpenExpenseModal`.
-   - En `EventCard.jsx`, `RentHealthPill` opera como disparador accesible para consultar de forma inmediata el radar y desglose ferial de cualquier stand (`ACTIVO`, `CONFIRMADO` o `ARCHIVADO`).
-   - En `EventSalesModal.jsx`, integrada la tarjeta completa de desglose financiero y radar ferial (indicadores contables, fase de salud, barra de progreso al 20%, ritmo diario requerido y consolidado de pagos y cortes de caja).
-2. **Consulta Integral de Histórico y Movimientos por Evento**:
-   - Garantizado que cualquier evento histórico o archivado permita auditar sus ventas, cortes de caja y movimientos asociados directamente desde su ficha/modal en eventos sin depender del monitor general.
-3. **Preservación Estricta de Contratos Existentes**:
-   - Preservado `selectedStandId` y `selectedEventId` en `EventFinancialRadar.jsx` (contrato de `surgery-053` 16/16 PASS).
-   - Preservado `data-testid="permanent-digital-pos-card"`, `toggle-archived-events-btn` y enlaces de `EventsManagementView.jsx` (contratos `surgery-056`, `surgery-058`, `surgery-065`).
-   - Mantenido `useModalBackHandler` en `EventSalesModal.jsx`.
+## Alcance Ejecutado (`Scope` de `feat-008` — COMPLETADO)
+1. **`server/services/catalog/liveCatalogSyncService.js`**:
+   - Extraído helper puro compartido (`normalizeSizesSignature` / `hasCatalogProductChanged`) para comparar de forma determinista `prev` contra `data`, incluyendo `sizes`.
+   - Incluido `sizes: true` en el `select` de `prisma.product.findMany` tanto en `deltaSyncRecentPosters` como en `syncCatalogFromWeb`.
+   - Garantizado que cualquier alta, baja o cambio de precio/nombre/dimensiones en `sizes` (incluso cuando `basePrice` mínimo no cambia, ej. agregar Pequeño Q35 a un póster que ya tenía Mini Q25) marque `changed = true`, ejecute el `upsert` e invalide `invalidateCatalogCache` e `invalidateVectorCache`.
+2. **`tests/catalog/catalog-sync-sizes.test.js`**:
+   - Añadidas 3 pruebas unitarias verificando `hasCatalogProductChanged` y la selección de `sizes: true` en `syncCatalogFromWeb` y `deltaSyncRecentPosters`.
 
 ---
 
 ## Exclusiones Explícitas (`Hands off` cumplidas al 100%)
-- **Cero lectura o modificación de `.env`** y **cero modificaciones en `prisma/schema.prisma`** o migraciones de base de datos.
-- **Cero alteración de módulos ajenos** (POS de mostrador, cálculo de comisiones, contratos de sincronización de catálogo, endpoints de voz IA o infraestructura Docker).
-- **Cero debilitamiento de suites de prueba** (`surgery-056`, `surgery-058`, ergonomía `>= 44px`, `zero-trust`, `check-architecture`).
+- **Cero lectura o modificación de `.env`** y **cero modificaciones en `prisma/schema.prisma`**.
+- **Cero alteración de módulos ajenos** (ventas, eventos, monitor, auth, voz).
+- **Cero debilitamiento de suites de prueba** existentes.
 - **Cero nuevas dependencias NPM** y **cero despliegue remoto (`git push` / `npm run deploy`)**.
 
 ---
 
-## Criterios Verificables de Cierre Cumplidos para `feat-007`
-1. [x] `src/components/EventsManagementView.jsx` monta y renderiza `EventFinancialRadar` para la gestión ferial multi-stand.
-2. [x] `src/components/events/EventCard.jsx` ofrece acceso interactivo hacia el radar y auditoría ferial a través de `RentHealthPill` y `onViewSales`.
-3. [x] `src/components/events/modals/EventSalesModal.jsx` integra la auditoría del Radar Financiero Ferial junto con el desglose de transacciones y cortes de caja para cualquier evento activo o archivado.
-4. [x] `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run harness:check` pasan al 100% con 0 violaciones y 0 CRLF.
+## Criterios Verificables de Cierre Cumplidos para `feat-008`
+1. [x] `server/services/catalog/liveCatalogSyncService.js` selecciona `sizes: true` y compara `sizes` en `deltaSyncRecentPosters` y `syncCatalogFromWeb` sin duplicar lógica.
+2. [x] `tests/catalog/catalog-sync-sizes.test.js` pasa al 100% (3/3 PASS) cubriendo el caso de agregar una talla sin cambiar `basePrice`.
+3. [x] `bash ./init.sh`, `bash scripts/check-architecture.sh`, `node scripts/validate-harness.mjs --min-score 100` y `npm run test:unit` pasan al 100% con 0 violaciones y 0 CRLF.

@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-11 16:15
-**Session ID:** sesion-011 (Implementación y Cierre de `feat-007`: Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos)
-**Active Feature:** Ninguna (`WIP = 0`; `feat-000..007` en `done`)
+**Last Updated:** 2026-11-12 19:36
+**Session ID:** sesion-012 (`feat-008`: Detección de cambios en `sizes` durante la sincronización del catálogo web)
+**Active Feature:** Ninguna (`WIP = 0`; `feat-000..008` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -22,7 +22,10 @@
   - Removido el selector `input[type="date"]` de la barra de control del monitor, sustituyéndolo por un indicador sutil de jornada en tiempo real con fecha actual, conservando el botón interactivo de actualización manual (`RotateCcw`, `min-h-[44px]`), el badge `"EN VIVO"` y la estampa de última sincronización.
   - Reubicado el Copiloto Gerencial & Auditoría IA (`data-testid="toggle-ai-copilot-btn"`) inmediatamente después del desglose de rendimiento por eventos (`EventsPerformanceList`), dejando una vista superior limpia y despejada para el monitoreo de ventas.
   - Suministrado el prop `selectedEventId={activeEvent?.id}` a `EventsPerformanceList.jsx` para resaltar visualmente el stand seleccionado en la lista, satisfaciendo el contrato histórico de `surgery-053`.
-- [x] **Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos `feat-007` (`265/265` pruebas unitarias PASS, `54/54` cirugías PASS, `53/53` suites de voz PASS, build PASS)**:
+- [x] **Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos `feat-007` (`265/265` pruebas unitarias PASS, `54/54` cirugías PASS, `53/53` suites de voz PASS, build PASS)**
+- [x] **Detección de Cambios en Tamaños (`sizes`) en Sincronización de Catálogo `feat-008` (`3/3` pruebas nuevas PASS, `265/265` unit tests PASS)**:
+  - Corregidos `deltaSyncRecentPosters` y `syncCatalogFromWeb` en `server/services/catalog/liveCatalogSyncService.js` para seleccionar `sizes: true` en `prisma.product.findMany` y comparar `prev.sizes` contra `data.sizes` mediante el helper compartido `hasCatalogProductChanged` + `normalizeSizesSignature`.
+  - Añadida suite `tests/catalog/catalog-sync-sizes.test.js` verificando que agregar tallas manteniendo el mismo `basePrice` mínimo (ej. agregar Pequeño Q35 a un póster con Mini Q25) dispara actualización e invalidación de caché.
   - Montado `EventFinancialRadar` en `EventsManagementView.jsx` para la administración contextual ferial multi-stand, con navegación entre stands físicos y consolidado global.
   - Habilitada la normalización automática en `EventFinancialRadar.jsx` para soportar colecciones de eventos con `eventId` o `id`, cálculo dinámico de `globalFinancials` y preservación exacta de `setSelectedStandId(selectedEventId)` dentro de `useEffect` (contrato de `surgery-053`).
   - En `EventCard.jsx`, transformado `RentHealthPill` en un disparador accesible (`min-h-[36px]`) que abre directamente el modal detallado del evento con su radar financiero y movimientos históricos.
