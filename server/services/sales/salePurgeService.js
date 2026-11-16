@@ -1,6 +1,26 @@
 import { prisma } from '../../config/prisma.js';
 import { getSequenceName, invalidateSequenceCache } from './saleNumberGenerator.js';
 
+async function cleanupOrphanPrintSheetsAndSettlements(tx, tenantId) {
+  if (typeof tx.printSheet?.deleteMany === 'function') {
+    await tx.printSheet.deleteMany({ where: { tenantId, items: { none: {} } } });
+  }
+  if (typeof tx.commissionSettlement?.deleteMany === 'function') {
+    await tx.commissionSettlement.deleteMany({ where: { tenantId, sales: { none: {} } } });
+  }
+}
+
+async function resetEventSequence(tx, eventId) {
+  await tx.event.update({ where: { id: eventId }, data: { currentSaleSequence: 0 } });
+  const seqName = getSequenceName(eventId);
+  if (typeof tx.$executeRawUnsafe === 'function') {
+    await tx.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
+  } else if (typeof tx.$queryRawUnsafe === 'function') {
+    await tx.$queryRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
+  }
+  invalidateSequenceCache(eventId);
+}
+
 /**
  * Satélite para purga controlada de ventas de prueba y reseteo de secuencia.
  * Exclusivo para Super Admins cuando se inicia la operación real de un evento.
@@ -53,44 +73,11 @@ export async function purgeEventSalesTransaction({ tenantId, eventId, userId }) 
       where: { tenantId, eventId },
     });
 
-    // 4.1 Limpiar pliegos de taller sin ítems (huérfanos tras borrar ventas)
-    if (typeof tx.printSheet?.deleteMany === 'function') {
-      await tx.printSheet.deleteMany({
-        where: {
-          tenantId,
-          items: { none: {} },
-        },
-      });
-    }
+    // 4.1 Limpiar pliegos de taller y liquidaciones huérfanas
+    await cleanupOrphanPrintSheetsAndSettlements(tx, tenantId);
 
-    // 4.2 Limpiar liquidaciones huérfanas sin ventas asociadas
-    if (typeof tx.commissionSettlement?.deleteMany === 'function') {
-      await tx.commissionSettlement.deleteMany({
-        where: {
-          tenantId,
-          sales: { none: {} },
-        },
-      });
-    }
-
-    // 5. Resetear la secuencia de ventas del evento a 0 para que arranque desde FERI-0001
-    await tx.event.update({
-      where: { id: eventId },
-      data: { currentSaleSequence: 0 },
-    });
-
-    // 6. Resetear secuencia nativa de PostgreSQL si existe y limpiar cache
-    if (typeof tx.$executeRawUnsafe === 'function') {
-      const seqName = getSequenceName(eventId);
-      await tx.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
-      invalidateSequenceCache(eventId);
-    } else if (typeof tx.$queryRawUnsafe === 'function') {
-      const seqName = getSequenceName(eventId);
-      await tx.$queryRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
-      invalidateSequenceCache(eventId);
-    } else {
-      invalidateSequenceCache(eventId);
-    }
+    // 5 y 6. Resetear secuencia de ventas a 0 y limpiar caché
+    await resetEventSequence(tx, eventId);
 
     // 7. Registro de auditoría inmutable
     await tx.auditLog.create({
@@ -111,6 +98,70 @@ export async function purgeEventSalesTransaction({ tenantId, eventId, userId }) 
     return {
       eventName: event.name,
       purgedSalesCount: salesCount,
+      currentSaleSequence: 0,
+    };
+  });
+}
+
+/**
+ * Purga controlada de datos de prueba del Punto de Venta Digital (Ventas en Línea / Redes).
+ * Deja en 0 ventas de redes, clientes huérfanos, liquidaciones de comisión huérfanas,
+ * cierres de caja digitales, pliegos huérfanos y secuencia del canal digital.
+ */
+export async function purgeOnlinePosTestDataTransaction({ tenantId, userId = null }) {
+  const digitalEventId = 'evt-ventas-redes-online';
+  return await prisma.$transaction(async (tx) => {
+    const event = await tx.event.findFirst({ where: { id: digitalEventId, tenantId } });
+    if (!event) throw new Error('Punto de Venta Digital no encontrado para esta organización.');
+
+    const onlineWhere = {
+      tenantId,
+      OR: [{ eventId: digitalEventId }, { orderType: 'REDES_PERSONALIZADO' }],
+    };
+
+    const purgedSalesCount = await tx.sale.count({ where: onlineWhere });
+    await tx.sale.deleteMany({ where: onlineWhere });
+
+    const closingsResult = await tx.cashClosing.deleteMany({
+      where: { tenantId, eventId: digitalEventId },
+    });
+
+    await cleanupOrphanPrintSheetsAndSettlements(tx, tenantId);
+
+    let purgedCustomersCount = 0;
+    if (typeof tx.customer?.deleteMany === 'function') {
+      const custRes = await tx.customer.deleteMany({
+        where: { tenantId, sales: { none: {} } },
+      });
+      purgedCustomersCount = Number(custRes?.count || 0);
+    }
+
+    await resetEventSequence(tx, digitalEventId);
+
+    if (typeof tx.auditLog?.create === 'function') {
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId,
+          action: 'VENTAS_REDES_PRUEBA_PURGADAS',
+          entity: 'event',
+          entityId: digitalEventId,
+          details: {
+            eventName: event.name,
+            purgedSalesCount,
+            purgedCustomersCount,
+            purgedClosingsCount: Number(closingsResult?.count || 0),
+            sequenceResetTo: 0,
+          },
+        },
+      });
+    }
+
+    return {
+      eventName: event.name,
+      purgedSalesCount,
+      purgedCustomersCount,
+      purgedClosingsCount: Number(closingsResult?.count || 0),
       currentSaleSequence: 0,
     };
   });

@@ -13,7 +13,7 @@ export { getEventKPIs, getMonitorDashboardMetrics, getEventSalesList } from './s
 export { getHourlySalesAnalytics, getTopSellingPosters } from './sales/saleAnalyticsService.js';
 export { createCashClosingTransaction } from './sales/cashClosingService.js';
 export { runMidnightClosingAudit } from './sales/midnightClosingService.js';
-export { purgeEventSalesTransaction } from './sales/salePurgeService.js';
+export { purgeEventSalesTransaction, purgeOnlinePosTestDataTransaction } from './sales/salePurgeService.js';
 export {
   isTargetEventArchived, queryOrderTrackingList, updateOrderDeliveryRecord,
 } from './sales/orderTrackingService.js';

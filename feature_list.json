@@ -281,6 +281,39 @@
       ],
       "evidence": "node --test tests/catalog/catalog-sync-sizes.test.js -> 3/3 PASS; npm run test:unit -> 265/265 PASS across 109 suites; bash ./init.sh -> PASS (CLEAN STATE, Overall: 100/100, check-architecture 0 violations, zero-trust 13/13, vite build PASS).",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/, 0 CRLF."
+    },
+    {
+      "id": "feat-009",
+      "name": "Historial Mensual de Ventas en Línea, Fix React #310 en Ver Ventas y Limpieza en 0 de Datos de Prueba",
+      "description": "Corregir el crash React #310 en EventSalesModal.jsx moviendo todos los hooks antes del retorno temprano, implementar OnlineSalesHistoryModal.jsx con selector de mes/fechas para consultar historial de meses anteriores con estado de pago, estado de comisión (pagada, cargada en corte o pendiente) y datos completos de entrega/cliente, soportar filtro mensual en getEventSalesList, y habilitar purgeOnlinePosTestDataTransaction + endpoint/script/botón SUPER_ADMIN para dejar en 0 el módulo de Ventas en Línea y Redes.",
+      "area": "online-sales-history-and-reset",
+      "user_visible_behavior": "Al pulsar 'Ver Ventas' en el Punto de Venta Digital (Vendedor Redes o Super Admin) se abre sin errores el historial mensual de ventas en línea con selector de mes, detalles de pago, comisión y entrega, y el Super Admin puede reiniciar a 0 los datos de prueba del canal digital.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-008"
+      ],
+      "required_files": [
+        "server/services/sales/saleKpiService.js",
+        "server/services/sales/salePurgeService.js",
+        "server/services/saleService.js",
+        "server/controllers/saleController.js",
+        "server/routes/apiRoutes.js",
+        "src/components/events/modals/EventSalesModal.jsx",
+        "src/components/events/modals/OnlineSalesHistoryModal.jsx",
+        "src/components/EventsManagementView.jsx",
+        "scripts/reset-online-pos-test-data.js",
+        "tests/sales/online-sales-history-and-purge.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/online-sales-history-and-purge.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/online-sales-history-and-purge.test.js -> 4/4 PASS in 137.49ms; npm run test:unit -> 265/265 PASS across 109 suites; bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS in 4.32s).",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Fix React #310 en EventSalesModal, historial mensual OnlineSalesHistoryModal con selector de mes/pago/comisión/entrega, y limpieza en 0 vía endpoint SUPER_ADMIN, UI y script CLI."
     }
   ]
 }

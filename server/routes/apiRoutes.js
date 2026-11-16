@@ -55,6 +55,7 @@ import {
   postCashClosing,
   getCashClosingsList,
   purgeEventSales,
+  purgeOnlinePosTestData,
   getOrderTrackingList,
   updateOrderDelivery,
 } from '../controllers/saleController.js';
@@ -271,6 +272,11 @@ router.post(
   '/sales/purge-test-sales',
   requireRole(['SUPER_ADMIN']),
   purgeEventSales
+);
+router.post(
+  '/sales/purge-online-test-data',
+  requireRole(['SUPER_ADMIN']),
+  purgeOnlinePosTestData
 );
 
 // ==========================================

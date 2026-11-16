@@ -23,6 +23,24 @@ export function getGuatemalaDayRange(dateInput = null) {
 }
 
 /**
+ * Retorna el rango civil exacto de inicio y fin de un mes (YYYY-MM) en America/Guatemala (UTC-6).
+ */
+export function getGuatemalaMonthRange(monthInput = null) {
+  const targetMonth = monthInput
+    ? String(monthInput).trim().slice(0, 7)
+    : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date()).slice(0, 7);
+  const match = /^(\d{4})-(\d{2})$/.exec(targetMonth);
+  if (!match) return { targetMonth: null, startOfMonth: new Date(NaN), endOfMonth: new Date(NaN) };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return { targetMonth: null, startOfMonth: new Date(NaN), endOfMonth: new Date(NaN) };
+  const lastDay = String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, '0');
+  const startOfMonth = new Date(`${targetMonth}-01T00:00:00.000-06:00`);
+  const endOfMonth = new Date(`${targetMonth}-${lastDay}T23:59:59.999-06:00`);
+  return { targetMonth, startOfMonth, endOfMonth };
+}
+
+/**
  * Obtiene métricas y KPIs en tiempo real de un evento utilizando agregaciones nativas de PostgreSQL en O(1)
  */
 export async function getEventKPIs(params, fallbackTenantId = null) {
@@ -184,7 +202,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
 /**
  * Lista las ventas de un evento con paginación y filtros nativos
  */
-export async function getEventSalesList({ tenantId, eventId, date = null, page = 1, limit = 50 }) {
+export async function getEventSalesList({ tenantId, eventId, date = null, month = null, page = 1, limit = 50 }) {
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
   const parsedLimit = Math.min(500, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
@@ -223,6 +241,19 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
         where.createdAt = { gte: startOfDay, lte: endOfDay };
       }
     }
+  } else if (month) {
+    const { startOfMonth, endOfMonth } = getGuatemalaMonthRange(month);
+    if (!Number.isNaN(startOfMonth.getTime()) && !Number.isNaN(endOfMonth.getTime())) {
+      if (isStand) {
+        where.OR = [
+          { eventId, createdAt: { gte: startOfMonth, lte: endOfMonth } },
+          { pickupEventId: eventId, createdAt: { gte: startOfMonth, lte: endOfMonth } },
+        ];
+      } else {
+        where.eventId = eventId;
+        where.createdAt = { gte: startOfMonth, lte: endOfMonth };
+      }
+    }
   } else {
     if (isStand) {
       where.OR = [
@@ -242,6 +273,9 @@ export async function getEventSalesList({ tenantId, eventId, date = null, page =
         items: { include: { product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } } } },
         payments: true,
         seller: { select: { fullName: true, email: true } },
+        customer: { select: { id: true, fullName: true, phone: true, deliveryAddress: true, department: true, municipality: true, sourceChannel: true } },
+        pickupEvent: { select: { id: true, name: true, location: true } },
+        commissionSettlement: { select: { id: true, settlementNumber: true, status: true, paidAt: true, totalCommission: true, commissionRate: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip,

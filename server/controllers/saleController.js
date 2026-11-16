@@ -1,6 +1,6 @@
 import {
   createSaleTransaction, updateSaleTransaction, getEventKPIs, getMonitorDashboardMetrics,
-  getEventSalesList as getEventSalesServiceList, purgeEventSalesTransaction,
+  getEventSalesList as getEventSalesServiceList, purgeEventSalesTransaction, purgeOnlinePosTestDataTransaction,
   isTargetEventArchived, queryOrderTrackingList, updateOrderDeliveryRecord,
 } from '../services/saleService.js';
 
@@ -60,8 +60,8 @@ export async function updateSale(req, res) {
 
 export async function getEventSalesList(req, res) {
   try {
-    const { date, page, limit } = req.query;
-    const result = await getEventSalesServiceList({ tenantId: req.tenantId, eventId: req.params.eventId, date, page, limit });
+    const { date, month, page, limit } = req.query;
+    const result = await getEventSalesServiceList({ tenantId: req.tenantId, eventId: req.params.eventId, date, month, page, limit });
     return res.json({
       success: true, data: result.sales, count: result.sales.length,
       pagination: {
@@ -121,6 +121,20 @@ export async function purgeEventSales(req, res) {
   } catch (err) {
     console.error('❌ Error purgando ventas del evento:', err);
     return res.status(400).json({ success: false, error: err.message || 'Error al purgar ventas.' });
+  }
+}
+
+export async function purgeOnlinePosTestData(req, res) {
+  try {
+    const result = await purgeOnlinePosTestDataTransaction({ tenantId: req.tenantId, userId: req.user?.id });
+    return res.json({
+      success: true,
+      message: `Punto de Venta Digital reiniciado en 0 (${result.purgedSalesCount} ventas y ${result.purgedCustomersCount} clientes de prueba eliminados).`,
+      data: result,
+    });
+  } catch (err) {
+    console.error('❌ Error reiniciando datos de prueba de Ventas en Línea:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Error al reiniciar datos de prueba.' });
   }
 }
 

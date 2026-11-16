@@ -20,9 +20,61 @@ const formatSpanishDate = (dateStr) => {
 
 export default function EventSalesModal({ event, salesList, closingsList = [], sales, isLoading, onClose }) {
   useModalBackHandler(Boolean(event), onClose);
-  if (!event) return null;
-  const list = salesList || sales || [];
   const [expandedDate, setExpandedDate] = useState(null);
+  const list = useMemo(() => salesList || sales || [], [salesList, sales]);
+
+  const overallPaymentTotals = useMemo(() => {
+    const totals = { EFECTIVO: 0, TARJETA: 0, TRANSFERENCIA: 0, OTRO: 0 };
+    list.forEach((sale) => {
+      (sale.payments || []).forEach((p) => {
+        const m = totals[p.method] !== undefined ? p.method : 'OTRO';
+        totals[m] = Number((totals[m] + Number(p.amount || 0)).toFixed(2));
+      });
+    });
+    return totals;
+  }, [list]);
+
+  const closingsSummary = useMemo(() => {
+    let reconciled = 0;
+    let autoMidnight = 0;
+    (closingsList || []).forEach((c) => {
+      if (c.closingType === 'DIARIO') reconciled += 1;
+      else if (c.closingType === 'AUTOMATICO_MEDIANOCHE') autoMidnight += 1;
+    });
+    return { total: (closingsList || []).length, reconciled, autoMidnight };
+  }, [closingsList]);
+
+  const groupedDays = useMemo(() => {
+    const todayStr = getGuatemalaDateStr(new Date());
+    const groups = new Map();
+
+    list.forEach((sale) => {
+      const dateStr = getGuatemalaDateStr(sale.createdAt);
+      if (!groups.has(dateStr)) groups.set(dateStr, []);
+      groups.get(dateStr).push(sale);
+    });
+
+    const sortedDates = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+    return sortedDates.map((dateStr) => {
+      const daySales = groups.get(dateStr) || [];
+      const totalSold = daySales.reduce((acc, s) => acc + Number(s.totalAmount || 0), 0);
+      const paymentTotals = { EFECTIVO: 0, TARJETA: 0, TRANSFERENCIA: 0 };
+      daySales.forEach((s) => {
+        (s.payments || []).forEach((p) => {
+          const m = p.method || 'EFECTIVO';
+          if (paymentTotals[m] !== undefined) paymentTotals[m] += Number(p.amount || 0);
+        });
+      });
+
+      const matchedClosing = (closingsList || []).find((c) => getGuatemalaDateStr(c.closingDate) === dateStr);
+      return {
+        dateStr, formattedDate: formatSpanishDate(dateStr), totalSold, salesCount: daySales.length,
+        paymentTotals, closing: matchedClosing || null, isToday: dateStr === todayStr, sales: daySales,
+      };
+    });
+  }, [list, closingsList]);
+
+  if (!event) return null;
 
   const fin = event.financials || {};
   const totalExpenses = Number(fin.totalExpenses || 0);
@@ -79,57 +131,6 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
     color: 'text-slate-400 bg-slate-900 border-slate-700',
     label: '⚪ EVALUANDO',
   };
-
-  const overallPaymentTotals = useMemo(() => {
-    const totals = { EFECTIVO: 0, TARJETA: 0, TRANSFERENCIA: 0, OTRO: 0 };
-    list.forEach((sale) => {
-      (sale.payments || []).forEach((p) => {
-        const m = totals[p.method] !== undefined ? p.method : 'OTRO';
-        totals[m] = Number((totals[m] + Number(p.amount || 0)).toFixed(2));
-      });
-    });
-    return totals;
-  }, [list]);
-
-  const closingsSummary = useMemo(() => {
-    let reconciled = 0;
-    let autoMidnight = 0;
-    (closingsList || []).forEach((c) => {
-      if (c.closingType === 'DIARIO') reconciled += 1;
-      else if (c.closingType === 'AUTOMATICO_MEDIANOCHE') autoMidnight += 1;
-    });
-    return { total: (closingsList || []).length, reconciled, autoMidnight };
-  }, [closingsList]);
-
-  const groupedDays = useMemo(() => {
-    const todayStr = getGuatemalaDateStr(new Date());
-    const groups = new Map();
-
-    list.forEach((sale) => {
-      const dateStr = getGuatemalaDateStr(sale.createdAt);
-      if (!groups.has(dateStr)) groups.set(dateStr, []);
-      groups.get(dateStr).push(sale);
-    });
-
-    const sortedDates = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
-    return sortedDates.map((dateStr) => {
-      const daySales = groups.get(dateStr) || [];
-      const totalSold = daySales.reduce((acc, s) => acc + Number(s.totalAmount || 0), 0);
-      const paymentTotals = { EFECTIVO: 0, TARJETA: 0, TRANSFERENCIA: 0 };
-      daySales.forEach((s) => {
-        (s.payments || []).forEach((p) => {
-          const m = p.method || 'EFECTIVO';
-          if (paymentTotals[m] !== undefined) paymentTotals[m] += Number(p.amount || 0);
-        });
-      });
-
-      const matchedClosing = (closingsList || []).find((c) => getGuatemalaDateStr(c.closingDate) === dateStr);
-      return {
-        dateStr, formattedDate: formatSpanishDate(dateStr), totalSold, salesCount: daySales.length,
-        paymentTotals, closing: matchedClosing || null, isToday: dateStr === todayStr, sales: daySales,
-      };
-    });
-  }, [list, closingsList]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
