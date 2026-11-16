@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 14:58
-**Session ID:** sesion-013 (`feat-009`: Historial Mensual de Ventas en Línea, Fix React #310 y Limpieza en 0)
-**Active Feature:** Ninguna (`WIP = 0`; `feat-000..009` en `done`)
+**Last Updated:** 2026-11-16 16:55
+**Session ID:** sesion-014 (`feat-010`: Retiro de botón destructivo `'Reiniciar en 0'` y endpoint `/api/sales/purge-online-test-data`; preparación segura de `feat-011`)
+**Active Feature:** Ninguna (`WIP = 0`; `feat-000..010` en `done`; `feat-011` pendiente de ejecución única en PostgreSQL de producción)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -23,7 +23,13 @@
   - Reubicado el Copiloto Gerencial & Auditoría IA (`data-testid="toggle-ai-copilot-btn"`) inmediatamente después del desglose de rendimiento por eventos (`EventsPerformanceList`), dejando una vista superior limpia y despejada para el monitoreo de ventas.
   - Suministrado el prop `selectedEventId={activeEvent?.id}` a `EventsPerformanceList.jsx` para resaltar visualmente el stand seleccionado en la lista, satisfaciendo el contrato histórico de `surgery-053`.
 - [x] **Reubicación del Radar Financiero Ferial y Consolidación de Histórico de Movimientos en la Sección de Eventos `feat-007` (`265/265` pruebas unitarias PASS, `54/54` cirugías PASS, `53/53` suites de voz PASS, build PASS)**
-- [x] **Detección de Cambios en Tamaños (`sizes`) en Sincronización de Catálogo `feat-008` (`3/3` pruebas nuevas PASS, `265/265` unit tests PASS)**:
+- [x] **Detección de Cambios en Tamaños (`sizes`) en Sincronización de Catálogo `feat-008` (`3/3` pruebas nuevas PASS, `265/265` unit tests PASS)**
+- [x] **Historial Mensual de Ventas en Línea, Fix React #310 y Limpieza en 0 `feat-009` (`ad51a7a`)**
+- [x] **Retiro de Botón Destructivo `'Reiniciar en 0'` y Endpoint `/sales/purge-online-test-data` `feat-010` (`4/4` `online-sales-history-and-purge.test.js`, `265/265` unit tests PASS, `bash ./init.sh` `100/100`)**:
+  - Eliminado el botón `'Reiniciar en 0'`, sus estados (`isConfirmingOnlineReset`, `isResettingOnline`, `onlineResetFeedback`), `handleConfirmOnlineReset` y modal de confirmación en `src/components/EventsManagementView.jsx`.
+  - Eliminados `POST /api/sales/purge-online-test-data` en `server/routes/apiRoutes.js`, `purgeOnlinePosTestData` en `server/controllers/saleController.js` y `purgeOnlinePosTestDataTransaction` en `server/services/saleService.js` y `server/services/sales/salePurgeService.js`, preservando intacta la protección `403` sobre `evt-ventas-redes-online` en `purgeEventSalesTransaction`.
+  - Blindado `scripts/reset-online-pos-test-data.js` de forma autocontenida para borrar **exclusivamente** registros con `eventId: 'evt-ventas-redes-online'` (cero borrado de ventas `POS_FERIA` ni otros eventos).
+  - Actualizado `tests/sales/online-sales-history-and-purge.test.js` (`4/4 PASS`).
   - Corregidos `deltaSyncRecentPosters` y `syncCatalogFromWeb` en `server/services/catalog/liveCatalogSyncService.js` para seleccionar `sizes: true` en `prisma.product.findMany` y comparar `prev.sizes` contra `data.sizes` mediante el helper compartido `hasCatalogProductChanged` + `normalizeSizesSignature`.
   - Añadida suite `tests/catalog/catalog-sync-sizes.test.js` verificando que agregar tallas manteniendo el mismo `basePrice` mínimo (ej. agregar Pequeño Q35 a un póster con Mini Q25) dispara actualización e invalidación de caché.
   - Montado `EventFinancialRadar` en `EventsManagementView.jsx` para la administración contextual ferial multi-stand, con navegación entre stands físicos y consolidado global.

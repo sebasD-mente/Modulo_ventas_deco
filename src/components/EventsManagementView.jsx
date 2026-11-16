@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Loader2, Archive, ChevronDown, ChevronUp, Smartphone, BarChart3, Trash2 } from 'lucide-react';
+import React from 'react';
+import { Loader2, Archive, ChevronDown, ChevronUp, Smartphone, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useEventsManager from './events/hooks/useEventsManager';
 import EventsFilterBar from './events/EventsFilterBar';
@@ -15,30 +15,9 @@ import DigitalEventMonitorSection from './events/DigitalEventMonitorSection';
 import EventFinancialRadar from './monitor/EventFinancialRadar';
 
 export default function EventsManagementView({ onEventActivated, onEventsChanged }) {
-  const { isVendedorRedes, isSuperAdmin, authFetch } = useAuth();
+  const { isVendedorRedes, isSuperAdmin } = useAuth();
   const m = useEventsManager({ onEventActivated, onEventsChanged });
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin);
-  const [isConfirmingOnlineReset, setIsConfirmingOnlineReset] = useState(false);
-  const [isResettingOnline, setIsResettingOnline] = useState(false);
-  const [onlineResetFeedback, setOnlineResetFeedback] = useState(null);
-
-  const handleConfirmOnlineReset = async () => {
-    setIsResettingOnline(true);
-    setOnlineResetFeedback(null);
-    try {
-      const res = await authFetch('/api/sales/purge-online-test-data', { method: 'POST' });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Error reiniciando datos de prueba.');
-      setIsConfirmingOnlineReset(false);
-      setOnlineResetFeedback(json.message || 'Punto de Venta Digital reiniciado en 0.');
-      await m.loadEvents();
-      onEventsChanged?.();
-    } catch (err) {
-      setOnlineResetFeedback(`⚠️ ${err.message}`);
-    } finally {
-      setIsResettingOnline(false);
-    }
-  };
 
   const digitalEvent = m.events?.find((e) => e.id === 'evt-ventas-redes-online') || m.activeEvents?.[0] || m.events?.[0];
 
@@ -154,31 +133,14 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <button
-                      type="button"
-                      onClick={() => m.viewEventSales(m.digitalPos)}
-                      className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer shadow-sm"
-                    >
-                      <BarChart3 className="w-4 h-4 shrink-0" />
-                      <span>Ver Ventas</span>
-                    </button>
-                    {isSuperAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => { setOnlineResetFeedback(null); setIsConfirmingOnlineReset(true); }}
-                        className="min-h-[44px] px-3.5 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/70 border border-red-700/50 text-red-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>Reiniciar en 0</span>
-                      </button>
-                    )}
-                  </div>
-                  {onlineResetFeedback && (
-                    <div className="p-2.5 rounded-xl bg-neutral-900 border border-neutral-700 text-[11px] text-emerald-300 font-medium">
-                      {onlineResetFeedback}
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => m.viewEventSales(m.digitalPos)}
+                    className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer shadow-sm"
+                  >
+                    <BarChart3 className="w-4 h-4 shrink-0" />
+                    <span>Ver Ventas</span>
+                  </button>
                 </div>
               )}
 
@@ -254,37 +216,6 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
         event={m.selectedEventForSales?.id === 'evt-ventas-redes-online' ? m.selectedEventForSales : null}
         onClose={() => m.setSelectedEventForSales(null)}
       />
-      {isConfirmingOnlineReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#141414] border border-red-800/60 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl text-white">
-            <h4 className="text-base font-black text-red-400">¿Reiniciar en 0 Ventas en Línea y Redes?</h4>
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              Esta acción eliminará todas las ventas de prueba de <strong>Ventas en Línea y Redes</strong>, clientes de prueba, liquidaciones huérfanas y cierres digitales, reiniciando la secuencia a 0. Las ferias físicas no serán afectadas.
-            </p>
-            {onlineResetFeedback && (
-              <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-700 text-xs text-red-200">{onlineResetFeedback}</div>
-            )}
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                disabled={isResettingOnline}
-                onClick={() => setIsConfirmingOnlineReset(false)}
-                className="min-h-[44px] px-4 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-bold text-neutral-300 hover:text-white cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isResettingOnline}
-                onClick={handleConfirmOnlineReset}
-                className="min-h-[44px] px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black cursor-pointer disabled:opacity-50"
-              >
-                {isResettingOnline ? 'Reiniciando...' : 'Sí, dejar todo en 0'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

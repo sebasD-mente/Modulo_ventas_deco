@@ -8,7 +8,67 @@
  */
 import 'dotenv/config';
 import { prisma } from '../server/config/prisma.js';
-import { purgeOnlinePosTestDataTransaction } from '../server/services/sales/salePurgeService.js';
+import { getSequenceName, invalidateSequenceCache } from '../server/services/sales/saleNumberGenerator.js';
+
+const DIGITAL_EVENT_ID = 'evt-ventas-redes-online';
+
+async function resetOnlinePosOnly(tenantId) {
+  return await prisma.$transaction(async (tx) => {
+    const event = await tx.event.findFirst({ where: { id: DIGITAL_EVENT_ID, tenantId } });
+    if (!event) throw new Error('Punto de Venta Digital no encontrado para esta organización.');
+
+    // ESTRICTO: únicamente ventas del canal digital evt-ventas-redes-online (jamás POS_FERIA)
+    const onlineWhere = {
+      tenantId,
+      eventId: DIGITAL_EVENT_ID,
+    };
+
+    const purgedSalesCount = await tx.sale.count({ where: onlineWhere });
+    await tx.sale.deleteMany({ where: onlineWhere });
+
+    const closingsResult = await tx.cashClosing.deleteMany({
+      where: { tenantId, eventId: DIGITAL_EVENT_ID },
+    });
+
+    await tx.printSheet.deleteMany({ where: { tenantId, items: { none: {} } } });
+    await tx.commissionSettlement.deleteMany({ where: { tenantId, sales: { none: {} } } });
+
+    const custRes = await tx.customer.deleteMany({
+      where: { tenantId, sales: { none: {} } },
+    });
+    const purgedCustomersCount = Number(custRes?.count || 0);
+
+    await tx.event.update({ where: { id: DIGITAL_EVENT_ID }, data: { currentSaleSequence: 0 } });
+    const seqName = getSequenceName(DIGITAL_EVENT_ID);
+    await tx.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS ${seqName};`);
+    invalidateSequenceCache(DIGITAL_EVENT_ID);
+
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        userId: null,
+        action: 'VENTAS_REDES_PRUEBA_PURGADAS',
+        entity: 'event',
+        entityId: DIGITAL_EVENT_ID,
+        details: {
+          eventName: event.name,
+          purgedSalesCount,
+          purgedCustomersCount,
+          purgedClosingsCount: Number(closingsResult?.count || 0),
+          sequenceResetTo: 0,
+        },
+      },
+    });
+
+    return {
+      eventName: event.name,
+      purgedSalesCount,
+      purgedCustomersCount,
+      purgedClosingsCount: Number(closingsResult?.count || 0),
+      currentSaleSequence: 0,
+    };
+  });
+}
 
 async function main() {
   if (!process.argv.includes('--confirm')) {
@@ -17,7 +77,7 @@ async function main() {
   }
 
   const digitalEvents = await prisma.event.findMany({
-    where: { id: 'evt-ventas-redes-online' },
+    where: { id: DIGITAL_EVENT_ID },
     select: { id: true, tenantId: true, name: true },
   });
 
@@ -27,7 +87,7 @@ async function main() {
   }
 
   for (const ev of digitalEvents) {
-    const result = await purgeOnlinePosTestDataTransaction({ tenantId: ev.tenantId, userId: null });
+    const result = await resetOnlinePosOnly(ev.tenantId);
     console.log(
       `✅ [${ev.tenantId}] "${result.eventName}" reiniciado en 0: ` +
       `${result.purgedSalesCount} ventas, ${result.purgedCustomersCount} clientes, ` +

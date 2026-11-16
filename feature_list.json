@@ -314,6 +314,57 @@
       ],
       "evidence": "node --test tests/sales/online-sales-history-and-purge.test.js -> 4/4 PASS in 137.49ms; npm run test:unit -> 265/265 PASS across 109 suites; bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS in 4.32s).",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Fix React #310 en EventSalesModal, historial mensual OnlineSalesHistoryModal con selector de mes/pago/comisión/entrega, y limpieza en 0 vía endpoint SUPER_ADMIN, UI y script CLI."
+    },
+    {
+      "id": "feat-010",
+      "name": "Retirar botón destructivo 'Reiniciar en 0' y endpoint /sales/purge-online-test-data de producción",
+      "description": "Eliminar por completo cualquier botón o endpoint permanente capaz de borrar datos de Ventas en Línea desde la aplicación: (1) retirar de src/components/EventsManagementView.jsx el botón 'Reiniciar en 0', su modal de confirmación, estados y handler handleConfirmOnlineReset; (2) eliminar POST /api/sales/purge-online-test-data de server/routes/apiRoutes.js, purgeOnlinePosTestData de server/controllers/saleController.js, y purgeOnlinePosTestDataTransaction de server/services/saleService.js y server/services/sales/salePurgeService.js preservando la protección 403 sobre evt-ventas-redes-online en purgeEventSalesTransaction; y (3) actualizar tests/sales/online-sales-history-and-purge.test.js para validar que no exista ningún botón ni ruta API de borrado masivo para Ventas en Línea.",
+      "area": "security-hardening-remove-destructive-ui",
+      "user_visible_behavior": "En Punto de Venta -> Ventas en Línea y Redes Sociales desaparece por completo el botón 'Reiniciar en 0' y el endpoint de borrado deja de existir en el backend, eliminando todo riesgo de borrado accidental por clic.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-009"
+      ],
+      "required_files": [
+        "src/components/EventsManagementView.jsx",
+        "server/routes/apiRoutes.js",
+        "server/controllers/saleController.js",
+        "server/services/saleService.js",
+        "server/services/sales/salePurgeService.js",
+        "tests/sales/online-sales-history-and-purge.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/online-sales-history-and-purge.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/online-sales-history-and-purge.test.js -> 4/4 PASS in 144.37ms; npm run test:unit -> 265/265 PASS across 109 suites; bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS in 4.46s).",
+      "notes": "No tocar OnlineSalesHistoryModal.jsx ni EventSalesModal.jsx salvo que sea estrictamente necesario. Ejecutar bajo Modo Diario Ágil (WIP = 1)."
+    },
+    {
+      "id": "feat-011",
+      "name": "Limpieza única en 0 de los datos de prueba de Ventas en Línea en el VPS de Producción (sin UI destructiva)",
+      "description": "Una vez desplegada feat-010 sin botones ni endpoints de borrado: (1) ejecutar una sola vez la limpieza transaccional de las 4 ventas de prueba (Q 855.00), clientes de prueba huérfanos, liquidaciones/cierres digitales y secuencia de evt-ventas-redes-online directamente en el PostgreSQL del VPS (sin tocar ventas POS_FERIA de stands físicos); y (2) verificar contra la API en vivo (GET /api/events y GET /api/sales/events/evt-ventas-redes-online) que el rol VENDEDOR_REDES inicia exactamente en 0.",
+      "area": "production-one-time-data-reset",
+      "user_visible_behavior": "El módulo del rol VENDEDOR_REDES en https://ventas.decovintage.online queda exactamente en 0 ventas (Q 0.00) y 0 clientes de prueba, sin afectar el evento físico activo y sin botones destructivos en la app.",
+      "priority": "P0",
+      "status": "not-started",
+      "dependencies": [
+        "feat-010"
+      ],
+      "required_files": [
+        "scripts/reset-online-pos-test-data.js"
+      ],
+      "verification": [
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "",
+      "notes": "Requiere acceso a la PostgreSQL de producción en el VPS/Dokploy (DATABASE_URL local no conecta a producción). Si el entorno no tiene acceso directo a la BD de producción, guiar al usuario con el comando exacto único en Dokploy o pedir autorización explícita."
     }
   ]
 }

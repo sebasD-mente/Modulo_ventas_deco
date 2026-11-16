@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prisma } from '../../server/config/prisma.js';
 import { getEventSalesList, getGuatemalaMonthRange } from '../../server/services/sales/saleKpiService.js';
-import { purgeOnlinePosTestDataTransaction } from '../../server/services/sales/salePurgeService.js';
+import { purgeEventSalesTransaction } from '../../server/services/sales/salePurgeService.js';
 
 const rootDir = process.cwd();
 
-describe('Historial Mensual de Ventas en Línea, Fix React #310 y Limpieza en 0', () => {
+describe('Historial Mensual de Ventas en Línea, Fix React #310 y Sin UI Destructiva', () => {
   it('1. EventSalesModal.jsx ejecuta todos los hooks antes del retorno temprano (sin React error #310)', () => {
     const content = fs.readFileSync(path.join(rootDir, 'src/components/events/modals/EventSalesModal.jsx'), 'utf-8');
     const earlyReturnIdx = content.indexOf('if (!event) return null;');
@@ -72,52 +72,33 @@ describe('Historial Mensual de Ventas en Línea, Fix React #310 y Limpieza en 0'
     }
   });
 
-  it('4. purgeOnlinePosTestDataTransaction limpia ventas de redes, clientes huérfanos, liquidaciones, cierres y secuencia', async () => {
+  it('4. No existe botón Reiniciar en 0 ni endpoint/servicio de borrado masivo para Ventas en Línea y se preserva 403 en purgeEventSalesTransaction', async () => {
+    const eventsView = fs.readFileSync(path.join(rootDir, 'src/components/EventsManagementView.jsx'), 'utf-8');
+    assert.ok(!eventsView.includes('Reiniciar en 0'), 'No debe existir botón Reiniciar en 0 en EventsManagementView.jsx');
+    assert.ok(!eventsView.includes('handleConfirmOnlineReset'), 'No debe existir handleConfirmOnlineReset');
+    assert.ok(!eventsView.includes('isConfirmingOnlineReset'), 'No debe existir modal isConfirmingOnlineReset');
+    assert.ok(!eventsView.includes('purge-online-test-data'), 'No debe llamarse a /api/sales/purge-online-test-data desde UI');
+
+    const apiRoutes = fs.readFileSync(path.join(rootDir, 'server/routes/apiRoutes.js'), 'utf-8');
+    const saleController = fs.readFileSync(path.join(rootDir, 'server/controllers/saleController.js'), 'utf-8');
+    const saleService = fs.readFileSync(path.join(rootDir, 'server/services/saleService.js'), 'utf-8');
+    const salePurgeService = fs.readFileSync(path.join(rootDir, 'server/services/sales/salePurgeService.js'), 'utf-8');
+
+    assert.ok(!apiRoutes.includes('purge-online-test-data'), 'No debe existir ruta /sales/purge-online-test-data');
+    assert.ok(!apiRoutes.includes('purgeOnlinePosTestData'), 'No debe importarse purgeOnlinePosTestData en apiRoutes.js');
+    assert.ok(!saleController.includes('purgeOnlinePosTestData'), 'No debe existir purgeOnlinePosTestData en saleController.js');
+    assert.ok(!saleService.includes('purgeOnlinePosTestDataTransaction'), 'No debe re-exportarse purgeOnlinePosTestDataTransaction');
+    assert.ok(!salePurgeService.includes('purgeOnlinePosTestDataTransaction'), 'No debe existir purgeOnlinePosTestDataTransaction en salePurgeService.js');
+
     const origTx = prisma.$transaction;
-    const calls = [];
-
-    prisma.$transaction = async (fn) => {
-      const tx = {
-        event: {
-          findFirst: async () => ({ id: 'evt-ventas-redes-online', name: 'Ventas en Línea y Redes Sociales' }),
-          update: async (args) => { calls.push({ op: 'event.update', args }); return args; },
-        },
-        sale: {
-          count: async () => 12,
-          deleteMany: async (args) => { calls.push({ op: 'sale.deleteMany', args }); return { count: 12 }; },
-        },
-        cashClosing: {
-          deleteMany: async (args) => { calls.push({ op: 'cashClosing.deleteMany', args }); return { count: 3 }; },
-        },
-        printSheet: {
-          deleteMany: async (args) => { calls.push({ op: 'printSheet.deleteMany', args }); return { count: 2 }; },
-        },
-        commissionSettlement: {
-          deleteMany: async (args) => { calls.push({ op: 'commissionSettlement.deleteMany', args }); return { count: 1 }; },
-        },
-        customer: {
-          deleteMany: async (args) => { calls.push({ op: 'customer.deleteMany', args }); return { count: 9 }; },
-        },
-        $executeRawUnsafe: async (sql) => { calls.push({ op: '$executeRawUnsafe', sql }); },
-        auditLog: {
-          create: async (args) => { calls.push({ op: 'auditLog.create', args }); return args; },
-        },
-      };
-      return await fn(tx);
-    };
-
+    prisma.$transaction = async (fn) => fn({
+      event: { findFirst: async () => ({ id: 'evt-ventas-redes-online', name: 'Ventas en Línea y Redes Sociales' }) },
+    });
     try {
-      const result = await purgeOnlinePosTestDataTransaction({ tenantId: 't-1', userId: 'u-admin' });
-      assert.equal(result.purgedSalesCount, 12);
-      assert.equal(result.purgedCustomersCount, 9);
-      assert.equal(result.purgedClosingsCount, 3);
-      assert.equal(result.currentSaleSequence, 0);
-
-      assert.ok(calls.some((c) => c.op === 'sale.deleteMany'));
-      assert.ok(calls.some((c) => c.op === 'customer.deleteMany'));
-      assert.ok(calls.some((c) => c.op === 'commissionSettlement.deleteMany'));
-      assert.ok(calls.some((c) => c.op === 'event.update' && c.args.data.currentSaleSequence === 0));
-      assert.ok(calls.some((c) => c.op === 'auditLog.create' && c.args.data.action === 'VENTAS_REDES_PRUEBA_PURGADAS'));
+      await assert.rejects(
+        () => purgeEventSalesTransaction({ tenantId: 't-1', eventId: 'evt-ventas-redes-online', userId: 'u-admin' }),
+        (err) => err?.statusCode === 403
+      );
     } finally {
       prisma.$transaction = origTx;
     }
