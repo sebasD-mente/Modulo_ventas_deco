@@ -351,7 +351,7 @@
       "area": "production-one-time-data-reset",
       "user_visible_behavior": "El módulo del rol VENDEDOR_REDES en https://ventas.decovintage.online queda exactamente en 0 ventas (Q 0.00) y 0 clientes de prueba, sin afectar el evento físico activo y sin botones destructivos en la app.",
       "priority": "P0",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-010"
       ],
@@ -363,8 +363,8 @@
         "bash scripts/check-architecture.sh",
         "node scripts/validate-harness.mjs --min-score 100"
       ],
-      "evidence": "",
-      "notes": "Requiere acceso a la PostgreSQL de producción en el VPS/Dokploy (DATABASE_URL local no conecta a producción). Si el entorno no tiene acceso directo a la BD de producción, guiar al usuario con el comando exacto único en Dokploy o pedir autorización explícita."
+      "evidence": "Producción verificada en https://ventas.decovintage.online (commit f8ea38a): GET /api/events -> { id: 'evt-ventas-redes-online', totalSold: 0, salesCount: 0 }; GET /api/sales/events/evt-ventas-redes-online -> count: 0; GET /api/commissions/pending -> 0; GET /api/commissions/settlements -> 0; GET /api/sales/orders/tracking -> 0. bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100).",
+      "notes": "Limpieza única en 0 completada y verificada en producción sin botones ni endpoints destructivos."
     }
   ]
 }
