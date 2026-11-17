@@ -455,6 +455,32 @@
       ],
       "evidence": "node --test tests/closing/closing-modular.test.js tests/m3-forensic-audit.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js -> Exit code 0 (70/70 PASS across 22 suites in 362.29ms: CashClosingView 69L < 70L without CashDenominationGrid, direct Efectivo Físico Directo (Q) always visible, zero Efectivo Esperado (Sistema): in summary & modal, zero amber/orange classes, CashDenominationGrid.jsx preserved on disk); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 194 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Conservados CashDenominationGrid.jsx en disco y exports DENOMINATIONS/INITIAL_COUNTS/calculateDenominationsTotal en useCashClosing.js, con CashClosingView.jsx < 70 líneas (69L) y 0 tonos naranjas."
+    },
+    {
+      "id": "feat-015",
+      "name": "Limpieza de la Vista de Eventos: Retiro de Tarjeta Global de Radar Financiero, Punto de Venta de Redes Primero e Integración Completa Dentro de Cada Evento",
+      "description": "En la sección Eventos (src/components/EventsManagementView.jsx y src/components/events/modals/EventSalesModal.jsx): (1) retirar por completo el componente EventFinancialRadar de la vista principal EventsManagementView.jsx para eliminar la saturación visual, dejando como primera tarjeta fija el punto de venta permanente 'Ventas en Línea y Redes Sociales' (permanent-digital-pos-card) e inmediatamente debajo las tarjetas limpias de selección de todos los demás eventos (En curso, Confirmados/Próximos y Archivados); (2) asegurar que toda la información financiera y de rentabilidad del evento (Radar del 20%, gastos operativos, balance pre-producción, peso de arriendo, meta 5x, ritmo diario, formas de pago, cortes de caja, acceso directo a gestionar gastos y movimientos por jornada) viva debidamente integrada y limpia dentro del modal individual de cada evento (EventSalesModal.jsx); (3) eliminar acentos naranjas/ámbar residuales (text-amber-*) en EventsManagementView.jsx y EventSalesModal.jsx en favor de estética blanca/neutra; y (4) conservar src/components/monitor/EventFinancialRadar.jsx en disco para no romper surgery-053 y agregar suite dedicada tests/events/events-clean-view-and-modal-radar.test.js.",
+      "area": "events-view-cleanup-and-contextual-radar",
+      "user_visible_behavior": "La sección Eventos luce limpia como selector de eventos sin la tarjeta global de Radar Financiero Ferial: muestra primero la tarjeta fija de Redes Sociales y enseguida las tarjetas de los demás eventos, mientras que el análisis financiero completo del Radar del 20% se consulta integrado dentro de cada evento al abrirlo.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-014"
+      ],
+      "required_files": [
+        "src/components/EventsManagementView.jsx",
+        "src/components/events/modals/EventSalesModal.jsx",
+        "tests/events/events-clean-view-and-modal-radar.test.js"
+      ],
+      "verification": [
+        "node --test tests/events/events-clean-view-and-modal-radar.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/events/events-clean-view-and-modal-radar.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js -> Exit code 0 (27/27 PASS across 16 suites in 263.54ms: EventFinancialRadar removed from EventsManagementView, permanent-digital-pos-card rendered first followed by active/confirmed/archived event cards, full contextual 20% Financial Radar + expense management CTA integrated inside EventSalesModal <= 380L, zero amber/orange classes in both components, EventFinancialRadar.jsx preserved on disk); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS with EventsManagementView bundle reduced 250.15 kB -> 231.89 kB); npm run harness:check -> status HARNESS_PASS (274 JS syntax OK, 31.57s); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Guardarraíl estricto cumplido: src/components/monitor/EventFinancialRadar.jsx conservado en disco (surgery-053 1.2 PASS) y todos los contratos de surgery-065 e inmutabilidad/rollover (m4 y feat-013) intactos."
     }
   ]
 }

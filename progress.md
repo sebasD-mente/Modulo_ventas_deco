@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 21:26
-**Session ID:** sesion-018 (Implementación y Cierre Verificado de `feat-013` y `feat-014` bajo `WIP = 1`)
-**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..014` en `done`)
+**Last Updated:** 2026-11-16 21:55
+**Session ID:** sesion-020 (Ejecución y Verificación de `feat-015`: Limpieza de Vista de Eventos sin Radar Global e Integración Dentro de Cada Evento)
+**Active Feature:** Ninguna (`WIP = 0`; `feat-000..015` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -53,12 +53,16 @@
   - Desmontado `<CashDenominationGrid />` de `CashClosingView.jsx` (`69L < 70L`), dejando siempre visible `Efectivo Físico Directo (Q)` (`min-h-[44px]`) y preservando `CashDenominationGrid.jsx` en disco y los exports puros en `useCashClosing.js`.
   - Retirado `Efectivo Esperado (Sistema):` tanto del resumen principal como del modal de confirmación en `CashClosingSummary.jsx`, conservando intacto `Balance / Diferencia` (`Caja cuadrada exacta` / `Sobrante en caja` / `Faltante en caja`) y el bloque WhatsApp.
   - Sustituidos todos los estilos `text-amber-400` por estética blanca/neutra en `CashClosingView.jsx` y `CashClosingSummary.jsx`.
+- [x] **Limpieza de la Vista de Eventos e Integración Contextual del Radar Financiero por Evento `feat-015` (`27/27` `events-clean-view` + `surgery-053` + `surgery-065` PASS, `265/265` unit tests PASS, `bash ./init.sh` `100/100`, bundle `-18.26 kB`)**:
+  - Desmontado por completo `EventFinancialRadar` de `src/components/EventsManagementView.jsx`, dejando primero la tarjeta fija `Ventas en Línea y Redes Sociales` (`permanent-digital-pos-card`) e inmediatamente debajo las tarjetas de selección de `Eventos en curso`, `Eventos confirmados / Próximos` y el acordeón de `Eventos Archivados`.
+  - Consolidado y pulido el análisis financiero del Radar del 20% dentro de `src/components/events/modals/EventSalesModal.jsx` (`364L <= 380L`), incluyendo resolución viva de `activeSalesEvent`, acceso directo a gestionar/registrar gastos (`onManageExpenses` / `modal-manage-expenses-btn`), las 4 tarjetas contables, progreso 5x arriendo, ritmo diario requerido, formas de pago, cortes de caja conciliados/automáticos y movimientos por jornada.
+  - Eliminadas todas las clases naranjas/ámbar (`text-amber-*`, `bg-amber-*`, `border-amber-*`) en `EventsManagementView.jsx` y `EventSalesModal.jsx` en favor de estética blanca/neutra, conservando `src/components/monitor/EventFinancialRadar.jsx` en disco para compatibilidad con `surgery-053` y agregando la suite `tests/events/events-clean-view-and-modal-radar.test.js`.
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..014` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..015` completadas y verificadas).
 
 ### What's Next
-- Revisar con el usuario y, cuando lo autorice explícitamente, desplegar a producción (`npm run deploy`).
+- Esperar instrucción del usuario para nuevas tareas o para desplegar el lote `feat-013`..`feat-015` a producción.
 
 ## Blockers / Risks
 - Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 70/70 closing/forensic tests PASS; 22/22 shift/rollover tests PASS).
@@ -72,35 +76,29 @@
   - Context: El conteo billete por billete ralentizaba el cierre en stand, pero suites existentes (`phase5-frontend-ergonomics-resilience.test.js` y `closing-modular.test.js`) auditan la presencia de `CashDenominationGrid.jsx` y la aritmética exportada en `useCashClosing.js`.
   - Alternatives considered: Borrar `CashDenominationGrid.jsx` y relajar suites ajenas (descartado por regla `Stay in scope` y prohibición de debilitar validadores).
   - Resolution: Se desmontó el componente en `CashClosingView.jsx` (`69L < 70L`) dejando siempre directo `Efectivo Físico Directo (Q)` y conservando el módulo y utilidades puras en disco.
+- **Retiro del Radar global en `EventsManagementView` e integración contextual en `EventSalesModal` (`feat-015`)**:
+  - Context: La vista de `Eventos` tenía una tarjeta global de `EventFinancialRadar` que saturaba la selección de eventos, mientras que cada evento ya posee su propio modal detallado.
+  - Alternatives considered: (a) Borrar `src/components/monitor/EventFinancialRadar.jsx` (descartado porque `surgery-053` prueba `1.2` inspecciona ese archivo estáticamente); (b) Apilar `EventExpensesModal` sobre `EventSalesModal` con doble backdrop `z-50` (descartado para evitar conflicto de pila de modales en móvil).
+  - Resolution: Se retiró `EventFinancialRadar` de `EventsManagementView.jsx` (reduciendo su bundle de `250.15 kB` a `231.89 kB`), se consolidó todo el análisis financiero del Radar del 20% sin tonos naranjas dentro de `EventSalesModal.jsx` (`364L <= 380L`) resolviendo `activeSalesEvent` desde `m.events` y conmutando limpiamente a `EventExpensesModal` al pulsar `Gastos`, conservando `EventFinancialRadar.jsx` en disco.
 
 ## Files Modified This Session
-- `server/services/sales/saleKpiService.js` — `shiftGuatemalaDateStr`, `resolveStandShiftWindow`, limpieza en `0` post-cierre y enriquecimiento `isEditableInOpenShift` / `effectiveShiftDate` (`0 CRLF`).
-- `server/services/sales/cashClosingService.js` — Unicidad estricta `409` por jornada diaria sin `cashClosing.update` y KPIs acotados a `targetDate` (`0 CRLF`).
-- `server/services/sales/midnightClosingService.js` — Corte automático puntual a las `23:59` CST y conciliación de jornadas con ventas rollover (`0 CRLF`).
-- `server/services/sales/saleUpdateService.js` — Editabilidad `200` de ventas post-cierre traspasadas a `D + 1` mientras `D + 1` siga abierta (`0 CRLF`).
-- `server/index.js` — Reloj cada 30s para disparar puntualmente la auditoría de las `23:59` CST (`0 CRLF`).
-- `src/components/RecentSalesList.jsx` — Vigilante ligero de cambio de jornada / `23:59` CST (`0 CRLF`).
-- `src/components/sales/RecentSaleRow.jsx` — Botón `Editar` habilitado por jornada abierta (`isSaleEditableInOpenShift`) y badge `↪ Jornada siguiente` (`0 CRLF`).
-- `src/components/events/modals/EventSalesModal.jsx` — Agrupación de ventas post-cierre bajo la tarjeta de `D + 1` (`0 CRLF`).
-- `src/components/CashClosingView.jsx` — Desmontado `CashDenominationGrid`, `Efectivo Físico Directo (Q)` directo, `0` naranja y `69` líneas (`< 70L`, `0 CRLF`).
-- `src/components/closing/CashClosingSummary.jsx` — Retirado `Efectivo Esperado (Sistema):` en vista y modal, `0` naranja (`0 CRLF`).
-- `src/components/closing/hooks/useCashClosing.js` — Compactado limpio `< 130L` preservando todos sus exports (`0 CRLF`).
-- `tests/sales/daily-shift-closing-rollover.test.js` — Nueva suite integral de `feat-013` (`0 CRLF`).
-- `tests/adversarial/m4-closing-immutability-thumbnails.test.js`, `tests/adversarial/surgery-053-multi-event-radar-contracts.test.js`, `tests/closing/closing-modular.test.js`, `tests/m3-forensic-audit.test.js`, `tests/adversarial/p5-2-sales-closing-challenger.test.js` — Suites alineadas y ampliadas (`0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` (`0 CRLF`).
+- `src/components/EventsManagementView.jsx` — Retiro de `EventFinancialRadar`, orden limpio (`permanent-digital-pos-card` primero seguido de eventos activos, confirmados y archivados), resolución viva `activeSalesEvent`, conexión `onManageExpenses` y `0` clases naranjas (`0 CRLF`).
+- `src/components/events/modals/EventSalesModal.jsx` — Radar Financiero Ferial integrado con acción directa `Gastos` / `Registrar gastos del stand`, métricas simétricas, cortes conciliados/automáticos, estética blanca/neutra (`0` clases naranjas) y `364L <= 380L` (`0 CRLF`).
+- `tests/events/events-clean-view-and-modal-radar.test.js` — Suite dedicada `5/5 PASS` de verificación de `feat-015` (`0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` con `feat-015` en `done` (`0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite de Jornada Diaria y Traspaso Post-Cierre (`feat-013`): `node --test tests/sales/daily-shift-closing-rollover.test.js tests/adversarial/m4-closing-immutability-thumbnails.test.js` -> `22/22 PASS across 5 suites (0 fail)`
-- [x] Suite Modular, Forense y Adversarial de Cierre de Caja (`feat-014`): `node --test tests/closing/closing-modular.test.js tests/m3-forensic-audit.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js` -> `70/70 PASS across 22 suites (0 fail)`
+- [x] Suite de Limpieza de Eventos y Radar Contextual (`feat-015`): `node --test tests/events/events-clean-view-and-modal-radar.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js` -> `27/27 PASS across 16 suites (0 fail)`
+- [x] Suites de Cohesión, Inmutabilidad, Rollover e Historial (`m4` + `feat-013` + `feat-009/010`): `node --test tests/adversarial/m4-closing-immutability-thumbnails.test.js tests/sales/daily-shift-closing-rollover.test.js tests/sales/online-sales-history-and-purge.test.js` -> `26/26 PASS across 6 suites (0 fail)`
 - [x] Suite Completa de Pruebas Unitarias: `npm run test:unit` -> `265/265 PASS across 109 suites`
 - [x] Suite Completa de Voz: `npm run test:voice` -> `53/53 PASS across 12 suites`
 - [x] Vigilante Arquitectónico Tolerancia Cero (Puerta 1): `bash scripts/check-architecture.sh` -> `0 violaciones, 0 excepciones, higiene y 6 capas verificadas`
 - [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
-- [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1568 modules PASS)`
-- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS`
+- [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1566 modules PASS)`
+- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (274 JS syntax OK, 31.57s)`
 - [x] Verificación de Formato: `0 CRLF` en todos los archivos gobernados y modificados.
 
 ## Notes for Next Session
 1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`).
-2. Todas las tareas planificadas `feat-000..014` están completadas y verificadas.
+2. Todas las tareas planificadas `feat-000..015` están completadas y verificadas.
 3. El inicio estándar para cualquier nueva tarea se ejecuta con `bash ./init.sh`.

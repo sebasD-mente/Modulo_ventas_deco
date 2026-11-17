@@ -12,7 +12,6 @@ import EventSalesModal from './events/modals/EventSalesModal';
 import OnlineSalesHistoryModal from './events/modals/OnlineSalesHistoryModal';
 import EventActionModals from './events/modals/EventActionModals';
 import DigitalEventMonitorSection from './events/DigitalEventMonitorSection';
-import EventFinancialRadar from './monitor/EventFinancialRadar';
 
 export default function EventsManagementView({ onEventActivated, onEventsChanged }) {
   const { isVendedorRedes, isSuperAdmin } = useAuth();
@@ -20,6 +19,9 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin);
 
   const digitalEvent = m.events?.find((e) => e.id === 'evt-ventas-redes-online') || m.activeEvents?.[0] || m.events?.[0];
+  const activeSalesEvent = m.selectedEventForSales && m.selectedEventForSales.id !== 'evt-ventas-redes-online'
+    ? (m.events?.find((e) => e.id === m.selectedEventForSales.id) || m.selectedEventForSales)
+    : null;
 
   return (
     <div className="bg-[#121212] p-4 sm:p-6 rounded-[28px] sm:rounded-[32px] border border-neutral-800 shadow-2xl space-y-5 text-white max-w-2xl mx-auto">
@@ -144,16 +146,6 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                 </div>
               )}
 
-              {/* RADAR FINANCIERO FERIAL (REGLA DEL 20%) */}
-              {m.events && m.events.length > 0 && (
-                <EventFinancialRadar
-                  eventDetails={m.events}
-                  isSuperAdmin={isSuperAdmin}
-                  selectedEventId={m.activeEvents[0]?.id || m.events.find((e) => e.id !== 'evt-ventas-redes-online')?.id}
-                  onOpenExpenseModal={(ev) => m.setEventForExpenses(ev)}
-                />
-              )}
-
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -182,7 +174,7 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
                   onClick={() => m.setShowArchivedSection(!m.showArchivedSection)}
                   className="w-full min-h-[44px] px-3.5 py-2 rounded-xl bg-[#161616] hover:bg-neutral-900 border border-neutral-800 flex items-center justify-between cursor-pointer select-none transition-colors"
                 >
-                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-neutral-300 font-bold text-xs uppercase tracking-wider">
                     <Archive className="w-4 h-4 shrink-0" />
                     <span>Eventos Archivados ({m.archivedEvents.length})</span>
                   </div>
@@ -206,11 +198,16 @@ export default function EventsManagementView({ onEventActivated, onEventsChanged
         </>
       )}
       <EventSalesModal
-        event={m.selectedEventForSales?.id !== 'evt-ventas-redes-online' ? m.selectedEventForSales : null}
+        event={activeSalesEvent}
         salesList={m.eventSalesList}
         closingsList={m.eventClosingsList}
         isLoading={m.isLoadingSales}
         onClose={() => m.setSelectedEventForSales(null)}
+        onManageExpenses={isSuperAdmin && activeSalesEvent ? (ev) => {
+          const target = ev || activeSalesEvent;
+          m.setSelectedEventForSales(null);
+          m.setEventForExpenses(target);
+        } : null}
       />
       <OnlineSalesHistoryModal
         event={m.selectedEventForSales?.id === 'evt-ventas-redes-online' ? m.selectedEventForSales : null}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Eye, X, Loader2, Target, AlertCircle, Sparkles, Clock, Banknote, CreditCard, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Eye, X, Loader2, Target, AlertCircle, Sparkles, Clock, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt } from 'lucide-react';
 import EventDayCard from '../daily/EventDayCard.jsx';
 import { useModalBackHandler } from '../../../hooks/useSpaBackNavigation';
 
@@ -27,7 +27,7 @@ const formatSpanishDate = (dateStr) => {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
-export default function EventSalesModal({ event, salesList, closingsList = [], sales, isLoading, onClose }) {
+export default function EventSalesModal({ event, salesList, closingsList = [], sales, isLoading, onClose, onManageExpenses }) {
   useModalBackHandler(Boolean(event), onClose);
   const [expandedDate, setExpandedDate] = useState(null);
   const list = useMemo(() => salesList || sales || [], [salesList, sales]);
@@ -106,11 +106,8 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
   const standRentCost = Number(fin.standRentCost || 0);
   const otherOperationalCost = Number(fin.otherOperationalCost || 0);
   const cumulativeSold = Number(fin.cumulativeSold !== undefined ? fin.cumulativeSold : (event.totalSold || 0));
-  const preProductionBalance = Number(
-    fin.preProductionBalance !== undefined
-      ? fin.preProductionBalance
-      : (cumulativeSold - totalExpenses)
-  );
+  const dailySold = Number(fin.dailySold !== undefined ? fin.dailySold : (groupedDays.find((d) => d.isToday)?.totalSold || 0));
+  const preProductionBalance = Number(fin.preProductionBalance !== undefined ? fin.preProductionBalance : (cumulativeSold - totalExpenses));
   const healthySalesTarget20Pct = Number(fin.healthySalesTarget20Pct || 0);
   const standRentRatioPct = Number(
     fin.standRentRatioPct !== undefined
@@ -118,13 +115,9 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
       : (standRentCost > 0 && cumulativeSold > 0 ? ((standRentCost / cumulativeSold) * 100).toFixed(1) : 0)
   );
   const healthPhase = fin.healthPhase || (
-    totalExpenses === 0
-      ? 'SIN_GASTOS'
-      : (preProductionBalance < 0
-        ? 'EN_RECUPERACION'
-        : (standRentCost > 0 && standRentRatioPct <= 20
-          ? 'EVENTO_SALUDABLE_20PCT'
-          : 'GASTOS_CUBIERTOS_RUMBO_20'))
+    totalExpenses === 0 ? 'SIN_GASTOS'
+      : preProductionBalance < 0 ? 'EN_RECUPERACION'
+        : standRentCost > 0 && standRentRatioPct <= 20 ? 'EVENTO_SALUDABLE_20PCT' : 'GASTOS_CUBIERTOS_RUMBO_20'
   );
   const totalEventDays = Number(fin.totalEventDays || 1);
   const requiredDailyRunRate = Number(fin.requiredDailyRunRate || 0);
@@ -136,26 +129,11 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
   );
 
   const phaseConfig = {
-    SIN_GASTOS: {
-      color: 'text-slate-400 bg-slate-900 border-slate-700',
-      label: '⚪ SIN GASTOS REGISTRADOS',
-    },
-    EN_RECUPERACION: {
-      color: 'text-red-400 bg-red-950/60 border-red-800',
-      label: '🔴 FASE 1: RECUPERANDO GASTOS DE FERIA',
-    },
-    GASTOS_CUBIERTOS_RUMBO_20: {
-      color: 'text-amber-400 bg-amber-950/60 border-amber-800',
-      label: '🟡 FASE 2: GASTOS CUBIERTOS • RUMBO AL ≤20%',
-    },
-    EVENTO_SALUDABLE_20PCT: {
-      color: 'text-emerald-400 bg-emerald-950/60 border-emerald-800',
-      label: '🟢 FASE 3: STAND SALUDABLE (ARRIENDO ≤ 20%)',
-    },
-  }[healthPhase] || {
-    color: 'text-slate-400 bg-slate-900 border-slate-700',
-    label: '⚪ EVALUANDO',
-  };
+    SIN_GASTOS: { color: 'text-neutral-400 bg-neutral-900 border-neutral-700', label: '⚪ SIN GASTOS REGISTRADOS' },
+    EN_RECUPERACION: { color: 'text-red-400 bg-red-950/60 border-red-800', label: '🔴 FASE 1: RECUPERANDO GASTOS DE FERIA' },
+    GASTOS_CUBIERTOS_RUMBO_20: { color: 'text-white bg-neutral-900 border-neutral-600', label: '⚪ FASE 2: GASTOS CUBIERTOS • RUMBO AL ≤20%' },
+    EVENTO_SALUDABLE_20PCT: { color: 'text-emerald-400 bg-emerald-950/60 border-emerald-800', label: '🟢 FASE 3: STAND SALUDABLE (ARRIENDO ≤ 20%)' },
+  }[healthPhase] || { color: 'text-neutral-400 bg-neutral-900 border-neutral-700', label: '⚪ EVALUANDO' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -173,7 +151,7 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                 </span>
               )}
               {event.status === 'ARCHIVADO' && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[9px] uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300 font-bold text-[9px] uppercase tracking-wider">
                   📦 ARCHIVADO
                 </span>
               )}
@@ -188,15 +166,15 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
         </div>
 
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 no-scrollbar text-xs">
-          {/* RADAR FINANCIERO FERIAL (REGLA DEL 20%) */}
-          <div className="p-4 rounded-2xl bg-black border border-neutral-800 space-y-3 shadow-lg">
+          {/* RADAR FINANCIERO FERIAL (REGLA DEL 20%) INTEGRADO EN EL EVENTO */}
+          <div data-testid="event-modal-financial-radar" className="p-4 rounded-2xl bg-black border border-neutral-800 space-y-3 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <div className="p-1.5 rounded-lg bg-neutral-900 text-white border border-neutral-800">
                   <Target className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-amber-300">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-white">
                     Radar Financiero Ferial (Regla del 20%)
                   </h4>
                   <p className="text-[10px] text-neutral-400">
@@ -204,20 +182,43 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                   </p>
                 </div>
               </div>
-              <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider self-start sm:self-center ${phaseConfig.color}`}>
-                {phaseConfig.label}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap self-start sm:self-center">
+                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${phaseConfig.color}`}>
+                  {phaseConfig.label}
+                </span>
+                {onManageExpenses && (
+                  <button
+                    type="button"
+                    data-testid="modal-manage-expenses-btn"
+                    onClick={() => onManageExpenses(event)}
+                    className="min-h-[36px] px-2.5 py-1 rounded-lg bg-white hover:bg-neutral-200 text-black font-black text-[11px] inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Receipt className="w-3.5 h-3.5 shrink-0" />
+                    <span>Gastos</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {totalExpenses === 0 ? (
-              <div className="p-3 rounded-xl bg-neutral-900/60 border border-dashed border-neutral-800 text-center space-y-1">
-                <div className="flex items-center justify-center gap-1.5 text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
+              <div className="p-3.5 rounded-xl bg-neutral-900/60 border border-dashed border-neutral-800 text-center space-y-2">
+                <div className="flex items-center justify-center gap-1.5 text-neutral-200">
+                  <AlertCircle className="w-4 h-4 text-neutral-400" />
                   <span className="text-[11px] font-bold">Sin gastos operativos registrados</span>
                 </div>
                 <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
                   Este stand no tiene gastos registrados todavía (arriendo, viáticos o transporte).
                 </p>
+                {onManageExpenses && (
+                  <button
+                    type="button"
+                    onClick={() => onManageExpenses(event)}
+                    className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-black text-xs inline-flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    <Receipt className="w-3.5 h-3.5 shrink-0" />
+                    <span>Registrar gastos del stand</span>
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -225,9 +226,12 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                   <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
                     <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Venta Acumulada</span>
                     <span className="text-xs sm:text-sm font-black font-mono text-white">Q {cumulativeSold.toFixed(2)}</span>
+                    <span className="text-[9px] text-neutral-500 block font-mono">
+                      {event.status === 'ACTIVO' || dailySold > 0 ? `Hoy: Q ${dailySold.toFixed(2)}` : `${list.length} ventas`}
+                    </span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Gastos Stand</span>
+                    <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Gastos Operativos</span>
                     <span className="text-xs sm:text-sm font-black font-mono text-red-400">Q {totalExpenses.toFixed(2)}</span>
                     <span className="text-[9px] text-neutral-500 block truncate" title={`Stand: Q${standRentCost} • Otros: Q${otherOperationalCost}`}>
                       Stand: Q{standRentCost.toFixed(0)} • Otros: Q{otherOperationalCost.toFixed(0)}
@@ -235,14 +239,14 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                   </div>
                   <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
                     <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Balance Pre-Prod</span>
-                    <span className={`text-xs sm:text-sm font-black font-mono ${preProductionBalance >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    <span className={`text-xs sm:text-sm font-black font-mono ${preProductionBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                       {preProductionBalance >= 0 ? `+Q ${preProductionBalance.toFixed(2)}` : `-Q ${Math.abs(preProductionBalance).toFixed(2)}`}
                     </span>
                     <span className="text-[9px] text-neutral-500 block">Post-stand</span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Peso Arriendo</span>
-                    <span className={`text-xs sm:text-sm font-black font-mono ${standRentRatioPct <= 20 && standRentCost > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    <span className="text-[9px] text-neutral-400 block font-semibold uppercase">Peso Arriendo (≤20%)</span>
+                    <span className={`text-xs sm:text-sm font-black font-mono ${standRentRatioPct <= 20 && standRentCost > 0 ? 'text-emerald-400' : 'text-white'}`}>
                       {standRentCost > 0 ? `${standRentRatioPct}%` : 'N/A'}
                     </span>
                     <span className="text-[9px] text-neutral-500 block font-mono">Meta: Q {healthySalesTarget20Pct.toFixed(0)}</span>
@@ -270,7 +274,7 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                         healthPhase === 'EVENTO_SALUDABLE_20PCT'
                           ? 'bg-emerald-400'
                           : healthPhase === 'GASTOS_CUBIERTOS_RUMBO_20'
-                            ? 'bg-amber-400'
+                            ? 'bg-white'
                             : 'bg-red-400'
                       }`}
                       style={{ width: `${Math.min(100, healthyTargetProgress)}%` }}
@@ -281,11 +285,11 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                 {requiredDailyRunRate > 0 && (
                   <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-300 flex items-center justify-between flex-wrap gap-1.5">
                     <span className="flex items-center gap-1 text-neutral-400">
-                      <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                      <Clock className="w-3 h-3 text-neutral-400 shrink-0" />
                       <span>Duración: <strong className="text-white">{totalEventDays} día(s)</strong></span>
                     </span>
                     <span className="font-medium text-right">
-                      Ritmo diario meta 20%: <strong className="text-amber-300 font-mono">Q {requiredDailyRunRate.toFixed(2)}/día</strong>{' '}
+                      Ritmo diario meta 20%: <strong className="text-white font-mono">Q {requiredDailyRunRate.toFixed(2)}/día</strong>{' '}
                       <span className="text-neutral-500">(~{requiredDailyMediumPosters} cuadros M/día)</span>
                     </span>
                   </div>
@@ -308,8 +312,10 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
                 </span>
               </div>
               <div className="flex items-center gap-1 text-neutral-400">
-                <CheckCircle2 className="w-3 h-3 text-amber-400" />
-                <span>Cortes de caja: <strong className="text-white font-mono">{closingsSummary.total}</strong> ({closingsSummary.reconciled} conciliados)</span>
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>
+                  Cortes de caja: <strong className="text-white font-mono">{closingsSummary.total}</strong> ({closingsSummary.reconciled} conciliados{closingsSummary.autoMidnight > 0 ? `, ${closingsSummary.autoMidnight} auto` : ''})
+                </span>
               </div>
             </div>
           </div>
