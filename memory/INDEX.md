@@ -26,4 +26,4 @@
 
 ## Índice de Temas Activos (1 línea de gancho por archivo)
 
-- `[feedback/project]` [harness-rules.md](topics/harness-rules.md) — Interacción natural, WIP=1, 5 niveles e `init.sh` multiplataforma (Linux/macOS y Windows PowerShell).
+- `[feedback/project]` [harness-rules.md](topics/harness-rules.md) — Interacción natural, WIP=1, prohibición de textos/botones naranjas en UI e `init.sh` multiplataforma.

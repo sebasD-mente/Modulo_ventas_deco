@@ -10,6 +10,7 @@
 
 - **Interacción 100% Natural con el Usuario (`Agent-Owned Harness`)**: El usuario se comunica siempre en lenguaje natural (ideas, decisiones de diseño, dudas o solicitudes directas). El agente es el único responsable de traducir de forma transparente los acuerdos de la conversación hacia `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md`.
 - **Cero Salto de Tareas (`Strict Sequential DAG` y `WIP = 1`)**: Las tareas registradas en `feature_list.json` (`N >= 1`) se ejecutan una por una respetando estrictamente sus dependencias (`dependencies`) y entregables físicos (`required_files`). Nunca se debe adelantar trabajo de una tarea cuyas dependencias no estén en `done`, ni crear documentos en `docs/` sin información real del proyecto (`Anti-Doc Bloat`).
+- **Restricción Visual Estricta — Cero Naranja/Ámbar en Textos o Botones (`UI Preference`)**: Por directriz expresa del usuario, se debe quitar y evitar de ahora en adelante el uso de colores naranjas o ámbar (`orange-*`, `amber-*`) en textos, iconos o botones de tarjetas y paneles; utilizar estilos limpios en blanco y gris neutro (`text-white`, `text-neutral-300`, `text-neutral-400`, `border-neutral-800`) como en la tarjeta `Base Productos`.
 
 ## 2. Ejecución Multiplataforma de `init.sh` (`project` / `feedback`)
 

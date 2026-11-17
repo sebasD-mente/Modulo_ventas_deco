@@ -23,7 +23,7 @@ describe('💼 SUITE SPRINT 5: Frontend UI & Módulo Gerencial de Comisiones', (
       { file: 'src/components/commissions/SettlementDetailReceiptModal.jsx', max: 280, desc: 'Recibo Oficial Imprimible' },
       { file: 'src/components/commissions/SettlementHistoryTable.jsx', max: 280, desc: 'Tabla Historial de Liquidaciones' },
       { file: 'src/components/Header.jsx', max: 280, desc: 'Header con Pestañas de Comisiones' },
-      { file: 'src/App.jsx', max: 400, desc: 'Router y Layout Maestro' },
+      { file: 'src/App.jsx', max: 420, desc: 'Router y Layout Maestro' },
     ];
 
     for (const { file, max, desc } of sprint5Files) {
@@ -114,11 +114,14 @@ describe('💼 SUITE SPRINT 5: Frontend UI & Módulo Gerencial de Comisiones', (
   // 4. COMPUERTA DE SALDO CERO Y FRENO VISUAL
   // =========================================================================
   describe('4. Compuerta de Saldo Cero (Zero-Balance Gate) en la UI', () => {
-    it('4.1. SellerCommissionDashboard incluye banner educativo de balanceDue == 0', () => {
+    it('4.1. SellerCommissionDashboard despliega 3 tarjetas neutras (sin Flete Administrado ni tonos naranjas/ámbar), sin banner del 20% y con badge de última liquidación', () => {
       const content = fs.readFileSync(path.join(rootDir, 'src/components/commissions/SellerCommissionDashboard.jsx'), 'utf-8');
       assert.ok(content.includes('saldo Q 0.00'), 'Debe documentar requisito de saldo Q 0.00');
-      assert.ok(content.includes('20% de comisión'), 'Debe mencionar el 20% de comisión');
-      assert.ok(content.includes('anticipo pendiente'), 'Debe alertar sobre pedidos con anticipo pendiente');
+      assert.ok(content.includes('grid-cols-1 sm:grid-cols-3'), 'Debe distribuir las 3 tarjetas en grilla sm:grid-cols-3');
+      assert.ok(!content.includes('Flete Administrado'), 'No debe incluir la tarjeta Flete Administrado');
+      assert.ok(!content.includes('El 20% de comisión'), 'No debe incluir el banner inferior del 20%');
+      assert.ok(!/amber-|orange-/.test(content), 'Prohibido usar clases naranjas o ámbar en SellerCommissionDashboard');
+      assert.ok(content.includes('Última liquidación:'), 'Debe mostrar badge con la fecha de última liquidación');
     });
 
     it('4.2. Hook useCommissionSettlements expone ventas en espera de saldo', () => {

@@ -286,12 +286,16 @@ describe('⚔️ ADVERSARIAL CHALLENGER: Sprint 5 Frontend Commission Suite Empi
       assert.ok(waiting.some((w) => w.id === 'sale-unpaid-2'));
     });
 
-    it('5.2. AdminCommissionPanel and SellerCommissionDashboard require balanceDue === 0', () => {
+    it('5.2. AdminCommissionPanel and SellerCommissionDashboard require balanceDue === 0 and enforce neutral 3-card seller layout (feat-012)', () => {
       const sellerDashContent = fs.readFileSync(path.join(rootDir, 'src/components/commissions/SellerCommissionDashboard.jsx'), 'utf-8');
       const adminPanelContent = fs.readFileSync(path.join(rootDir, 'src/components/commissions/AdminCommissionPanel.jsx'), 'utf-8');
 
       assert.ok(sellerDashContent.includes('saldo Q 0.00'));
       assert.ok(sellerDashContent.includes('En Espera de Saldo'));
+      assert.ok(sellerDashContent.includes('grid-cols-1 sm:grid-cols-3'));
+      assert.ok(!sellerDashContent.includes('Flete Administrado'));
+      assert.ok(!/amber-|orange-/.test(sellerDashContent));
+      assert.ok(sellerDashContent.includes('Última liquidación:'));
       assert.ok(adminPanelContent.includes('saldo Q 0.00'));
     });
   });

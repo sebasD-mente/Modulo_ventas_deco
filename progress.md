@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 16:55
-**Session ID:** sesion-014 (`feat-010`: Retiro de botón destructivo `'Reiniciar en 0'` y endpoint `/api/sales/purge-online-test-data`; preparación segura de `feat-011`)
-**Active Feature:** Ninguna (`WIP = 0`; `feat-000..010` en `done`; `feat-011` pendiente de ejecución única en PostgreSQL de producción)
+**Last Updated:** 2026-11-16 19:38
+**Session ID:** sesion-016 (Ejecución y cierre de `feat-012`: Simplificación Visual de Mis Comisiones para `VENDEDOR_REDES`)
+**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..012` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -37,11 +37,19 @@
   - En `EventCard.jsx`, transformado `RentHealthPill` en un disparador accesible (`min-h-[36px]`) que abre directamente el modal detallado del evento con su radar financiero y movimientos históricos.
   - En `EventSalesModal.jsx`, integrada la tarjeta completa de desglose financiero y Radar Ferial (regla del 20%, 4 tarjetas contables, barra de progreso hacia 5x arriendo, ritmo diario ferial requerido, desglose consolidado de formas de pago y cortes de caja conciliados/automáticos) para cualquier evento (activo o archivado).
 
+- [x] **Limpieza única en 0 de los datos de prueba de Ventas en Línea en el VPS de Producción `feat-011` (`aae1eb2`)**
+- [x] **Simplificación Visual de Mis Comisiones para `VENDEDOR_REDES` `feat-012` (`61/61` commission tests PASS, `265/265` unit tests PASS, `bash ./init.sh` `100/100`)**:
+  - Retirada la tarjeta `"Flete Administrado"` y redistribuido el espacio superior en 3 columnas equitativas (`grid-cols-1 sm:grid-cols-3`: **Comisiones Listas**, **Base Productos** y **En Espera de Saldo**).
+  - Eliminados todos los estilos naranjas/ámbar (`text-amber-*`, `bg-amber-*`, `border-amber-*`) en `SellerCommissionDashboard.jsx`, unificando la tarjeta **En Espera de Saldo** con la estética blanca/neutra de **Base Productos** (`text-neutral-300`, `text-neutral-400`, `text-white`).
+  - Retirado por completo el banner inferior del 20% debajo de las tarjetas KPI.
+  - Incorporado el badge neutro `Última liquidación: <fecha es-GT | Sin registros>` (`data-testid="last-settlement-badge"`) junto al botón de actualizar en la cabecera de **"Ventas Elegibles para Liquidar"**, sincronizado con `settlements` y `fetchSettlements()` desde `CommissionSettlementView.jsx`.
+  - Alineadas las suites `tests/commissions/commission-frontend.test.js` y `tests/adversarial/sprint5-commission-frontend-challenger.test.js` (`61/61 PASS`).
+
 ### What's In Progress
-- Ninguna tarea en curso (`WIP = 0`; todas las tareas `feat-000..007` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..012` completadas y verificadas).
 
 ### What's Next
-- Repositorio en estado limpio integral (`clean state`, `100/100`, 0 violaciones, 0 excepciones). Nuevos requerimientos de producto o diseño pueden formularse para el siguiente ciclo.
+- Esperar siguientes requerimientos funcionales del usuario o desplegar `feat-012` cuando el usuario lo indique.
 
 ## Blockers / Risks
 - Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 54/54 surgery suites PASS).
@@ -58,14 +66,14 @@
   - Resolution: `RentHealthPill` ahora acepta `onOpenRadar` y actúa como botón accesible (`min-h-[36px]`) enlazado a `onViewSales(event)`.
 
 ## Files Modified This Session
-- `src/components/monitor/EventFinancialRadar.jsx` — Soporte `eventId || id`, cálculo global automático y preservación de `selectedEventId` (`0 CRLF`).
-- `src/components/EventsManagementView.jsx` — Montado `EventFinancialRadar` en la vista de eventos (`0 CRLF`).
-- `src/components/events/EventCard.jsx` — `RentHealthPill` interactivo enlazado a `onViewSales` en eventos activos, confirmados y archivados (`0 CRLF`).
-- `src/components/events/modals/EventSalesModal.jsx` — Desglose financiero completo, radar del 20%, formas de pago y cortes de caja (`0 CRLF`).
-- `feature_list.json` — `feat-007` actualizada a `"status": "done"` con evidencia exhaustiva (`0 CRLF`).
-- `sprint-contract.md` — Contrato actualizado con cierre de `feat-007` (`0 CRLF`).
-- `progress.md` — Bitácora actualizada con los detalles de `sesion-011` (`0 CRLF`).
-- `session-handoff.md` — Acta de entrega con verificación en limpio (`0 CRLF`).
+- `src/components/CommissionSettlementView.jsx` — Pasado `settlements` y refresco conjunto `fetchSettlements()` a `SellerCommissionDashboard` (`0 CRLF`).
+- `src/components/commissions/SellerCommissionDashboard.jsx` — Grilla de 3 tarjetas sin Flete Administrado, estética neutra/blanca sin colores naranjas/ámbar, retiro de banner del 20% y badge de fecha de última liquidación (`0 CRLF`).
+- `tests/commissions/commission-frontend.test.js` — Contrato `4.1` actualizado para validar 3 tarjetas, cero naranja/ámbar y badge de última liquidación (`0 CRLF`).
+- `tests/adversarial/sprint5-commission-frontend-challenger.test.js` — Caso `5.2` enriquecido con invariantes de `feat-012` (`0 CRLF`).
+- `feature_list.json` — `feat-012` actualizada a `"status": "done"` con evidencia ejecutable (`0 CRLF`).
+- `sprint-contract.md` — Contrato actualizado con cierre de `feat-012` (`0 CRLF`).
+- `progress.md` — Bitácora actualizada con los detalles de `sesion-016` (`0 CRLF`).
+- `session-handoff.md` — Acta de entrega actualizada en estado limpio (`0 CRLF`).
 
 ## Verification Evidence
 - [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`

@@ -49,6 +49,7 @@ export default function CommissionSettlementView() {
     errorMsg,
     successMsg,
     fetchPendingCommissions,
+    fetchSettlements,
     emitSettlement,
     markSettlementPaid,
     fetchSettlementDetail,
@@ -149,8 +150,12 @@ export default function CommissionSettlementView() {
               pendingData={pendingData}
               salesWaitingBalance={salesWaitingBalance}
               waitingSummary={waitingSummary}
+              settlements={settlements}
               isLoading={isLoadingPending}
-              onRefresh={() => fetchPendingCommissions()}
+              onRefresh={() => {
+                fetchPendingCommissions();
+                fetchSettlements();
+              }}
             />
           )}
         </>

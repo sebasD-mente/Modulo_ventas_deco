@@ -2,9 +2,7 @@ import React from 'react';
 import {
   DollarSign,
   Package,
-  Truck,
   Clock,
-  Sparkles,
   RefreshCw,
   Loader2,
   CheckCircle2,
@@ -20,15 +18,28 @@ export default function SellerCommissionDashboard({
     sales: [],
   },
   waitingSummary = { count: 0, totalBalance: 0 },
+  settlements = [],
   isLoading = false,
   onRefresh,
 }) {
   const sales = pendingData.sales || [];
 
+  const latestSettlement = Array.isArray(settlements) && settlements.length > 0
+    ? [...settlements].sort(
+        (a, b) =>
+          new Date(b.paidAt || b.createdAt || 0).getTime() -
+          new Date(a.paidAt || a.createdAt || 0).getTime()
+      )[0]
+    : null;
+  const lastSettlementDateLabel =
+    latestSettlement && (latestSettlement.paidAt || latestSettlement.createdAt)
+      ? new Date(latestSettlement.paidAt || latestSettlement.createdAt).toLocaleDateString('es-GT')
+      : 'Sin registros';
+
   return (
     <div className="space-y-6">
       {/* 1. Tarjetas de Resumen KPI en Tiempo Real */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* KPI 1: Comisiones Listas al 20% */}
         <div className="bg-[#121212] border border-emerald-500/30 rounded-[28px] p-4 text-white shadow-lg relative overflow-hidden flex flex-col justify-between min-h-[110px]">
           <div className="flex items-center justify-between text-neutral-400">
@@ -65,36 +76,16 @@ export default function SellerCommissionDashboard({
           </div>
         </div>
 
-        {/* KPI 3: Flete Administrado (Excluido de Comisión) */}
+        {/* KPI 3: Ventas en Espera de Saldo */}
         <div className="bg-[#121212] border border-neutral-800 rounded-[28px] p-4 text-white shadow-lg flex flex-col justify-between min-h-[110px]">
           <div className="flex items-center justify-between text-neutral-400">
             <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-300">
-              Flete Administrado
-            </span>
-            <Truck className="w-4 h-4 text-neutral-400 shrink-0" />
-          </div>
-          <div>
-            <div className="text-lg sm:text-xl font-bold font-mono text-neutral-300">
-              Q {pendingData.totalShippingExcluded.toFixed(2)}
-            </div>
-            <div className="mt-1">
-              <span className="inline-block px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 text-[10px] font-semibold">
-                sin comisión
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 4: Ventas en Espera de Saldo */}
-        <div className="bg-[#121212] border border-neutral-800 rounded-[28px] p-4 text-white shadow-lg flex flex-col justify-between min-h-[110px]">
-          <div className="flex items-center justify-between text-neutral-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
               En Espera de Saldo
             </span>
-            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            <Clock className="w-4 h-4 text-neutral-400 shrink-0" />
           </div>
           <div>
-            <div className="text-lg sm:text-xl font-bold font-mono text-amber-400">
+            <div className="text-lg sm:text-xl font-bold font-mono text-white">
               {waitingSummary.count} {waitingSummary.count === 1 ? 'orden' : 'órdenes'}
             </div>
             <div className="text-[10px] text-neutral-400 font-sans mt-0.5">
@@ -104,17 +95,9 @@ export default function SellerCommissionDashboard({
         </div>
       </div>
 
-      {/* 2. Banner Educativo de Negocio */}
-      <div className="bg-amber-950/30 border border-amber-800/60 rounded-[24px] p-4 text-amber-200 text-xs flex items-start gap-3 shadow-md">
-        <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-        <p className="leading-relaxed font-sans">
-          💡 <strong>El 20% de comisión</strong> se habilita automáticamente cuando el cliente liquida el 100% de la orden (saldo Q 0.00). Los pedidos con anticipo pendiente se reflejarán aquí al momento de su entrega.
-        </p>
-      </div>
-
-      {/* 3. Tabla de Ventas Elegibles */}
+      {/* 2. Tabla de Ventas Elegibles */}
       <div className="bg-[#121212] border border-neutral-800 rounded-[32px] p-5 sm:p-6 text-white space-y-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-800">
           <div>
             <h3 className="font-bold text-sm uppercase tracking-wider text-white">
               Ventas Elegibles para Liquidar
@@ -123,17 +106,26 @@ export default function SellerCommissionDashboard({
               Órdenes completadas con saldo Q 0.00 pendientes de corte oficial.
             </p>
           </div>
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              title="Actualizar datos"
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-all cursor-pointer"
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span
+              data-testid="last-settlement-badge"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-medium"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          )}
+              <span className="text-neutral-400">Última liquidación:</span>
+              <span className="font-mono font-semibold text-white">{lastSettlementDateLabel}</span>
+            </span>
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading}
+                title="Actualizar datos"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-all cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (

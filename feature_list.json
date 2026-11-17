@@ -365,6 +365,33 @@
       ],
       "evidence": "Producción verificada en https://ventas.decovintage.online (commit f8ea38a): GET /api/events -> { id: 'evt-ventas-redes-online', totalSold: 0, salesCount: 0 }; GET /api/sales/events/evt-ventas-redes-online -> count: 0; GET /api/commissions/pending -> 0; GET /api/commissions/settlements -> 0; GET /api/sales/orders/tracking -> 0. bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100).",
       "notes": "Limpieza única en 0 completada y verificada en producción sin botones ni endpoints destructivos."
+    },
+    {
+      "id": "feat-012",
+      "name": "Simplificación Visual de Mis Comisiones (Vendedor Redes): 3 Tarjetas sin Flete, Cero Color Naranja, Retiro de Banner del 20% y Badge de Última Liquidación",
+      "description": "En la sección Mis Comisiones del rol VENDEDOR_REDES (SellerCommissionDashboard.jsx y CommissionSettlementView.jsx): (1) retirar la tarjeta 'Flete Administrado' y redistribuir equitativamente el espacio entre las 3 tarjetas restantes (grid-cols-1 sm:grid-cols-3: Comisiones Listas, Base Productos y En Espera de Saldo); (2) eliminar todos los textos, iconos o estilos naranjas/ámbar (text-amber-*, bg-amber-*, border-amber-*) en la tarjeta 'En Espera de Saldo' dejándola con estética blanca/neutra idéntica a 'Base Productos' (text-neutral-300 en título, text-neutral-400 en icono/subtítulo y text-white en valor principal); (3) retirar por completo el letrero/banner inferior que dice 'El 20% de comisión se habilita automáticamente...'; (4) incorporar en la cabecera del panel 'Ventas Elegibles para Liquidar', justo al lado del botón de actualizar, un badge visible en tonos neutros/blancos que muestre la fecha de la última liquidación del vendedor (calculada desde el historial de settlements); y (5) alinear las suites tests/commissions/commission-frontend.test.js y tests/adversarial/sprint5-commission-frontend-challenger.test.js al nuevo contrato visual.",
+      "area": "commissions-seller-dashboard-ui",
+      "user_visible_behavior": "En Mis Comisiones el vendedor de redes visualiza 3 tarjetas bien distribuidas (Comisiones Listas, Base Productos y En Espera de Saldo en color blanco/neutro sin tonos naranjas), sin el banner gigante del 20%, y con un badge junto al botón de actualizar que indica la fecha de su última liquidación.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-011"
+      ],
+      "required_files": [
+        "src/components/CommissionSettlementView.jsx",
+        "src/components/commissions/SellerCommissionDashboard.jsx",
+        "tests/commissions/commission-frontend.test.js",
+        "tests/adversarial/sprint5-commission-frontend-challenger.test.js"
+      ],
+      "verification": [
+        "node --test tests/commissions/commission-frontend.test.js tests/adversarial/sprint5-commission-frontend-challenger.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/commissions/commission-frontend.test.js tests/adversarial/sprint5-commission-frontend-challenger.test.js -> Exit code 0 (61/61 PASS across 15 suites, 0 fail); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS); bash scripts/check-architecture.sh -> Exit code 0; node scripts/validate-harness.mjs --min-score 100 -> Overall: 100/100 (25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Tarjeta Flete Administrado y banner del 20% retirados, grilla en 3 columnas (sm:grid-cols-3), En Espera de Saldo en estética blanca/neutra sin colores naranja/ámbar y badge de última liquidación junto al botón de actualizar."
     }
   ]
 }
