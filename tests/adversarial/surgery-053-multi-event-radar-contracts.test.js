@@ -236,15 +236,9 @@ describe('⚔️ [DEKO-STANDIA-053] SUITE DE CONTRATOS: MULTI-EVENTO, MULTI-VEND
       );
     });
 
-    it('5.3: createCashClosingTransaction actualiza el cierre diario si ya existe para soportar relevos de turno', async () => {
+    it('5.3: createCashClosingTransaction prohíbe sobreescribir cierres diarios existentes y responde HTTP 409 (feat-013)', async () => {
       const origFindFirst = prisma.cashClosing.findFirst;
       const origUpdate = prisma.cashClosing.update;
-      const origSaleAgg = prisma.sale.aggregate;
-      const origItemAgg = prisma.saleItem.aggregate;
-      const origPayGroup = prisma.salePayment.groupBy;
-      const origItemGroup = prisma.saleItem.groupBy;
-      const origSaleFindMany = prisma.sale.findMany;
-      const origEventFind = prisma.event.findUnique;
 
       let updateInvoked = false;
 
@@ -253,40 +247,34 @@ describe('⚔️ [DEKO-STANDIA-053] SUITE DE CONTRATOS: MULTI-EVENTO, MULTI-VEND
           id: 'closing-existing-01',
           totalCashReported: 500,
           totalSalesCount: 10,
-          observations: 'Turno Mañana',
+          observations: 'Turno Cerrado',
         });
 
-        prisma.cashClosing.update = async ({ where, data }) => {
+        prisma.cashClosing.update = async () => {
           updateInvoked = true;
-          return { id: where.id, ...data, closedBy: { fullName: 'Supervisor' }, event: { name: 'Stand 1' } };
+          throw new Error('No debe invocar prisma.cashClosing.update');
         };
 
-        prisma.sale.aggregate = async () => ({ _count: { id: 15 }, _sum: { totalAmount: 975 } });
-        prisma.saleItem.aggregate = async () => ({ _sum: { quantity: 15 } });
-        prisma.salePayment.groupBy = async () => [{ method: 'EFECTIVO', _count: { id: 15 }, _sum: { amount: 975 } }];
-        prisma.saleItem.groupBy = async () => [];
-        prisma.sale.findMany = async () => [];
-        prisma.event.findUnique = async () => ({ id: 'event-1', name: 'Stand 1' });
+        await assert.rejects(
+          () =>
+            createCashClosingTransaction({
+              tenantId: 'tenant-test',
+              eventId: 'event-1',
+              closedById: 'user-relevo',
+              totalCashReported: 975,
+              date: '2026-10-19',
+            }),
+          (err) => {
+            assert.strictEqual(err.statusCode, 409);
+            assert.match(err.message, /Ya existe un cierre de caja registrado para esta jornada/);
+            return true;
+          }
+        );
 
-        const result = await createCashClosingTransaction({
-          tenantId: 'tenant-test',
-          eventId: 'event-1',
-          closedById: 'user-relevo',
-          totalCashReported: 975,
-          date: '2026-10-19',
-        });
-
-        assert.strictEqual(updateInvoked, true, 'Debe haber invocado prisma.cashClosing.update');
-        assert.strictEqual(result.totalSalesCount, 15);
+        assert.strictEqual(updateInvoked, false, 'Jamás debe invocar prisma.cashClosing.update');
       } finally {
         prisma.cashClosing.findFirst = origFindFirst;
         prisma.cashClosing.update = origUpdate;
-        prisma.sale.aggregate = origSaleAgg;
-        prisma.saleItem.aggregate = origItemAgg;
-        prisma.salePayment.groupBy = origPayGroup;
-        prisma.saleItem.groupBy = origItemGroup;
-        prisma.sale.findMany = origSaleFindMany;
-        prisma.event.findUnique = origEventFind;
       }
     });
   });

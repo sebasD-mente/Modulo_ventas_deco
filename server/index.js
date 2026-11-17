@@ -11,7 +11,7 @@ import apiRoutes from './routes/apiRoutes.js';
 import { prisma } from './config/prisma.js';
 import { syncCatalogFromWeb } from './services/catalogSyncService.js';
 import { deltaSyncRecentPosters } from './services/catalog/liveCatalogSyncService.js';
-import { runMidnightClosingAudit } from './services/sales/midnightClosingService.js';
+import { runMidnightClosingAudit, getGuatemalaClockParts } from './services/sales/midnightClosingService.js';
 import { getAvailableKeys, isKeyInCooldown } from './services/ai/aiKeyPoolService.js';
 import { pruneExpiredSessions } from './services/ai/aiSessionService.js';
 
@@ -212,7 +212,7 @@ const server = app.listen(ENV.PORT, () => {
   }, FAST_DELTA_INTERVAL_MS).unref();
   // ── Fin Sincronización ──────────────────────────────────────────────────────
 
-  // 🔒 Auditoría de Cierre Automático de Medianoche (jornadas previas sin arqueo oficial)
+  // 🔒 Auditoría de Cierre Automático de Jornada (11:59 PM CST y recuperación post-medianoche)
   runMidnightClosingAudit()
     .then((res) => {
       if (res && res.closingsCreated > 0) {
@@ -221,13 +221,24 @@ const server = app.listen(ENV.PORT, () => {
     })
     .catch((err) => console.warn('[MidnightClosing] ⚠️ Error en auditoría inicial:', err.message));
 
-  // Verificación periódica cada 15 minutos para conciliar días pasados en cuanto cruza la medianoche
-  const MIDNIGHT_AUDIT_INTERVAL_MS = 15 * 60 * 1000;
+  // Reloj de precisión cada 30s para disparar puntualmente a las 23:59 CST (America/Guatemala)
+  // y barrido de recuperación cada 15 minutos después de medianoche.
+  let last2359AuditDate = null;
+  let lastRecoveryAuditMs = Date.now();
+  const CLOSING_CLOCK_TICK_MS = 30 * 1000;
+  const RECOVERY_AUDIT_INTERVAL_MS = 15 * 60 * 1000;
   setInterval(() => {
-    runMidnightClosingAudit().catch((err) =>
+    const now = new Date();
+    const { dateStr, hour, minute } = getGuatemalaClockParts(now);
+    const shouldRun2359 = hour === 23 && minute === 59 && last2359AuditDate !== dateStr;
+    const shouldRunRecovery = now.getTime() - lastRecoveryAuditMs >= RECOVERY_AUDIT_INTERVAL_MS;
+    if (!shouldRun2359 && !shouldRunRecovery) return;
+    if (shouldRun2359) last2359AuditDate = dateStr;
+    lastRecoveryAuditMs = now.getTime();
+    runMidnightClosingAudit({ now }).catch((err) =>
       console.warn('[MidnightClosing] ⚠️ Error en auditoría programada:', err.message)
     );
-  }, MIDNIGHT_AUDIT_INTERVAL_MS).unref();
+  }, CLOSING_CLOCK_TICK_MS).unref();
 
   // 🧹 Limpieza periódica de sesiones de IA inactivas (>72h)
   const isTest = ENV.NODE_ENV === 'test' || process.env.NODE_ENV === 'test';

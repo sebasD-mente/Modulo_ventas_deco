@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma.js';
-import { getGuatemalaDayRange } from './saleKpiService.js';
+import { getGuatemalaDayRange, shiftGuatemalaDateStr } from './saleKpiService.js';
 import { validateOfficialItemPrice } from '../catalog/catalogSizeResolver.js';
 
 /**
@@ -39,17 +39,48 @@ export async function updateSaleTransaction({
       throw error;
     }
 
-    // 1.1 Inmutabilidad Contable: Validar jornada cerrada o anterior
-    const { targetDate: saleDateStr, startOfDay, endOfDay } = getGuatemalaDayRange(existing.createdAt);
-    const isPastDay = saleDateStr < getGuatemalaDayRange().targetDate;
+    // 1.1 Inmutabilidad Contable: Validar jornada cerrada o anterior (con traspaso post-cierre a D+1)
+    const saleCreatedAt = new Date(existing.createdAt);
+    const { targetDate: saleDateStr, startOfDay, endOfDay } = getGuatemalaDayRange(saleCreatedAt);
+    const todayStr = getGuatemalaDayRange().targetDate;
     const closingFinder = tx.cashClosing?.findFirst ? tx.cashClosing : null;
-    const existingClosing = closingFinder
+    const saleDayClosing = closingFinder
       ? await closingFinder.findFirst({
           where: { tenantId, eventId: existing.eventId, closingDate: { gte: startOfDay, lte: endOfDay } },
+          orderBy: { closingDate: 'desc' },
         })
       : null;
 
-    if (isPastDay || existingClosing) {
+    const isPostClosingRollover = Boolean(
+      saleDayClosing?.closingDate &&
+      !Number.isNaN(saleCreatedAt.getTime()) &&
+      saleCreatedAt.getTime() > new Date(saleDayClosing.closingDate).getTime()
+    );
+
+    if (saleDayClosing && !isPostClosingRollover) {
+      const error = new Error('No se puede modificar una venta de una jornada cerrada o anterior.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const effectiveShiftDate = isPostClosingRollover
+      ? shiftGuatemalaDateStr(saleDateStr, 1)
+      : saleDateStr;
+
+    let effectiveShiftClosing = null;
+    if (isPostClosingRollover && closingFinder) {
+      const nextRange = getGuatemalaDayRange(effectiveShiftDate);
+      effectiveShiftClosing = await closingFinder.findFirst({
+        where: {
+          tenantId,
+          eventId: existing.eventId,
+          closingDate: { gte: nextRange.startOfDay, lte: nextRange.endOfDay },
+        },
+        orderBy: { closingDate: 'desc' },
+      });
+    }
+
+    if (effectiveShiftDate < todayStr || effectiveShiftClosing) {
       const error = new Error('No se puede modificar una venta de una jornada cerrada o anterior.');
       error.statusCode = 403;
       throw error;

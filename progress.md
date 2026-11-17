@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 19:38
-**Session ID:** sesion-016 (Ejecución y cierre de `feat-012`: Simplificación Visual de Mis Comisiones para `VENDEDOR_REDES`)
-**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..012` en `done`)
+**Last Updated:** 2026-11-16 21:26
+**Session ID:** sesion-018 (Implementación y Cierre Verificado de `feat-013` y `feat-014` bajo `WIP = 1`)
+**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..014` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -44,49 +44,63 @@
   - Retirado por completo el banner inferior del 20% debajo de las tarjetas KPI.
   - Incorporado el badge neutro `Última liquidación: <fecha es-GT | Sin registros>` (`data-testid="last-settlement-badge"`) junto al botón de actualizar en la cabecera de **"Ventas Elegibles para Liquidar"**, sincronizado con `settlements` y `fetchSettlements()` desde `CommissionSettlementView.jsx`.
   - Alineadas las suites `tests/commissions/commission-frontend.test.js` y `tests/adversarial/sprint5-commission-frontend-challenger.test.js` (`61/61 PASS`).
+- [x] **Ciclo Contable Estricto de Jornada Diaria y Traspaso Post-Cierre `D -> D + 1` `feat-013` (`22/22` `daily-shift-closing-rollover` + `m4` PASS, `265/265` unit tests PASS, `bash ./init.sh` `100/100`)**:
+  - Eliminada la sobreescritura `prisma.cashClosing.update` en `cashClosingService.js`, imponiendo unicidad estricta de **1 cierre por jornada** (`HTTP 409` ante cualquier segundo intento salvo `idempotentReplay` con la misma `idempotencyKey`) y acotando el cálculo de KPIs diarios a la jornada `targetDate`.
+  - Implementado corte automático puntual a las **11:59 PM CST (`23:59` `America/Guatemala`)** en `midnightClosingService.js` y reloj de precisión cada 30s en `server/index.js`, respetando ventas post-cierre ya pertenecientes a `D + 1` y conciliando también ventas rollover heredadas de `D - 1`.
+  - Implementada `resolveStandShiftWindow` en `saleKpiService.js` para limpiar de inmediato a `0` `"Ventas de Hoy"` y las métricas vivas en cuanto se cierra la jornada (`createdAt <= closingDate`) y sumar automáticamente en `D + 1` cualquier venta post-cierre (`createdAt > closingDate`).
+  - Actualizados `saleUpdateService.js`, `RecentSaleRow.jsx`, `RecentSalesList.jsx` y `EventSalesModal.jsx` para que toda venta post-cierre se contabilice en `D + 1`, permanezca 100% editable mientras `D + 1` siga abierta y se agrupe bajo `D + 1` en Movimientos por Jornada.
+- [x] **Simplificación de Interfaz en Cierre de Caja `feat-014` (`70/70` `closing-modular` + `m3` + `p5-2` PASS, `265/265` unit tests PASS, `bash ./init.sh` `100/100`)**:
+  - Desmontado `<CashDenominationGrid />` de `CashClosingView.jsx` (`69L < 70L`), dejando siempre visible `Efectivo Físico Directo (Q)` (`min-h-[44px]`) y preservando `CashDenominationGrid.jsx` en disco y los exports puros en `useCashClosing.js`.
+  - Retirado `Efectivo Esperado (Sistema):` tanto del resumen principal como del modal de confirmación en `CashClosingSummary.jsx`, conservando intacto `Balance / Diferencia` (`Caja cuadrada exacta` / `Sobrante en caja` / `Faltante en caja`) y el bloque WhatsApp.
+  - Sustituidos todos los estilos `text-amber-400` por estética blanca/neutra en `CashClosingView.jsx` y `CashClosingSummary.jsx`.
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..012` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..014` completadas y verificadas).
 
 ### What's Next
-- Esperar siguientes requerimientos funcionales del usuario o desplegar `feat-012` cuando el usuario lo indique.
+- Revisar con el usuario y, cuando lo autorice explícitamente, desplegar a producción (`npm run deploy`).
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 54/54 surgery suites PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 70/70 closing/forensic tests PASS; 22/22 shift/rollover tests PASS).
 
 ## Decisions Made
-- **Normalización de identificadores en `EventFinancialRadar.jsx`**:
-  - Context: Los eventos provistos por `/api/events` exponen `id`, mientras que los feeds del monitor histórico usaban `eventId`.
-  - Resolution: Se mapeó `eventId: e.eventId || e.id` en `physicalEvents` y se calculó un fallback puro para `computedGlobalFinancials` en ausencia de `globalFinancials` explícito, preservando intactos los contratos de sincronización de `selectedStandId` y `selectedEventId`.
-- **Integración del Radar dentro de `EventSalesModal.jsx`**:
-  - Context: Consultar eventos históricos y archivados requería ver su balance contable y regla del 20% sin recurrir al monitor de ventas en vivo.
-  - Resolution: Se colocó una tarjeta completa de Radar Financiero en la parte superior de `EventSalesModal.jsx`, permitiendo a administradores y vendedores auditar los costos, progreso de recuperación y cortes de caja de cualquier stand pasado o presente.
-- **Interactividad en `RentHealthPill` de `EventCard.jsx`**:
-  - Context: Los usuarios deseaban abrir la información de rentabilidad directamente desde la tarjeta del evento.
-  - Resolution: `RentHealthPill` ahora acepta `onOpenRadar` y actúa como botón accesible (`min-h-[36px]`) enlazado a `onViewSales(event)`.
+- **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
+  - Context: Cerrar caja temprano (p. ej. 7:30 PM) y recibir un cliente de último minuto bloqueaba la edición con `403` y dejaba ambigua la conciliación del dinero, sin modificar `prisma/schema.prisma`.
+  - Alternatives considered: (a) Agregar una columna `shiftDate` en `prisma/schema.prisma` (descartado por restricción explícita de no alterar el esquema Prisma); (b) Permitir sobreescribir el cierre diario existente con `prisma.cashClosing.update` (descartado por requerimiento de unicidad estricta de 1 cierre al día).
+  - Resolution: Se derivó determinísticamente la ventana contable efectiva en `America/Guatemala` usando `closingDate` (`createdAt <= dayClosing.closingDate` pertenece a `D`; `createdAt > dayClosing.closingDate` pasa a `D + 1` con `gt: prevClosing.closingDate`), garantizando partición exacta sin doble conteo ni dinero huérfano.
+- **Desmonte de `CashDenominationGrid` sin borrar el módulo en disco (`feat-014`)**:
+  - Context: El conteo billete por billete ralentizaba el cierre en stand, pero suites existentes (`phase5-frontend-ergonomics-resilience.test.js` y `closing-modular.test.js`) auditan la presencia de `CashDenominationGrid.jsx` y la aritmética exportada en `useCashClosing.js`.
+  - Alternatives considered: Borrar `CashDenominationGrid.jsx` y relajar suites ajenas (descartado por regla `Stay in scope` y prohibición de debilitar validadores).
+  - Resolution: Se desmontó el componente en `CashClosingView.jsx` (`69L < 70L`) dejando siempre directo `Efectivo Físico Directo (Q)` y conservando el módulo y utilidades puras en disco.
 
 ## Files Modified This Session
-- `src/components/CommissionSettlementView.jsx` — Pasado `settlements` y refresco conjunto `fetchSettlements()` a `SellerCommissionDashboard` (`0 CRLF`).
-- `src/components/commissions/SellerCommissionDashboard.jsx` — Grilla de 3 tarjetas sin Flete Administrado, estética neutra/blanca sin colores naranjas/ámbar, retiro de banner del 20% y badge de fecha de última liquidación (`0 CRLF`).
-- `tests/commissions/commission-frontend.test.js` — Contrato `4.1` actualizado para validar 3 tarjetas, cero naranja/ámbar y badge de última liquidación (`0 CRLF`).
-- `tests/adversarial/sprint5-commission-frontend-challenger.test.js` — Caso `5.2` enriquecido con invariantes de `feat-012` (`0 CRLF`).
-- `feature_list.json` — `feat-012` actualizada a `"status": "done"` con evidencia ejecutable (`0 CRLF`).
-- `sprint-contract.md` — Contrato actualizado con cierre de `feat-012` (`0 CRLF`).
-- `progress.md` — Bitácora actualizada con los detalles de `sesion-016` (`0 CRLF`).
-- `session-handoff.md` — Acta de entrega actualizada en estado limpio (`0 CRLF`).
+- `server/services/sales/saleKpiService.js` — `shiftGuatemalaDateStr`, `resolveStandShiftWindow`, limpieza en `0` post-cierre y enriquecimiento `isEditableInOpenShift` / `effectiveShiftDate` (`0 CRLF`).
+- `server/services/sales/cashClosingService.js` — Unicidad estricta `409` por jornada diaria sin `cashClosing.update` y KPIs acotados a `targetDate` (`0 CRLF`).
+- `server/services/sales/midnightClosingService.js` — Corte automático puntual a las `23:59` CST y conciliación de jornadas con ventas rollover (`0 CRLF`).
+- `server/services/sales/saleUpdateService.js` — Editabilidad `200` de ventas post-cierre traspasadas a `D + 1` mientras `D + 1` siga abierta (`0 CRLF`).
+- `server/index.js` — Reloj cada 30s para disparar puntualmente la auditoría de las `23:59` CST (`0 CRLF`).
+- `src/components/RecentSalesList.jsx` — Vigilante ligero de cambio de jornada / `23:59` CST (`0 CRLF`).
+- `src/components/sales/RecentSaleRow.jsx` — Botón `Editar` habilitado por jornada abierta (`isSaleEditableInOpenShift`) y badge `↪ Jornada siguiente` (`0 CRLF`).
+- `src/components/events/modals/EventSalesModal.jsx` — Agrupación de ventas post-cierre bajo la tarjeta de `D + 1` (`0 CRLF`).
+- `src/components/CashClosingView.jsx` — Desmontado `CashDenominationGrid`, `Efectivo Físico Directo (Q)` directo, `0` naranja y `69` líneas (`< 70L`, `0 CRLF`).
+- `src/components/closing/CashClosingSummary.jsx` — Retirado `Efectivo Esperado (Sistema):` en vista y modal, `0` naranja (`0 CRLF`).
+- `src/components/closing/hooks/useCashClosing.js` — Compactado limpio `< 130L` preservando todos sus exports (`0 CRLF`).
+- `tests/sales/daily-shift-closing-rollover.test.js` — Nueva suite integral de `feat-013` (`0 CRLF`).
+- `tests/adversarial/m4-closing-immutability-thumbnails.test.js`, `tests/adversarial/surgery-053-multi-event-radar-contracts.test.js`, `tests/closing/closing-modular.test.js`, `tests/m3-forensic-audit.test.js`, `tests/adversarial/p5-2-sales-closing-challenger.test.js` — Suites alineadas y ampliadas (`0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` (`0 CRLF`).
 
 ## Verification Evidence
-- [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
-- [x] Vigilante Arquitectónico Tolerancia Cero (Puerta 1): `bash scripts/check-architecture.sh` -> `0 violaciones, 0 excepciones, higiene y 6 capas verificadas`
-- [x] Suite Completa de Contratos Feriales (surgery-053): `node --test tests/adversarial/surgery-053-multi-event-radar-contracts.test.js` -> `16/16 PASS (0 fail)`
-- [x] Suites Quirúrgicas de Eventos, POS y Transparencia: `surgery-053`, `surgery-056`, `surgery-058`, `surgery-065` -> `54/54 PASS across 27 suites`
+- [x] Suite de Jornada Diaria y Traspaso Post-Cierre (`feat-013`): `node --test tests/sales/daily-shift-closing-rollover.test.js tests/adversarial/m4-closing-immutability-thumbnails.test.js` -> `22/22 PASS across 5 suites (0 fail)`
+- [x] Suite Modular, Forense y Adversarial de Cierre de Caja (`feat-014`): `node --test tests/closing/closing-modular.test.js tests/m3-forensic-audit.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js` -> `70/70 PASS across 22 suites (0 fail)`
 - [x] Suite Completa de Pruebas Unitarias: `npm run test:unit` -> `265/265 PASS across 109 suites`
 - [x] Suite Completa de Voz: `npm run test:voice` -> `53/53 PASS across 12 suites`
-- [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1567 modules PASS en 6.30s)`
-- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS en 41.06s`
+- [x] Vigilante Arquitectónico Tolerancia Cero (Puerta 1): `bash scripts/check-architecture.sh` -> `0 violaciones, 0 excepciones, higiene y 6 capas verificadas`
+- [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
+- [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1568 modules PASS)`
+- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS`
 - [x] Verificación de Formato: `0 CRLF` en todos los archivos gobernados y modificados.
 
 ## Notes for Next Session
 1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`).
-2. Todas las tareas planificadas `feat-000..007` están completadas y verificadas.
+2. Todas las tareas planificadas `feat-000..014` están completadas y verificadas.
 3. El inicio estándar para cualquier nueva tarea se ejecuta con `bash ./init.sh`.

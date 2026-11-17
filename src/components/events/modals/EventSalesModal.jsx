@@ -8,6 +8,15 @@ const getGuatemalaDateStr = (dateInput) => {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date(dateInput));
 };
 
+const shiftGuatemalaDateStr = (dateStr, deltaDays = 1) => {
+  const parts = String(dateStr || '').trim().slice(0, 10).split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return String(dateStr || '');
+  const [y, m, d] = parts;
+  const utcNoon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  utcNoon.setUTCDate(utcNoon.getUTCDate() + deltaDays);
+  return utcNoon.toISOString().slice(0, 10);
+};
+
 const formatSpanishDate = (dateStr) => {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -46,10 +55,26 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
 
   const groupedDays = useMemo(() => {
     const todayStr = getGuatemalaDateStr(new Date());
-    const groups = new Map();
+    const closingByDate = new Map();
+    (closingsList || []).forEach((c) => {
+      const cDate = getGuatemalaDateStr(c.closingDate);
+      if (!cDate) return;
+      const existing = closingByDate.get(cDate);
+      if (!existing || new Date(c.closingDate).getTime() > new Date(existing.closingDate).getTime()) {
+        closingByDate.set(cDate, c);
+      }
+    });
 
+    const groups = new Map();
     list.forEach((sale) => {
-      const dateStr = getGuatemalaDateStr(sale.createdAt);
+      const rawDateStr = getGuatemalaDateStr(sale.createdAt);
+      const dayClosing = closingByDate.get(rawDateStr);
+      const isPostClosingRollover = Boolean(
+        dayClosing?.closingDate &&
+        sale.createdAt &&
+        new Date(sale.createdAt).getTime() > new Date(dayClosing.closingDate).getTime()
+      );
+      const dateStr = isPostClosingRollover ? shiftGuatemalaDateStr(rawDateStr, 1) : rawDateStr;
       if (!groups.has(dateStr)) groups.set(dateStr, []);
       groups.get(dateStr).push(sale);
     });
@@ -66,10 +91,10 @@ export default function EventSalesModal({ event, salesList, closingsList = [], s
         });
       });
 
-      const matchedClosing = (closingsList || []).find((c) => getGuatemalaDateStr(c.closingDate) === dateStr);
+      const matchedClosing = closingByDate.get(dateStr) || null;
       return {
         dateStr, formattedDate: formatSpanishDate(dateStr), totalSold, salesCount: daySales.length,
-        paymentTotals, closing: matchedClosing || null, isToday: dateStr === todayStr, sales: daySales,
+        paymentTotals, closing: matchedClosing, isToday: dateStr >= todayStr, sales: daySales,
       };
     });
   }, [list, closingsList]);

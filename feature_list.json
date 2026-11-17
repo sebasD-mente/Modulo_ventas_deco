@@ -392,6 +392,69 @@
       ],
       "evidence": "node --test tests/commissions/commission-frontend.test.js tests/adversarial/sprint5-commission-frontend-challenger.test.js -> Exit code 0 (61/61 PASS across 15 suites, 0 fail); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS); bash scripts/check-architecture.sh -> Exit code 0; node scripts/validate-harness.mjs --min-score 100 -> Overall: 100/100 (25/25 PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Tarjeta Flete Administrado y banner del 20% retirados, grilla en 3 columnas (sm:grid-cols-3), En Espera de Saldo en estética blanca/neutra sin colores naranja/ámbar y badge de última liquidación junto al botón de actualizar."
+    },
+    {
+      "id": "feat-013",
+      "name": "Ciclo Contable Estricto de Jornada Diaria: 1 Cierre al Día, Corte Automático 11:59 PM, Limpieza de Nueva Venta y Traspaso Post-Cierre al Día Siguiente",
+      "description": "Corregir de raíz el ciclo de jornadas y cierres de caja en stands feriales sin alterar prisma/schema.prisma: (1) Unicidad de 1 cierre diario por jornada (cashClosingService.js y useCashClosing.js): prohibir sobreescribir cierres diarios existentes en la misma jornada contable (devolver HTTP 409 si la jornada activa ya fue cerrada, eliminando el prisma.cashClosing.update que permitía múltiples cierres al día); (2) Cierre automático puntual a las 11:59 PM hora Guatemala (midnightClosingService.js y server/index.js): asegurar que si a las 23:59 CST (America/Guatemala) una jornada tiene ventas abiertas sin cierre manual, el sistema ejecute automáticamente el cierre contable de esa jornada (AUTOMATICO_MEDIANOCHE); (3) Limpieza inmediata de Nueva Venta al cerrar jornada (saleKpiService.js, RecentSalesList.jsx y App.jsx): en cuanto se ejecute el cierre (manual o automático de las 11:59 PM), todas las ventas de ese periodo cerrado (createdAt <= closingDate) desaparecen de inmediato de 'Ventas de Hoy' y de las métricas vivas de turno en Nueva Venta (dejando la pantalla limpia en 0 para ese periodo y archivándolas como solo lectura en la sección Eventos); y (4) Traspaso automático de ventas post-cierre a la jornada del día siguiente D+1 (saleKpiService.js, saleUpdateService.js, cashClosingService.js, midnightClosingService.js, RecentSaleRow.jsx y EventSalesModal.jsx): si tras haberse cerrado la jornada del día D llega un cliente de último minuto y se registra una venta ese mismo día (sale.createdAt > dayClosing.closingDate), dicha venta y su dinero quedan cargados contablemente en la jornada siguiente (D+1), permaneciendo 100% editables en Nueva Venta mientras D+1 siga abierta (eliminando el falso error 403 'No se puede modificar una venta de una jornada cerrada'), sin contaminar el cierre ya asentado de D, sumándose al arqueo y KPIs de D+1 al día siguiente y agrupándose bajo D+1 en Movimientos por Jornada de EventSalesModal.jsx.",
+      "area": "pos-daily-shift-closing-and-rollover",
+      "user_visible_behavior": "Al cerrar la caja del día (1 único cierre permitido por día o cierre automático a las 11:59 PM), la lista de 'Ventas de Hoy' en Nueva Venta queda inmediatamente limpia en 0 y las ventas cerradas pasan al histórico de Eventos; si después de cerrar caja entra una venta de último minuto, el sistema la registra, la permite editar con normalidad y la carga automáticamente en la jornada y caja del día siguiente.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-012"
+      ],
+      "required_files": [
+        "server/services/sales/cashClosingService.js",
+        "server/services/sales/midnightClosingService.js",
+        "server/services/sales/saleKpiService.js",
+        "server/services/sales/saleUpdateService.js",
+        "server/index.js",
+        "src/components/RecentSalesList.jsx",
+        "src/components/sales/RecentSaleRow.jsx",
+        "src/components/events/modals/EventSalesModal.jsx",
+        "tests/sales/daily-shift-closing-rollover.test.js",
+        "tests/adversarial/m4-closing-immutability-thumbnails.test.js",
+        "tests/adversarial/surgery-053-multi-event-radar-contracts.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/daily-shift-closing-rollover.test.js tests/adversarial/m4-closing-immutability-thumbnails.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/daily-shift-closing-rollover.test.js tests/adversarial/m4-closing-immutability-thumbnails.test.js -> Exit code 0 (22/22 PASS across 5 suites in 173.66ms: strict 1-closing-per-day 409 lock + idempotencyKey replay, immediate 0-state reset of Nueva Venta & live KPIs upon closing, post-closing D->D+1 rollover editable 200 while closed shift stays 403, D+1 cash closing & KPI inclusion of post-closing sales, punctual 23:59 CST auto-closing, and EventSalesModal/RecentSaleRow rollover contracts); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites including surgery-053 5.3 409 lock); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS in 4.06s); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env y cero cambios en prisma/schema.prisma."
+    },
+    {
+      "id": "feat-014",
+      "name": "Simplificación de Interfaz en Cierre de Caja: Retiro de Panel de Denominaciones, Retiro de Efectivo Esperado en Sistema y Cero Color Naranja",
+      "description": "En la sección Cierre de Caja (src/components/CashClosingView.jsx, src/components/closing/CashClosingSummary.jsx y src/components/closing/hooks/useCashClosing.js): (1) retirar de CashClosingView.jsx el panel de conteo por denominaciones de billetes y monedas (CashDenominationGrid), dejando siempre visible y directo el campo 'Efectivo Físico Directo (Q)' para agilizar el cierre en stand; (2) retirar el campo 'Efectivo Esperado (Sistema):' de CashClosingSummary.jsx (tanto en el resumen en pantalla como en el modal de confirmación) ya que es redundante frente al indicador 'Balance / Diferencia' (Caja cuadrada / Sobrante / Faltante), dejando todo el resto de la sección tal y como está (Cobros por Vendedor, Fondo Inicial / Gastos Caja / Retiros, Efectivo Físico Directo, Balance / Diferencia, Observaciones, botón Registrar y conciliar cierre y bloque WhatsApp); (3) sustituir clases naranjas/ámbar (text-amber-400) por blanco/neutro en CashClosingView.jsx y CashClosingSummary.jsx respetando la directriz de diseño del proyecto; y (4) alinear tests/closing/closing-modular.test.js y tests/m3-forensic-audit.test.js al nuevo contrato visual sin eliminar src/components/closing/CashDenominationGrid.jsx del disco (requerido por tests/frontend/phase5-frontend-ergonomics-resilience.test.js) y respetando el techo < 70 líneas en CashClosingView.jsx.",
+      "area": "cash-closing-ui-streamlining",
+      "user_visible_behavior": "En Cierre de Caja el vendedor ingresa directamente el efectivo físico contado sin perder tiempo llenando billetes por denominación y visualiza directamente el Balance / Diferencia sin el campo redundante de Efectivo Esperado en Sistema ni textos en color naranja.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-013"
+      ],
+      "required_files": [
+        "src/components/CashClosingView.jsx",
+        "src/components/closing/CashClosingSummary.jsx",
+        "src/components/closing/hooks/useCashClosing.js",
+        "tests/closing/closing-modular.test.js",
+        "tests/m3-forensic-audit.test.js",
+        "tests/adversarial/p5-2-sales-closing-challenger.test.js"
+      ],
+      "verification": [
+        "node --test tests/closing/closing-modular.test.js tests/m3-forensic-audit.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/closing/closing-modular.test.js tests/m3-forensic-audit.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js -> Exit code 0 (70/70 PASS across 22 suites in 362.29ms: CashClosingView 69L < 70L without CashDenominationGrid, direct Efectivo Físico Directo (Q) always visible, zero Efectivo Esperado (Sistema): in summary & modal, zero amber/orange classes, CashDenominationGrid.jsx preserved on disk); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 194 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Conservados CashDenominationGrid.jsx en disco y exports DENOMINATIONS/INITIAL_COUNTS/calculateDenominationsTotal en useCashClosing.js, con CashClosingView.jsx < 70 líneas (69L) y 0 tonos naranjas."
     }
   ]
 }

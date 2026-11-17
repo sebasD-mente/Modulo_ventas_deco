@@ -23,6 +23,125 @@ export function getGuatemalaDayRange(dateInput = null) {
 }
 
 /**
+ * Desplaza una fecha civil YYYY-MM-DD por deltaDays sin deriva de zona horaria del SO.
+ */
+export function shiftGuatemalaDateStr(dateStr, deltaDays = 1) {
+  const parts = String(dateStr || '').trim().slice(0, 10).split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return String(dateStr || '');
+  const [y, m, d] = parts;
+  const utcNoon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  utcNoon.setUTCDate(utcNoon.getUTCDate() + deltaDays);
+  return utcNoon.toISOString().slice(0, 10);
+}
+
+async function findStandDayClosing(client, { tenantId, eventId, startOfDay, endOfDay }) {
+  if (!client?.cashClosing || !eventId) return null;
+  const where = {
+    ...(tenantId ? { tenantId } : {}),
+    eventId,
+    closingDate: { gte: startOfDay, lte: endOfDay },
+  };
+  try {
+    if (typeof client.cashClosing.findFirst === 'function') {
+      return await client.cashClosing.findFirst({ where, orderBy: { closingDate: 'desc' } });
+    }
+    if (typeof client.cashClosing.findMany === 'function') {
+      const list = await client.cashClosing.findMany({ where, orderBy: { closingDate: 'desc' }, take: 1 });
+      return list?.[0] || null;
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Resuelve la ventana contable exacta de una jornada para un stand físico:
+ * - Si hoy ya tiene CashClosing (y no se está generando ese cierre), limpia Nueva Venta dejando solo
+ *   ventas post-cierre (createdAt > dayClosing.closingDate) que pasan a D+1.
+ * - Si el día consultado está abierto y D-1 tuvo cierre temprano, incorpora las ventas post-cierre de D-1.
+ * - Si es un día pasado ya cerrado, acota el techo en dayClosing.closingDate.
+ */
+export async function resolveStandShiftWindow({
+  tenantId,
+  eventId,
+  date,
+  forClosing = false,
+  now = null,
+  client = prisma,
+}) {
+  const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
+  if (Number.isNaN(startOfDay.getTime()) || Number.isNaN(endOfDay.getTime())) return null;
+
+  const todayStr = getGuatemalaDayRange(now).targetDate;
+  const isStand = Boolean(eventId && eventId !== 'evt-ventas-redes-online');
+  if (!isStand) {
+    return {
+      targetDate,
+      startOfDay,
+      endOfDay,
+      fromMs: startOfDay.getTime(),
+      toMs: endOfDay.getTime(),
+      createdAtFilter: { gte: startOfDay, lte: endOfDay },
+      dayClosing: null,
+      prevClosing: null,
+      isPostClosingRolloverWindow: false,
+      effectiveShiftDate: targetDate,
+      isOpenShift: targetDate >= todayStr,
+    };
+  }
+
+  const prevDateStr = shiftGuatemalaDateStr(targetDate, -1);
+  const { startOfDay: prevStart, endOfDay: prevEnd } = getGuatemalaDayRange(prevDateStr);
+  const [prevClosing, dayClosing] = await Promise.all([
+    findStandDayClosing(client, { tenantId, eventId, startOfDay: prevStart, endOfDay: prevEnd }),
+    findStandDayClosing(client, { tenantId, eventId, startOfDay, endOfDay }),
+  ]);
+
+  if (!forClosing && targetDate === todayStr && dayClosing?.closingDate) {
+    const closeDt = new Date(dayClosing.closingDate);
+    if (!Number.isNaN(closeDt.getTime())) {
+      return {
+        targetDate,
+        startOfDay,
+        endOfDay,
+        fromMs: closeDt.getTime() + 1,
+        toMs: endOfDay.getTime(),
+        createdAtFilter: { gt: closeDt, lte: endOfDay },
+        dayClosing,
+        prevClosing,
+        isPostClosingRolloverWindow: true,
+        effectiveShiftDate: shiftGuatemalaDateStr(targetDate, 1),
+        isOpenShift: true,
+      };
+    }
+  }
+
+  const prevCloseDt = prevClosing?.closingDate ? new Date(prevClosing.closingDate) : null;
+  const hasPrevRollover = Boolean(
+    prevCloseDt && !Number.isNaN(prevCloseDt.getTime()) && prevCloseDt.getTime() < prevEnd.getTime()
+  );
+  const dayCloseDt = !forClosing && dayClosing?.closingDate ? new Date(dayClosing.closingDate) : null;
+  const effectiveUpper = dayCloseDt && !Number.isNaN(dayCloseDt.getTime()) ? dayCloseDt : endOfDay;
+
+  return {
+    targetDate,
+    startOfDay,
+    endOfDay,
+    fromMs: hasPrevRollover ? prevCloseDt.getTime() + 1 : startOfDay.getTime(),
+    toMs: effectiveUpper.getTime(),
+    createdAtFilter: hasPrevRollover
+      ? { gt: prevCloseDt, lte: effectiveUpper }
+      : { gte: startOfDay, lte: effectiveUpper },
+    dayClosing,
+    prevClosing,
+    isPostClosingRolloverWindow: false,
+    effectiveShiftDate: targetDate,
+    isOpenShift: !dayClosing && targetDate >= todayStr,
+  };
+}
+
+/**
  * Retorna el rango civil exacto de inicio y fin de un mes (YYYY-MM) en America/Guatemala (UTC-6).
  */
 export function getGuatemalaMonthRange(monthInput = null) {
@@ -44,7 +163,7 @@ export function getGuatemalaMonthRange(monthInput = null) {
  * Obtiene métricas y KPIs en tiempo real de un evento utilizando agregaciones nativas de PostgreSQL en O(1)
  */
 export async function getEventKPIs(params, fallbackTenantId = null) {
-  let tenantId = null, eventId = null, date = null;
+  let tenantId = null, eventId = null, date = null, forClosing = false, now = null;
 
   if (typeof params === 'string') {
     eventId = params;
@@ -53,6 +172,8 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     tenantId = params.tenantId || fallbackTenantId || null;
     eventId = params.eventId || null;
     date = params.date || null;
+    forClosing = Boolean(params.forClosing);
+    now = params.now || null;
   }
 
   const isAlias = !eventId || ['current', 'activo', 'active', 'hoy'].includes(String(eventId).trim().toLowerCase());
@@ -103,11 +224,12 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
       : {}),
   };
 
+  let shiftWindow = null;
   if (date) {
-    const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
-    if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
-      saleWhere.createdAt = { gte: startOfDay, lte: endOfDay };
-      paymentWhere.createdAt = { gte: startOfDay, lte: endOfDay };
+    shiftWindow = await resolveStandShiftWindow({ tenantId, eventId, date, forClosing, now });
+    if (shiftWindow) {
+      saleWhere.createdAt = shiftWindow.createdAtFilter;
+      paymentWhere.createdAt = shiftWindow.createdAtFilter;
     }
   }
 
@@ -184,6 +306,15 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
     eventId,
     event: eventRecord || (eventId ? { id: eventId } : null),
     date,
+    shiftClosedToday: Boolean(shiftWindow?.isPostClosingRolloverWindow),
+    activeShiftDate: shiftWindow?.effectiveShiftDate || date || null,
+    todayClosing: shiftWindow?.dayClosing
+      ? {
+          id: shiftWindow.dayClosing.id,
+          closingType: shiftWindow.dayClosing.closingType,
+          closingDate: shiftWindow.dayClosing.closingDate,
+        }
+      : null,
     totalTransactions,
     totalAmount,
     totalRevenue: totalAmount,
@@ -202,7 +333,7 @@ export async function getEventKPIs(params, fallbackTenantId = null) {
 /**
  * Lista las ventas de un evento con paginación y filtros nativos
  */
-export async function getEventSalesList({ tenantId, eventId, date = null, month = null, page = 1, limit = 50 }) {
+export async function getEventSalesList({ tenantId, eventId, date = null, month = null, page = 1, limit = 50, now = null }) {
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
   const parsedLimit = Math.min(500, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
@@ -215,30 +346,29 @@ export async function getEventSalesList({ tenantId, eventId, date = null, month 
 
   let dayWindow = null;
   if (date) {
-    const { startOfDay, endOfDay } = getGuatemalaDayRange(date);
-    if (!Number.isNaN(startOfDay.getTime()) && !Number.isNaN(endOfDay.getTime())) {
-      dayWindow = { startOfDay, endOfDay };
+    dayWindow = await resolveStandShiftWindow({ tenantId, eventId, date, forClosing: false, now });
+    if (dayWindow) {
       if (isStand) {
         where.OR = [
-          // 1. Ventas propias del stand creadas en esa fecha
-          { eventId, createdAt: { gte: startOfDay, lte: endOfDay } },
+          // 1. Ventas propias del stand dentro de la jornada contable activa
+          { eventId, createdAt: dayWindow.createdAtFilter },
           // 2. Pedidos remotos asignados a este stand con saldo pendiente (sin importar fecha de creación)
           { pickupEventId: eventId, balanceDue: { gt: 0 } },
-          // 3. Pedidos remotos liquidados en este stand con pagos registrados en esa fecha
+          // 3. Pedidos remotos liquidados en este stand con pagos [SALDO] en la jornada contable activa
           {
             pickupEventId: eventId,
             balanceDue: { lte: 0 },
             payments: {
               some: {
                 reference: { contains: '[SALDO]' },
-                createdAt: { gte: startOfDay, lte: endOfDay },
+                createdAt: dayWindow.createdAtFilter,
               },
             },
           },
         ];
       } else {
         where.eventId = eventId;
-        where.createdAt = { gte: startOfDay, lte: endOfDay };
+        where.createdAt = dayWindow.createdAtFilter;
       }
     }
   } else if (month) {
@@ -311,12 +441,28 @@ export async function getEventSalesList({ tenantId, eventId, date = null, month 
     }
 
     sales = sales.map((s) => {
-      if (Number(s.balanceDue || 0) > 0 || s.eventId === eventId || s.pickupEventId !== eventId) return s;
+      if (Number(s.balanceDue || 0) > 0) return s;
+
+      const shiftMeta = dayWindow
+        ? {
+            effectiveShiftDate: dayWindow.effectiveShiftDate,
+            isEditableInOpenShift: Boolean(dayWindow.isOpenShift && s.eventId === eventId),
+            isPostClosingRollover: Boolean(
+              dayWindow.isPostClosingRolloverWindow ||
+              (s.createdAt && getGuatemalaDayRange(s.createdAt).targetDate < dayWindow.effectiveShiftDate)
+            ),
+          }
+        : {};
+
+      if (s.eventId === eventId || s.pickupEventId !== eventId) {
+        return dayWindow ? { ...s, ...shiftMeta } : s;
+      }
+
       const allSaldo = (s.payments || []).filter((p) => String(p.reference || '').includes('[SALDO]'));
       const daySaldo = dayWindow
         ? allSaldo.filter((p) => {
             const ms = p.createdAt ? new Date(p.createdAt).getTime() : NaN;
-            return !Number.isNaN(ms) && ms >= dayWindow.startOfDay.getTime() && ms <= dayWindow.endOfDay.getTime();
+            return !Number.isNaN(ms) && ms >= dayWindow.fromMs && ms <= dayWindow.toMs;
           })
         : allSaldo;
       const effectivePayments = daySaldo.length > 0 ? daySaldo : allSaldo;
@@ -327,6 +473,7 @@ export async function getEventSalesList({ tenantId, eventId, date = null, month 
       }, 0);
       return {
         ...s,
+        ...shiftMeta,
         standCollectedAmount,
         standCollectedAt: latestMs > 0 ? new Date(latestMs).toISOString() : (s.updatedAt || s.createdAt),
         standCollectedPayments: effectivePayments,

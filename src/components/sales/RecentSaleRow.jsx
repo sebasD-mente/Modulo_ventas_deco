@@ -8,6 +8,16 @@ function isSaleFromToday(dateStr) {
   return fmt(dateStr) === fmt(new Date());
 }
 
+function isSaleEditableInOpenShift(sale, standEventId = null) {
+  if (typeof sale?.isEditableInOpenShift === 'boolean') {
+    return sale.isEditableInOpenShift;
+  }
+  if (standEventId && sale?.eventId === standEventId) {
+    return true;
+  }
+  return isSaleFromToday(sale?.createdAt);
+}
+
 function formatSaleTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -103,6 +113,11 @@ export default function RecentSaleRow({ sale, standEventId = null, onEdit, onBal
           {isStandBalanceCollection && (
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1">
               ✅ Saldo cobrado
+            </span>
+          )}
+          {sale.isPostClosingRollover && (
+            <span className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 font-bold text-[10px] flex items-center gap-1" title="Registrada después del cierre de caja; se contabiliza en la jornada siguiente">
+              ↪ Jornada siguiente
             </span>
           )}
           {hasBalance && sale.paymentStatus !== 'PENDIENTE_PAGO' && (
@@ -213,7 +228,7 @@ export default function RecentSaleRow({ sale, standEventId = null, onEdit, onBal
           <span className="min-h-[44px] px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center select-none" title="Saldo liquidado en mostrador">
             Liquidada
           </span>
-        ) : isSaleFromToday(sale.createdAt) ? (
+        ) : isSaleEditableInOpenShift(sale, standEventId) ? (
           <button
             type="button"
             onClick={() => onEdit(sale)}
@@ -224,7 +239,7 @@ export default function RecentSaleRow({ sale, standEventId = null, onEdit, onBal
             <span>Editar</span>
           </button>
         ) : (
-          <span className="min-h-[44px] px-2.5 py-1 rounded-xl bg-neutral-900 text-neutral-500 border border-neutral-800 text-[11px] font-semibold flex items-center select-none" title="Las ventas de días anteriores están archivadas y son inmutables">
+          <span className="min-h-[44px] px-2.5 py-1 rounded-xl bg-neutral-900 text-neutral-500 border border-neutral-800 text-[11px] font-semibold flex items-center select-none" title="Las ventas de jornadas cerradas están archivadas y son inmutables">
             Cerrada
           </span>
         )}

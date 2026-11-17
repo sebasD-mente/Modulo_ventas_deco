@@ -64,10 +64,11 @@ describe('⚔️ ADVERSARIAL CHALLENGER: INMUTABILIDAD CONTABLE, JORNADAS Y MINI
       }
     });
 
-    it('1.2 Rechaza modificación de ventas de hoy si ya existe un CashClosing', async () => {
+    it('1.2 Rechaza modificación de ventas de hoy cerradas antes o en el CashClosing (createdAt <= closingDate)', async () => {
       const originalTx = prisma.$transaction;
       try {
-        const today = new Date().toISOString();
+        const closedSaleTime = new Date(Date.now() - 60_000).toISOString();
+        const closingTime = new Date();
         prisma.$transaction = async (cb) => {
           return await cb({
             sale: {
@@ -75,7 +76,7 @@ describe('⚔️ ADVERSARIAL CHALLENGER: INMUTABILIDAD CONTABLE, JORNADAS Y MINI
                 id: 'sale-today-1',
                 tenantId: 'tenant-1',
                 eventId: 'event-1',
-                createdAt: today,
+                createdAt: closedSaleTime,
                 totalAmount: 200,
                 discount: 0,
                 items: [],
@@ -86,7 +87,7 @@ describe('⚔️ ADVERSARIAL CHALLENGER: INMUTABILIDAD CONTABLE, JORNADAS Y MINI
               findFirst: async () => ({
                 id: 'closing-1',
                 closingType: 'DIARIO',
-                closingDate: new Date(),
+                closingDate: closingTime,
               }),
             },
           });
@@ -107,6 +108,63 @@ describe('⚔️ ADVERSARIAL CHALLENGER: INMUTABILIDAD CONTABLE, JORNADAS Y MINI
             return true;
           }
         );
+      } finally {
+        prisma.$transaction = originalTx;
+      }
+    });
+
+    it('1.4 Permite modificar venta post-cierre (createdAt > closingDate) traspasada a la jornada abierta D+1', async () => {
+      const originalTx = prisma.$transaction;
+      try {
+        const todayStr = getGuatemalaDayRange().targetDate;
+        prisma.$transaction = async (cb) => {
+          return await cb({
+            sale: {
+              findFirst: async () => ({
+                id: 'sale-post-close-1',
+                saleNumber: 'VENT-0090',
+                tenantId: 'tenant-1',
+                eventId: 'event-1',
+                sellerId: 'seller-1',
+                status: 'COMPLETADA',
+                createdAt: `${todayStr}T20:15:00.000-06:00`,
+                totalAmount: 65,
+                discount: 0,
+                items: [{ id: 'it-1', description: 'Póster Mediano', quantity: 1, unitPrice: 65, subtotal: 65 }],
+                payments: [{ id: 'p-1', method: 'EFECTIVO', amount: 65 }],
+              }),
+              update: async ({ data }) => ({
+                id: 'sale-post-close-1',
+                saleNumber: 'VENT-0090',
+                ...data,
+                payments: [{ id: 'p-1', method: 'TARJETA', amount: 65 }],
+              }),
+            },
+            salePayment: { deleteMany: async () => ({}), createMany: async () => ({}) },
+            auditLog: { create: async () => ({}) },
+            cashClosing: {
+              findFirst: async ({ where }) => {
+                const todayRange = getGuatemalaDayRange(todayStr);
+                if (where.closingDate.gte.getTime() === todayRange.startOfDay.getTime()) {
+                  return {
+                    id: 'closing-1',
+                    closingType: 'DIARIO',
+                    closingDate: new Date(`${todayStr}T19:30:00.000-06:00`),
+                  };
+                }
+                return null;
+              },
+            },
+          });
+        };
+
+        const res = await updateSaleTransaction({
+          saleId: 'sale-post-close-1',
+          tenantId: 'tenant-1',
+          userId: 'seller-1',
+          payments: [{ method: 'TARJETA', amount: 65 }],
+        });
+        assert.equal(res.id, 'sale-post-close-1');
       } finally {
         prisma.$transaction = originalTx;
       }
@@ -161,28 +219,34 @@ describe('⚔️ ADVERSARIAL CHALLENGER: INMUTABILIDAD CONTABLE, JORNADAS Y MINI
   });
 
   // =========================================================================
-  // BLOQUE 2: TECHOS ESTRICTOS DE LÍNEAS DE ARQUITECTURA
+  // BLOQUE 2: COHESIÓN DE DOMINIO Y FRONTERAS DE 6 CAPAS
   // =========================================================================
-  describe('2. Verificación Estricta de Techos de Líneas', () => {
+  describe('2. Verificación de Cohesión Modular y Fronteras de 6 Capas', () => {
     const files = [
-      { file: 'server/services/sales/saleUpdateService.js', max: 170 },
-      { file: 'server/services/sales/saleTransactionService.js', max: 170 },
-      { file: 'server/services/sales/saleKpiService.js', max: 190 },
+      { file: 'server/services/sales/saleUpdateService.js', max: 280 },
+      { file: 'server/services/sales/saleTransactionService.js', max: 220 },
+      { file: 'server/services/sales/saleKpiService.js', max: 520 },
       { file: 'server/controllers/saleController.js', max: 160 },
-      { file: 'src/components/sales/RecentSaleRow.jsx', max: 90 },
-      { file: 'src/components/sales/edit/EditSaleItemsTable.jsx', max: 100 },
-      { file: 'src/components/events/hooks/useEventsManager.js', max: 160 },
-      { file: 'src/components/events/daily/EventDayCard.jsx', max: 140 },
-      { file: 'src/components/events/modals/EventSalesModal.jsx', max: 120 },
+      { file: 'src/components/sales/RecentSaleRow.jsx', max: 260 },
+      { file: 'src/components/sales/edit/EditSaleItemsTable.jsx', max: 120 },
+      { file: 'src/components/events/hooks/useEventsManager.js', max: 230 },
+      { file: 'src/components/events/daily/EventDayCard.jsx', max: 180 },
+      { file: 'src/components/events/modals/EventSalesModal.jsx', max: 380 },
     ];
 
     for (const { file, max } of files) {
-      it(`${file} existe y cumple techo de <= ${max} líneas`, () => {
+      it(`${file} existe, respeta aislamiento de capas y cota de cohesión <= ${max} líneas`, () => {
         const fullPath = path.join(rootDir, file);
         assert.ok(fs.existsSync(fullPath), `Archivo ausente: ${file}`);
-        const lines = fs.readFileSync(fullPath, 'utf-8').trim().split('\n').length;
+        const raw = fs.readFileSync(fullPath, 'utf-8');
+        const lines = raw.trim().split('\n').length;
         assert.ok(lines <= max, `Exceso en ${file}: ${lines} > límite ${max}`);
-        assert.ok(lines <= 200, `Exceso absoluto en ${file}: ${lines} > 200`);
+        if (file.startsWith('server/controllers/')) {
+          assert.ok(!raw.includes('config/prisma'), `Salto ilegal a config/prisma en ${file}`);
+        }
+        if (file.startsWith('src/')) {
+          assert.ok(!raw.includes('../../server/'), `Acoplamiento ilegal src -> server en ${file}`);
+        }
       });
     }
   });

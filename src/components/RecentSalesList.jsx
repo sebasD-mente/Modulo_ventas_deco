@@ -22,12 +22,14 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
   const [sharingSale, setSharingSale] = useState(null);
   const [successToast, setSuccessToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const lastShiftDayRef = useRef(null);
 
   const fetchSales = async () => {
     if (!eventId) return;
     setIsLoading(true);
     try {
       const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date());
+      lastShiftDayRef.current = todayStr;
       const res = await authFetch(`/api/sales/events/${eventId}?date=${todayStr}`);
       const json = await res.json();
       if (json.success) setSales(json.data || []);
@@ -45,6 +47,33 @@ export default function RecentSalesList({ eventId, refreshTrigger, onSaleUpdated
   useEffect(() => {
     fetchSales();
   }, [eventId, refreshTrigger]);
+
+  // Vigilante ligero de corte automático 11:59 PM CST y cambio de día en Guatemala
+  useEffect(() => {
+    if (!eventId) return undefined;
+    const tick = setInterval(() => {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(now);
+      const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+      const dateStr = `${map.year}-${map.month}-${map.day}`;
+      const hour = Number(map.hour === '24' ? 0 : map.hour);
+      const minute = Number(map.minute);
+      const isCutoffWindow = (hour === 23 && minute === 59) || (hour === 0 && minute === 0);
+      if ((lastShiftDayRef.current && lastShiftDayRef.current !== dateStr) || isCutoffWindow) {
+        if (onSaleUpdated) onSaleUpdated();
+        else fetchSales();
+      }
+    }, 30000);
+    return () => clearInterval(tick);
+  }, [eventId, onSaleUpdated]);
 
   useEffect(() => {
     return () => {

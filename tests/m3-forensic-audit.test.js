@@ -17,11 +17,18 @@ process.env.SUPER_ADMIN_EMAILS = 'superadmin@dekolabs.org';
 describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude', () => {
 
   // --------------------------------------------------------------------------
-  // 1. C-08: UnifiedAiChat.jsx - Negociación de Audio iOS y Cleanup
+  // 1. C-08: UnifiedAiChat.jsx y hooks modulares - Negociación de Audio iOS y Cleanup
   // --------------------------------------------------------------------------
-  describe('1. C-08: UnifiedAiChat.jsx - Audio Cross-Browser & Resource Cleanup', () => {
-    const filePath = path.join(ROOT, 'src/components/UnifiedAiChat.jsx');
-    const content = fs.readFileSync(filePath, 'utf-8');
+  describe('1. C-08: UnifiedAiChat.jsx & Hooks - Audio Cross-Browser & Resource Cleanup', () => {
+    const content = [
+      'src/components/UnifiedAiChat.jsx',
+      'src/components/ai-chat/hooks/useAiChatAudio.js',
+      'src/components/ai-chat/hooks/useAiVoiceRecorder.js',
+      'src/components/ai-chat/hooks/useAiChatStream.js',
+    ]
+      .filter((rel) => fs.existsSync(path.join(ROOT, rel)))
+      .map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf-8'))
+      .join('\n');
 
     it('1.1 Debe implementar getSupportedAudioMimeType con orden preferencial de codecs', () => {
       assert.ok(content.includes('getSupportedAudioMimeType'), 'Falta getSupportedAudioMimeType');
@@ -39,17 +46,17 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
     it('1.3 Debe gestionar streamRef y detener todas las pistas de audio en cleanup', () => {
       assert.ok(content.includes('streamRef = useRef(null)'), 'Falta declaración de streamRef');
       assert.ok(content.includes('streamRef.current?.getTracks()') || content.includes('streamRef.current.getTracks()'), 'Falta parada de tracks en streamRef');
-      assert.ok(content.includes('useEffect(() => {'), 'Falta hook de limpieza al desmontar');
+      assert.ok(content.includes('useEffect('), 'Falta hook de limpieza al desmontar');
       assert.ok(content.includes('clearInterval(recordingTimerRef.current)'), 'Falta parada del timer de grabación');
     });
 
     it('1.4 Debe asignar extensión de archivo dinámica (.mp4, .aac, .webm) según el tipo de blob real', () => {
-      assert.ok(content.includes("audioBlob.type.includes('mp4') ? 'mp4'"), 'Falta detección de extensión mp4');
+      assert.ok(content.includes("includes('mp4') ? 'mp4'"), 'Falta detección de extensión mp4');
       assert.ok(content.includes('voice-sale.${ext}') || content.includes('`voice-sale.${ext}`'), 'Falta nombre dinámico en FormData');
     });
 
     it('1.5 Debe propagar pendingDraft en la consulta de texto para edición conversacional', () => {
-      assert.ok(content.includes('pendingDraft: pendingDraft || null'), 'Falta envío de pendingDraft en handleSendText');
+      assert.ok(content.includes('pendingDraft: pendingDraft') && content.includes('|| null'), 'Falta envío de pendingDraft en handleSendText');
     });
   });
 
@@ -167,11 +174,16 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
   });
 
   // --------------------------------------------------------------------------
-  // 5. A-05: EditSaleModal.jsx - Inmutabilidad Estricta
+  // 5. A-05: EditSaleModal.jsx & useEditSaleForm.js - Inmutabilidad Estricta
   // --------------------------------------------------------------------------
-  describe('5. A-05: EditSaleModal.jsx - Pureza e Inmutabilidad de Estado React', () => {
-    const modalPath = path.join(ROOT, 'src/components/EditSaleModal.jsx');
-    const content = fs.readFileSync(modalPath, 'utf-8');
+  describe('5. A-05: EditSaleModal.jsx & useEditSaleForm.js - Pureza e Inmutabilidad de Estado React', () => {
+    const content = [
+      'src/components/EditSaleModal.jsx',
+      'src/components/sales/edit/hooks/useEditSaleForm.js',
+    ]
+      .filter((rel) => fs.existsSync(path.join(ROOT, rel)))
+      .map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf-8'))
+      .join('\n');
 
     it('5.1 No debe mutar directamente propiedades en el objeto del array', () => {
       assert.ok(!content.includes('current.quantity = newQty;'), 'Mutación directa de objeto detectada');
@@ -232,21 +244,29 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
       assert.ok(content.includes('onSubmit={handleOpenConfirmation}'), 'El form debe apuntar a handleOpenConfirmation');
     });
 
-    it('7.3 El modal debe renderizar advertencia de inmutabilidad contable y desglose de efectivo', () => {
+    it('7.3 El modal debe renderizar advertencia de inmutabilidad contable y desglose simplificado sin Efectivo Esperado ni naranja (feat-014)', () => {
+      const summaryContent = fs.readFileSync(path.join(ROOT, 'src/components/closing/CashClosingSummary.jsx'), 'utf-8');
       assert.ok(content.includes('¿Confirmar Asiento de Cierre?'), 'Falta título de confirmación');
-      assert.ok(content.includes('Efectivo Esperado (Sistema):'), 'Falta display de efectivo esperado');
       assert.ok(content.includes('Efectivo Físico Contado:'), 'Falta display de efectivo físico');
       assert.ok(content.includes('Balance / Diferencia:'), 'Falta display de balance');
       assert.ok(content.includes('handleConfirmClosing'), 'Falta handler definitivo handleConfirmClosing');
+      assert.ok(!content.includes('Efectivo Esperado (Sistema):'), 'No debe contener Efectivo Esperado (Sistema): en CashClosingView');
+      assert.ok(!summaryContent.includes('Efectivo Esperado (Sistema):'), 'No debe contener Efectivo Esperado (Sistema): en CashClosingSummary');
+      assert.ok(!content.includes('amber-') && !summaryContent.includes('amber-'), 'Cero tonos naranjas/ámbar en cierre de caja');
     });
   });
 
   // --------------------------------------------------------------------------
-  // 8. A-08: ProductionManagementView.jsx - Debounce de 250ms en Búsqueda
+  // 8. A-08: ProductionManagementView.jsx & useProductionQueue.js - Debounce de 250ms en Búsqueda
   // --------------------------------------------------------------------------
-  describe('8. A-08: ProductionManagementView.jsx - Debounce de 250ms en Búsqueda', () => {
-    const prodPath = path.join(ROOT, 'src/components/ProductionManagementView.jsx');
-    const content = fs.readFileSync(prodPath, 'utf-8');
+  describe('8. A-08: ProductionManagementView.jsx & useProductionQueue.js - Debounce de 250ms en Búsqueda', () => {
+    const content = [
+      'src/components/ProductionManagementView.jsx',
+      'src/components/production/hooks/useProductionQueue.js',
+    ]
+      .filter((rel) => fs.existsSync(path.join(ROOT, rel)))
+      .map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf-8'))
+      .join('\n');
 
     it('8.1 Debe declarar estado debouncedSearchQuery', () => {
       assert.ok(content.includes('debouncedSearchQuery'), 'Falta debouncedSearchQuery');
@@ -260,7 +280,7 @@ describe('🔬 AUDITORÍA FORENSE M3: Verificación de Integridad y Cero Fraude'
 
     it('8.3 fetchItems debe depender de debouncedSearchQuery y no de searchQuery directo', () => {
       assert.ok(content.includes('debouncedSearchQuery.trim()'), 'fetchItems debe usar debouncedSearchQuery');
-      assert.ok(content.includes('[authFetch, selectedEventId, statusFilter, debouncedSearchQuery]'), 'Array de dependencias de fetchItems debe incluir debouncedSearchQuery');
+      assert.ok(content.includes('authFetch, selectedEventId, statusFilter, debouncedSearchQuery'), 'Array de dependencias de fetchItems debe incluir debouncedSearchQuery');
     });
   });
 

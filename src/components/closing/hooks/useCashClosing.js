@@ -12,8 +12,7 @@ export const INITIAL_COUNTS = { 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 1: 0,
 
 export function calculateDenominationsTotal(counts = {}) {
   const safe = counts || {};
-  const sum = DENOMINATIONS.reduce((acc, d) => acc + (Number(safe[d.value]) || 0) * d.value, 0);
-  return Number(sum.toFixed(2));
+  return Number(DENOMINATIONS.reduce((acc, d) => acc + (Number(safe[d.value]) || 0) * d.value, 0).toFixed(2));
 }
 
 export function calculateDifference(numReported, calculatedCash) {
@@ -29,13 +28,11 @@ export function getDiscrepancyStatus(diff) {
 export function formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations }) {
   const todayStr = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const diffText = difference === 0 ? 'Q 0.00 (Cuadrado Exacto ✅)' : difference > 0 ? `+Q ${difference.toFixed(2)} (Sobrante 🟢)` : `-Q ${Math.abs(difference).toFixed(2)} (Faltante 🔴)`;
-
   let sellerSection = '';
   if (Array.isArray(liveMetrics?.sellerBreakdown) && liveMetrics.sellerBreakdown.length > 0) {
     const lines = liveMetrics.sellerBreakdown.map((s) => `• ${s.sellerName} (${s.transactions} tx): Ef Q ${(s.cashCollected || 0).toFixed(2)} | Tot Q ${(s.totalSold || 0).toFixed(2)}`).join('\n');
     sellerSection = `\n\n👥 *COBRO POR VENDEDOR:*\n${lines}`;
   }
-
   return `🎪 *CIERRE DE CAJA — ${activeEvent?.tenant?.name || 'DECO VINTAGE'}*
 📅 *Fecha:* ${todayStr}
 📍 *Evento:* ${activeEvent?.name || 'Evento'} (${activeEvent?.location || 'Stand'})
@@ -83,30 +80,22 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
   const discrepancy = useMemo(() => getDiscrepancyStatus(difference), [difference]);
 
   const updateCount = (val, deltaOrExact) => {
-    setCounts(prev => ({ ...prev, [val]: Math.max(0, typeof deltaOrExact === 'function' ? deltaOrExact(prev[val] || 0) : (Number(deltaOrExact) || 0)) }));
+    setCounts((prev) => ({ ...prev, [val]: Math.max(0, typeof deltaOrExact === 'function' ? deltaOrExact(prev[val] || 0) : (Number(deltaOrExact) || 0)) }));
   };
-
   const resetCounts = () => { setCounts(INITIAL_COUNTS); setManualCash(''); setOpeningCashFloat(''); setPettyCashExpenses(''); setCashDrops(''); };
-
   const copyToClipboard = () => {
-    const text = formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations });
-    navigator?.clipboard?.writeText?.(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    navigator?.clipboard?.writeText?.(formatWhatsAppSummary({ activeEvent, liveMetrics, calculatedCash, cardAmount, transferAmount, totalGross, numReported, difference, observations }));
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
   };
 
   const submitClosing = async () => {
     setIsSubmitting(true); setErrorMsg(null); setSuccessMsg(null);
     try {
       const res = await fetchFn('/api/closings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: activeEvent?.id || eventId,
-          closingType: 'DIARIO',
-          totalCashReported: numReported,
-          openingCashFloat: floatAmt, pettyCashExpenses: expensesAmt, cashDrops: dropsAmt,
-          observations: observations || null,
+          eventId: activeEvent?.id || eventId, closingType: 'DIARIO', totalCashReported: numReported,
+          openingCashFloat: floatAmt, pettyCashExpenses: expensesAmt, cashDrops: dropsAmt, observations: observations || null,
         }),
       });
       const data = await res.json();
@@ -114,10 +103,7 @@ export function useCashClosing({ liveMetrics, activeEvent, eventId, onClosingCom
       setSuccessMsg('¡Cierre de caja asentado y conciliado con éxito en PostgreSQL!');
       if (onClosingCompleted) onClosingCompleted();
       return true;
-    } catch (err) {
-      setErrorMsg(err.message);
-      return false;
-    } finally { setIsSubmitting(false); }
+    } catch (err) { setErrorMsg(err.message); return false; } finally { setIsSubmitting(false); }
   };
 
   return {

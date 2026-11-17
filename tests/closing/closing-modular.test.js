@@ -100,14 +100,20 @@ describe('🛡️ SUITE MODULAR DE ARQUEO DE CAJA: CashClosingView & Submódulos
       assert.match(content, /onClick=\{handleConfirmClosing\}/);
     });
 
-    it('3.3. Retiene las cadenas exactas auditadas por m3-forensic-audit', () => {
+    it('3.3. Retiene las cadenas exactas del cierre simplificado sin denominaciones, sin Efectivo Esperado y sin color naranja (feat-014)', () => {
+      const summaryContent = fs.readFileSync(path.join(rootDir, 'src/components/closing/CashClosingSummary.jsx'), 'utf-8');
       assert.ok(content.includes('showConfirmModal'), 'Debe incluir showConfirmModal');
       assert.ok(content.includes('handleOpenConfirmation'), 'Debe incluir handleOpenConfirmation');
       assert.ok(content.includes('¿Confirmar Asiento de Cierre?'), 'Debe incluir título de confirmación');
-      assert.ok(content.includes('Efectivo Esperado (Sistema):'), 'Debe incluir display efectivo esperado');
+      assert.ok(content.includes('Efectivo Físico Directo (Q)'), 'Debe mostrar siempre Efectivo Físico Directo (Q)');
       assert.ok(content.includes('Efectivo Físico Contado:'), 'Debe incluir display efectivo contado');
       assert.ok(content.includes('Balance / Diferencia:'), 'Debe incluir display balance');
       assert.ok(content.includes('handleConfirmClosing'), 'Debe incluir handleConfirmClosing');
+      assert.ok(!content.includes('CashDenominationGrid'), 'No debe montar ni importar CashDenominationGrid en CashClosingView');
+      assert.ok(!content.includes('Efectivo Esperado (Sistema):'), 'No debe mostrar Efectivo Esperado (Sistema): en CashClosingView');
+      assert.ok(!summaryContent.includes('Efectivo Esperado (Sistema):'), 'No debe mostrar Efectivo Esperado (Sistema): en CashClosingSummary');
+      assert.ok(!content.includes('amber-'), 'Cero clases naranjas/ámbar en CashClosingView');
+      assert.ok(!summaryContent.includes('amber-'), 'Cero clases naranjas/ámbar en CashClosingSummary');
     });
   });
 

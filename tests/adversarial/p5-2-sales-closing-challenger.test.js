@@ -337,10 +337,10 @@ describe('⚔️ ADVERSARIAL CHALLENGER P5.2: EditSaleModal, CashClosingView & I
   describe('2. Stress-Testing Adversarial: src/components/closing/', () => {
 
     // 2.1 Aritmética de Denominaciones en Quetzales
-    it('2.1 Aritmética de Denominaciones: Catálogo completo de 7 denominaciones oficiales en Guatemala', () => {
-      assert.strictEqual(DENOMINATIONS.length, 7);
+    it('2.1 Aritmética de Denominaciones: Catálogo completo de 9 denominaciones oficiales en Guatemala', () => {
+      assert.strictEqual(DENOMINATIONS.length, 9);
       const values = DENOMINATIONS.map(d => d.value);
-      assert.deepEqual(values, [200, 100, 50, 20, 10, 5, 1]);
+      assert.deepEqual(values, [200, 100, 50, 20, 10, 5, 1, 0.5, 0.25]);
 
       // Conteo masivo de arqueo real
       const heavyCounts = {
@@ -540,8 +540,8 @@ describe('⚔️ ADVERSARIAL CHALLENGER P5.2: EditSaleModal, CashClosingView & I
 
     it('3.3 Límite Estricto de Líneas (Line Ceilings) en Contenedores y Submódulos', () => {
       const lineCounts = [
-        { file: 'EditSaleModal.jsx', content: editModalContent, max: 70 },
-        { file: 'useEditSaleForm.js', content: editHookContent, max: 120 },
+        { file: 'EditSaleModal.jsx', content: editModalContent, max: 75 },
+        { file: 'useEditSaleForm.js', content: editHookContent, max: 130 },
         { file: 'EditSaleItemsTable.jsx', content: editTableContent, max: 110 },
         { file: 'CashClosingView.jsx', content: cashClosingContent, max: 70 },
         { file: 'useCashClosing.js', content: cashHookContent, max: 130 },

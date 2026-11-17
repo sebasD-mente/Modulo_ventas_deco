@@ -20,8 +20,46 @@ export async function createCashClosingTransaction({
   idempotencyKey = null,
 }) {
   const { targetDate, startOfDay, endOfDay } = getGuatemalaDayRange(date);
+  const isDailyClosing = closingType === 'DIARIO' || closingType === 'AUTOMATICO_MEDIANOCHE';
 
-  const kpis = await getEventKPIs({ tenantId, eventId, date: date ? targetDate : null });
+  if (isDailyClosing && typeof prisma.cashClosing?.findFirst === 'function') {
+    let existingClosing = null;
+    try {
+      existingClosing = await prisma.cashClosing.findFirst({
+        where: {
+          tenantId,
+          eventId,
+          closingDate: { gte: startOfDay, lte: endOfDay },
+        },
+        include: {
+          closedBy: { select: { fullName: true, email: true } },
+          event: { select: { name: true } },
+        },
+      });
+    } catch (_) {
+      existingClosing = null;
+    }
+
+    if (existingClosing) {
+      if (
+        idempotencyKey &&
+        (existingClosing.idempotencyKey === idempotencyKey || existingClosing.observations?.includes(idempotencyKey))
+      ) {
+        return { ...existingClosing, idempotentReplay: true };
+      }
+
+      const err = new Error(`Ya existe un cierre de caja registrado para esta jornada (${targetDate}).`);
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
+  const kpis = await getEventKPIs({
+    tenantId,
+    eventId,
+    date: isDailyClosing ? targetDate : (date ? targetDate : null),
+    forClosing: isDailyClosing,
+  });
 
   const salesCash = Number(kpis.paymentBreakdown?.EFECTIVO?.amount || 0);
   const floatAmt = Math.max(0, Number(openingCashFloat || 0));
@@ -40,60 +78,10 @@ export async function createCashClosingTransaction({
     ? [observations, `[${extraNotes.join(' | ')}]`].filter(Boolean).join(' ')
     : observations;
 
-  if (closingType === 'DIARIO' && typeof prisma.cashClosing?.findFirst === 'function') {
-    const existingDaily = await prisma.cashClosing.findFirst({
-      where: {
-        tenantId,
-        eventId,
-        closingType: 'DIARIO',
-        closingDate: { gte: startOfDay, lte: endOfDay },
-      },
-      include: {
-        closedBy: { select: { fullName: true, email: true } },
-        event: { select: { name: true } },
-      },
-    });
-
-    if (existingDaily) {
-      if (
-        (idempotencyKey && existingDaily.observations?.includes(idempotencyKey)) ||
-        (Math.abs(Number(existingDaily.totalCashReported) - Number(totalCashReported)) < 0.01 &&
-          Number(existingDaily.totalSalesCount || 0) === Number(kpis.totalTransactions || 0))
-      ) {
-        return { ...existingDaily, idempotentReplay: true };
-      }
-
-      if (typeof prisma.cashClosing?.update === 'function') {
-        return await prisma.cashClosing.update({
-          where: { id: existingDaily.id },
-          data: {
-            closedById,
-            totalCashCalculated,
-            totalCashReported,
-            cashDifference,
-            totalCard,
-            totalTransfer,
-            totalSalesCount: kpis.totalTransactions,
-            grossTotal: kpis.totalAmount,
-            observations: finalObservations,
-            status,
-          },
-          include: {
-            closedBy: { select: { fullName: true, email: true } },
-            event: { select: { name: true } },
-          },
-        });
-      }
-
-      const err = new Error(`Ya existe un cierre de caja diario registrado para esta jornada (${targetDate}).`);
-      err.statusCode = 409;
-      throw err;
-    }
-  }
-
+  const todayStr = getGuatemalaDayRange().targetDate;
   const closingDateValue = date instanceof Date
     ? date
-    : date
+    : date && targetDate !== todayStr
       ? endOfDay
       : new Date();
 
@@ -104,6 +92,9 @@ export async function createCashClosingTransaction({
       closedById,
       closingType,
       closingDate: closingDateValue,
+      openingCashFloat: floatAmt,
+      pettyCashExpenses: expensesAmt,
+      cashDrops: dropsAmt,
       totalCashCalculated,
       totalCashReported,
       cashDifference,
@@ -113,6 +104,7 @@ export async function createCashClosingTransaction({
       grossTotal: kpis.totalAmount,
       observations: finalObservations,
       status,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     },
     include: {
       closedBy: { select: { fullName: true, email: true } },
