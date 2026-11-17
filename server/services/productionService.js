@@ -1,7 +1,52 @@
 import { prisma } from '../config/prisma.js';
 
+const SINGLE_VALID_STATUSES = ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'];
+const ARCHIVE_OP1_STATUSES = ['SEPARADO', 'A_PRODUCCION', 'IMPRESO'];
+const ACTIVE_COMBINED_STATUSES = ['PENDIENTE', 'A_PRODUCCION'];
+
 /**
- * Servicio para consultar obras de producción con paginación y filtros nativos
+ * Resuelve el filtro de estados de producción según el rol del usuario y la bandeja solicitada.
+ */
+function resolveProductionStatusFilter({ status, isSuperAdmin, hasOp1Role, hasOp2Role, isVendedorRedesOnly }) {
+  const isOp1Only = Boolean(hasOp1Role && !hasOp2Role && !isSuperAdmin);
+  const isOp2Only = Boolean(hasOp2Role && !hasOp1Role && !isSuperAdmin);
+
+  if (isOp2Only) {
+    if (status === 'IMPRESO' || status === 'ARCHIVO_OP2' || status === 'RESUELTOS') {
+      return { productionStatus: 'IMPRESO' };
+    }
+    // Operario 2 solo ve por defecto en su cola activa lo que requiere impresión
+    return { productionStatus: 'A_PRODUCCION' };
+  }
+
+  if (isOp1Only && !status) {
+    // Operario 1 ve por defecto únicamente su cola activa pendiente
+    return { productionStatus: 'PENDIENTE' };
+  }
+
+  if (status === 'ARCHIVO_OP1' || status === 'RESUELTOS') {
+    return { productionStatus: { in: ARCHIVE_OP1_STATUSES } };
+  }
+  if (status === 'ARCHIVO_OP2') {
+    return { productionStatus: 'IMPRESO' };
+  }
+  if (status === 'COLA_ACTIVA') {
+    return { productionStatus: { in: ACTIVE_COMBINED_STATUSES } };
+  }
+  if (status && status !== 'ALL' && SINGLE_VALID_STATUSES.includes(status)) {
+    return { productionStatus: status };
+  }
+
+  if (!status && !isVendedorRedesOnly && (isSuperAdmin || (hasOp1Role && hasOp2Role))) {
+    return { productionStatus: { in: ACTIVE_COMBINED_STATUSES } };
+  }
+
+  return {};
+}
+
+/**
+ * Servicio para consultar obras de producción con paginación escalable (>300+ diseños),
+ * exclusión estricta de ventas anuladas y trazabilidad de auditoría (productionLogs).
  */
 export async function getProductionItems({
   tenantId,
@@ -9,28 +54,30 @@ export async function getProductionItems({
   status,
   search,
   page = 1,
-  limit = 50,
+  limit = 500,
   userRoles = [],
   userId,
   source = 'ALL',
 }) {
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
-  const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
-  const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
+  const hasOp1Role = userRoles.includes('OPERARIO_1');
+  const hasOp2Role = userRoles.includes('OPERARIO_2');
+  const isOperario1 = hasOp1Role || isSuperAdmin;
+  const isOperario2 = hasOp2Role || isSuperAdmin;
   const isVendedorRedes = userRoles.includes('VENDEDOR_REDES');
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);
 
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
-  const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+  const parsedLimit = Math.min(1000, Math.max(1, parseInt(limit, 10) || 500));
   const skip = (parsedPage - 1) * parsedLimit;
 
-  let statusFilter = {};
-  if (isOperario2 && !isOperario1 && !isSuperAdmin) {
-    // Operario 2 solo ve en su cola lo que requiere impresión
-    statusFilter = { productionStatus: 'A_PRODUCCION' };
-  } else if (status && status !== 'ALL' && ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'].includes(status)) {
-    statusFilter = { productionStatus: status };
-  }
+  const statusFilter = resolveProductionStatusFilter({
+    status,
+    isSuperAdmin,
+    hasOp1Role,
+    hasOp2Role,
+    isVendedorRedesOnly,
+  });
 
   let sourceCondition = {};
   if (isVendedorRedesOnly || source === 'PEDIDOS') {
@@ -54,6 +101,7 @@ export async function getProductionItems({
   const whereClause = {
     sale: {
       tenantId,
+      status: { not: 'ANULADA' },
       ...(eventId ? { eventId } : {}),
       ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
       ...sourceCondition,
@@ -64,9 +112,15 @@ export async function getProductionItems({
   if (search) {
     whereClause.OR = [
       { description: { contains: search, mode: 'insensitive' } },
+      { customDimensions: { contains: search, mode: 'insensitive' } },
       { sale: { saleNumber: { contains: search, mode: 'insensitive' } } },
     ];
   }
+
+  const isArchiveQuery = ['SEPARADO', 'IMPRESO', 'ARCHIVO_OP1', 'ARCHIVO_OP2', 'RESUELTOS'].includes(status);
+  const orderByClause = isArchiveQuery
+    ? [{ statusChangedAt: 'desc' }, { createdAt: 'desc' }]
+    : { createdAt: 'desc' };
 
   const [total, items] = await Promise.all([
     prisma.saleItem.count({ where: whereClause }),
@@ -75,6 +129,12 @@ export async function getProductionItems({
       include: {
         product: {
           select: { id: true, name: true, sku: true, imageUrl: true, category: true },
+        },
+        productionLogs: {
+          include: {
+            user: { select: { id: true, fullName: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
         },
         sale: {
           select: {
@@ -94,7 +154,7 @@ export async function getProductionItems({
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: orderByClause,
       skip,
       take: parsedLimit,
     }),
@@ -105,14 +165,14 @@ export async function getProductionItems({
     total,
     page: parsedPage,
     limit: parsedLimit,
-    totalPages: Math.ceil(total / parsedLimit),
+    totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
     hasNext: parsedPage * parsedLimit < total,
     hasPrev: parsedPage > 1,
   };
 }
 
 /**
- * Actualiza el estado de producción de un ítem con validaciones de rol y log de auditoría
+ * Actualiza el estado de producción de un ítem con candado de inmutabilidad por etapa y log de auditoría
  */
 export async function updateItemProductionStatus({
   id,
@@ -125,11 +185,12 @@ export async function updateItemProductionStatus({
 }) {
   const targetId = id || itemId;
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
-  const isOperario1 = userRoles.includes('OPERARIO_1') || isSuperAdmin;
-  const isOperario2 = userRoles.includes('OPERARIO_2') || isSuperAdmin;
+  const hasOp1Role = userRoles.includes('OPERARIO_1');
+  const hasOp2Role = userRoles.includes('OPERARIO_2');
+  const isOperario1 = hasOp1Role || isSuperAdmin;
+  const isOperario2 = hasOp2Role || isSuperAdmin;
 
-  const validStatuses = ['PENDIENTE', 'SEPARADO', 'A_PRODUCCION', 'IMPRESO'];
-  if (!validStatuses.includes(status)) {
+  if (!SINGLE_VALID_STATUSES.includes(status)) {
     const error = new Error('Estado de producción no válido.');
     error.statusCode = 400;
     throw error;
@@ -158,9 +219,20 @@ export async function updateItemProductionStatus({
       throw error;
     }
 
+    if (item.sale?.status === 'ANULADA') {
+      const error = new Error('No se puede procesar producción de una venta anulada.');
+      error.statusCode = 403;
+      throw error;
+    }
+
     if (status === 'IMPRESO') {
       if (!isOperario2) {
         const error = new Error('No tienes permiso de taller para marcar obras como IMPRESO.');
+        error.statusCode = 403;
+        throw error;
+      }
+      if (!isSuperAdmin && item.productionStatus === 'IMPRESO') {
+        const error = new Error('Este diseño ya fue impreso y archivado de forma inmutable.');
         error.statusCode = 403;
         throw error;
       }
@@ -175,32 +247,42 @@ export async function updateItemProductionStatus({
         error.statusCode = 403;
         throw error;
       }
-    } else if (['SEPARADO', 'PENDIENTE'].includes(status) && !isOperario1) {
-      const error = new Error('No tienes permiso de Operario 1 para cambiar el estado a SEPARADO o PENDIENTE.');
-      error.statusCode = 403;
-      throw error;
+      if (!isSuperAdmin && item.productionStatus !== 'PENDIENTE') {
+        const error = new Error('Este diseño ya fue procesado y archivado de forma inmutable.');
+        error.statusCode = 403;
+        throw error;
+      }
+    } else if (status === 'SEPARADO') {
+      if (!isOperario1) {
+        const error = new Error('No tienes permiso de Operario 1 para cambiar el estado a SEPARADO.');
+        error.statusCode = 403;
+        throw error;
+      }
+      if (!isSuperAdmin && item.productionStatus !== 'PENDIENTE') {
+        const error = new Error('Este diseño ya fue procesado y archivado de forma inmutable.');
+        error.statusCode = 403;
+        throw error;
+      }
+    } else if (status === 'PENDIENTE') {
+      if (!isSuperAdmin) {
+        const error = new Error('Este diseño ya fue procesado y archivado de forma inmutable.');
+        error.statusCode = 403;
+        throw error;
+      }
     }
 
+    const now = new Date();
     const updateData = {
       productionStatus: status,
       productionNotes: notes !== undefined ? notes : item.productionNotes,
-      statusChangedAt: new Date(),
+      statusChangedAt: now,
       statusChangedById: userId,
     };
 
     if (status === 'IMPRESO') {
-      updateData.impresoAt = new Date();
+      updateData.impresoAt = now;
       updateData.impresoById = userId;
     }
-
-    const updated = await client.saleItem.update({
-      where: { id: targetId },
-      data: updateData,
-      include: {
-        product: true,
-        sale: { include: { event: true } },
-      },
-    });
 
     if (typeof client.productionLog?.create === 'function') {
       await client.productionLog.create({
@@ -213,6 +295,21 @@ export async function updateItemProductionStatus({
         },
       });
     }
+
+    const updated = await client.saleItem.update({
+      where: { id: targetId },
+      data: updateData,
+      include: {
+        product: true,
+        productionLogs: {
+          include: {
+            user: { select: { id: true, fullName: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        sale: { include: { event: true } },
+      },
+    });
 
     if (tenantId && typeof client.auditLog?.create === 'function') {
       await client.auditLog.create({
@@ -244,7 +341,7 @@ export async function updateItemProductionStatus({
 }
 
 /**
- * Obtiene métricas en tiempo real de la cola de producción
+ * Obtiene métricas en tiempo real de la cola de producción excluyendo ventas anuladas
  */
 export async function getProductionMetrics({ tenantId, eventId, userRoles = [], userId, source = 'ALL' }) {
   const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
@@ -275,6 +372,7 @@ export async function getProductionMetrics({ tenantId, eventId, userRoles = [], 
   const whereBase = {
     sale: {
       tenantId,
+      status: { not: 'ANULADA' },
       ...(eventId ? { eventId } : {}),
       ...(isVendedorRedesOnly && userId ? { sellerId: userId } : {}),
       ...sourceCondition,
@@ -289,5 +387,12 @@ export async function getProductionMetrics({ tenantId, eventId, userRoles = [], 
     prisma.saleItem.count({ where: whereBase }),
   ]);
 
-  return { pending, separated, inProduction, printed, total };
+  return {
+    pending,
+    separated,
+    inProduction,
+    printed,
+    resolved: separated + inProduction + printed,
+    total,
+  };
 }

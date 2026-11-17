@@ -481,6 +481,36 @@
       ],
       "evidence": "node --test tests/events/events-clean-view-and-modal-radar.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js -> Exit code 0 (27/27 PASS across 16 suites in 263.54ms: EventFinancialRadar removed from EventsManagementView, permanent-digital-pos-card rendered first followed by active/confirmed/archived event cards, full contextual 20% Financial Radar + expense management CTA integrated inside EventSalesModal <= 380L, zero amber/orange classes in both components, EventFinancialRadar.jsx preserved on disk); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS with EventsManagementView bundle reduced 250.15 kB -> 231.89 kB); npm run harness:check -> status HARNESS_PASS (274 JS syntax OK, 31.57s); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Guardarraíl estricto cumplido: src/components/monitor/EventFinancialRadar.jsx conservado en disco (surgery-053 1.2 PASS) y todos los contratos de surgery-065 e inmutabilidad/rollover (m4 y feat-013) intactos."
+    },
+    {
+      "id": "feat-016",
+      "name": "Rediseño Operativo de Producción: Cola Completa sin Tope de 50, Tamaño de Póster Visible en Móvil y Archivo Inmutable de Resueltos con Auditoría por Operario",
+      "description": "Reestructurar el panel y servicio de Producción (server/services/productionService.js, ProductionManagementView.jsx, ProductionOrderCard.jsx, ProductionFilterTabs.jsx, useProductionQueue.js y usePrintSheets.js) sin modificar prisma/schema.prisma: (1) Desbloqueo de cola masiva (>300+ diseños): elevar el límite en getProductionItems hasta 1000 por página (usando limit=500 por defecto en useProductionQueue y usePrintSheets + controles de paginación Anterior/Siguiente y contador 'Mostrando X de Y diseños') y excluir estrictamente ventas con status ANULADA en getProductionItems y getProductionMetrics; (2) Tamaño de póster 100% visible en celular: en ProductionOrderCard.jsx extraer el tamaño desde item.description (ej. '(Mediano)') y/o item.customDimensions para mostrar un badge destacado e imposible de truncar en móvil con el TAMAÑO DEL PÓSTER y la CANTIDAD, permitiendo 2 líneas (line-clamp-2 break-words) para el título de la obra y eliminando todos los colores naranjas/ámbar (amber-*/orange-*); y (3) Cola Activa vs Archivo Inmutable de Resueltos por Rol: tanto OPERARIO_1 (Producción 1 / Stock) como OPERARIO_2 (Impresión 2 / Taller) ven por defecto únicamente su Cola Activa pendiente (PENDIENTE para Operario 1; A_PRODUCCION para Operario 2). En el instante en que un operario registra una acción (Operario 1: SEPARADO de stock o A_PRODUCCION; Operario 2: IMPRESO), el diseño sale inmediatamente de su cola activa y pasa a su pestaña 'Archivo de Resueltos', donde queda registrado de forma INMUTABLE (HTTP 403 en backend si un operario intenta revertir o modificar un ítem ya procesado en su etapa, y 0 botones de acción en el archivo) mostrando exactamente la acción realizada, la fecha, la hora (America/Guatemala) y el nombre del usuario que ejecutó la acción (leído desde productionLogs con user).",
+      "area": "production-queue-scale-mobile-size-and-immutable-archive",
+      "user_visible_behavior": "En Producción se visualizan todos los diseños sin quedar truncados en 50, cada tarjeta muestra claramente en celular el tamaño del póster, y al marcar un diseño como Separado, A Imprimir o Impreso desaparece al instante de la cola pendiente y queda archivado de forma inmutable en la cola de Resueltos con fecha, hora y usuario responsable tanto para Operario 1 como para Operario 2.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-015"
+      ],
+      "required_files": [
+        "server/services/productionService.js",
+        "src/components/ProductionManagementView.jsx",
+        "src/components/production/ProductionOrderCard.jsx",
+        "src/components/production/ProductionFilterTabs.jsx",
+        "src/components/production/hooks/useProductionQueue.js",
+        "src/components/production/hooks/usePrintSheets.js",
+        "tests/production/production-scale-mobile-and-immutable-archive.test.js"
+      ],
+      "verification": [
+        "node --test tests/production/production-scale-mobile-and-immutable-archive.test.js tests/unit/production-seller-isolation.test.js tests/production/production-adversarial.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/production/production-scale-mobile-and-immutable-archive.test.js tests/unit/production-seller-isolation.test.js tests/production/production-adversarial.test.js -> Exit code 0 (25/25 PASS across 12 suites in 1311.14ms: 360-item fair queue returned without 50/100 truncation + pagination up to 1000, ANULADA sales excluded in items & metrics, Operario 1 & Operario 2 immediate removal from active queue into immutable archive with user/date/time America/Guatemala stamps from productionLogs + HTTP 403 anti-reversal lock, prominent non-truncated poster-size-badge & line-clamp-2 on mobile, zero amber/orange classes, and 0 action buttons in archive); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS in 4.48s); npm run harness:check -> status HARNESS_PASS (275 JS syntax OK, 31.69s); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/schema.prisma (reutilizando SaleItem y ProductionLog con user), y preservados todos los guardarraíles de production-seller-isolation, production-adversarial y phase5-frontend-ergonomics-resilience."
     }
   ]
 }

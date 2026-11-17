@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 21:55
-**Session ID:** sesion-020 (Ejecución y Verificación de `feat-015`: Limpieza de Vista de Eventos sin Radar Global e Integración Dentro de Cada Evento)
-**Active Feature:** Ninguna (`WIP = 0`; `feat-000..015` en `done`)
+**Last Updated:** 2026-11-16 22:55
+**Session ID:** sesion-022 (Ejecución y Verificación de `feat-016`: Rediseño Operativo de Producción — Cola >300 Diseños, Tamaño en Móvil y Archivo Inmutable por Operario)
+**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..016` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -57,15 +57,20 @@
   - Desmontado por completo `EventFinancialRadar` de `src/components/EventsManagementView.jsx`, dejando primero la tarjeta fija `Ventas en Línea y Redes Sociales` (`permanent-digital-pos-card`) e inmediatamente debajo las tarjetas de selección de `Eventos en curso`, `Eventos confirmados / Próximos` y el acordeón de `Eventos Archivados`.
   - Consolidado y pulido el análisis financiero del Radar del 20% dentro de `src/components/events/modals/EventSalesModal.jsx` (`364L <= 380L`), incluyendo resolución viva de `activeSalesEvent`, acceso directo a gestionar/registrar gastos (`onManageExpenses` / `modal-manage-expenses-btn`), las 4 tarjetas contables, progreso 5x arriendo, ritmo diario requerido, formas de pago, cortes de caja conciliados/automáticos y movimientos por jornada.
   - Eliminadas todas las clases naranjas/ámbar (`text-amber-*`, `bg-amber-*`, `border-amber-*`) en `EventsManagementView.jsx` y `EventSalesModal.jsx` en favor de estética blanca/neutra, conservando `src/components/monitor/EventFinancialRadar.jsx` en disco para compatibilidad con `surgery-053` y agregando la suite `tests/events/events-clean-view-and-modal-radar.test.js`.
+- [x] **Rediseño Operativo de Producción: Cola Masiva >300 Diseños, Tamaño Visible en Móvil y Archivo Inmutable por Operario `feat-016` (`25/25` `production-scale` + `seller-isolation` + `production-adversarial` PASS, `265/265` unit tests PASS, `bash ./init.sh` `100/100`)**:
+  - Elevado el tope máximo de paginación en `getProductionItems` (`server/services/productionService.js`) hasta `1000` por página (`limit = 500` por defecto en `useProductionQueue.js` y `usePrintSheets.js`), agregados controles accesibles de paginación (`min-h-[44px]`) y contador `"Mostrando X de Y diseños"`, y excluidas estrictamente las ventas con `status: 'ANULADA'` tanto en `getProductionItems` como en `getProductionMetrics`.
+  - Proyectados `productionLogs` con `user: { id, fullName, email }` en `getProductionItems` y `updateItemProductionStatus` sin modificar `prisma/schema.prisma`.
+  - Extraído determinísticamente el tamaño del póster (`extractPosterSizeInfo` en `ProductionOrderCard.jsx`) para mostrar en primera línea móvil un badge prominente no truncable (`data-testid="poster-size-badge"`, `shrink-0`) junto con la cantidad (`data-testid="poster-qty-badge"`), sustituyendo el truncamiento de 1 línea del título por `line-clamp-2 break-words` y erradicando al 100% los tonos naranjas/ámbar (`amber-*` / `orange-*`).
+  - Separadas estrictamente la **Cola Pendiente / Por Imprimir** y el **Archivo Inmutable de Resueltos / Impresos** tanto para `OPERARIO_1` como para `OPERARIO_2`: al procesar un diseño (`SEPARADO` o `A_PRODUCCION` para Operario 1; `IMPRESO` para Operario 2), sale al instante de su cola activa y queda sellado en el archivo con acción, nombre del usuario responsable y fecha/hora exacta en `America/Guatemala` (`es-GT`), con `0` botones de acción en el archivo y bloqueo `HTTP 403` en backend ante cualquier intento de re-modificación o reversión por operarios.
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..015` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..016` completadas y verificadas).
 
 ### What's Next
-- Esperar instrucción del usuario para nuevas tareas o para desplegar el lote `feat-013`..`feat-015` a producción.
+- Listo para revisión del usuario y despliegue a producción de `feat-016` o definición de nuevas mejoras bajo `WIP = 1`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 70/70 closing/forensic tests PASS; 22/22 shift/rollover tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 25/25 production scale & adversarial tests PASS).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -80,25 +85,32 @@
   - Context: La vista de `Eventos` tenía una tarjeta global de `EventFinancialRadar` que saturaba la selección de eventos, mientras que cada evento ya posee su propio modal detallado.
   - Alternatives considered: (a) Borrar `src/components/monitor/EventFinancialRadar.jsx` (descartado porque `surgery-053` prueba `1.2` inspecciona ese archivo estáticamente); (b) Apilar `EventExpensesModal` sobre `EventSalesModal` con doble backdrop `z-50` (descartado para evitar conflicto de pila de modales en móvil).
   - Resolution: Se retiró `EventFinancialRadar` de `EventsManagementView.jsx` (reduciendo su bundle de `250.15 kB` a `231.89 kB`), se consolidó todo el análisis financiero del Radar del 20% sin tonos naranjas dentro de `EventSalesModal.jsx` (`364L <= 380L`) resolviendo `activeSalesEvent` desde `m.events` y conmutando limpiamente a `EventExpensesModal` al pulsar `Gastos`, conservando `EventFinancialRadar.jsx` en disco.
+- **Separación de Bandeja Principal (`Cola Activa` vs `Archivo Inmutable`) y Trazabilidad sin Migración Prisma (`feat-016`)**:
+  - Context: Con >300 diseños vendidos en feria, el límite de `50` ocultaba pedidos, `truncate` ocultaba el tamaño en móvil, y mezclar ítems resueltos con pendientes permitía confusiones y carecía de un archivo inmutable auditable para Operario 1 y Operario 2, sin alterar `prisma/schema.prisma`.
+  - Alternatives considered: (a) Añadir nuevas columnas de auditoría en `SaleItem` modificando `prisma/schema.prisma` (descartado porque `ProductionLog` con relación `user` ya persiste cada transición); (b) Mostrar pestañas de archivo dentro de `ProductionFilterTabs` para `isOp2Only` rompiendo el contrato histórico `if (isOp2Only) return null;` de `production-adversarial.test.js` (descartado para preservar compatibilidad al 100%).
+  - Resolution: Se incorporó un selector superior dedicado de bandeja (`Cola Pendiente / Por Imprimir` vs `Archivo de Resueltos / Impresos`) en `ProductionManagementView.jsx` para ambos operarios y `SUPER_ADMIN`, conservando `ProductionFilterTabs` para sub-estados de Operario 1 / Admin (`if (isOp2Only) return null;`), proyectando `productionLogs` ordenados cronológicamente con nombre de usuario y hora `America/Guatemala` y bloqueando con `HTTP 403` cualquier mutación posterior de operarios sobre diseños ya procesados.
 
 ## Files Modified This Session
-- `src/components/EventsManagementView.jsx` — Retiro de `EventFinancialRadar`, orden limpio (`permanent-digital-pos-card` primero seguido de eventos activos, confirmados y archivados), resolución viva `activeSalesEvent`, conexión `onManageExpenses` y `0` clases naranjas (`0 CRLF`).
-- `src/components/events/modals/EventSalesModal.jsx` — Radar Financiero Ferial integrado con acción directa `Gastos` / `Registrar gastos del stand`, métricas simétricas, cortes conciliados/automáticos, estética blanca/neutra (`0` clases naranjas) y `364L <= 380L` (`0 CRLF`).
-- `tests/events/events-clean-view-and-modal-radar.test.js` — Suite dedicada `5/5 PASS` de verificación de `feat-015` (`0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` con `feat-015` en `done` (`0 CRLF`).
+- `server/services/productionService.js` — Paginación escalable hasta `1000` (`limit=500` por defecto), exclusión estricta de `ANULADA` en ítems y métricas, soporte de filtros compuestos (`COLA_ACTIVA`, `ARCHIVO_OP1`, `ARCHIVO_OP2`), inclusión de `productionLogs.user` y candado `HTTP 403` de inmutabilidad post-acción para Operario 1 y Operario 2 (`0 CRLF`).
+- `src/components/production/hooks/useProductionQueue.js` — Gestión de `queueBucket` (`ACTIVE` vs `ARCHIVE`), `page`/`pagination` con `limit=500`, retiro inmediato de la cola activa al resolver un diseño y preservación de debounce `250ms` (`0 CRLF`).
+- `src/components/production/hooks/usePrintSheets.js` — Elevación de `limit` de `100` a `500` al consultar diseños candidatos sin pliego (`0 CRLF`).
+- `src/components/production/ProductionFilterTabs.jsx` — Sub-filtros contextuales para Cola Activa y Archivo de Resueltos manteniendo `min-h-[44px]`, `aria-pressed` e `if (isOp2Only) return null;` (`0 CRLF`).
+- `src/components/production/ProductionOrderCard.jsx` — Extracción determinista `extractPosterSizeInfo` con badge móvil prominente `shrink-0` (`poster-size-badge` + `poster-qty-badge`), título `line-clamp-2 break-words`, bloque `immutable-audit-record` con usuario y fecha/hora Guatemala (`extractAuditEntries`), `0` botones en archivo y `0` clases naranjas (`0 CRLF`).
+- `src/components/ProductionManagementView.jsx` — Selector estricto `Cola Pendiente / Por Imprimir` vs `Archivo de Resueltos / Impresos`, contador `"Mostrando X de Y diseños"`, controles de paginación accesibles y `0` clases naranjas (`0 CRLF`).
+- `tests/production/production-scale-mobile-and-immutable-archive.test.js` — Suite integral de verificación de `feat-016` (cola de 360/620 diseños, exclusión de anuladas, inmutabilidad `403` Op1/Op2, extracción móvil de tamaños y auditoría cronológica) (`0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` con `feat-016` en `done` (`0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite de Limpieza de Eventos y Radar Contextual (`feat-015`): `node --test tests/events/events-clean-view-and-modal-radar.test.js tests/adversarial/surgery-053-multi-event-radar-contracts.test.js tests/adversarial/surgery-065-events-compact-cards-and-back-navigation.test.js` -> `27/27 PASS across 16 suites (0 fail)`
-- [x] Suites de Cohesión, Inmutabilidad, Rollover e Historial (`m4` + `feat-013` + `feat-009/010`): `node --test tests/adversarial/m4-closing-immutability-thumbnails.test.js tests/sales/daily-shift-closing-rollover.test.js tests/sales/online-sales-history-and-purge.test.js` -> `26/26 PASS across 6 suites (0 fail)`
+- [x] Suite Integral de Producción (`feat-016` + Aislamiento Vendedor + Adversarial Phase 5): `node --test tests/production/production-scale-mobile-and-immutable-archive.test.js tests/unit/production-seller-isolation.test.js tests/production/production-adversarial.test.js` -> `25/25 PASS across 12 suites (0 fail)`
 - [x] Suite Completa de Pruebas Unitarias: `npm run test:unit` -> `265/265 PASS across 109 suites`
 - [x] Suite Completa de Voz: `npm run test:voice` -> `53/53 PASS across 12 suites`
 - [x] Vigilante Arquitectónico Tolerancia Cero (Puerta 1): `bash scripts/check-architecture.sh` -> `0 violaciones, 0 excepciones, higiene y 6 capas verificadas`
 - [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
 - [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1566 modules PASS)`
-- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (274 JS syntax OK, 31.57s)`
+- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (275 JS syntax OK, 31.69s)`
 - [x] Verificación de Formato: `0 CRLF` en todos los archivos gobernados y modificados.
 
 ## Notes for Next Session
 1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`).
-2. Todas las tareas planificadas `feat-000..015` están completadas y verificadas.
+2. Todas las tareas planificadas `feat-000..016` están completadas y verificadas.
 3. El inicio estándar para cualquier nueva tarea se ejecuta con `bash ./init.sh`.

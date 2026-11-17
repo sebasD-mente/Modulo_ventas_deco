@@ -80,8 +80,8 @@ export default function usePrintSheets() {
     try {
       setIsLoadingUnassigned(true);
       const [resPending, resProd] = await Promise.all([
-        authFetch('/api/production/items?status=PENDIENTE&limit=100'),
-        authFetch('/api/production/items?status=A_PRODUCCION&limit=100'),
+        authFetch('/api/production/items?status=PENDIENTE&limit=500'),
+        authFetch('/api/production/items?status=A_PRODUCCION&limit=500'),
       ]);
       const jsonPending = await resPending.json();
       const jsonProd = await resProd.json();
