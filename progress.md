@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-17 20:56
-**Session ID:** sesion-028 (Implementación y Verificación Completa de `feat-019`: Casilla de Edición de Diseño con Descripción y Costo Sumado al Total en Nueva Venta de Redes)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..019` en `done`)
+**Last Updated:** 2026-11-17 21:53
+**Session ID:** sesion-030 (Implementación y Cierre de `feat-020`: Inclusión del Costo de Edición de Diseño en la Base Comisionable del 20% Excluyendo el Flete)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..020` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -81,14 +81,20 @@
   - Extendidos `server/validators/remoteSaleValidators.js` (`createRemoteSaleSchema`) y `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction`) para validar y sumar `editionCost >= 0` a `totalAmount`, estampar `[Edición (+Q X.XX): <descripción>]` en `sale.notes` y `[Edición]: <descripción>` en `SaleItem.productionNotes` (visible en Taller en `ProductionOrderCard.jsx` sin crear `SaleItem` fantasma, sin alterar `prisma/schema.prisma` y manteniendo intacta la base de comisión del 20% en `calculateSaleProductBase`).
   - Añadida la suite `tests/sales/remote-sale-design-edition.test.js` (`9/9 PASS`).
 
+- [x] **Inclusión del Costo de Edición de Diseño en la Base Comisionable del 20% para `VENDEDOR_REDES` `feat-020` (`122/122` `commission-design-edition` + `remote-sale-design-edition` + `commission-frontend` + `domain3/commission` + `m3-challenger` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Exportado `extractSaleEditionCost(sale)` en `server/services/commissionService.js` leyendo `sale.editionCost` o el sello estructurado `[Edición (+Q X.XX): ...]` persistido en `sale.notes` (incluyendo notas multilínea tras cobro de saldo), e integrado en `calculateSaleProductBase(sale)` (`Math.max(0, itemsSubtotal - discount) + editionCost`, evitando doble conteo en la rama fallback `totalAmount - shippingCost` y excluyendo el 100% de `shippingCost`).
+  - Enriquecido `getSettlementById` en `server/services/commissionService.js` mapeando cada venta en `settlement.sales` con `baseProductos` y `commissionAmount` al 20%, impactando automáticamente `getPendingCommissions` (`sales`, `totalProductsAmount`, `totalCommission`, `waitingSummary.potentialCommission`) y `createSettlementTransaction`.
+  - Actualizado `src/components/commissions/SettlementDetailReceiptModal.jsx` (`267L <= 280L`) con `extractReceiptEditionCost` y `calculateReceiptRowAmounts` preservando estrictamente `s.baseProductos ??`.
+  - Actualizada la aserción `3.2` en `tests/sales/remote-sale-design-edition.test.js` (`Q 130 + Q 25 = Q 155 -> Q 31.00`), alineado `MockCommissionStore` en `tests/adversarial/m3-commission-invariants-challenger.test.js` al predicado Prisma `{ status: { in: [...] } }` y al ciclo `PENDIENTE_PAGO -> PAGADO` (`Surgery 1.1..1.2`), y creada la suite dedicada `tests/commissions/commission-design-edition-inclusion.test.js` (`6/6 PASS`).
+
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..019` completadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..020` completadas).
 
 ### What's Next
-- Desplegar `feat-019` a producción (`npm run deploy` -> `https://ventas.decovintage.online`) cuando el usuario lo solicite o registrar el siguiente requerimiento en `feature_list.json`.
+- Revisar con el propietario si desea desplegar `feat-020` a producción (`https://ventas.decovintage.online`) o planificar nuevas mejoras en el backlog.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 38/38 design edition & remote sale contract tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 122/122 commission & design edition contract tests PASS).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -123,25 +129,25 @@
   - Alternatives considered: (a) Insertar un `SaleItem` adicional llamado `"Edición..."` (descartado porque entraría como póster falso a la cola de impresión de Taller/Operario 2 y alteraría la base de pósters de comisión del 20%); (b) Agregar columnas nuevas en `Sale` en `prisma/schema.prisma` (descartado para mantener cero migraciones destructivas/DDL innecesarias en producción).
   - Resolution: Se implementó `DesignEditionPanel.jsx` (`86L`) entre `SaleCartList` y `DeliveryMethodSelector` (respetando `surgery-059` `2.1` y `4.2`), sumando `effectiveEditionCost` a `totalAmount` en `useRemoteSaleForm.js` (`344L <= 350L`) y `createRemoteSaleTransaction`, desglosándolo en `RemoteQuoterSummary.jsx` (`323L <= 350L`) y `WhatsAppQuoteShareModal.jsx` (`187L <= 280L`), y estampando `[Edición (+Q X.XX): ...]` en `sale.notes` y `[Edición]: ...` en `SaleItem.productionNotes` para que Taller vea la instrucción directamente en `ProductionOrderCard.jsx`.
 
+- **Inclusión del Cargo de Edición de Diseño en la Comisión del 20% (`feat-020` — Implementado)**:
+  - Context: En `feat-019` se mantuvo la edición fuera de `calculateSaleProductBase`, pero el propietario aclaró explícitamente que el valor cobrado por Edición de Diseño **sí se incluye en el cálculo del 20% de comisión** del vendedor de redes (únicamente el flete queda excluido).
+  - Alternatives considered: Crear un `SaleItem` adicional para sumar la edición (descartado porque contaminaría la cola de impresión de Taller con un cuadro inexistente) o sumar `editionCost` también en la rama fallback `totalAmount - shippingCost` (descartado porque `totalAmount` ya incluye `editionCost`, lo que causaría doble conteo).
+  - Resolution: `calculateSaleProductBase(sale)` en `commissionService.js` suma `extractSaleEditionCost(sale)` a `Math.max(0, itemsSub - discount)` cuando la venta trae `itemsSubtotal` o `items` (y usa `Math.max(0, totalAmount - shippingCost)` sin doble conteo cuando solo trae `totalAmount`), enriqueciendo `getSettlementById` y alineando `SettlementDetailReceiptModal.jsx` (`267L <= 280L`) con preservación estricta de `s.baseProductos ??`.
+
 ## Files Modified This Session
-- `src/components/manual-sale/DesignEditionPanel.jsx` — Nuevo panel minimalista de Edición de Diseño (`Descripción de la edición` + `Costo de la edición (Q)`, `86L <= 140L`, `0 CRLF`).
-- `src/components/FastManualSaleForm.jsx` — Montado `<DesignEditionPanel />` debajo de `<SaleCartList />` y arriba de `<DeliveryMethodSelector />` en `REDES_PERSONALIZADO` (`343L <= 350L`, `0 CRLF`).
-- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — `calculateRemoteOrderTotals`, estados `editionDescription`/`editionCost`, validación preventiva, payload y limpieza post-venta (`344L <= 350L`, `0 CRLF`).
-- `src/components/manual-sale/RemoteQuoterSummary.jsx` — Desglose `Edición de diseño: Q X.XX` en `Desglose Contable de la Orden` (`323L <= 350L`, `0 CRLF`).
-- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` — `extractSaleEditionDetails` y `buildWhatsAppOrderMessage` incluyendo edición en el comprobante de WhatsApp (`187L <= 280L`, `0 CRLF`).
-- `server/validators/remoteSaleValidators.js` — Campos `editionDescription` y `editionCost` con validación Zod en `createRemoteSaleSchema` (`0 CRLF`).
-- `server/services/sales/remoteSaleService.js` — Suma de `editionCost` en `totalAmount`, sello en `sale.notes` y `SaleItem.productionNotes` sin `SaleItem` fantasma y trazabilidad en `AuditLog` (`0 CRLF`).
-- `tests/sales/remote-sale-design-edition.test.js` — Suite dedicada de `feat-019` (`9/9 PASS`, `0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Sincronizados a `done` / `WIP = 0` con evidencia verificable (`0 CRLF`).
+- `server/services/commissionService.js` — Exportado `extractSaleEditionCost(sale)`, sumado el cargo de edición a `calculateSaleProductBase(sale)` y enriquecidas `settlement.sales` en `getSettlementById` (`0 CRLF`).
+- `src/components/commissions/SettlementDetailReceiptModal.jsx` — Incorporados `extractReceiptEditionCost` y `calculateReceiptRowAmounts` preservando `s.baseProductos ??` (`267L <= 280L`, `0 CRLF`).
+- `tests/sales/remote-sale-design-edition.test.js` — Actualizada aserción `3.2` para verificar base comisionable `Q 155.00` y comisión `Q 31.00` (`0 CRLF`).
+- `tests/commissions/commission-design-edition-inclusion.test.js` — Nueva suite dedicada (`6/6 PASS`) cubriendo extracción directa/notas multilínea, descuentos, exclusión de flete, liquidaciones y recibo (`0 CRLF`).
+- `tests/adversarial/m3-commission-invariants-challenger.test.js` — Alineado `MockCommissionStore` al predicado Prisma `{ status: { in: [...] } }` y al ciclo de 2 pasos `PENDIENTE_PAGO -> PAGADO` (`Surgery 1.1..1.2`) (`0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Cierre documental de `feat-020` en `done` (`WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite Focalizada `feat-019` + Guardarraíles: `node --test tests/sales/remote-sale-design-edition.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (38/38 PASS across 15 suites in 167.63ms)`
-- [x] Pruebas Unitarias del Proyecto: `npm run test:unit` -> `Exit code 0 (265/265 PASS across 109 suites)`
-- [x] Suite de Voz y VAD: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
-- [x] Compuerta Física Unificada Deko Labs: `npm run harness:check` -> `status: HARNESS_PASS, framework: STAND-IA-UNIFIED-HARNESS (36.04s: check-architecture PASS, validate-harness 100/100, audit-secrets 195 files OK, audit-syntax 278 JS files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS)`
-- [x] Verificación en 3 Puertas (`sesion-028`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`
-- [x] Validación Matemática del Arnés: `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
+- [x] Suite Dedicada + Contratos de Comisiones y Edición (`feat-020`): `node --test tests/commissions/commission-design-edition-inclusion.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js tests/domain3/commission.test.js tests/adversarial/m3-commission-invariants-challenger.test.js` -> `Exit code 0 (122/122 PASS across 33 suites in 285.28ms)`
+- [x] Pruebas Unitarias y de Voz: `npm run test:unit` -> `265/265 PASS across 109 suites`; `npm run test:voice` -> `53/53 PASS across 12 suites`
+- [x] Compuerta Física Integral: `npm run harness:check` -> `status: HARNESS_PASS, framework: STAND-IA-UNIFIED-HARNESS in 32.91s (195 secrets OK, 279 JS syntax OK, 13/13 zero-trust, vite build 1568 modules PASS in 4.19s)`
+- [x] Verificación en 3 Puertas (`sesion-030`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, zero-trust 13/13 PASS, vite build PASS)`
 
 ## Notes for Next Session
-1. `feat-019` implementada y verificada al 100% en local (`WIP = 0`, `Overall: 100/100`, `0 CRLF`).
-2. Lista para desplegar en producción con `npm run deploy` cuando el usuario lo solicite.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..020` en `done`).
+2. `feat-020` está lista para commit/despliegue cuando el propietario lo indique (`npm run deploy` previa solicitud).

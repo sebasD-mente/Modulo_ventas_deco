@@ -10,16 +10,55 @@ function createHttpError(message, statusCode) {
 }
 
 /**
- * Calcula la base imponible neta de productos excluyendo estrictamente el 100% del flete.
- * Base = Math.max(0, itemsSubtotal - discount)
+ * Extrae el cargo por Edición de Diseño desde sale.editionCost o desde el sello
+ * estructurado '[Edición (+Q X.XX): ...]' persistido en sale.notes.
+ */
+export function extractSaleEditionCost(sale = {}) {
+  if (!sale || typeof sale !== 'object') return 0;
+  if (sale.editionCost != null && Number.isFinite(Number(sale.editionCost)) && Number(sale.editionCost) > 0) {
+    return Number(Number(sale.editionCost).toFixed(2));
+  }
+  if (typeof sale.notes === 'string') {
+    const match = sale.notes.match(/\[Edici[oó]n\s*\(\+Q\s*([0-9]+(?:\.[0-9]+)?)\)/i);
+    if (match) {
+      const parsed = Number(match[1]);
+      return Number.isFinite(parsed) && parsed > 0 ? Number(parsed.toFixed(2)) : 0;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Calcula la base comisionable neta (productos netos + edición de diseño),
+ * excluyendo estrictamente el 100% del flete (shippingCost).
+ * Base = Math.max(0, itemsSubtotal - discount) + editionCost
  */
 export function calculateSaleProductBase(sale) {
-  const itemsSub = sale.itemsSubtotal != null && !Number.isNaN(Number(sale.itemsSubtotal))
-    ? Number(sale.itemsSubtotal)
-    : (Array.isArray(sale.items) && sale.items.length > 0
-      ? sale.items.reduce((acc, it) => acc + Number(it.quantity || 1) * Number(it.unitPrice || 0), 0)
-      : Math.max(0, Number(sale.totalAmount || 0) - Number(sale.shippingCost || 0) + Number(sale.discount || 0)));
-  return Number(Math.max(0, itemsSub - Number(sale.discount || 0)).toFixed(2));
+  if (!sale || typeof sale !== 'object') return 0;
+  const hasItemsSubtotal = sale.itemsSubtotal != null && !Number.isNaN(Number(sale.itemsSubtotal));
+  const hasItems = Array.isArray(sale.items) && sale.items.length > 0;
+
+  if (hasItemsSubtotal || hasItems) {
+    const itemsSub = hasItemsSubtotal
+      ? Number(sale.itemsSubtotal)
+      : sale.items.reduce(
+          (acc, it) =>
+            acc +
+            (it.unitPrice != null
+              ? Number(it.quantity || 1) * Number(it.unitPrice || 0)
+              : Number(it.subtotal || 0)),
+          0
+        );
+    const netProducts = Math.max(0, itemsSub - Number(sale.discount || 0));
+    const editionCost = extractSaleEditionCost(sale);
+    return Number((netProducts + editionCost).toFixed(2));
+  }
+
+  if (sale.totalAmount != null && !Number.isNaN(Number(sale.totalAmount))) {
+    return Number(Math.max(0, Number(sale.totalAmount) - Number(sale.shippingCost || 0)).toFixed(2));
+  }
+
+  return extractSaleEditionCost(sale);
 }
 
 /**
@@ -395,6 +434,19 @@ export async function getSettlementById({ tenantId, settlementId }) {
   });
 
   if (!settlement) throw createHttpError('Liquidación no encontrada.', 404);
+  if (Array.isArray(settlement.sales)) {
+    return {
+      ...settlement,
+      sales: settlement.sales.map((s) => {
+        const baseProductos = calculateSaleProductBase(s);
+        return {
+          ...s,
+          baseProductos,
+          commissionAmount: Number((baseProductos * 0.20).toFixed(2)),
+        };
+      }),
+    };
+  }
   return settlement;
 }
 

@@ -1,6 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, Loader2, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 
+export function extractReceiptEditionCost(sale = {}) {
+  if (!sale || typeof sale !== 'object') return 0;
+  if (sale.editionCost != null && Number.isFinite(Number(sale.editionCost)) && Number(sale.editionCost) > 0) {
+    return Number(Number(sale.editionCost).toFixed(2));
+  }
+  if (typeof sale.notes === 'string') {
+    const match = sale.notes.match(/\[Edici[oó]n\s*\(\+Q\s*([0-9]+(?:\.[0-9]+)?)\)/i);
+    if (match) {
+      const parsed = Number(match[1]);
+      return Number.isFinite(parsed) && parsed > 0 ? Number(parsed.toFixed(2)) : 0;
+    }
+  }
+  return 0;
+}
+
+export function calculateReceiptRowAmounts(s = {}) {
+  const editionCost = extractReceiptEditionCost(s);
+  const hasItemsSub = s.itemsSubtotal != null && Number(s.itemsSubtotal) > 0;
+  const hasItemsArr = !hasItemsSub && Array.isArray(s.items) && s.items.length > 0;
+  const fallbackBase = hasItemsSub
+    ? Math.max(0, Number(s.itemsSubtotal) - Number(s.discount || 0)) + editionCost
+    : hasItemsArr
+    ? Math.max(
+        0,
+        s.items.reduce(
+          (acc, it) =>
+            acc + (it.unitPrice != null ? Number(it.quantity || 1) * Number(it.unitPrice || 0) : Number(it.subtotal || 0)),
+          0
+        ) - Number(s.discount || 0)
+      ) + editionCost
+    : Math.max(0, Number(s.totalAmount || 0) - Number(s.shippingCost || 0));
+  const base = Number(Number(s.baseProductos ?? fallbackBase).toFixed(2));
+  const comm = Number((base * 0.20).toFixed(2));
+  return { base, comm };
+}
+
 export default function SettlementDetailReceiptModal({
   isOpen,
   onClose,
@@ -152,13 +188,7 @@ export default function SettlementDetailReceiptModal({
                   </thead>
                   <tbody className="divide-y divide-neutral-800/60 print:divide-neutral-200">
                     {(settlement.sales || []).map((s) => {
-                      const base = Number(
-                        s.baseProductos ??
-                        Math.max(0, (Number(s.itemsSubtotal || 0) > 0
-                          ? Number(s.itemsSubtotal) - Number(s.discount || 0)
-                          : Number(s.totalAmount || 0) - Number(s.shippingCost || 0)))
-                      );
-                      const comm = Number((base * 0.20).toFixed(2));
+                      const { base, comm } = calculateReceiptRowAmounts(s);
                       return (
                         <tr key={s.id} className="hover:bg-neutral-900/40 print:hover:bg-transparent">
                           <td className="py-1.5 px-2 font-bold text-white print:text-black">#{s.saleNumber}</td>

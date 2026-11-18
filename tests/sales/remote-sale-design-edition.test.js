@@ -292,7 +292,7 @@ describe('feat-019: Casilla de Edición de Diseño (Descripción + Costo Sumado 
       );
     });
 
-    it('3.2 createRemoteSaleTransaction suma editionCost al total, estampa sale.notes y SaleItem.productionNotes para Taller sin crear SaleItem fantasma, y mantiene intacta la comisión del 20%', async () => {
+    it('3.2 createRemoteSaleTransaction suma editionCost al total, estampa sale.notes y SaleItem.productionNotes para Taller sin crear SaleItem fantasma, e incluye la edición en la base comisionable del 20% (excluyendo flete)', async () => {
       let capturedSaleCreate = null;
       let capturedAuditCreate = null;
 
@@ -381,9 +381,10 @@ describe('feat-019: Casilla de Edición de Diseño (Descripción + Costo Sumado 
         assert.equal(capturedAuditCreate.details.editionCost, 25);
         assert.equal(capturedAuditCreate.details.editionDescription, 'Se agregaron letras en la esquina inferior');
 
-        // Base de comisión del 20% permanece estrictamente sobre los pósters (Q 130.00 -> Q 26.00)
+        // Base de comisión del 20% suma pósters + edición (Q 130.00 + Q 25.00 = Q 155.00 -> Q 31.00) excluyendo el flete (Q 35.00)
         const commissionBase = calculateSaleProductBase(sale);
-        assert.equal(commissionBase, 130, 'La base de comisión de pósters no se distorsiona por edición ni flete');
+        assert.equal(commissionBase, 155, 'La base comisionable suma pósters (Q 130) + edición (Q 25) = Q 155.00 y excluye flete (Q 35)');
+        assert.equal(Number((commissionBase * 0.20).toFixed(2)), 31, 'La comisión del 20% debe ser Q 31.00');
       } finally {
         prisma.$transaction = origTx;
       }

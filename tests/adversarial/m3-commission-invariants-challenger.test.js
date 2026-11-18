@@ -87,6 +87,7 @@ class MockCommissionStore {
       totalAmount: Number(sale.totalAmount != null ? sale.totalAmount : (Number(sale.itemsSubtotal || 0) - Number(sale.discount || 0) + Number(sale.shippingCost || 0))),
       depositAmount: Number(sale.depositAmount || 0),
       balanceDue: Number(sale.balanceDue != null ? sale.balanceDue : 0),
+      orderType: sale.orderType || 'REDES_PERSONALIZADO',
       status: sale.status || 'COMPLETADA',
       paymentStatus: sale.paymentStatus || 'PAGADO_TOTAL',
       commissionPaid: Boolean(sale.commissionPaid),
@@ -115,11 +116,15 @@ class MockCommissionStore {
           for (const s of store.sales.values()) {
             if (where?.tenantId && s.tenantId !== where.tenantId) continue;
             if (where?.sellerId && s.sellerId !== where.sellerId) continue;
+            if (where?.orderType && s.orderType !== where.orderType) continue;
             if (where?.id?.in && !where.id.in.includes(s.id)) continue;
-            if (where?.status && s.status !== where.status) continue;
+            if (typeof where?.status === 'string' && s.status !== where.status) continue;
+            if (Array.isArray(where?.status?.in) && !where.status.in.includes(s.status)) continue;
+            if (where?.status?.not && s.status === where.status.not) continue;
             if (where?.commissionPaid !== undefined && s.commissionPaid !== where.commissionPaid) continue;
             if (where?.commissionSettlementId === null && s.commissionSettlementId !== null) continue;
-            if (where?.balanceDue !== undefined && Number(s.balanceDue) !== Number(where.balanceDue)) continue;
+            if (typeof where?.balanceDue === 'number' && Number(s.balanceDue) !== Number(where.balanceDue)) continue;
+            if (where?.balanceDue?.gt !== undefined && !(Number(s.balanceDue) > Number(where.balanceDue.gt))) continue;
             if (where?.createdAt?.gte && new Date(s.createdAt) < new Date(where.createdAt.gte)) continue;
             if (where?.createdAt?.lte && new Date(s.createdAt) > new Date(where.createdAt.lte)) continue;
 
@@ -143,11 +148,12 @@ class MockCommissionStore {
           let count = 0;
           for (const s of store.sales.values()) {
             if (where?.tenantId && s.tenantId !== where.tenantId) continue;
-            if (where?.id?.in && where.id.in.includes(s.id)) {
-              if (data.commissionSettlementId !== undefined) s.commissionSettlementId = data.commissionSettlementId;
-              if (data.commissionPaid !== undefined) s.commissionPaid = data.commissionPaid;
-              count++;
-            }
+            if (where?.id?.in && !where.id.in.includes(s.id)) continue;
+            if (where?.commissionSettlementId !== undefined && s.commissionSettlementId !== where.commissionSettlementId) continue;
+            if (where?.commissionPaid !== undefined && s.commissionPaid !== where.commissionPaid) continue;
+            if (data.commissionSettlementId !== undefined) s.commissionSettlementId = data.commissionSettlementId;
+            if (data.commissionPaid !== undefined) s.commissionPaid = data.commissionPaid;
+            count++;
           }
           return { count };
         },
@@ -931,12 +937,12 @@ describe('⚔️ CHALLENGER M3: Invariante 20% & Zero-Balance Gate Forensic Suit
       // Comisión: 349.99 * 0.20 = 69.998 -> 70.00
       assert.strictEqual(settlement.totalCommission, 70.00);
 
-      // Verificar congelamiento en la BD
+      // Verificar vinculación atómica en PENDIENTE_PAGO (Surgery 1.1: commissionPaid pasa a true al desembolsar)
       const s1 = store.sales.get('freeze-sale-1');
       const s2 = store.sales.get('freeze-sale-2');
-      assert.strictEqual(s1.commissionPaid, true);
+      assert.strictEqual(s1.commissionPaid, false);
       assert.strictEqual(s1.commissionSettlementId, settlement.id);
-      assert.strictEqual(s2.commissionPaid, true);
+      assert.strictEqual(s2.commissionPaid, false);
       assert.strictEqual(s2.commissionSettlementId, settlement.id);
 
       // Consulta subsiguiente de comisiones pendientes debe reportar 0 ventas disponibles
@@ -961,6 +967,16 @@ describe('⚔️ CHALLENGER M3: Invariante 20% & Zero-Balance Gate Forensic Suit
           return true;
         }
       );
+
+      // Al marcar como pagada (Surgery 1.2), commissionPaid pasa a true en las ventas vinculadas
+      await markSettlementPaid({
+        tenantId: 'tenant-deko-01',
+        settlementId: settlement.id,
+        paymentReference: 'TRANSF-FREEZE-001',
+        userId: 'usr-admin-01',
+      });
+      assert.strictEqual(store.sales.get('freeze-sale-1').commissionPaid, true);
+      assert.strictEqual(store.sales.get('freeze-sale-2').commissionPaid, true);
     });
 
     it('5.2 Generador correlativo LIQ-YYYYMM-001 incrementa secuencialmente y maneja padding de 3 dígitos', async () => {

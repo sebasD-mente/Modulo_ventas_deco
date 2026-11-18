@@ -602,6 +602,34 @@
       ],
       "evidence": "node --test tests/sales/remote-sale-design-edition.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js -> Exit code 0 (38/38 PASS across 15 suites in 167.63ms: DesignEditionPanel mounted strictly between SaleCartList and DeliveryMethodSelector in REDES_PERSONALIZADO, exact inputs 'Descripción de la edición' & 'Costo de la edición (Q)' >= 44px without amber/orange, calculateRemoteOrderTotals reactive sum productsAmount + effectiveEditionCost + effectiveShippingCost, WhatsAppQuoteShareModal breakdown from direct props & sale.notes, Zod + createRemoteSaleTransaction persistence into sale.notes & SaleItem.productionNotes without phantom SaleItem, calculateSaleProductBase 20% commission invariant preserved, line caps DesignEditionPanel 86L<=140L / FastManualSaleForm 343L<=350L / useRemoteSaleForm 344L<=350L / RemoteQuoterSummary 323L<=350L / WhatsAppQuoteShareModal 187L<=280L); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 36.04s (195 secrets OK, 278 JS syntax OK, 13/13 zero-trust, vite build 1568 modules PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-028. Cero lectura de .env, cero cambios en prisma/schema.prisma, y cumplidos al 100% los guardarraíles de surgery-059 (orden DOM y pasos 3 y 4), surgery-061 (techos <= 350L y paleta libre de naranja), ergonomía >= 44px y 0 CRLF."
+    },
+    {
+      "id": "feat-020",
+      "name": "Inclusión del Costo de Edición de Diseño en la Base Comisionable del 20% para Vendedor de Redes (Excluyendo Únicamente el Flete)",
+      "description": "Ajustar el motor contable de comisiones del rol VENDEDOR_REDES para que el costo de edición de diseño sí forme parte de la base comisionable del 20% (excluyendo únicamente el flete de envío), sin modificar prisma/schema.prisma: (1) En server/services/commissionService.js: exportar extractSaleEditionCost(sale) leyendo sale.editionCost o el sello estructurado '[Edición (+Q X.XX): ...]' persistido en sale.notes, y sumar dicho monto a la base neta en calculateSaleProductBase(sale) (base = Math.max(0, itemsSubtotal - discount) + editionCost), impactando automáticamente getPendingCommissions (ventas elegibles y waitingSummary.potentialCommission), createSettlementTransaction (totalProductsAmount y totalCommission) y enriqueciendo settlement.sales en getSettlementById con baseProductos y commissionAmount; (2) En src/components/commissions/SettlementDetailReceiptModal.jsx: asegurar que el fallback de base respete también el cargo de edición manteniendo intacto el operador nullish coalescing 's.baseProductos ??'; y (3) Actualizar la aserción de comisión en tests/sales/remote-sale-design-edition.test.js y agregar la suite dedicada tests/commissions/commission-design-edition-inclusion.test.js.",
+      "area": "commissions-include-design-edition",
+      "user_visible_behavior": "Cuando un pedido de redes incluye un cargo por Edición de Diseño (ej. Q 130 en cuadros + Q 25 de edición + Q 35 de flete), tanto en Mis Comisiones como en Liquidaciones y Recibos de Corte la base comisionable es Q 155.00 y la comisión del 20% para el vendedor es Q 31.00 (incluyendo la edición y excluyendo únicamente el flete).",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-019"
+      ],
+      "required_files": [
+        "server/services/commissionService.js",
+        "src/components/commissions/SettlementDetailReceiptModal.jsx",
+        "tests/sales/remote-sale-design-edition.test.js",
+        "tests/commissions/commission-design-edition-inclusion.test.js",
+        "tests/adversarial/m3-commission-invariants-challenger.test.js"
+      ],
+      "verification": [
+        "node --test tests/commissions/commission-design-edition-inclusion.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js tests/domain3/commission.test.js tests/adversarial/m3-commission-invariants-challenger.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/commissions/commission-design-edition-inclusion.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js tests/domain3/commission.test.js tests/adversarial/m3-commission-invariants-challenger.test.js -> Exit code 0 (122/122 PASS across 33 suites in 285.28ms: extractSaleEditionCost from direct prop & multiline sale.notes '[Edición (+Q X.XX): ...]', calculateSaleProductBase = Math.max(0, itemsSubtotal - discount) + editionCost with 100% shippingCost exclusion & 0 double-counting in raw fallback, getPendingCommissions eligible & waitingSummary.potentialCommission, createSettlementTransaction & getSettlementById sales enrichment, SettlementDetailReceiptModal calculateReceiptRowAmounts preserving 's.baseProductos ??' <= 280L); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 32.91s (195 secrets OK, 279 JS syntax OK, 13/13 zero-trust, vite build 1568 modules PASS in 4.19s); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-030. Guardarraíles verificados al 100%: 's.baseProductos ??' preservado en SettlementDetailReceiptModal.jsx (267L <= 280L), 100% de flete excluido, MockCommissionStore en m3-commission-invariants-challenger.test.js alineado al predicado Prisma status.in y al ciclo PENDIENTE_PAGO -> PAGADO de Surgery 1.1..1.2, cero lectura de .env, cero cambios en prisma/schema.prisma y 0 CRLF."
     }
   ]
 }
