@@ -571,6 +571,37 @@
       ],
       "evidence": "node --test tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js -> Exit code 0 (41/41 PASS across 14 suites in 173.89ms: resetModalState on open/close/submit revoking blob URLs with 0 uploadSuccess freeze across 3 consecutive openings, CustomArtUploader <input type='file' multiple> + batch upload + individual thumbnail removal + e.target.value reset, 1-to-1 SaleItem batch creation with 15/15 unique IDs & createRemoteSaleSchema/createRemoteSaleTransaction A_PRODUCCION verification, line caps CustomItemModal 258L<=280L / CustomArtUploader 223L<=280L / useRemoteSaleForm 342L<=350L, 0 amber/orange classes); node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js -> Exit code 0 (1/1 PASS); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 31.12s (194 secrets OK, 277 JS syntax OK, 13/13 zero-trust, vite build 1567 modules PASS in 3.94s); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-026. Cero lectura de .env, cero cambios en prisma/schema.prisma, y cumplidos todos los guardarraíles de surgery-061 (3.1..3.6 y techos <= 280L / <= 350L), ergonomía >= 44px en todos los controles y 0 CRLF."
+    },
+    {
+      "id": "feat-019",
+      "name": "Casilla de Edición de Diseño (Descripción + Costo de Edición) en Nueva Venta de Redes Sumada al Total del Pedido",
+      "description": "Incorporar en el formulario general de Nueva Venta de Redes (REDES_PERSONALIZADO) una casilla/sección dedicada a Ediciones de Diseño ubicada inmediatamente debajo del panel donde se ven agregados los diseños al pedido (SaleCartList.jsx) e inmediatamente arriba de Método de Entrega & Logística (DeliveryMethodSelector.jsx), sin alterar prisma/schema.prisma: (1) UI de Edición (src/components/manual-sale/DesignEditionPanel.jsx y FastManualSaleForm.jsx): tarjeta limpia y minimalista con campo para 'Descripción de la edición' (ej. 'Se agregaron letras en la esquina inferior') y campo numérico para 'Costo de la edición (Q)', con estética blanca/neutra, cero colores naranja/ámbar, cero doble icono y ergonomía táctil >= 44px; (2) Aritmética Reactiva y Desglose (useRemoteSaleForm.js, RemoteQuoterSummary.jsx y WhatsAppQuoteShareModal.jsx): sumar automáticamente effectiveEditionCost al total del pedido (totalAmount = productsAmount + effectiveEditionCost + effectiveShippingCost, impactando en tiempo real el botón 100%, balanceDue y el desglose 'Edición de diseño: Q X.XX' en RemoteQuoterSummary.jsx así como el comprobante de WhatsApp), limpiando ambos campos tras registrar la venta; y (3) Validación y Persistencia Backend sin Migración Prisma (remoteSaleValidators.js y remoteSaleService.js): aceptar editionDescription y editionCost >= 0 en createRemoteSaleSchema y createRemoteSaleTransaction sumando editionCost a totalAmount, estampando el detalle estructurado '[Edición (+Q X.XX): <descripción>]' en sale.notes y '[Edición]: <descripción>' en productionNotes de los SaleItems para que Taller/Producción visualice la instrucción exacta de edición en ProductionOrderCard.jsx sin crear ítems fantasma en la cola de impresión ni distorsionar la base de comisión de pósters.",
+      "area": "remote-sales-design-edition-charge",
+      "user_visible_behavior": "En Nueva Venta de Redes, justo debajo de los pósters agregados al pedido, el vendedor dispone de una casilla para describir la edición solicitada (ej. 'Se agregaron letras en la esquina inferior') e ingresar el costo de la edición, el cual se suma de inmediato al total del pedido, queda desglosado en el cotizador y en WhatsApp, y llega visible como nota de edición a Taller.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-018"
+      ],
+      "required_files": [
+        "src/components/manual-sale/DesignEditionPanel.jsx",
+        "src/components/FastManualSaleForm.jsx",
+        "src/components/manual-sale/hooks/useRemoteSaleForm.js",
+        "src/components/manual-sale/RemoteQuoterSummary.jsx",
+        "src/components/manual-sale/WhatsAppQuoteShareModal.jsx",
+        "server/validators/remoteSaleValidators.js",
+        "server/services/sales/remoteSaleService.js",
+        "tests/sales/remote-sale-design-edition.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/remote-sale-design-edition.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/remote-sale-design-edition.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js -> Exit code 0 (38/38 PASS across 15 suites in 167.63ms: DesignEditionPanel mounted strictly between SaleCartList and DeliveryMethodSelector in REDES_PERSONALIZADO, exact inputs 'Descripción de la edición' & 'Costo de la edición (Q)' >= 44px without amber/orange, calculateRemoteOrderTotals reactive sum productsAmount + effectiveEditionCost + effectiveShippingCost, WhatsAppQuoteShareModal breakdown from direct props & sale.notes, Zod + createRemoteSaleTransaction persistence into sale.notes & SaleItem.productionNotes without phantom SaleItem, calculateSaleProductBase 20% commission invariant preserved, line caps DesignEditionPanel 86L<=140L / FastManualSaleForm 343L<=350L / useRemoteSaleForm 344L<=350L / RemoteQuoterSummary 323L<=350L / WhatsAppQuoteShareModal 187L<=280L); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 36.04s (195 secrets OK, 278 JS syntax OK, 13/13 zero-trust, vite build 1568 modules PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-028. Cero lectura de .env, cero cambios en prisma/schema.prisma, y cumplidos al 100% los guardarraíles de surgery-059 (orden DOM y pasos 3 y 4), surgery-061 (techos <= 350L y paleta libre de naranja), ergonomía >= 44px y 0 CRLF."
     }
   ]
 }

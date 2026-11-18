@@ -13,8 +13,8 @@ import CustomerWhatsAppSearch from './manual-sale/CustomerWhatsAppSearch';
 import DeliveryMethodSelector from './manual-sale/DeliveryMethodSelector';
 import RemoteQuoterSummary from './manual-sale/RemoteQuoterSummary';
 import CustomItemModal from './manual-sale/CustomItemModal';
+import DesignEditionPanel from './manual-sale/DesignEditionPanel';
 import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
-
 
 export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
   const { isVendedorRedes, isVendedor, isSuperAdmin, authFetch } = useAuth();
@@ -211,6 +211,15 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             onChangeSize={cart.changeItemSize} onRemoveItem={cart.removeItem} onClearCart={cart.clearCart}
           />
 
+          {/* Casilla de Edición de Diseño (Descripción + Costo sumado al Total) */}
+          <DesignEditionPanel
+            editionDescription={remoteForm.editionDescription}
+            setEditionDescription={remoteForm.setEditionDescription}
+            editionCost={remoteForm.editionCost}
+            setEditionCost={remoteForm.setEditionCost}
+            effectiveEditionCost={remoteForm.effectiveEditionCost}
+          />
+
           {/* Selector de Entrega y Logística */}
           <DeliveryMethodSelector
             deliveryMethod={remoteForm.deliveryMethod} setDeliveryMethod={remoteForm.setDeliveryMethod}
@@ -224,7 +233,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           {/* Cotizador y Registro de Anticipo */}
           <RemoteQuoterSummary
             productsSubtotal={remoteForm.productsSubtotal} productsAmount={remoteForm.productsAmount}
-            discount={cart.discount} effectiveShippingCost={remoteForm.effectiveShippingCost}
+            discount={cart.discount} effectiveEditionCost={remoteForm.effectiveEditionCost}
+            editionDescription={remoteForm.editionDescription} effectiveShippingCost={remoteForm.effectiveShippingCost}
             totalAmount={remoteForm.totalAmount}
             depositInput={remoteForm.depositInput} setDepositInput={remoteForm.setDepositInput}
             numericDeposit={remoteForm.numericDeposit} balanceDue={remoteForm.balanceDue}

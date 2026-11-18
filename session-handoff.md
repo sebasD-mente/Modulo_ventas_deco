@@ -1,28 +1,32 @@
 # Session Handoff
 
 ## Current Objective
-- **Goal:** Ejecución y cierre verificado de `feat-018` (Desbloqueo de Múltiples Diseños e Imágenes en Pedidos Personalizados para `VENDEDOR_REDES`: reinicio limpio del modal en cada apertura/cierre/confirmación, carga múltiple `multiple` con gestión individual de miniaturas en `CustomArtUploader.jsx` e inyección 1-a-1 de `SaleItem`s al carrito).
-- **Current status:** `clean-state` (`WIP = 0`; `feat-000..018` en `done`; `Overall: 100/100`).
-- **Branch / commit:** `main` (todos los entregables y artefactos del arnés en `0 CRLF` y puertas `100/100` en verde).
+- **Goal:** Implementación y verificación integral de `feat-019` (casilla de Edición de Diseño con descripción y costo sumado al total del pedido en Nueva Venta de Redes, ubicada inmediatamente debajo de `SaleCartList`).
+- **Current status:** `clean-state` (`WIP = 0`; `feat-000..019` en `done`; `Overall: 100/100`).
+- **Branch / commit:** `main` (`feat-019` completada y verificada en local con `0 CRLF`, lista para despliegue cuando el usuario lo indique).
 
 ## Completed This Session
-- [x] Implementado `src/components/manual-sale/CustomArtUploader.jsx` (`223L <= 280L`) con `<input type="file" multiple>`, *Drag & Drop* multi-archivo, limpieza `e.target.value = ''`, adición incremental de fotos (`+ Agregar más imágenes a este lote`), remoción individual (`min-h-[44px] min-w-[44px]`) con revocación de `blob:` URLs y soporte de enlace URL externo.
-- [x] Actualizado `src/components/manual-sale/CustomItemModal.jsx` (`258L <= 280L`) con `resetModalState()` al abrir (`isOpen`), cerrar/cancelar y enviar (eliminando el bloqueo `uploadSuccess` del 2.º diseño en adelante) y `buildCustomItemPayloads()` para inyectar $N$ cuadros individuales al carrito cuando se suben $N > 1$ imágenes en lote, preservando intactos los contratos `surgery-061` (`3.1..3.6`) y `val005` (`>= 44px`).
-- [x] Actualizado `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`342L <= 350L`) con `createCartCustomItem` y secuencia monotónica sin colisión de IDs en ráfagas síncronas.
-- [x] Creada y ejecutada `tests/sales/custom-item-multi-image-and-reset.test.js` (`11/11 PASS`) junto con `surgery-061` (`23/23 PASS`), `feat-017` (`7/7 PASS`), `val005` `CustomItemModal` (`1/1 PASS`), `npm run test:unit` (`265/265 PASS`), `npm run test:voice` (`53/53 PASS`), `npm run harness:check` (`HARNESS_PASS`) y `bash ./init.sh` (`100/100 CLEAN STATE`).
+- [x] Creado `src/components/manual-sale/DesignEditionPanel.jsx` (`86L <= 140L`) y montado en `src/components/FastManualSaleForm.jsx` (`343L <= 350L`) inmediatamente debajo de `<SaleCartList />` y arriba de `<DeliveryMethodSelector />` dentro del modo `REDES_PERSONALIZADO`, con los campos `Descripción de la edición` y `Costo de la edición (Q)` (`min-h-[44px]`, cero tonos naranja/ámbar y cero doble icono).
+- [x] Incorporada la suma reactiva `calculateRemoteOrderTotals` en `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`344L <= 350L`) (`totalAmount = productsAmount + effectiveEditionCost + effectiveShippingCost`), validación de descripción obligatoria cuando `effectiveEditionCost > 0`, limpieza automática al registrar la venta, desglose `Edición de diseño: Q X.XX` en `src/components/manual-sale/RemoteQuoterSummary.jsx` (`323L <= 350L`) y desglose en `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` (`187L <= 280L`).
+- [x] Extendidos `server/validators/remoteSaleValidators.js` y `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction`) para aceptar `editionDescription` y `editionCost >= 0`, sumar `editionCost` a `totalAmount`, estampar `[Edición (+Q X.XX): <descripción>]` en `sale.notes` y `[Edición]: <descripción>` en `SaleItem.productionNotes` (visible en Taller sin crear `SaleItem` fantasma ni alterar la comisión del 20% ni `prisma/schema.prisma`).
+- [x] Creada y ejecutada la suite `tests/sales/remote-sale-design-edition.test.js` (`9/9 PASS`; `38/38 PASS` con `surgery-059/061`; `265/265` unit tests PASS; `53/53` voice tests PASS; `npm run harness:check` `HARNESS_PASS`).
 
 ## Blockers / Risks
 - Ninguno activo.
 
 ## Files Touched
-- `src/components/manual-sale/CustomArtUploader.jsx`
-- `src/components/manual-sale/CustomItemModal.jsx`
+- `src/components/manual-sale/DesignEditionPanel.jsx`
+- `src/components/FastManualSaleForm.jsx`
 - `src/components/manual-sale/hooks/useRemoteSaleForm.js`
-- `tests/sales/custom-item-multi-image-and-reset.test.js`
+- `src/components/manual-sale/RemoteQuoterSummary.jsx`
+- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx`
+- `server/validators/remoteSaleValidators.js`
+- `server/services/sales/remoteSaleService.js`
+- `tests/sales/remote-sale-design-edition.test.js`
 - `feature_list.json`
 - `sprint-contract.md`
 - `progress.md`
 - `session-handoff.md`
 
 ## Recommended Next Step
-- Desplegar `feat-018` a producción (`npm run deploy`) cuando el usuario lo solicite, o iniciar la siguiente sesión con `bash ./init.sh` para planificar nuevas funcionalidades en `feature_list.json`.
+- Desplegar `feat-019` a producción (`npm run deploy` -> `https://ventas.decovintage.online`) cuando el usuario lo solicite o registrar la siguiente funcionalidad en `feature_list.json`.

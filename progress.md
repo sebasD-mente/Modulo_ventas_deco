@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-17 19:12
-**Session ID:** sesion-026 (Ejecución y Verificación Integral de `feat-018`: Desbloqueo de Múltiples Diseños e Imágenes en Pedidos Personalizados)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..018` en `done`)
+**Last Updated:** 2026-11-17 20:56
+**Session ID:** sesion-028 (Implementación y Verificación Completa de `feat-019`: Casilla de Edición de Diseño con Descripción y Costo Sumado al Total en Nueva Venta de Redes)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..019` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -75,14 +75,20 @@
   - Implementada la inyección 1-a-1 por diseño (`buildCustomItemPayloads` en `CustomItemModal.jsx` + secuencia monotónica sin colisiones `createCartCustomItem` en `useRemoteSaleForm.js`, `342L <= 350L`): al subir $N > 1$ imágenes en una misma tanda, se crean automáticamente $N$ ítems independientes en el carrito (`Diseño 1/N .. Diseño N/N`), cada uno con su propio `customImageUrl` para el cálculo contable, el comprobante de WhatsApp y la cola de Producción / Taller (`A_PRODUCCION`).
   - Añadida la suite `tests/sales/custom-item-multi-image-and-reset.test.js` (`11/11 PASS`).
 
+- [x] **Casilla de Edición de Diseño (Descripción + Costo Sumado al Total) en Nueva Venta de Redes `feat-019` (`38/38` `remote-sale-design-edition` + `surgery-059/061` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Creado `src/components/manual-sale/DesignEditionPanel.jsx` (`86L <= 140L`) y montado en `src/components/FastManualSaleForm.jsx` (`343L <= 350L`) estrictamente debajo de `<SaleCartList />` y arriba de `<DeliveryMethodSelector />` en el modo `REDES_PERSONALIZADO`, con los campos `Descripción de la edición` (`placeholder="Ej. Se agregaron letras en la esquina inferior"`) y `Costo de la edición (Q)` (`min-h-[44px]`, cero clases `amber-*`/`orange-*` y cero emojis redundantes).
+  - Incorporado `calculateRemoteOrderTotals` en `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`344L <= 350L`) sumando `effectiveEditionCost` en tiempo real a `totalAmount` (`productsAmount + effectiveEditionCost + effectiveShippingCost`), validando descripción obligatoria cuando `effectiveEditionCost > 0`, limpiando ambos estados tras confirmar la venta, y desglosando `Edición de diseño: Q X.XX` en `src/components/manual-sale/RemoteQuoterSummary.jsx` (`323L <= 350L`) y en `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` (`187L <= 280L`).
+  - Extendidos `server/validators/remoteSaleValidators.js` (`createRemoteSaleSchema`) y `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction`) para validar y sumar `editionCost >= 0` a `totalAmount`, estampar `[Edición (+Q X.XX): <descripción>]` en `sale.notes` y `[Edición]: <descripción>` en `SaleItem.productionNotes` (visible en Taller en `ProductionOrderCard.jsx` sin crear `SaleItem` fantasma, sin alterar `prisma/schema.prisma` y manteniendo intacta la base de comisión del 20% en `calculateSaleProductBase`).
+  - Añadida la suite `tests/sales/remote-sale-design-edition.test.js` (`9/9 PASS`).
+
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..018` completadas y verificadas localmente).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..019` completadas).
 
 ### What's Next
-- Listo para desplegar `feat-018` a producción (`npm run deploy`) cuando el usuario lo indique o registrar el siguiente requerimiento en `feature_list.json`.
+- Desplegar `feat-019` a producción (`npm run deploy` -> `https://ventas.decovintage.online`) cuando el usuario lo solicite o registrar el siguiente requerimiento en `feature_list.json`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 41/41 custom item & remote sale contract tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 38/38 design edition & remote sale contract tests PASS).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -112,20 +118,30 @@
   - Alternatives considered: (a) Guardar un array de URLs concatenadas en una sola fila de `SaleItem` (descartado porque rompería `prisma/schema.prisma` y evitaría que Taller/Producción gestione cada póster por separado); (b) Meter toda la galería `multiple` dentro de `CustomItemModal.jsx` sin extraer subcomponente (descartado porque superaría de inmediato el techo duro de `280` líneas de `surgery-061`).
   - Resolution: Se implementó `resetModalState()` en `CustomItemModal.jsx` (`258L <= 280L`), se extrajo `CustomArtUploader.jsx` (`223L <= 280L`) con `<input type="file" multiple>`, limpieza `e.target.value = ''` y remoción individual de miniaturas (`min-h-[44px] min-w-[44px]`), y se habilitó la creación 1-a-1 de `SaleItem`s con secuencia monotónica libre de colisiones en `useRemoteSaleForm.js` (`342L <= 350L`).
 
+- **Cargo de Edición de Diseño sin `SaleItem` Fantasma ni Migración Prisma (`feat-019` — Implementado)**:
+  - Context: El usuario solicitó añadir en Nueva Venta de Redes, justo debajo de la lista de diseños agregados (`SaleCartList`), una casilla para registrar la descripción de una edición (ej. `"Se agregaron letras en la esquina inferior"`) y el costo de esa edición sumándolo al total del pedido, sin alterar `prisma/schema.prisma`.
+  - Alternatives considered: (a) Insertar un `SaleItem` adicional llamado `"Edición..."` (descartado porque entraría como póster falso a la cola de impresión de Taller/Operario 2 y alteraría la base de pósters de comisión del 20%); (b) Agregar columnas nuevas en `Sale` en `prisma/schema.prisma` (descartado para mantener cero migraciones destructivas/DDL innecesarias en producción).
+  - Resolution: Se implementó `DesignEditionPanel.jsx` (`86L`) entre `SaleCartList` y `DeliveryMethodSelector` (respetando `surgery-059` `2.1` y `4.2`), sumando `effectiveEditionCost` a `totalAmount` en `useRemoteSaleForm.js` (`344L <= 350L`) y `createRemoteSaleTransaction`, desglosándolo en `RemoteQuoterSummary.jsx` (`323L <= 350L`) y `WhatsAppQuoteShareModal.jsx` (`187L <= 280L`), y estampando `[Edición (+Q X.XX): ...]` en `sale.notes` y `[Edición]: ...` en `SaleItem.productionNotes` para que Taller vea la instrucción directamente en `ProductionOrderCard.jsx`.
+
 ## Files Modified This Session
-- `src/components/manual-sale/CustomArtUploader.jsx` — Nuevo subcomponente de carga múltiple (`multiple`), *Drag & Drop*, adición incremental, remoción individual de miniaturas con revocación de `blob:` URLs y enlace URL externo (`223L <= 280L`, `0 CRLF`).
-- `src/components/manual-sale/CustomItemModal.jsx` — Reinicio limpio `resetModalState()` al abrir/cerrar/confirmar, generación 1-a-1 en lote (`buildCustomItemPayloads`) y cumplimiento de ergonomía táctil `>= 44px` y contratos `surgery-061` (`258L <= 280L`, `0 CRLF`).
-- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — Helper `createCartCustomItem` con contador monotónico para inyecciones síncronas en lote sin colisión de IDs (`342L <= 350L`, `0 CRLF`).
-- `tests/sales/custom-item-multi-image-and-reset.test.js` — Suite de verificación de reinicio multi-apertura, carga múltiple, remoción individual, inyección 1-a-1 hacia Zod/`createRemoteSaleTransaction` y ergonomía `>= 44px` (`11/11 PASS`, `0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Cierre documental y evidencia verificada de `feat-018` (`WIP = 0`, `0 CRLF`).
+- `src/components/manual-sale/DesignEditionPanel.jsx` — Nuevo panel minimalista de Edición de Diseño (`Descripción de la edición` + `Costo de la edición (Q)`, `86L <= 140L`, `0 CRLF`).
+- `src/components/FastManualSaleForm.jsx` — Montado `<DesignEditionPanel />` debajo de `<SaleCartList />` y arriba de `<DeliveryMethodSelector />` en `REDES_PERSONALIZADO` (`343L <= 350L`, `0 CRLF`).
+- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — `calculateRemoteOrderTotals`, estados `editionDescription`/`editionCost`, validación preventiva, payload y limpieza post-venta (`344L <= 350L`, `0 CRLF`).
+- `src/components/manual-sale/RemoteQuoterSummary.jsx` — Desglose `Edición de diseño: Q X.XX` en `Desglose Contable de la Orden` (`323L <= 350L`, `0 CRLF`).
+- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` — `extractSaleEditionDetails` y `buildWhatsAppOrderMessage` incluyendo edición en el comprobante de WhatsApp (`187L <= 280L`, `0 CRLF`).
+- `server/validators/remoteSaleValidators.js` — Campos `editionDescription` y `editionCost` con validación Zod en `createRemoteSaleSchema` (`0 CRLF`).
+- `server/services/sales/remoteSaleService.js` — Suma de `editionCost` en `totalAmount`, sello en `sale.notes` y `SaleItem.productionNotes` sin `SaleItem` fantasma y trazabilidad en `AuditLog` (`0 CRLF`).
+- `tests/sales/remote-sale-design-edition.test.js` — Suite dedicada de `feat-019` (`9/9 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Sincronizados a `done` / `WIP = 0` con evidencia verificable (`0 CRLF`).
 
 ## Verification Evidence
-- [x] Suites Focalizadas `feat-018` + `surgery-061` + `feat-017`: `node --test tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js` -> `Exit code 0 (41/41 PASS across 14 suites in 173.89ms)`
-- [x] Ergonomía Táctil `val005` (`CustomItemModal`): `node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js` -> `Exit code 0 (1/1 PASS)`
-- [x] Suite Completa de Voz: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
-- [x] Compuerta Unificada Deko Labs: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 31.12s (check-architecture PASS, validate-harness 100/100 PASS, audit-secrets 194 files PASS, audit-syntax 277 JS files PASS, verify-gemini-models PASS, zero-trust 13/13 PASS, test:unit 265/265 PASS across 109 suites, vite build 1567 modules PASS in 3.94s)`
-- [x] Verificación en 3 Puertas (`sesion-026`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`
+- [x] Suite Focalizada `feat-019` + Guardarraíles: `node --test tests/sales/remote-sale-design-edition.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (38/38 PASS across 15 suites in 167.63ms)`
+- [x] Pruebas Unitarias del Proyecto: `npm run test:unit` -> `Exit code 0 (265/265 PASS across 109 suites)`
+- [x] Suite de Voz y VAD: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
+- [x] Compuerta Física Unificada Deko Labs: `npm run harness:check` -> `status: HARNESS_PASS, framework: STAND-IA-UNIFIED-HARNESS (36.04s: check-architecture PASS, validate-harness 100/100, audit-secrets 195 files OK, audit-syntax 278 JS files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1568 modules PASS)`
+- [x] Verificación en 3 Puertas (`sesion-028`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`
+- [x] Validación Matemática del Arnés: `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`), con `feat-018` completada, probada y lista para despliegue cuando el usuario lo solicite.
-2. Iniciar siempre cualquier sesión futura ejecutando `bash ./init.sh`.
+1. `feat-019` implementada y verificada al 100% en local (`WIP = 0`, `Overall: 100/100`, `0 CRLF`).
+2. Lista para desplegar en producción con `npm run deploy` cuando el usuario lo solicite.

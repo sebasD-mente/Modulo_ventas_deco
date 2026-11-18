@@ -4,50 +4,64 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-018` Completada y Verificada en `100/100`)
-- **Tareas recientes completadas:** `feat-015`, `feat-016`, `feat-017` y `feat-018` (`done`).
-- **Tarea activa en ejecución (`WIP = 0`):** Ninguna (`feat-000..018` en `done`).
-- **Última verificación ejecutada:** `Modo Diario Ágil` (`41/41` suites focalizadas PASS, `1/1` `val005` `CustomItemModal` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100 CLEAN STATE`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-019` Completada y Verificada)
+- **Tareas completadas:** `feat-000` a `feat-019` (`done`).
+- **Siguiente tarea planificada en cola DAG:** Ninguna pendiente (`WIP = 0`).
+- **Última verificación ejecutada:** `Modo Diario Ágil` (`38/38` `feat-019 + surgery-059/061` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`).
 
 ---
 
-## Alcance Incluido (`In-Scope`) para `feat-018`
+## Alcance Incluido (`In-Scope`) para `feat-019`
 
-1. **Reinicio Limpio de Estado en `CustomItemModal.jsx` (Solución al bloqueo del 2.º diseño en adelante)**:
-   - Como `<CustomItemModal />` permanece montado en `FastManualSaleForm.jsx` (`if (!isOpen) return null;`), implementar una función `resetModalState()` que limpie todos los estados locales (`mode = 'STANDARD'`, `material = 'MDF_5_5MM'`, `selectedSize = null`, `customWidth = ''`, `customHeight = ''`, `unitPrice = ''`, `quantity = 1`, `description = ''`, `uploadedArts = []`, `customImageUrl = ''`, `isUploading = false`, `uploadError = ''`, `showUrlInput = false`, `errorMsg = ''`) y revoque cualquier `blob:` URL temporal (`URL.revokeObjectURL`).
-   - Ejecutar `resetModalState()` al confirmar (`handleSubmit`), al cerrar/cancelar (`handleClose` -> `onClose()`) y en `useEffect` cuando `isOpen` cambie a `true`, garantizando que el vendedor pueda abrir `+ Personalizado` 2, 5 o 20 veces seguidas en un mismo pedido con el modal y el selector de archivos 100% limpios.
+1. **Nueva Casilla de Edición de Diseño debajo de los Diseños del Pedido (`src/components/manual-sale/DesignEditionPanel.jsx` + `src/components/FastManualSaleForm.jsx`)**:
+   - Crear el componente `src/components/manual-sale/DesignEditionPanel.jsx` (`<= 140` líneas) y montarlo en la rama `REDES_PERSONALIZADO` de `FastManualSaleForm.jsx` **inmediatamente debajo de `<SaleCartList />` e inmediatamente arriba de `<DeliveryMethodSelector />`**.
+   - **Diseño e Inputs**:
+     - Tarjeta limpia acorde al formulario (`p-4 rounded-2xl bg-black border border-neutral-800 text-xs space-y-3`), con cabecera de icono minimalista de `lucide-react` (p. ej. `PenTool` o `Type`, cero emojis redundantes y cero clases `amber-*` / `orange-*`), título **`Edición de Diseño (Opcional)`** y badge derecho `+ Q {effectiveEditionCost.toFixed(2)}` cuando `effectiveEditionCost > 0`.
+     - **Campo 1 — `Descripción de la edición`**: `<input type="text" ... placeholder="Ej. Se agregaron letras en la esquina inferior" className="... min-h-[44px] ..." />`.
+     - **Campo 2 — `Costo de la edición (Q)`**: `<input type="number" min="0" step="any" ... placeholder="0.00" className="... min-h-[44px] font-mono ..." />`.
 
-2. **Subida Múltiple de Imágenes (`multiple`) + Quitar / Reemplazar / Agregar Más Fotos (`src/components/manual-sale/CustomArtUploader.jsx`)**:
-   - Extraer la interfaz y lógica de carga de artes personalizados hacia un subcomponente cohesivo `src/components/manual-sale/CustomArtUploader.jsx` (manteniendo `CustomItemModal.jsx` muy por debajo de su techo estricto de `<= 280` líneas).
-   - Habilitar `<input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" />` y soporte de múltiples archivos en *Drag & Drop* (`Array.from(e.dataTransfer?.files || [])`).
-   - Procesar y subir secuencialmente o en paralelo controlado cada imagen seleccionada usando `compressImage(file, 1920, 0.85)` hacia `POST /api/sales/upload-art`, acumulando los resultados en `uploadedArts` (`[{ id, url, previewUrl, name }]`) sin destruir ni ocultar nunca el botón para **seguir agregando más imágenes** (`+ Agregar imagen(es)`).
-   - Renderizar una grilla/lista clara de miniaturas cargadas donde cada imagen tenga un botón accesible (`min-h-[44px] min-w-[44px]`) para **quitarla individualmente** si el vendedor seleccionó una foto equivocada, conservando también la opción de ingresar un enlace URL externo manual (Drive, Dropbox, etc.).
+2. **Suma Reactiva al Total del Pedido y Desglose Visual (`useRemoteSaleForm.js`, `RemoteQuoterSummary.jsx` y `WhatsAppQuoteShareModal.jsx`)**:
+   - **En `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`<= 350` líneas estrictas)**:
+     - Añadir estados `editionDescription` (`''`) y `editionCost` (`''`).
+     - Calcular `effectiveEditionCost = Math.max(0, Number((Number(editionCost) || 0).toFixed(2)))`.
+     - Sumar `effectiveEditionCost` a `totalAmount`:
+       `totalAmount = Number((productsAmount + effectiveEditionCost + effectiveShippingCost).toFixed(2))`
+       *(Esto actualiza automáticamente `balanceDue`, `isDepositValid` y el botón de `100%` en `RemoteQuoterSummary.jsx`)*.
+     - Si `effectiveEditionCost > 0 && !editionDescription.trim()`, mostrar validación preventiva clara en `confirmRemoteSale` (`'Ingresa la descripción de la edición realizada (ej. letras o retoque aplicado).'`).
+     - Incluir `editionDescription: editionDescription.trim() || null` y `editionCost: effectiveEditionCost` en el `payload` enviado a `POST /api/sales/remote`, y limpiar ambos estados (`setEditionDescription('')`, `setEditionCost('')`) tras registrar la venta.
+   - **En `src/components/manual-sale/RemoteQuoterSummary.jsx` (`<= 350` líneas estrictas)**:
+     - Recibir `effectiveEditionCost = 0` (y opcionalmente `editionDescription = ''`).
+     - En el bloque `Desglose Contable de la Orden`, cuando `effectiveEditionCost > 0`, mostrar la fila:
+       `Edición de diseño:` -> `Q {effectiveEditionCost.toFixed(2)}` justo antes de `Envío / Flete:` y `Total de la Orden:`.
+   - **En `src/components/manual-sale/WhatsAppQuoteShareModal.jsx`**:
+     - Si la venta registrada incluye edición (leída desde `sale.editionCost` / `sale.editionDescription` o extraída del sello `[Edición (+Q ...): ...]` en `sale.notes`), mostrar la línea correspondiente de edición en el resumen de WhatsApp para que cuadre al centavo con `Total de la Orden`.
 
-3. **Creación Individual por Diseño en el Carrito (`CustomItemModal.jsx` + `useRemoteSaleForm.js`)**:
-   - En `handleSubmit` de `CustomItemModal.jsx`:
-     - Construir la lista efectiva de artes: las URLs de `uploadedArts` más `customImageUrl.trim()` (si ingresó enlace manual adicional).
-     - **Caso 0 o 1 imagen**: invocar `onAddCustomItem` una sola vez (comportamiento idéntico al actual, respetando `quantity`).
-     - **Caso $N > 1$ imágenes subidas en el mismo lote**: iterar por las $N$ imágenes e invocar `onAddCustomItem` **1 vez por cada imagen** etiquetando claramente cada obra (ej. `${description.trim()} — Diseño ${idx + 1}/${N}`), con el mismo `material`, `customDimensions`, `unitPrice` unitario, `quantity` por diseño y su propio `customImageUrl`. Así, cada cuadro entra como su propio `SaleItem` independiente al carrito, suma exactamente el total correspondiente, se lista con su link individual en el comprobante de WhatsApp y llega por separado con su foto a la cola de Producción / Taller (`Operario 1` y `Operario 2`).
-   - En `addCustomItem` de `src/components/manual-sale/hooks/useRemoteSaleForm.js`:
-     - Asegurar que el `id` generado para cada ítem personalizado sea 100% único incluso cuando `addCustomItem` se invoca $N$ veces seguidas dentro del mismo tick síncrono (usando `setCartItems((prev) => [...prev, newItem])` —que ya es funcional y soporta múltiples llamadas en ráfaga— más un contador o sufijo aleatorio robusto).
+3. **Validación Zod y Persistencia Backend sin Alterar `prisma/schema.prisma` (`server/validators/remoteSaleValidators.js` + `server/services/sales/remoteSaleService.js`)**:
+   - **En `server/validators/remoteSaleValidators.js` (`createRemoteSaleSchema`)**:
+     - Añadir `editionDescription: z.string().trim().max(300, 'La descripción de la edición no puede exceder 300 caracteres').optional().nullable()` y `editionCost: z.number().nonnegative('El costo de edición no puede ser negativo').optional().default(0)`.
+   - **En `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction`)**:
+     - Calcular `const editionCost = Math.max(0, Number(Number(data.editionCost || 0).toFixed(2)));` y `const editionDescription = typeof data.editionDescription === 'string' ? data.editionDescription.trim() : '';`.
+     - Si `editionCost > 0 && !editionDescription`, lanzar error `400` (`'La descripción de la edición es obligatoria cuando se cobra un costo de edición.'`).
+     - Sumar `editionCost` al total de la venta:
+       `const totalAmount = Number((productsAmount + editionCost + shippingCost).toFixed(2));`
+     - **PROHIBIDO crear un `SaleItem` ficticio para la edición** (evita ensuciar la cola de impresión de Taller con un póster inexistente y mantiene intacto el cálculo de comisión del 20% sobre `sale.items` en `commissionService.js`). En cambio, cuando `editionCost > 0 || editionDescription`:
+       1. Estampar de forma legible en `sale.notes`: `[Edición (+Q ${editionCost.toFixed(2)}): ${editionDescription || 'Edición personalizada'}]` (concatenado limpiamente con `data.notes` si existe).
+       2. Estampar en `productionNotes` de cada ítem de `itemsData`: `editionDescription ? \`[Edición]: \${editionDescription}\` : null` (preservando `item.productionNotes` si viniera definido), de modo que `ProductionOrderCard.jsx` muestre automáticamente la indicación de edición en Taller.
+       3. Registrar `editionCost` y `editionDescription` en `auditLog.create` (`details`) y devolver `editionCost` / `editionDescription` en el objeto retornado por `createRemoteSaleTransaction`.
 
-4. **Guardarraíles Innegociables de Arquitectura y Suites Existentes**:
-   - **Techo estricto de líneas (`surgery-061` tests `4.1` y `4.2`)**:
-     - `src/components/manual-sale/CustomItemModal.jsx` **DEBE tener `<= 280` líneas**.
-     - `src/components/manual-sale/hooks/useRemoteSaleForm.js` **DEBE tener `<= 350` líneas**.
-   - **Cadenas exactas obligatorias dentro de `CustomItemModal.jsx` (`surgery-061` tests `3.1..3.6`)**:
-     - `const [unitPrice, setUnitPrice] = useState('');`
-     - `const [selectedSize, setSelectedSize] = useState(null);`
-     - `placeholder="0.00"`
-     - `material === m.id ? 'bg-white text-black border-white font-bold shadow-sm' : 'bg-black border-neutral-800 text-neutral-400 hover:text-white'`
-     - `mode === 'STANDARD' ? 'bg-white text-black shadow font-bold' : 'text-neutral-400 hover:text-white'`
-     - `mode === 'CUSTOM' ? 'bg-white text-black shadow font-bold' : 'text-neutral-400 hover:text-white'`
-     - `bg-emerald-500 hover:bg-emerald-400 text-black font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20`
-   - **Ergonomía táctil `>= 44px` (`val005-sprint3-ergonomics-api-challenger.test.js` test `1.1`)**:
-     - Todo `<button>`, `<input>` (salvo `hidden` / `className="hidden"` — ¡ojo! en `val005` el extractor `extractOpeningTags` solo ignora `type="hidden"`, por lo que cualquier `<input type="file" ... />` en `CustomItemModal.jsx` si quedara allí o en `CustomArtUploader.jsx` conviene que incluya `min-h-[44px]` además de `hidden` por defensa en profundidad!) y `<select>` debe incluir `min-h-[44px]` (y `min-w-[44px]` si es botón `rounded-full` sin `w-full`).
-   - **Suite nueva dedicada**: crear `tests/sales/custom-item-multi-image-and-reset.test.js` verificando: (a) reinicio completo del modal tras enviar/cerrar para agregar 2+ diseños consecutivos; (b) carga `multiple` y remoción individual de imágenes en `CustomArtUploader.jsx`; (c) creación de $N$ ítems independientes en el carrito con IDs únicos y `customImageUrl` propio al subir $N$ imágenes en lote; y (d) compatibilidad Zod con `createRemoteSaleSchema`.
+4. **Guardarraíles Críticos de Arquitectura y Suites Existentes**:
+   - **Orden estricto en `FastManualSaleForm.jsx` (`surgery-059` test `2.1`)**: `<SaleCartList` -> `<DesignEditionPanel` -> `<DeliveryMethodSelector` -> `<RemoteQuoterSummary` (`cartIdx < deliveryIdx < quoterIdx`).
+   - **No alterar numeración de pasos 3 y 4 (`surgery-059` test `4.2`)**: mantener intactos `'<span>3. Método de Entrega & Logística</span>'` en `DeliveryMethodSelector.jsx` y `'<span>4. Cotizador & Registro de Anticipo</span>'` en `RemoteQuoterSummary.jsx`.
+   - **Techos estrictos de líneas (`surgery-059`, `surgery-061`, `surgery-066`)**:
+     - `src/components/FastManualSaleForm.jsx <= 350` líneas (actualmente `332L`).
+     - `src/components/manual-sale/hooks/useRemoteSaleForm.js <= 350` líneas (actualmente `341L`: **¡atención!** compactar declaraciones multi-línea o extraer helper puro para no pasar de `350L`).
+     - `src/components/manual-sale/RemoteQuoterSummary.jsx <= 350` líneas (actualmente `315L`).
+     - `src/components/manual-sale/DesignEditionPanel.jsx <= 280` líneas.
+   - **Ergonomía táctil `>= 44px`**: todo `<input>` y `<button>` en `DesignEditionPanel.jsx` debe tener `min-h-[44px]`.
+   - **Estética limpia**: cero clases `amber-*` / `orange-*`, cero emojis redundantes en botones y `0 CRLF`.
+   - **Suite nueva dedicada**: crear `tests/sales/remote-sale-design-edition.test.js` verificando aritmética frontend/backend (`productsAmount + editionCost + shippingCost`), validación cuando falta descripción con costo `> 0`, persistencia en `sale.notes` y `SaleItem.productionNotes` sin crear `SaleItem` fantasma, e invarianza de `calculateSaleProductBase` en comisiones.
 
 ## Exclusiones Explícitas (`Out-of-Scope`)
 - Cero lectura o modificación de `.env`.
-- Cero modificaciones en `prisma/schema.prisma` (cada diseño personalizado usa `SaleItem.customImageUrl` ya existente).
-- Cero cambios en la lógica de precios o recargos de materiales (`PVC_SURCHARGE`, `WOOD_CUSTOM_CUT_SURCHARGE`, `VINYL_DISCOUNT_FACTOR`).
+- Cero modificaciones en `prisma/schema.prisma`.
+- Cero cambios en el modo presencial de mostrador (`POS_FERIA`).

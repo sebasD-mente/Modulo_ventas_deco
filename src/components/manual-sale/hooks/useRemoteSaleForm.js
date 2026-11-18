@@ -8,6 +8,11 @@ const GUATEMALA_DEPARTMENTS = [
   'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa'
 ];
 
+const INITIAL_CUSTOMER_DATA = {
+  fullName: '', phone: '', email: '', deliveryAddress: '',
+  department: 'Guatemala', municipality: 'Guatemala', sourceChannel: 'WHATSAPP', notes: '',
+};
+
 let customItemSeq = 0;
 
 export function createCartCustomItem({ description, unitPrice, quantity = 1, material = 'MDF_5_5MM', customDimensions = '30x40 cm', customImageUrl = null }) {
@@ -23,6 +28,17 @@ export function createCartCustomItem({ description, unitPrice, quantity = 1, mat
   };
 }
 
+export function calculateRemoteOrderTotals({
+  cartItems = [], discount = 0, editionCost = 0, deliveryMethod = 'ENVIO_COURIER', shippingCost = 0,
+}) {
+  const productsSubtotal = Number(cartItems.reduce((sum, it) => sum + (Number(it.subtotal) || 0), 0).toFixed(2));
+  const productsAmount = Math.max(0, Number((productsSubtotal - (Number(discount) || 0)).toFixed(2)));
+  const effectiveEditionCost = Math.max(0, Number((Number(editionCost) || 0).toFixed(2)));
+  const effectiveShippingCost = deliveryMethod === 'ENVIO_COURIER' ? Math.max(0, Number((Number(shippingCost) || 0).toFixed(2))) : 0;
+  const totalAmount = Number((productsAmount + effectiveEditionCost + effectiveShippingCost).toFixed(2));
+  return { productsSubtotal, productsAmount, effectiveEditionCost, effectiveShippingCost, totalAmount };
+}
+
 export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const { authFetch } = useAuth();
   const { cartItems, setCartItems, discount, clearCart } = cart;
@@ -33,16 +49,11 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isInlineCreation, setIsInlineCreation] = useState(false);
-  const [customerData, setCustomerData] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    deliveryAddress: '',
-    department: 'Guatemala',
-    municipality: 'Guatemala',
-    sourceChannel: 'WHATSAPP',
-    notes: '',
-  });
+  const [customerData, setCustomerData] = useState(INITIAL_CUSTOMER_DATA);
+
+  // Edición de Diseño (Descripción + Costo sumado al Total)
+  const [editionDescription, setEditionDescription] = useState('');
+  const [editionCost, setEditionCost] = useState('');
 
   // Logística y Flete
   const [deliveryMethod, setDeliveryMethod] = useState('ENVIO_COURIER');
@@ -153,11 +164,10 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     return () => { isMounted = false; };
   }, [authFetch, eventId]);
 
-  // Aritmética financiera reactiva (anticipo libre > 0 sin tope mínimo del 50%)
-  const productsSubtotal = cartItems.reduce((sum, it) => sum + (Number(it.subtotal) || 0), 0);
-  const productsAmount = Math.max(0, Number((productsSubtotal - (Number(discount) || 0)).toFixed(2)));
-  const effectiveShippingCost = deliveryMethod === 'ENVIO_COURIER' ? Number(shippingCost || 0) : 0;
-  const totalAmount = Number((productsAmount + effectiveShippingCost).toFixed(2));
+  // Aritmética financiera reactiva (incluye edición de diseño + flete; anticipo libre > 0)
+  const {
+    productsSubtotal, productsAmount, effectiveEditionCost, effectiveShippingCost, totalAmount,
+  } = calculateRemoteOrderTotals({ cartItems, discount, editionCost, deliveryMethod, shippingCost });
 
   const numericDeposit = isPendingPaymentOnly ? 0 : (Number(depositInput) || 0);
   const balanceDue = Math.max(0, Number((totalAmount - numericDeposit).toFixed(2)));
@@ -170,29 +180,15 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     setCustomerResults([]);
     setIsInlineCreation(false);
     setCustomerData({
-      fullName: cust.fullName || '',
-      phone: cust.phone || '',
-      email: cust.email || '',
-      deliveryAddress: cust.deliveryAddress || '',
-      department: cust.department || 'Guatemala',
-      municipality: cust.municipality || 'Guatemala',
-      sourceChannel: cust.sourceChannel || 'WHATSAPP',
-      notes: cust.notes || '',
+      fullName: cust.fullName || '', phone: cust.phone || '', email: cust.email || '',
+      deliveryAddress: cust.deliveryAddress || '', department: cust.department || 'Guatemala',
+      municipality: cust.municipality || 'Guatemala', sourceChannel: cust.sourceChannel || 'WHATSAPP', notes: cust.notes || '',
     });
   };
 
   const clearSelectedCustomer = () => {
     setSelectedCustomer(null);
-    setCustomerData({
-      fullName: '',
-      phone: '',
-      email: '',
-      deliveryAddress: '',
-      department: 'Guatemala',
-      municipality: 'Guatemala',
-      sourceChannel: 'WHATSAPP',
-      notes: '',
-    });
+    setCustomerData({ ...INITIAL_CUSTOMER_DATA });
   };
 
   // Inyección de ítem personalizado al carrito (soporta ráfagas síncronas multi-imagen sin colisión de ID)
@@ -205,6 +201,14 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const confirmRemoteSale = async () => {
     if (cartItems.length === 0) {
       setSubmitError('Debes agregar al menos un producto a la orden.');
+      return false;
+    }
+    if (Number(editionCost) < 0) {
+      setSubmitError('El costo de la edición no puede ser negativo.');
+      return false;
+    }
+    if (effectiveEditionCost > 0 && !editionDescription.trim()) {
+      setSubmitError('Ingresa la descripción de la edición realizada (ej. letras o retoque aplicado).');
       return false;
     }
     if (!customerData.fullName.trim() || customerData.fullName.trim().length < 2) {
@@ -273,15 +277,10 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       })),
       payments: isPendingPaymentOnly || numericDeposit === 0
         ? []
-        : [
-            {
-              method: depositPaymentMethod,
-              amount: numericDeposit,
-              reference: depositReference?.trim() || null,
-              receiptUrl: depositReceiptUrl || null,
-            },
-          ],
+        : [{ method: depositPaymentMethod, amount: numericDeposit, reference: depositReference?.trim() || null, receiptUrl: depositReceiptUrl || null }],
       discount: Number(discount) || 0,
+      editionDescription: editionDescription.trim() || null,
+      editionCost: effectiveEditionCost,
       notes: remoteSaleNotes?.trim() || null,
       idempotencyKey: clientUuid,
     };
@@ -303,6 +302,8 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       clearCart();
       clearSelectedCustomer();
       setShippingCost(0);
+      setEditionDescription('');
+      setEditionCost('');
       setIsPendingPaymentOnly(false);
       setDepositInput('');
       setDepositReference('');
@@ -324,6 +325,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     customerQuery, setCustomerQuery, customerResults, isSearchingCustomer,
     selectedCustomer, customerData, setCustomerData, isInlineCreation, setIsInlineCreation,
     selectCustomer, clearSelectedCustomer, departments: GUATEMALA_DEPARTMENTS,
+    editionDescription, setEditionDescription, editionCost, setEditionCost, effectiveEditionCost,
     deliveryMethod, setDeliveryMethod, shippingCost, setShippingCost,
     shippingCourier, setShippingCourier, shippingTrackingNumber, setShippingTrackingNumber,
     pickupEventId, setPickupEventId, availablePickupEvents,

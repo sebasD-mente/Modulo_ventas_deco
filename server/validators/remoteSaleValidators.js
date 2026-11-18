@@ -47,6 +47,8 @@ export const createRemoteSaleSchema = z.object({
   items: z.array(remoteSaleItemSchema).min(1, 'La orden debe incluir al menos un producto'),
   payments: z.array(remoteSalePaymentSchema).default([]),
   discount: z.number().nonnegative('El descuento no puede ser negativo').default(0),
+  editionDescription: z.string().trim().max(300, 'La descripción de la edición no puede exceder 300 caracteres').optional().nullable(),
+  editionCost: z.number().nonnegative('El costo de edición no puede ser negativo').optional().default(0),
   notes: z.string().max(500).optional().nullable(),
   idempotencyKey: z.string().max(255).optional().nullable(),
 }).refine(
@@ -55,6 +57,9 @@ export const createRemoteSaleSchema = z.object({
 ).refine(
   (data) => data.deliveryMethod !== 'RETIRO_EVENTO' || (typeof data.pickupEventId === 'string' && data.pickupEventId.trim().length > 0),
   { message: 'Debe especificar el evento de retiro (pickupEventId) cuando el método es RETIRO_EVENTO', path: ['pickupEventId'] }
+).refine(
+  (data) => !(Number(data.editionCost || 0) > 0) || Boolean(data.editionDescription && data.editionDescription.trim().length > 0),
+  { message: 'La descripción de la edición es obligatoria cuando se cobra un costo de edición.', path: ['editionDescription'] }
 );
 
 // Esquema de Cobro de Saldo Restante

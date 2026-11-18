@@ -1,15 +1,31 @@
 import React, { useState } from 'react';
 import { Smartphone, Copy, Check, X, Share2, CheckCircle2 } from 'lucide-react';
 
-export default function WhatsAppQuoteShareModal({
-  isOpen,
-  onClose,
-  sale,
-}) {
-  const [copied, setCopied] = useState(false);
+export function extractSaleEditionDetails(sale = {}) {
+  const directCost = Number(sale?.editionCost ?? NaN);
+  const directDesc = typeof sale?.editionDescription === 'string' ? sale.editionDescription.trim() : '';
+  if ((Number.isFinite(directCost) && directCost > 0) || directDesc) {
+    return {
+      hasEdition: true,
+      editionCost: Number.isFinite(directCost) && directCost > 0 ? Number(directCost.toFixed(2)) : 0,
+      editionDescription: directDesc,
+    };
+  }
 
-  if (!isOpen || !sale) return null;
+  const rawNotes = String(sale?.notes || '');
+  const stampedMatch = rawNotes.match(/\[Edici[oó]n\s*\(\+Q\s*([0-9]+(?:\.[0-9]{1,2})?)\):\s*([^\]]+)\]/i);
+  if (stampedMatch) {
+    return {
+      hasEdition: true,
+      editionCost: Number(Number(stampedMatch[1] || 0).toFixed(2)),
+      editionDescription: stampedMatch[2].trim(),
+    };
+  }
 
+  return { hasEdition: false, editionCost: 0, editionDescription: '' };
+}
+
+export function buildWhatsAppOrderMessage(sale = {}) {
   const fullName = sale.customer?.fullName || sale.customerName || 'Estimado(a) Cliente';
   const saleNumber = sale.saleNumber || 'ORDEN';
   const items = sale.items || [];
@@ -17,24 +33,32 @@ export default function WhatsAppQuoteShareModal({
   const depositAmount = Number(sale.depositAmount || 0).toFixed(2);
   const balanceDue = Number(sale.balanceDue || 0).toFixed(2);
   const paymentStatus = sale.paymentStatus || (Number(balanceDue) > 0 ? 'ANTICIPO_PAGADO' : 'PAGADO_TOTAL');
+  const shippingCost = Number(sale.shippingCost || 0);
+  const editionInfo = extractSaleEditionDetails(sale);
 
-  const deliveryDescription = sale.deliveryMethod === 'ENVIO_COURIER'
+  const deliveryBase = sale.deliveryMethod === 'ENVIO_COURIER'
     ? `${sale.shippingCourier || 'Courier'} a ${sale.customer?.deliveryAddress || 'Dirección de envío'}`
     : sale.deliveryMethod === 'RETIRO_EVENTO'
     ? 'Retiro en Stand de Feria'
     : 'Entrega en Punto de Venta';
+  const deliveryDescription = shippingCost > 0 ? `${deliveryBase} (Flete: Q ${shippingCost.toFixed(2)})` : deliveryBase;
 
-  const formattedItems = items
-    .map((it) => {
-      let line = `• ${it.quantity}x ${it.description} — Q ${Number(it.subtotal || 0).toFixed(2)}`;
-      if (it.customImageUrl) {
-        line += `\n  🖼️ *Arte / Diseño Aprobado:* ${it.customImageUrl}`;
-      }
-      return line;
-    })
-    .join('\n');
+  const itemLines = items.map((it) => {
+    let line = `• ${it.quantity}x ${it.description} — Q ${Number(it.subtotal || 0).toFixed(2)}`;
+    if (it.customImageUrl) {
+      line += `\n  🖼️ *Arte / Diseño Aprobado:* ${it.customImageUrl}`;
+    }
+    return line;
+  });
 
-  const formattedText = `✨ *DECO VINTAGE GUATE — PEDIDO CONFIRMADO* ✨
+  if (editionInfo.hasEdition) {
+    const descLabel = editionInfo.editionDescription || 'Edición personalizada';
+    itemLines.push(`• Edición de diseño (${descLabel}) — Q ${editionInfo.editionCost.toFixed(2)}`);
+  }
+
+  const formattedItems = itemLines.join('\n');
+
+  return `✨ *DECO VINTAGE GUATE — PEDIDO CONFIRMADO* ✨
 Hola *${fullName}*, tu orden *#${saleNumber}* ha sido registrada con éxito:
 
 📦 *Detalle:*
@@ -46,6 +70,19 @@ ${formattedItems}
 🔴 *Saldo Pendiente contra Entrega:* Q ${balanceDue}
 
 Tu pedido entra hoy mismo a taller de producción. Te compartiremos tu guía de envío en cuanto sea despachado. ¡Gracias por tu preferencia!`;
+}
+
+export default function WhatsAppQuoteShareModal({
+  isOpen,
+  onClose,
+  sale,
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen || !sale) return null;
+
+  const saleNumber = sale.saleNumber || 'ORDEN';
+  const formattedText = buildWhatsAppOrderMessage(sale);
 
   // Limpieza de teléfono para WhatsApp API
   const rawPhone = (sale.customer?.phone || '').replace(/[^0-9]/g, '');

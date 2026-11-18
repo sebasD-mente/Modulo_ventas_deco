@@ -138,9 +138,26 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
 
   const eventId = data.eventId || 'evt-ventas-redes-online';
 
+  const rawEditionCost = Number(data.editionCost ?? 0);
+  if (!Number.isFinite(rawEditionCost) || rawEditionCost < 0) {
+    const error = new Error('El costo de edición no puede ser negativo.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const editionCost = Number(rawEditionCost.toFixed(2));
+  const editionDescription = typeof data.editionDescription === 'string' ? data.editionDescription.trim() : '';
+  if (editionCost > 0 && !editionDescription) {
+    const error = new Error('La descripción de la edición es obligatoria cuando se cobra un costo de edición.');
+    error.statusCode = 400;
+    throw error;
+  }
+
   // 1. Aritmética Financiera Estricta y Validación de Precios
   const itemsData = data.items.map((item) => {
     validateOfficialItemPrice(item);
+    const existingProdNote = typeof item.productionNotes === 'string' ? item.productionNotes.trim() : '';
+    const editionProdNote = editionDescription ? `[Edición]: ${editionDescription}` : '';
+    const mergedProductionNotes = [existingProdNote, editionProdNote].filter(Boolean).join(' • ') || null;
     return {
       productId: item.productId || null,
       description: item.description.trim(),
@@ -151,6 +168,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
       material: item.material || null,
       customDimensions: item.customDimensions || null,
       customImageUrl: item.customImageUrl || null,
+      productionNotes: mergedProductionNotes,
       productionStatus: 'PENDIENTE',
     };
   });
@@ -159,7 +177,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
   const discount = Number(data.discount || 0);
   const productsAmount = Math.max(0, Number((itemsSubtotal - discount).toFixed(2)));
   const shippingCost = Number(data.shippingCost || 0);
-  const totalAmount = Number((productsAmount + shippingCost).toFixed(2));
+  const totalAmount = Number((productsAmount + editionCost + shippingCost).toFixed(2));
   const paymentsList = Array.isArray(data.payments) ? data.payments : [];
   const paymentsTotal = Number(paymentsList.reduce((acc, p) => acc + Number(p.amount), 0).toFixed(2));
   const isZeroPayment = paymentsList.length === 0 || paymentsTotal === 0;
@@ -216,6 +234,11 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
       }
 
       const saleNumber = await generateSaleNumber(eventId, tx);
+      const baseNotes = typeof data.notes === 'string' ? data.notes.trim() : '';
+      const editionNoteStamp = (editionCost > 0 || editionDescription)
+        ? `[Edición (+Q ${editionCost.toFixed(2)}): ${editionDescription || 'Edición personalizada'}]`
+        : '';
+      const combinedSaleNotes = [baseNotes, editionNoteStamp].filter(Boolean).join('\n') || null;
 
       const sale = await tx.sale.create({
         data: {
@@ -225,7 +248,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
           saleNumber,
           totalAmount,
           discount,
-          notes: data.notes || null,
+          notes: combinedSaleNotes,
           status,
           inputChannel: 'REDES_SOCIALES',
           idempotencyKey: idempotencyKey || null,
@@ -257,11 +280,24 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
       await tx.auditLog.create({
         data: {
           tenantId, userId: sellerId, action: 'VENTA_REMOTA_REGISTRADA', entity: 'sale', entityId: sale.id,
-          details: { saleNumber, totalAmount, depositAmount, balanceDue, paymentStatus, customerId: finalCustomerId },
+          details: {
+            saleNumber,
+            totalAmount,
+            depositAmount,
+            balanceDue,
+            paymentStatus,
+            customerId: finalCustomerId,
+            editionCost,
+            editionDescription: editionDescription || null,
+          },
         },
       });
 
-      return sale;
+      return {
+        ...sale,
+        editionCost,
+        editionDescription: editionDescription || null,
+      };
     }, { maxWait: 15000, timeout: 30000 });
   } catch (err) {
     if (

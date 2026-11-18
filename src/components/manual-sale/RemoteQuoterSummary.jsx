@@ -9,7 +9,8 @@ const PAYMENT_METHODS = [
 ];
 
 export default function RemoteQuoterSummary({
-  productsSubtotal = 0, productsAmount = 0, discount = 0, effectiveShippingCost = 0, totalAmount = 0,
+  productsSubtotal = 0, productsAmount = 0, discount = 0, effectiveEditionCost = 0, editionDescription = '',
+  effectiveShippingCost = 0, totalAmount = 0,
   depositInput = '', setDepositInput, numericDeposit = 0, balanceDue = 0,
   isDepositValid = false, depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,
   remoteSaleNotes, setRemoteSaleNotes, depositReceiptUrl = null, setDepositReceiptUrl,
@@ -69,6 +70,12 @@ export default function RemoteQuoterSummary({
         <div className="flex items-center justify-between text-neutral-400"><span>Subtotal Productos:</span><span className="font-mono text-white">Q {productsSubtotal.toFixed(2)}</span></div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-emerald-400"><span>Descuento aplicado:</span><span className="font-mono">- Q {Number(discount).toFixed(2)}</span></div>
+        )}
+        {effectiveEditionCost > 0 && (
+          <div className="flex items-center justify-between text-neutral-300" data-testid="quoter-edition-row" title={editionDescription?.trim() || undefined}>
+            <span>Edición de diseño:</span>
+            <span className="font-mono text-white">Q {effectiveEditionCost.toFixed(2)}</span>
+          </div>
         )}
         <div className="flex items-center justify-between text-neutral-400"><span>Envío / Flete:</span><span className="font-mono text-white">Q {effectiveShippingCost.toFixed(2)}</span></div>
         <div className="flex items-center justify-between text-sm font-bold pt-2 border-t border-neutral-800 text-white"><span>Total de la Orden:</span><span className="font-mono text-emerald-400 text-base">Q {totalAmount.toFixed(2)}</span></div>
