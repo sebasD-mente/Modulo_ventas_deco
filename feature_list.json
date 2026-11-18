@@ -543,6 +543,34 @@
       ],
       "evidence": "node --test tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js -> Exit code 0 (58/58 PASS across 20 suites in 335.12ms: <50% flexible deposits accepted in createRemoteSaleTransaction & registerBalancePayment activating A_PRODUCCION, 0 auto-fill in useRemoteSaleForm, exact label 'Valor del anticipo' + free input & 100% button only, 0 redundant colored button emojis + justify-center text-center alignment, dynamic 'Registrar Venta (abono Q 0.00)' CTA, and 2026 global footer in App.jsx & LoginView.jsx); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (276 JS syntax OK, 13/13 zero-trust, 193 secrets OK, vite build 1566 modules PASS in 4.22s); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/schema.prisma, y preservados al 100% los guardarraíles de surgery-056, surgery-059, surgery-061, surgery-064 y surgery-065."
+    },
+    {
+      "id": "feat-018",
+      "name": "Desbloqueo de Múltiples Diseños e Imágenes en Pedidos Personalizados: Reinicio Limpio del Modal, Carga Múltiple (multiple) y Gestión Individual de Artes",
+      "description": "Corregir de raíz el bloqueo en Pedidos Personalizados (CustomItemModal.jsx, CustomArtUploader.jsx y useRemoteSaleForm.js) que impedía al VENDEDOR_REDES agregar un segundo diseño o múltiples imágenes a un mismo pedido sin alterar prisma/schema.prisma: (1) Reinicio limpio de estado del modal en cada apertura/cierre/envío: como CustomItemModal permanece montado en FastManualSaleForm.jsx, implementar resetModalState() al abrir (isOpen), cancelar/cerrar y confirmar envío (revocando object URLs previas) para que uploadSuccess, customImageUrl, previewUrl, description, medidas y precio jamás queden congelados del primer diseño y permitan agregar tantos diseños personalizados consecutivos como requiera el pedido; (2) Carga múltiple de imágenes en un solo paso (multiple) + controles Quitar/Agregar más: extraer el cargador visual a src/components/manual-sale/CustomArtUploader.jsx permitiendo seleccionar o arrastrar 1 o varias imágenes a la vez (<input type='file' multiple>), seguir sumando imágenes al lote y eliminar/reemplazar cualquier miniatura individual antes de confirmar; y (3) Inyección individual por diseño al carrito: cuando se suban N > 1 imágenes en una misma tanda dentro del modal, generar automáticamente N ítems individuales en el carrito (1 SaleItem por cada imagen con su propio customImageUrl, numeración clara ej. 'Diseño 1/N' e ID único sin colisión en addCustomItem) para que tanto el cálculo contable como el mensaje de WhatsApp y la cola de Producción/Taller reciban cada arte por separado.",
+      "area": "remote-sales-custom-orders-multi-image",
+      "user_visible_behavior": "En Nueva Venta de Redes (+ Personalizado), el vendedor puede subir varias imágenes de una sola vez para crear múltiples cuadros personalizados en un paso, quitar o cambiar cualquier foto subida si se equivocó, y volver a abrir '+ Personalizado' cuantas veces quiera dentro del mismo pedido con el formulario y cargador de imágenes siempre limpios y habilitados.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-017"
+      ],
+      "required_files": [
+        "src/components/manual-sale/CustomArtUploader.jsx",
+        "src/components/manual-sale/CustomItemModal.jsx",
+        "src/components/manual-sale/hooks/useRemoteSaleForm.js",
+        "tests/sales/custom-item-multi-image-and-reset.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js",
+        "node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js -> Exit code 0 (41/41 PASS across 14 suites in 173.89ms: resetModalState on open/close/submit revoking blob URLs with 0 uploadSuccess freeze across 3 consecutive openings, CustomArtUploader <input type='file' multiple> + batch upload + individual thumbnail removal + e.target.value reset, 1-to-1 SaleItem batch creation with 15/15 unique IDs & createRemoteSaleSchema/createRemoteSaleTransaction A_PRODUCCION verification, line caps CustomItemModal 258L<=280L / CustomArtUploader 223L<=280L / useRemoteSaleForm 342L<=350L, 0 amber/orange classes); node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js -> Exit code 0 (1/1 PASS); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 31.12s (194 secrets OK, 277 JS syntax OK, 13/13 zero-trust, vite build 1567 modules PASS in 3.94s); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-026. Cero lectura de .env, cero cambios en prisma/schema.prisma, y cumplidos todos los guardarraíles de surgery-061 (3.1..3.6 y techos <= 280L / <= 350L), ergonomía >= 44px en todos los controles y 0 CRLF."
     }
   ]
 }

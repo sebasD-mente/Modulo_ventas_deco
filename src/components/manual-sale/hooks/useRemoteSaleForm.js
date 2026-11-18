@@ -8,6 +8,21 @@ const GUATEMALA_DEPARTMENTS = [
   'Santa Rosa', 'Sololá', 'Suchitepéquez', 'Totonicapán', 'Zacapa'
 ];
 
+let customItemSeq = 0;
+
+export function createCartCustomItem({ description, unitPrice, quantity = 1, material = 'MDF_5_5MM', customDimensions = '30x40 cm', customImageUrl = null }) {
+  const qty = Number(quantity) || 1, price = Number(unitPrice) || 0;
+  return {
+    id: `custom-${Date.now()}-${++customItemSeq}-${Math.random().toString(36).slice(2, 6)}`,
+    productId: null,
+    description: `Personalizado: ${String(description || '').trim()} (${material}, ${customDimensions})`,
+    unitPrice: price, quantity: qty, subtotal: Number((qty * price).toFixed(2)),
+    isCustom: true, material, customDimensions, customImageUrl: customImageUrl || null,
+    availableSizes: [{ sizeId: 'CUSTOM', nombre: customDimensions || 'Personalizado', precio: price }],
+    selectedSizeId: 'CUSTOM',
+  };
+}
+
 export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const { authFetch } = useAuth();
   const { cartItems, setCartItems, discount, clearCart } = cart;
@@ -180,24 +195,9 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     });
   };
 
-  // Inyección de ítem personalizado al carrito
-  const addCustomItem = ({ description, unitPrice, quantity = 1, material = 'MDF_5_5MM', customDimensions = '30x40 cm', customImageUrl = null }) => {
-    const qty = Number(quantity) || 1;
-    const price = Number(unitPrice) || 0;
-    const newItem = {
-      id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      productId: null,
-      description: `Personalizado: ${description.trim()} (${material}, ${customDimensions})`,
-      unitPrice: price,
-      quantity: qty,
-      subtotal: Number((qty * price).toFixed(2)),
-      isCustom: true,
-      material,
-      customDimensions,
-      customImageUrl,
-      availableSizes: [{ sizeId: 'CUSTOM', nombre: customDimensions || 'Personalizado', precio: price }],
-      selectedSizeId: 'CUSTOM',
-    };
+  // Inyección de ítem personalizado al carrito (soporta ráfagas síncronas multi-imagen sin colisión de ID)
+  const addCustomItem = (itemData) => {
+    const newItem = createCartCustomItem(itemData);
     setCartItems((prev) => [...prev, newItem]);
   };
 

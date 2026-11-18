@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-17 18:05
-**Session ID:** sesion-024 (Implementación y Verificación de `feat-017`: Anticipo Libre en Ventas de Redes, Iconografía Minimalista Centrada, Etiqueta `Valor del anticipo`, Botón `Registrar Venta (abono Q 0.00)` y Pie de Página Global 2026)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..017` en `done`)
+**Last Updated:** 2026-11-17 19:12
+**Session ID:** sesion-026 (Ejecución y Verificación Integral de `feat-018`: Desbloqueo de Múltiples Diseños e Imágenes en Pedidos Personalizados)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..018` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -69,14 +69,20 @@
   - Sustituida la etiqueta `"Monto ingresado por el cliente (Q):"` por el título exacto **`Valor del anticipo`** y reemplazado el botón primario de cierre por **`Registrar Venta (abono Q 0.00)`** (con monto dinámico `Q ${numericDeposit.toFixed(2)}`).
   - Actualizado el pie de página global en `src/App.jsx` (layout principal y vista de vendedor sin stand) e incorporado en `src/components/LoginView.jsx` con el texto exacto **`Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026`**.
 
+- [x] **Desbloqueo de Múltiples Diseños e Imágenes en Pedidos Personalizados `feat-018` (`41/41` `custom-item-multi-image` + `surgery-061` + `feat-017` PASS, `1/1` `val005` `CustomItemModal` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `bash ./init.sh` `100/100`)**:
+  - Implementado `resetModalState()` (apoyado en `createInitialCustomModalState()` y `revokeArtPreviewUrls()`) dentro de `src/components/manual-sale/CustomItemModal.jsx` (`258L <= 280L`), ejecutándose al abrir (`isOpen`), cancelar/cerrar (`handleClose`) y confirmar (`handleSubmit`), eliminando de raíz el estado congelado `uploadSuccess` que ocultaba el selector de archivos a partir del 2.º diseño en un mismo pedido.
+  - Extraído `src/components/manual-sale/CustomArtUploader.jsx` (`223L <= 280L`) con `<input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" />`, soporte multi-archivo por *Drag & Drop*, limpieza `e.target.value = ''` para permitir re-seleccionar archivos, botón permanente `+ Agregar más imágenes a este lote`, remoción individual accesible (`min-h-[44px] min-w-[44px]`) de cualquier miniatura equivocada y enlace URL externo opcional.
+  - Implementada la inyección 1-a-1 por diseño (`buildCustomItemPayloads` en `CustomItemModal.jsx` + secuencia monotónica sin colisiones `createCartCustomItem` en `useRemoteSaleForm.js`, `342L <= 350L`): al subir $N > 1$ imágenes en una misma tanda, se crean automáticamente $N$ ítems independientes en el carrito (`Diseño 1/N .. Diseño N/N`), cada uno con su propio `customImageUrl` para el cálculo contable, el comprobante de WhatsApp y la cola de Producción / Taller (`A_PRODUCCION`).
+  - Añadida la suite `tests/sales/custom-item-multi-image-and-reset.test.js` (`11/11 PASS`).
+
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..017` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..018` completadas y verificadas localmente).
 
 ### What's Next
-- Cola de tareas actual en `done` (`feat-000..017`); listo para despliegue a producción cuando el usuario lo solicite o para registrar nuevas funcionalidades bajo `WIP = 1`.
+- Listo para desplegar `feat-018` a producción (`npm run deploy`) cuando el usuario lo indique o registrar el siguiente requerimiento en `feature_list.json`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 58/58 remote sale & surgery contract tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 41/41 custom item & remote sale contract tests PASS).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -101,25 +107,25 @@
   - Alternatives considered: Retirar la validación únicamente en el componente React `RemoteQuoterSummary.jsx` (descartado porque `POST /api/sales/remote` rechazaría en servidor con `HTTP 400 Anticipo insuficiente` cualquier anticipo menor al 50%).
   - Resolution: Se retiró la restricción del 50% de extremo a extremo (`RemoteQuoterSummary.jsx`, `useRemoteSaleForm.js`, `BalancePaymentModal.jsx` y `remoteSaleService.js`), iniciando `depositInput` vacío (`''` -> `abono Q 0.00`), dejando únicamente el campo `Valor del anticipo` y el botón de `100%`, y preservando intactas las clases y contratos estáticos exigidos por `surgery-056`, `surgery-059`, `surgery-061`, `surgery-064` y `surgery-065`.
 
+- **Extracción de `CustomArtUploader.jsx` + Reinicio Limpio + Lote Multi-Imagen 1-a-1 hacia `SaleItem` (`feat-018` — Implementado)**:
+  - Context: En producción el vendedor de redes reportó que `CustomItemModal.jsx` permitía subir el primer diseño pero bloqueaba agregar más diseños después, porque el modal permanece siempre montado (`if (!isOpen) return null;`), nunca reiniciaba `uploadSuccess` al enviar/cerrar y ocultaba el `<input type="file">` cuando `uploadSuccess === true`; además carecía de selección `multiple` y de botón para quitar/cambiar imagen, estando `CustomItemModal.jsx` en `277/280` líneas (`surgery-061` test `4.1`).
+  - Alternatives considered: (a) Guardar un array de URLs concatenadas en una sola fila de `SaleItem` (descartado porque rompería `prisma/schema.prisma` y evitaría que Taller/Producción gestione cada póster por separado); (b) Meter toda la galería `multiple` dentro de `CustomItemModal.jsx` sin extraer subcomponente (descartado porque superaría de inmediato el techo duro de `280` líneas de `surgery-061`).
+  - Resolution: Se implementó `resetModalState()` en `CustomItemModal.jsx` (`258L <= 280L`), se extrajo `CustomArtUploader.jsx` (`223L <= 280L`) con `<input type="file" multiple>`, limpieza `e.target.value = ''` y remoción individual de miniaturas (`min-h-[44px] min-w-[44px]`), y se habilitó la creación 1-a-1 de `SaleItem`s con secuencia monotónica libre de colisiones en `useRemoteSaleForm.js` (`342L <= 350L`).
+
 ## Files Modified This Session
-- `server/services/sales/remoteSaleService.js` — Retirada la compuerta del 50% en `createRemoteSaleTransaction` y `registerBalancePayment`, aceptando cualquier anticipo `> 0` y `<= totalAmount` (`0 CRLF`).
-- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — Eliminado el `useEffect` de auto-llenado al 50% y el bloqueo de `minDeposit`, validando anticipo libre `> 0` (`342L <= 350L`, `0 CRLF`).
-- `src/components/manual-sale/RemoteQuoterSummary.jsx` — Etiqueta `Valor del anticipo`, solo campo numérico + botón `100%`, retiro de emojis a color redundantes con texto centrado y botón primario `Registrar Venta (abono Q 0.00)` dinámico (`316L <= 350L`, `0 CRLF`).
-- `src/components/FastManualSaleForm.jsx` — Limpieza de doble icono `📱` junto a `<Smartphone />`, subtítulo sin `50/50` y centrado de controles (`333L <= 350L`, `0 CRLF`).
-- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` — Limpieza de dobles iconos (`📲`, `✅`, `📋`) dejando solo iconos minimalistas Lucide con texto centrado (`0 CRLF`).
-- `src/components/sales/BalancePaymentModal.jsx` — Retiro del mínimo del 50% y doble icono en anticipo diferido (`PENDIENTE_PAGO`), etiqueta `Valor del anticipo` y botón `100%` (`0 CRLF`).
-- `src/App.jsx` y `src/components/LoginView.jsx` — Nuevo pie de página global `Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026` (`0 CRLF`).
-- `tests/sales/remote-sale-flexible-deposit-and-footer.test.js` — Suite integral backend + frontend para los 5 requerimientos de `feat-017` (`9/9 PASS`, `0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés cerrado en `done` (`WIP = 0`, `0 CRLF`).
+- `src/components/manual-sale/CustomArtUploader.jsx` — Nuevo subcomponente de carga múltiple (`multiple`), *Drag & Drop*, adición incremental, remoción individual de miniaturas con revocación de `blob:` URLs y enlace URL externo (`223L <= 280L`, `0 CRLF`).
+- `src/components/manual-sale/CustomItemModal.jsx` — Reinicio limpio `resetModalState()` al abrir/cerrar/confirmar, generación 1-a-1 en lote (`buildCustomItemPayloads`) y cumplimiento de ergonomía táctil `>= 44px` y contratos `surgery-061` (`258L <= 280L`, `0 CRLF`).
+- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — Helper `createCartCustomItem` con contador monotónico para inyecciones síncronas en lote sin colisión de IDs (`342L <= 350L`, `0 CRLF`).
+- `tests/sales/custom-item-multi-image-and-reset.test.js` — Suite de verificación de reinicio multi-apertura, carga múltiple, remoción individual, inyección 1-a-1 hacia Zod/`createRemoteSaleTransaction` y ergonomía `>= 44px` (`11/11 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Cierre documental y evidencia verificada de `feat-018` (`WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite Dedicada `feat-017` + Contratos Quirúrgicos: `node --test tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (58/58 PASS across 20 suites in 335.12ms)`
-- [x] Pruebas Unitarias Completas: `npm run test:unit` -> `Exit code 0 (265/265 PASS across 109 suites)`
-- [x] Suites de Voz y VAD: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
-- [x] Compuerta Física Unificada: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (276 JS syntax OK, 13/13 zero-trust, 193 secrets OK, vite build 1566 modules PASS in 4.22s)`
-- [x] Verificación en 3 Puertas (`sesion-024`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, zero-trust 13/13 PASS, vite build PASS)`
-- [x] Validación Matemática del Arnés: `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
+- [x] Suites Focalizadas `feat-018` + `surgery-061` + `feat-017`: `node --test tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js` -> `Exit code 0 (41/41 PASS across 14 suites in 173.89ms)`
+- [x] Ergonomía Táctil `val005` (`CustomItemModal`): `node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js` -> `Exit code 0 (1/1 PASS)`
+- [x] Suite Completa de Voz: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
+- [x] Compuerta Unificada Deko Labs: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 31.12s (check-architecture PASS, validate-harness 100/100 PASS, audit-secrets 194 files PASS, audit-syntax 277 JS files PASS, verify-gemini-models PASS, zero-trust 13/13 PASS, test:unit 265/265 PASS across 109 suites, vite build 1567 modules PASS in 3.94s)`
+- [x] Verificación en 3 Puertas (`sesion-026`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`), con `feat-000..017` completadas y verificadas.
-2. Listo para despliegue a producción cuando el usuario lo indique o para abordar el siguiente requerimiento iniciando con `bash ./init.sh`.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`), con `feat-018` completada, probada y lista para despliegue cuando el usuario lo solicite.
+2. Iniciar siempre cualquier sesión futura ejecutando `bash ./init.sh`.

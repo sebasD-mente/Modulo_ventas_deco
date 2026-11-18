@@ -1,15 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { Palette, X, Plus, Upload, CheckCircle2, Loader2, Ruler, Sparkles, Scissors } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Palette, X, Plus, Ruler, Sparkles, Scissors } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { compressImage } from '../../utils/imageCompression';
 import { OFFICIAL_SIZES, CUSTOM_CM2_RATE, WOOD_CUSTOM_CUT_SURCHARGE, PVC_SURCHARGE, VINYL_DISCOUNT_FACTOR } from './manualSaleConstants';
 import { getLocalCatalog } from '../../services/catalogCacheService';
+import CustomArtUploader, { revokeArtPreviewUrls } from './CustomArtUploader';
 
 const MATERIALS = [
   { id: 'MDF_5_5MM', label: 'MDF 5.5mm', desc: 'Madera oficial' },
   { id: 'PVC_5MM', label: 'PVC 5mm', desc: 'Anti-humedad (+Q15)' },
   { id: 'VINILO_SOLO', label: 'Vinilo Solo', desc: 'Sin cuadro (-50%)' },
 ];
+
+export function createInitialCustomModalState() {
+  return {
+    mode: 'STANDARD', material: 'MDF_5_5MM', selectedSize: null,
+    customWidth: '', customHeight: '', unitPrice: '', quantity: 1,
+    description: '', uploadedArts: [], customImageUrl: '',
+    isUploading: false, uploadError: '', showUrlInput: false, errorMsg: '',
+  };
+}
+
+export function buildCustomItemPayloads({
+  description = '', material = 'MDF_5_5MM', customDimensions = '',
+  unitPrice = 0, quantity = 1, uploadedArts = [], customImageUrl = '',
+}) {
+  const baseDesc = String(description || '').trim();
+  const priceNum = Number(unitPrice) || 0;
+  const qtyNum = Math.max(1, Number(quantity) || 1);
+  const artUrls = [];
+  if (Array.isArray(uploadedArts)) {
+    for (const art of uploadedArts) {
+      const cleanUrl = typeof art?.url === 'string' ? art.url.trim() : '';
+      if (cleanUrl) artUrls.push(cleanUrl);
+    }
+  }
+  const manualUrl = typeof customImageUrl === 'string' ? customImageUrl.trim() : '';
+  if (manualUrl && !artUrls.includes(manualUrl)) artUrls.push(manualUrl);
+
+  if (artUrls.length <= 1) {
+    return [{ description: baseDesc, material, customDimensions, unitPrice: priceNum, quantity: qtyNum, customImageUrl: artUrls[0] || null }];
+  }
+  return artUrls.map((url, idx) => ({
+    description: `${baseDesc} — Diseño ${idx + 1}/${artUrls.length}`,
+    material, customDimensions, unitPrice: priceNum, quantity: qtyNum, customImageUrl: url,
+  }));
+}
 
 export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   const { authFetch } = useAuth();
@@ -26,6 +61,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
     } catch (_) {}
     return OFFICIAL_SIZES;
   }, []);
+
   const [mode, setMode] = useState('STANDARD');
   const [material, setMaterial] = useState('MDF_5_5MM');
   const [selectedSize, setSelectedSize] = useState(null);
@@ -34,33 +70,39 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   const [unitPrice, setUnitPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [description, setDescription] = useState('');
+  const [uploadedArts, setUploadedArts] = useState([]);
   const [customImageUrl, setCustomImageUrl] = useState('');
-  const [previewUrl, setPreviewUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Cálculo paramétrico reactivo del precio sugerido (solo al seleccionar tamaño o medidas)
+  const resetModalState = useCallback(() => {
+    const initial = createInitialCustomModalState();
+    setMode(initial.mode); setMaterial(initial.material); setSelectedSize(initial.selectedSize);
+    setCustomWidth(initial.customWidth); setCustomHeight(initial.customHeight);
+    setUnitPrice(initial.unitPrice); setQuantity(initial.quantity); setDescription(initial.description);
+    setUploadedArts((prev) => { revokeArtPreviewUrls(prev); return []; });
+    setCustomImageUrl(initial.customImageUrl); setIsUploading(initial.isUploading);
+    setUploadError(initial.uploadError); setShowUrlInput(initial.showUrlInput); setErrorMsg(initial.errorMsg);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) resetModalState();
+  }, [isOpen, resetModalState]);
+
   useEffect(() => {
     let price = 0;
     if (mode === 'STANDARD') {
       if (selectedSize) {
         const base = selectedSize.precio || 0;
-        if (material === 'PVC_5MM') price = base + PVC_SURCHARGE;
-        else if (material === 'VINILO_SOLO') price = base * VINYL_DISCOUNT_FACTOR;
-        else price = base;
+        price = material === 'PVC_5MM' ? base + PVC_SURCHARGE : material === 'VINILO_SOLO' ? base * VINYL_DISCOUNT_FACTOR : base;
       }
     } else {
-      const w = Number(customWidth) || 0;
-      const h = Number(customHeight) || 0;
+      const w = Number(customWidth) || 0, h = Number(customHeight) || 0;
       if (w > 0 && h > 0) {
-        const areaCm2 = w * h;
-        const basePrint = areaCm2 * CUSTOM_CM2_RATE;
-        if (material === 'PVC_5MM') price = basePrint + PVC_SURCHARGE;
-        else if (material === 'VINILO_SOLO') price = basePrint * VINYL_DISCOUNT_FACTOR;
-        else price = basePrint + WOOD_CUSTOM_CUT_SURCHARGE;
+        const basePrint = w * h * CUSTOM_CM2_RATE;
+        price = material === 'PVC_5MM' ? basePrint + PVC_SURCHARGE : material === 'VINILO_SOLO' ? basePrint * VINYL_DISCOUNT_FACTOR : basePrint + WOOD_CUSTOM_CUT_SURCHARGE;
       }
     }
     if (price > 0) setUnitPrice(String(Number(price.toFixed(2))));
@@ -68,44 +110,14 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
 
   if (!isOpen) return null;
 
-  const handleFileUpload = async (file) => {
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setUploadError('Formato inválido. Solo se admiten imágenes JPEG, PNG o WebP.');
-      return;
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      setUploadError('La imagen supera el límite máximo permitido de 15MB.');
-      return;
-    }
-    setUploadError('');
-    setUploadSuccess(false);
-    setPreviewUrl(URL.createObjectURL(file));
-    setIsUploading(true);
-
-    try {
-      let fileToUpload = file;
-      if (file.type.startsWith('image/')) {
-        try { fileToUpload = await compressImage(file, 1920, 0.85); } catch { fileToUpload = file; }
-      }
-      const formData = new FormData();
-      formData.append('image', fileToUpload);
-      const res = await authFetch('/api/sales/upload-art', { method: 'POST', body: formData });
-      const json = await res.json();
-      if (res.ok && json.success && json.url) {
-        setCustomImageUrl(json.url); setUploadSuccess(true);
-      } else {
-        setUploadError(json.error || 'Fallo al subir a Google Storage.');
-      }
-    } catch {
-      setUploadError('Error de conexión al transferir a Cloud Storage.');
-    } finally {
-      setIsUploading(false);
-    }
+  const handleClose = () => {
+    resetModalState();
+    onClose();
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isUploading) return setErrorMsg('Espera a que termine de subir la imagen a la nube.');
     if (!description.trim()) return setErrorMsg('Ingresa una descripción para el diseño.');
     if (mode === 'CUSTOM' && (!Number(customWidth) || !Number(customHeight))) {
       return setErrorMsg('Ingresa un ancho y alto válidos en centímetros.');
@@ -120,14 +132,12 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
       ? `Estándar: ${selectedSize?.nombre || 'Personalizado'} (${selectedSize?.dimensiones || 'N/A'})`
       : `Especial: ${customWidth.trim()} x ${customHeight.trim()} cm (Corte Taller)`;
 
-    onAddCustomItem({
-      description: description.trim(),
-      material,
-      customDimensions: dims,
-      unitPrice: priceNum,
-      quantity: Number(quantity) || 1,
-      customImageUrl: customImageUrl.trim() || null,
+    const payloads = buildCustomItemPayloads({
+      description, material, customDimensions: dims, unitPrice: priceNum,
+      quantity: Number(quantity) || 1, uploadedArts, customImageUrl,
     });
+    for (const itemPayload of payloads) onAddCustomItem(itemPayload);
+    resetModalState();
     onClose();
   };
 
@@ -135,6 +145,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   const heightNum = Number(customHeight) || 0;
   const area = widthNum * heightNum;
   const basePrint = area * CUSTOM_CM2_RATE;
+  const totalArtsCount = uploadedArts.length + (customImageUrl.trim() && !uploadedArts.some((a) => a.url === customImageUrl.trim()) ? 1 : 0);
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 overflow-y-auto">
@@ -144,12 +155,12 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
             <Palette className="w-5 h-5 text-white" />
             <h3 className="font-bold text-sm uppercase tracking-wider">Cotizador de Pedido Personalizado</h3>
           </div>
-          <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer">
+          <button type="button" onClick={handleClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {errorMsg && <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">⚠️ {errorMsg}</div>}
+        {errorMsg && <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">{errorMsg}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
@@ -204,11 +215,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
                 {area > 0 && (
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-between text-[11px]">
                     <span className="text-neutral-400">Área: <strong className="text-white font-mono">{area.toLocaleString()} cm²</strong></span>
-                    {material === 'MDF_5_5MM' && (
-                      <span className="text-neutral-300 flex items-center gap-1 font-semibold">
-                        <Scissors className="w-3.5 h-3.5 text-cyan-400" />Base Q{basePrint.toFixed(2)} + Q25 corte taller
-                      </span>
-                    )}
+                    {material === 'MDF_5_5MM' && <span className="text-neutral-300 flex items-center gap-1 font-semibold"><Scissors className="w-3.5 h-3.5 text-cyan-400" />Base Q{basePrint.toFixed(2)} + Q25 corte taller</span>}
                     {material === 'PVC_5MM' && <span className="text-sky-400 font-semibold">Base Q{basePrint.toFixed(2)} + Q15 PVC</span>}
                     {material === 'VINILO_SOLO' && <span className="text-emerald-400 font-semibold">Base Q{basePrint.toFixed(2)} x 50% lámina</span>}
                   </div>
@@ -219,55 +226,28 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-neutral-400 font-semibold mb-1">Precio Acordado (Q) *</label>
+              <label className="block text-neutral-400 font-semibold mb-1">Precio Unitario Acordado (Q) *</label>
               <input type="number" min="1" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} placeholder="0.00" className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-white focus:outline-none" />
             </div>
             <div>
-              <label className="block text-neutral-400 font-semibold mb-1">Cantidad</label>
+              <label className="block text-neutral-400 font-semibold mb-1">Cantidad por Diseño</label>
               <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full min-h-[44px] px-3.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold focus:border-white focus:outline-none" />
             </div>
           </div>
 
-          <div>
-            <label className="block text-neutral-400 font-semibold mb-1">Arte o Foto para Producción</label>
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer?.files?.[0]); }}
-              className={`p-3 rounded-2xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-1 text-center min-h-[70px] ${uploadSuccess ? 'border-emerald-500 bg-emerald-500/10' : 'border-neutral-800 hover:border-neutral-600 bg-black/40'}`}
-            >
-              {isUploading ? (
-                <div className="flex items-center gap-2 text-white font-semibold"><Loader2 className="w-4 h-4 animate-spin text-cyan-400" /><span>Subiendo a Cloud Storage...</span></div>
-              ) : uploadSuccess ? (
-                <div className="flex items-center gap-2 text-emerald-400 font-bold"><CheckCircle2 className="w-4 h-4" /><span>✓ Arte en la nube listo para taller</span></div>
-              ) : (
-                <label className="cursor-pointer flex items-center gap-2 text-neutral-400 hover:text-white">
-                  <Upload className="w-4 h-4 text-white" />
-                  <span className="text-[11px]">Arrastra imagen o haz clic para subir (JPEG, PNG, WebP max 15MB)</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleFileUpload(e.target.files?.[0])} className="hidden" />
-                </label>
-              )}
-            {previewUrl && (
-              <div className="flex items-center gap-2 mt-1">
-                <img src={previewUrl} alt="Preview" className="w-10 h-10 object-cover rounded-lg border border-neutral-700" />
-                <span className="text-[10px] text-neutral-400 truncate max-w-[200px]">{customImageUrl || 'Previsualización local'}</span>
-              </div>
-            )}
-            {uploadError && <span className="text-[10px] text-red-400 mt-1">⚠️ {uploadError}</span>}
-          </div>
-
-          <button type="button" onClick={() => setShowUrlInput(!showUrlInput)} className="text-[10px] text-neutral-500 hover:text-neutral-300 mt-1 underline cursor-pointer">
-            {showUrlInput ? 'Ocultar enlace manual' : '+ Ingresar enlace URL externo (Drive, Dropbox...)'}
-          </button>
-
-          {showUrlInput && (
-            <input type="url" value={customImageUrl} onChange={(e) => setCustomImageUrl(e.target.value)} placeholder="https://storage.googleapis.com/... o enlace de foto" className="w-full min-h-[44px] px-3.5 mt-1 bg-black border border-neutral-800 rounded-xl text-white font-mono text-[11px] focus:border-white focus:outline-none" />
-          )}
-          </div>
+          <CustomArtUploader
+            authFetch={authFetch} uploadedArts={uploadedArts} setUploadedArts={setUploadedArts}
+            customImageUrl={customImageUrl} setCustomImageUrl={setCustomImageUrl}
+            showUrlInput={showUrlInput} setShowUrlInput={setShowUrlInput}
+            isUploading={isUploading} setIsUploading={setIsUploading}
+            uploadError={uploadError} setUploadError={setUploadError}
+          />
 
           <div className="pt-2 flex items-center justify-end gap-2 border-t border-neutral-800">
-            <button type="button" onClick={onClose} className="min-h-[44px] px-4 rounded-xl text-neutral-400 hover:text-white font-semibold cursor-pointer">Cancelar</button>
-            <button type="submit" className="min-h-[44px] px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20">
-              <Plus className="w-4 h-4" /><span>Agregar al Pedido</span>
+            <button type="button" onClick={handleClose} className="min-h-[44px] px-4 rounded-xl text-neutral-400 hover:text-white font-semibold cursor-pointer">Cancelar</button>
+            <button type="submit" disabled={isUploading} className="min-h-[44px] px-5 rounded-xl justify-center text-center bg-emerald-500 hover:bg-emerald-400 text-black font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>{totalArtsCount > 1 ? `Agregar ${totalArtsCount} Diseños al Pedido` : 'Agregar al Pedido'}</span>
             </button>
           </div>
         </form>
