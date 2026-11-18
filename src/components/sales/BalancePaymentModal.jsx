@@ -13,14 +13,13 @@ const PAYMENT_METHODS = [
 export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
   const { authFetch } = useAuth();
   const isPendingPayment = sale?.paymentStatus === 'PENDIENTE_PAGO';
-  const minDeposit = Number((Number(sale?.totalAmount || 0) * 0.50).toFixed(2));
 
   const [method, setMethod] = useState(isPendingPayment ? 'TRANSFERENCIA' : 'EFECTIVO');
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitMethod2, setSplitMethod2] = useState('TRANSFERENCIA');
   const [splitAmount1, setSplitAmount1] = useState('');
   const [reference2, setReference2] = useState('');
-  const [customAmount, setCustomAmount] = useState(isPendingPayment ? minDeposit.toString() : Number(sale?.balanceDue || 0).toString());
+  const [customAmount, setCustomAmount] = useState(isPendingPayment ? '' : Number(sale?.balanceDue || 0).toString());
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [receiptUrl, setReceiptUrl] = useState(null);
@@ -68,8 +67,8 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (balanceDue <= 0) return setErrorMsg('Esta venta no tiene saldo pendiente.');
-    if (isPendingPayment && numericAmount < minDeposit) {
-      return setErrorMsg(`Para activar la orden en taller se requiere un anticipo mínimo del 50% (Q ${minDeposit.toFixed(2)}).`);
+    if (isPendingPayment && numericAmount <= 0) {
+      return setErrorMsg('Ingresa un valor de anticipo mayor a Q 0.00.');
     }
     if (isPendingPayment && numericAmount > balanceDue + 0.05) {
       return setErrorMsg(`El monto no puede exceder el total de la orden (Q ${balanceDue.toFixed(2)}).`);
@@ -174,19 +173,33 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          {/* Si es orden pendiente, permitir ingresar anticipo */}
+          {/* Si es orden pendiente, permitir ingresar anticipo libre o 100% */}
           {isPendingPayment && (
-            <div>
-              <label className="block text-neutral-400 font-semibold mb-1">Monto del Abono (Mínimo 50%: Q {minDeposit.toFixed(2)})</label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button type="button" onClick={() => setCustomAmount(minDeposit.toString())} className="min-h-[44px] px-2 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold cursor-pointer transition-colors">
-                  ⚡ 50% (Q {minDeposit.toFixed(2)})
-                </button>
-                <button type="button" onClick={() => setCustomAmount(Number(sale.totalAmount).toFixed(2))} className="min-h-[44px] px-2 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold cursor-pointer transition-colors">
-                  💯 100% (Q {Number(sale.totalAmount).toFixed(2)})
+            <div className="space-y-2">
+              <label className="block text-neutral-300 font-semibold">Valor del anticipo</label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={customAmount}
+                  onChange={(e) => { setCustomAmount(e.target.value); setErrorMsg(null); }}
+                  className="flex-1 min-h-[44px] px-3.5 py-2 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setCustomAmount(Number(sale.totalAmount).toFixed(2)); setErrorMsg(null); }}
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border flex items-center justify-center gap-1.5 text-center shrink-0 ${
+                    Math.abs(numericAmount - Number(sale.totalAmount)) < 0.01 && Number(sale.totalAmount) > 0
+                      ? 'bg-white text-black border-white shadow-sm font-bold'
+                      : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>100% (Q {Number(sale.totalAmount).toFixed(2)})</span>
                 </button>
               </div>
-              <input type="number" step="any" min={minDeposit} value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} className="w-full min-h-[44px] px-3.5 py-2 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-amber-400" />
             </div>
           )}
 
@@ -280,22 +293,22 @@ export default function BalancePaymentModal({ sale, onClose, onSuccess }) {
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2.5">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="min-h-[44px] px-4 py-2 rounded-xl text-neutral-400 hover:text-white font-semibold transition-colors cursor-pointer">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="min-h-[44px] px-4 py-2 rounded-xl text-neutral-400 hover:text-white font-semibold flex items-center justify-center text-center transition-colors cursor-pointer">
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || balanceDue <= 0}
-              className="min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+              className="min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center justify-center gap-1.5 text-center transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                   <span>Procesando...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>{isPendingPayment ? `Registrar Anticipo (Q ${numericAmount.toFixed(2)})` : `Cobrar Saldo (Q ${balanceDue.toFixed(2)})`}</span>
                 </>
               )}

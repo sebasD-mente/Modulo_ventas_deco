@@ -156,6 +156,10 @@ export default function LoginView() {
           <span>Autenticación Criptográfica Zero-Trust • Google Identity</span>
         </div>
       </div>
+
+      <footer className="mt-6 text-center text-xs text-neutral-500">
+        Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026
+      </footer>
     </div>
   );
 }

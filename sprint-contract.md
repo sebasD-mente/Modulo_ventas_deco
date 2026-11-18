@@ -1,50 +1,54 @@
 # Sprint Contract (Contrato de Ejecución de Tarea — `deko-eventsales`)
 
-Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**. El Planificador y el Ejecutor (*Maker*) acuerdan el alcance exacto y los criterios verificables de éxito antes de cerrar la entrega, evitando desviaciones de alcance (*Scope Creep*) o interpretaciones ambiguas.
+Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**. El Planificador y el Ejecutor (*Maker*) acuerdan el alcance exacto y los criterios verificables de éxito antes de iniciar la implementación, evitando desviaciones de alcance (*Scope Creep*) o interpretaciones ambiguas.
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-016` Completada y Verificada)
-- **Tareas recientes completadas:** `feat-013`, `feat-014`, `feat-015` y `feat-016` (`done`).
-- **Tarea activa en cola DAG:** Ninguna (`WIP = 0`; `feat-000..016` en `done`).
-- **Marcha de trabajo ejecutada:** `Modo Diario Ágil` (`WIP = 1` durante implementación, cerrada en `CLEAN STATE` `100/100`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-017` Completada y Verificada)
+- **Tareas recientes completadas:** `feat-013`, `feat-014`, `feat-015`, `feat-016` y `feat-017` (`done`).
+- **Siguiente tarea planificada en cola DAG:** Ninguna pendiente (`feat-000..017` en `done`).
+- **Marcha de trabajo ejecutada:** `Modo Diario Ágil` (`WIP = 1` -> verificación en 3 puertas `bash ./init.sh` `100/100` -> cierre limpio `WIP = 0`).
 
 ---
 
-## Alcance Incluido (`In-Scope`) para `feat-016`
+## Alcance Incluido (`In-Scope`) para `feat-017`
 
-1. **Desbloqueo de Cola Masiva (> 300+ diseños) y Exclusión de Ventas Anuladas (`server/services/productionService.js`, `useProductionQueue.js`, `usePrintSheets.js`, `ProductionManagementView.jsx`)**:
-   - En `getProductionItems` (`productionService.js`): elevar el tope máximo permitido de `limit` de `100` a `1000` (`Math.min(1000, Math.max(1, parseInt(limit, 10) || 500))`), excluir ventas anuladas (`sale: { status: { not: 'ANULADA' }, ... }`) tanto en `getProductionItems` como en `getProductionMetrics`, e incluir `productionLogs: { include: { user: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'desc' } }` en cada ítem consultado.
-   - En `useProductionQueue.js` y `ProductionManagementView.jsx`: consultar con `limit=500` y estado `page` + `pagination`, mostrando un indicador claro `"Mostrando X de Y diseños"` y paginador accesible (`min-h-[44px]`) cuando `totalPages > 1`. En `usePrintSheets.js`: elevar `limit` de `100` a `500` al consultar ítems sin pliego.
+1. **Anticipo Libre sin Restricción del 50% + Solo Campo de Anticipo y Botón `100%` (`RemoteQuoterSummary.jsx`, `useRemoteSaleForm.js`, `remoteSaleService.js`, `BalancePaymentModal.jsx`)**:
+   - **Frontend (`useRemoteSaleForm.js`)**:
+     - Eliminar el `useEffect` que pre-rellenaba automáticamente `depositInput` con el 50% (`minDeposit`), dejando `depositInput` inicialmente vacío (`''` -> `numericDeposit = 0`) para que el vendedor ingrese libremente el monto real cobrado o pulse el botón `100%`.
+     - Actualizar `isDepositValid` a `totalAmount > 0 && (isPendingPaymentOnly || (numericDeposit > 0 && numericDeposit <= totalAmount + 0.01))`.
+     - En `confirmRemoteSale`, retirar el bloqueo `if (numericDeposit < minDeposit)` y validar únicamente que en modo `Con Anticipo` el valor sea `> 0` y `<= totalAmount + 0.01`.
+   - **Frontend (`RemoteQuoterSummary.jsx`)**:
+     - Retirar el botón `50% Anticipo`, el indicador `Mínimo 50%: Q ...`, el bloque ámbar `isInsufficient` (`"Anticipo insuficiente..."`) y el texto `(mínimo 50% = Q ...)` dentro de `Pendiente Pago`.
+     - Dejar únicamente el campo numérico para ingresar el anticipo cobrado y el botón de `100%` (`setDepositInput(totalAmount.toString())`), cambiando el mensaje de estado válido parcial a `"Anticipo registrado"` + `"Saldo pendiente: Q ..."`.
+   - **Backend (`server/services/sales/remoteSaleService.js`) y Modal de Anticipo Diferido (`BalancePaymentModal.jsx`)**:
+     - En `createRemoteSaleTransaction`: retirar la compuerta que rechazaba con `HTTP 400` pagos menores al 50% (`paymentsTotal < requiredDeposit && paymentsTotal < minProductDeposit`), aceptando cualquier anticipo positivo (`paymentsTotal > 0` y `<= totalAmount + 0.01`), marcando `ANTICIPO_PAGADO` cuando `< totalAmount` o `PAGADO_TOTAL` cuando `>= totalAmount` y enviando los ítems a `A_PRODUCCION`.
+     - En `registerBalancePayment` (rama `isPendingPayment`) y `BalancePaymentModal.jsx`: retirar igualmente el tope mínimo del 50% al acreditar el primer anticipo sobre una orden previamente guardada como `PENDIENTE_PAGO` (dejando solo el botón de `100%` y el campo libre `> 0`).
 
-2. **Tamaño del Póster 100% Visible en Celular + Cero Color Naranja (`src/components/production/ProductionOrderCard.jsx` y `ProductionManagementView.jsx`)**:
-   - Extraer de forma determinista el tamaño del póster desde `item.description` (p. ej. el sufijo entre paréntesis `(Mini | Pequeño | Mediano | Grande | Gigante)` al final de la descripción, limpiándolo del título si se muestra aparte) y/o `item.customDimensions`.
-   - Renderizar en `ProductionOrderCard.jsx` un **badge prominente e imposible de truncar (`shrink-0`) con el Tamaño del Póster** (ej. `📐 Mediano`) y la **Cantidad** (`x2`) en primera vista móvil, cambiando el título `truncate` de 1 línea por `line-clamp-2 break-words` para que en pantallas angostas jamás se corte ni oculte el tamaño ni la obra.
-   - Erradicar por completo cualquier clase naranja/ámbar (`bg-amber-*`, `text-amber-*`, `border-amber-*`) en `ProductionOrderCard.jsx` y `ProductionManagementView.jsx`, utilizando botones/badges limpios en blanco, verde esmeralda, cian o gris neutro.
+2. **Retiro de Iconos a Color Redundantes (Doble Icono) y Centrado de Texto en Botones (`RemoteQuoterSummary.jsx`, `FastManualSaleForm.jsx`, `WhatsAppQuoteShareModal.jsx`, `BalancePaymentModal.jsx`)**:
+   - En `RemoteQuoterSummary.jsx`, quitar todos los emojis/iconos a color redundantes de los botones (`⚡` en `Con Anticipo`, `⏳` en `Pendiente Pago`, `💯` en `100%`, `🔍` en `Verificar Boleta (OCR)`), conservando únicamente los iconos minimalistas de `lucide-react` (`Zap`, `Clock`, `CheckCircle2`, `Smartphone`, `Banknote`, `CreditCard`, `Search`, `Upload`) y asegurando alineación y texto debidamente centrado (`flex items-center justify-center gap-1.5 text-center`).
+   - Limpiar también los dobles iconos del flujo de Nueva Venta de Redes: retirar `📱` junto a `<Smartphone />` en la cabecera de `FastManualSaleForm.jsx` (y actualizar el subtítulo `'Venta remota con anticipo 50/50, CRM y logística'` por `'Venta remota, registro de anticipo, CRM y logística'`), retirar `📲`, `✅` y `📋` junto a `<Smartphone />`, `<Check />` y `<Copy />` en `WhatsAppQuoteShareModal.jsx`, y retirar `⚡` / `💯` en `BalancePaymentModal.jsx`.
 
-3. **Separación Estricta `Cola Pendiente` vs `Archivo Inmutable de Resueltos` para `OPERARIO_1` y `OPERARIO_2` (`productionService.js`, `useProductionQueue.js`, `ProductionFilterTabs.jsx`, `ProductionOrderCard.jsx`)**:
-   - **Comportamiento por defecto (Cola Activa):**
-     - `OPERARIO_1` (Stock / Producción 1): abre por defecto en su **Cola Pendiente** (`status = 'PENDIENTE'`). En el mismo instante en que marca un diseño como **`📦 Separar Stock` (`SEPARADO`)** o **`🖨️ Enviar a Imprimir` (`A_PRODUCCION`)**, el ítem **desaparece inmediatamente de su cola activa** y pasa a su pestaña **`Archivo de Resueltos`** (`ARCHIVO_OP1` / estados `['SEPARADO', 'A_PRODUCCION', 'IMPRESO']`).
-     - `OPERARIO_2` (Impresión 2 / Taller): abre por defecto en su **Cola por Imprimir** (`status = 'A_PRODUCCION'`), y ahora dispone también de su pestaña **`Archivo de Impresos`** (`status = 'IMPRESO'`). En el mismo instante en que marca un diseño como **`✅ Marcar como IMPRESO`**, el ítem **desaparece inmediatamente de su cola por imprimir** y pasa a su **`Archivo de Impresos`**.
-     - `SUPER_ADMIN`: puede conmutar entre **Cola Activa** (`PENDIENTE` / `A_PRODUCCION`) y **Archivo de Resueltos** (`SEPARADO` / `A_PRODUCCION` / `IMPRESO`) con visibilidad completa.
-   - **Inmutabilidad Estricta Anti-Salto de Trabajo (Backend + UI):**
-     - En `updateItemProductionStatus` (`productionService.js`):
-       - Si el usuario es `OPERARIO_1` (sin `SUPER_ADMIN`), **SOLO puede actuar sobre ítems cuyo estado actual sea `PENDIENTE`** (`item.productionStatus === 'PENDIENTE'`) hacia `'SEPARADO'` o `'A_PRODUCCION'`. Si `item.productionStatus !== 'PENDIENTE'`, rechazar con `HTTP 403` (`"Este diseño ya fue procesado y archivado de forma inmutable."`) e impedir volver a `'PENDIENTE'` o alterar un registro ya resuelto.
-       - Si el usuario es `OPERARIO_2` (sin `SUPER_ADMIN`), **SOLO puede actuar sobre ítems en `A_PRODUCCION`** hacia `'IMPRESO'`. Si ya está en `'IMPRESO'`, es `100%` inmutable (`HTTP 403`).
-     - En `ProductionOrderCard.jsx` (modo archivo / ítem ya resuelto para ese rol):
-       - **Cero botones de modificación** (100% solo lectura para operarios).
-       - Mostrar bloque de **Registro Inmutable de Auditoría** con:
-         - **Acción ejecutada** (`Separado de Stock`, `Enviado a Impresión` o `Impreso en Taller`),
-         - **Usuario responsable** (`fullName` del operario extraído de `productionLogs`),
-         - **Fecha y hora exacta** en zona horaria `America/Guatemala` (`es-GT`).
-         *(Cuando un ítem pasó por Operario 1 -> `A_PRODUCCION` y luego Operario 2 -> `IMPRESO`, mostrar ambos sellos cronológicos: quién y cuándo lo mandó a imprimir, y quién y cuándo terminó la impresión).*
+3. **Etiqueta Correcta del Campo: `Valor del anticipo` (`RemoteQuoterSummary.jsx`)**:
+   - Eliminar el título `"Monto ingresado por el cliente (Q):"` (y el encabezado duplicado `"Monto de Anticipo a Registrar"`) y colocar como título exacto del campo **`Valor del anticipo`**.
 
-4. **Guardarraíles de Suites Existentes**:
-   - Preservar `const isVendedorRedesOnly = Boolean(isVendedorRedes && !isSuperAdmin && !isOperario1 && !isOperario2);` y `{!isVendedorRedesOnly && (` en `ProductionManagementView.jsx` (`tests/unit/production-seller-isolation.test.js`).
-   - Preservar `if (isVendedorRedesOnly || source === 'PEDIDOS')` en `getProductionItems` y `getProductionMetrics` (`tests/unit/production-seller-isolation.test.js`).
-   - Preservar el debounce exacto de `250ms` (`debouncedSearchQuery`, `setTimeout`, `250`, `clearTimeout(timer)`) en `useProductionQueue.js` (`tests/production/production-adversarial.test.js`).
-   - Preservar `min-h-[44px]` en `ProductionFilterTabs.jsx` (`tests/frontend/phase5-frontend-ergonomics-resilience.test.js`).
+4. **Texto del Botón que Finaliza la Venta: `Registrar Venta (abono Q 0.00)` (`RemoteQuoterSummary.jsx`)**:
+   - Eliminar el texto `"Registrar Pedido 50/50..."` / `"Registrar Pedido..."` en el botón primario de confirmación y mostrar **`Registrar Venta (abono Q ${numericDeposit.toFixed(2)})`** (de modo que en estado inicial `0` se lea exactamente `Registrar Venta (abono Q 0.00)` y al escribir un anticipo o pulsar `100%` refleje el monto exacto abonado; y en estado `isSubmitting` mostrar `'Registrando venta...'`).
+
+5. **Nuevo Pie de Página Global en el Sitio (`src/App.jsx` y `src/components/LoginView.jsx`)**:
+   - Sustituir el texto del `<footer>` global en `src/App.jsx` (e incorporarlo de forma consistente en `src/components/LoginView.jsx` y en la vista informativa de vendedor sin stand en `src/App.jsx`) por:
+     **`Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026`**.
+
+6. **Guardarraíles de Suites Existentes**:
+   - Preservar en `RemoteQuoterSummary.jsx` las cadenas de clases auditadas estáticamente por `tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js`:
+     - `'bg-white text-black border-white shadow-sm font-bold'`
+     - `'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'`
+     - `'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'`
+   - Preservar en `RemoteQuoterSummary.jsx` el encabezado `'<span>4. Cotizador & Registro de Anticipo</span>'` y mantener `RemoteQuoterSummary.jsx <= 350` líneas y `FastManualSaleForm.jsx <= 350` líneas (`tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js` y `tests/adversarial/surgery-066-voice-catalog-search.test.js`).
+   - Preservar en `remoteSaleService.js` las trazas forenses de `registerBalancePayment` (`[Saldo Q`, `cobrado por:`, `collectorName`, `collectorRole`, `SALDO_VENTA_COBRADO`) auditadas por `tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js`.
+   - Mantener ergonomía táctil `min-h-[44px]` / `min-h-[48px]` en todos los controles interactivos y `0 CRLF` en todos los archivos tocados.
 
 ## Exclusiones Explícitas (`Out-of-Scope`)
 - Cero lectura o modificación de `.env`.
-- Cero modificaciones en `prisma/schema.prisma` (reutilizar `SaleItem` y `ProductionLog` ya existentes).
+- Cero modificaciones en `prisma/schema.prisma`.
+- Cero cambios en la lógica de ventas presenciales de mostrador (`POS_FERIA` / `PaymentSummaryBar.jsx`) ni en el descuento del 50% de material `VINILO_SOLO` en `CustomItemModal.jsx`.

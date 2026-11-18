@@ -1,31 +1,34 @@
 # Session Handoff
 
 ## Current Objective
-- **Goal:** Repositorio en estado limpio tras completar y verificar `feat-016` (Rediseño Operativo de Producción: cola completa sin tope de 50 diseños, tamaño de póster prominente en celular, cero colores naranjas y Archivo Inmutable de Resueltos con sello de usuario, fecha y hora tanto para Operario 1 como para Operario 2).
-- **Current status:** `clean-state` (`WIP = 0`; `feat-000..016` en `done`; `Overall: 100/100`).
-- **Branch / commit:** `main` (commit de `feat-016` listo para despliegue cuando el usuario lo indique).
+- **Goal:** Implementación y verificación integral de `feat-017` (anticipo libre sin mínimo del 50% en Nueva Venta de Redes, retiro de iconos a color redundantes con texto centrado, etiqueta `Valor del anticipo`, botón primario `Registrar Venta (abono Q 0.00)` y nuevo pie de página global 2026).
+- **Current status:** `clean-state` (`WIP = 0`; `feat-000..017` en `done`; `Overall: 100/100`).
+- **Branch / commit:** `main` (`0 CRLF` en todos los archivos gobernados y de producción).
 
 ## Completed This Session
-- [x] Desbloqueada la cola masiva de `Producción` en `server/services/productionService.js`, `useProductionQueue.js`, `usePrintSheets.js` y `ProductionManagementView.jsx` (`limit = 500` por defecto, escalable hasta `1000`, paginación accesible `min-h-[44px]`, contador `"Mostrando X de Y diseños"` y exclusión estricta de ventas `ANULADA` en listado y métricas).
-- [x] Destacado el tamaño del póster en móvil en `src/components/production/ProductionOrderCard.jsx` mediante `extractPosterSizeInfo` (`data-testid="poster-size-badge"`, `shrink-0`), badge de cantidad (`data-testid="poster-qty-badge"`), título de 2 líneas (`line-clamp-2 break-words`) sin truncamiento de una línea, y retiro total de clases `amber-*` / `orange-*`.
-- [x] Implementada la separación estricta entre **Cola Pendiente / Por Imprimir** y **Archivo Inmutable de Resueltos / Impresos** para `OPERARIO_1`, `OPERARIO_2` y `SUPER_ADMIN`, sellando cada diseño procesado con acción, usuario responsable y fecha/hora exacta en `America/Guatemala` (`productionLogs.user`), `0` botones de acción en el archivo y bloqueo `HTTP 403` en backend ante intentos de reversión o re-modificación por operarios.
-- [x] Verificadas las suites `tests/production/production-scale-mobile-and-immutable-archive.test.js`, `tests/unit/production-seller-isolation.test.js` y `tests/production/production-adversarial.test.js` (`25/25 PASS`), `npm run test:unit` (`265/265 PASS`), `npm run test:voice` (`53/53 PASS`), `bash ./init.sh` (`CLEAN STATE`, `100/100`) y `npm run harness:check` (`HARNESS_PASS`).
+- [x] Retirada de extremo a extremo la restricción del 50% de anticipo en Nueva Venta de Redes: en backend (`createRemoteSaleTransaction` y `registerBalancePayment` en `server/services/sales/remoteSaleService.js`) y en frontend (`useRemoteSaleForm.js`, `RemoteQuoterSummary.jsx` y `BalancePaymentModal.jsx`), eliminando el auto-llenado al 50%, el botón de `50%` y la alerta ámbar de anticipo insuficiente, dejando únicamente el campo libre (`> 0` y `<= totalAmount`) y el botón de `100%`.
+- [x] Eliminados los emojis/iconos a color redundantes (doble icono) en `RemoteQuoterSummary.jsx`, `FastManualSaleForm.jsx`, `WhatsAppQuoteShareModal.jsx` y `BalancePaymentModal.jsx`, conservando exclusivamente los iconos minimalistas de `lucide-react` con icono y texto centrados (`justify-center text-center`).
+- [x] Renombrado el título del campo a **`Valor del anticipo`** y actualizado el botón de confirmación a **`Registrar Venta (abono Q 0.00)`** con actualización dinámica del abono (`Registrar Venta (abono Q X.XX)`).
+- [x] Actualizado el pie de página global en `src/App.jsx` y `src/components/LoginView.jsx` a **`Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026`**.
+- [x] Añadida y verificada la suite `tests/sales/remote-sale-flexible-deposit-and-footer.test.js` junto con `npm run test:unit` (`265/265 PASS`), `npm run test:voice` (`53/53 PASS`), `npm run harness:check` (`HARNESS_PASS`) y `bash ./init.sh` (`100/100`).
 
 ## Blockers / Risks
 - Ninguno activo.
 
 ## Files Touched
-- `server/services/productionService.js`
-- `src/components/ProductionManagementView.jsx`
-- `src/components/production/ProductionOrderCard.jsx`
-- `src/components/production/ProductionFilterTabs.jsx`
-- `src/components/production/hooks/useProductionQueue.js`
-- `src/components/production/hooks/usePrintSheets.js`
-- `tests/production/production-scale-mobile-and-immutable-archive.test.js`
+- `server/services/sales/remoteSaleService.js`
+- `src/components/manual-sale/hooks/useRemoteSaleForm.js`
+- `src/components/manual-sale/RemoteQuoterSummary.jsx`
+- `src/components/FastManualSaleForm.jsx`
+- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx`
+- `src/components/sales/BalancePaymentModal.jsx`
+- `src/App.jsx`
+- `src/components/LoginView.jsx`
+- `tests/sales/remote-sale-flexible-deposit-and-footer.test.js`
 - `feature_list.json`
 - `sprint-contract.md`
 - `progress.md`
 - `session-handoff.md`
 
 ## Recommended Next Step
-- Desplegar `feat-016` a producción cuando el usuario lo solicite, o definir el siguiente alcance en `feature_list.json` iniciando siempre con `bash ./init.sh`.
+- Iniciar la próxima sesión con `bash ./init.sh`; el repositorio queda listo para desplegar a producción cuando el usuario lo solicite o para abrir la siguiente tarea (`feat-018`) bajo `WIP = 1`.

@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-16 22:55
-**Session ID:** sesion-022 (Ejecución y Verificación de `feat-016`: Rediseño Operativo de Producción — Cola >300 Diseños, Tamaño en Móvil y Archivo Inmutable por Operario)
-**Active Feature:** Ninguna en código (`WIP = 0`; `feat-000..016` en `done`)
+**Last Updated:** 2026-11-17 18:05
+**Session ID:** sesion-024 (Implementación y Verificación de `feat-017`: Anticipo Libre en Ventas de Redes, Iconografía Minimalista Centrada, Etiqueta `Valor del anticipo`, Botón `Registrar Venta (abono Q 0.00)` y Pie de Página Global 2026)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..017` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -63,14 +63,20 @@
   - Extraído determinísticamente el tamaño del póster (`extractPosterSizeInfo` en `ProductionOrderCard.jsx`) para mostrar en primera línea móvil un badge prominente no truncable (`data-testid="poster-size-badge"`, `shrink-0`) junto con la cantidad (`data-testid="poster-qty-badge"`), sustituyendo el truncamiento de 1 línea del título por `line-clamp-2 break-words` y erradicando al 100% los tonos naranjas/ámbar (`amber-*` / `orange-*`).
   - Separadas estrictamente la **Cola Pendiente / Por Imprimir** y el **Archivo Inmutable de Resueltos / Impresos** tanto para `OPERARIO_1` como para `OPERARIO_2`: al procesar un diseño (`SEPARADO` o `A_PRODUCCION` para Operario 1; `IMPRESO` para Operario 2), sale al instante de su cola activa y queda sellado en el archivo con acción, nombre del usuario responsable y fecha/hora exacta en `America/Guatemala` (`es-GT`), con `0` botones de acción en el archivo y bloqueo `HTTP 403` en backend ante cualquier intento de re-modificación o reversión por operarios.
 
+- [x] **Flexibilización de Anticipo en Nueva Venta de Redes, Iconografía Minimalista Centrada, Etiqueta `Valor del anticipo`, Botón `Registrar Venta (abono Q 0.00)` y Pie de Página Global 2026 `feat-017` (`58/58` `remote-sale-flexible-deposit` + `surgery-056/059/061` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `bash ./init.sh` `100/100`)**:
+  - Retirada de extremo a extremo la compuerta del 50% de anticipo tanto en backend (`createRemoteSaleTransaction` y `registerBalancePayment` en `server/services/sales/remoteSaleService.js`) como en frontend (`useRemoteSaleForm.js`, `RemoteQuoterSummary.jsx` y `BalancePaymentModal.jsx`), aceptando cualquier anticipo positivo (`> 0` y `<= totalAmount`) para iniciar `A_PRODUCCION`, eliminando el auto-llenado forzoso al 50%, el botón de `50%` y los avisos de anticipo insuficiente, y dejando únicamente el campo numérico libre y el botón de `100%`.
+  - Eliminados todos los emojis/iconos a color redundantes (doble icono: `⚡`, `⏳`, `💯`, `🔍`, `📱`, `📲`, `✅`, `📋`) en `RemoteQuoterSummary.jsx`, `FastManualSaleForm.jsx`, `WhatsAppQuoteShareModal.jsx` y `BalancePaymentModal.jsx`, dejando exclusivamente los iconos minimalistas de `lucide-react` con texto centrado (`justify-center text-center`).
+  - Sustituida la etiqueta `"Monto ingresado por el cliente (Q):"` por el título exacto **`Valor del anticipo`** y reemplazado el botón primario de cierre por **`Registrar Venta (abono Q 0.00)`** (con monto dinámico `Q ${numericDeposit.toFixed(2)}`).
+  - Actualizado el pie de página global en `src/App.jsx` (layout principal y vista de vendedor sin stand) e incorporado en `src/components/LoginView.jsx` con el texto exacto **`Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026`**.
+
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..016` completadas y verificadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..017` completadas y verificadas).
 
 ### What's Next
-- Listo para revisión del usuario y despliegue a producción de `feat-016` o definición de nuevas mejoras bajo `WIP = 1`.
+- Cola de tareas actual en `done` (`feat-000..017`); listo para despliegue a producción cuando el usuario lo solicite o para registrar nuevas funcionalidades bajo `WIP = 1`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 25/25 production scale & adversarial tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 58/58 remote sale & surgery contract tests PASS).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -90,27 +96,30 @@
   - Alternatives considered: (a) Añadir nuevas columnas de auditoría en `SaleItem` modificando `prisma/schema.prisma` (descartado porque `ProductionLog` con relación `user` ya persiste cada transición); (b) Mostrar pestañas de archivo dentro de `ProductionFilterTabs` para `isOp2Only` rompiendo el contrato histórico `if (isOp2Only) return null;` de `production-adversarial.test.js` (descartado para preservar compatibilidad al 100%).
   - Resolution: Se incorporó un selector superior dedicado de bandeja (`Cola Pendiente / Por Imprimir` vs `Archivo de Resueltos / Impresos`) en `ProductionManagementView.jsx` para ambos operarios y `SUPER_ADMIN`, conservando `ProductionFilterTabs` para sub-estados de Operario 1 / Admin (`if (isOp2Only) return null;`), proyectando `productionLogs` ordenados cronológicamente con nombre de usuario y hora `America/Guatemala` y bloqueando con `HTTP 403` cualquier mutación posterior de operarios sobre diseños ya procesados.
 
+- **Retiro Fullstack de la Compuerta del 50% de Anticipo en Ventas de Redes (`feat-017`)**:
+  - Context: En `RemoteQuoterSummary.jsx` y `useRemoteSaleForm.js` el vendedor no podía ingresar un anticipo menor al 50% (además un `useEffect` auto-rellenaba el 50% al agregar productos), pero en `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction` y `registerBalancePayment`) también existía una compuerta dura `HTTP 400` del 50%.
+  - Alternatives considered: Retirar la validación únicamente en el componente React `RemoteQuoterSummary.jsx` (descartado porque `POST /api/sales/remote` rechazaría en servidor con `HTTP 400 Anticipo insuficiente` cualquier anticipo menor al 50%).
+  - Resolution: Se retiró la restricción del 50% de extremo a extremo (`RemoteQuoterSummary.jsx`, `useRemoteSaleForm.js`, `BalancePaymentModal.jsx` y `remoteSaleService.js`), iniciando `depositInput` vacío (`''` -> `abono Q 0.00`), dejando únicamente el campo `Valor del anticipo` y el botón de `100%`, y preservando intactas las clases y contratos estáticos exigidos por `surgery-056`, `surgery-059`, `surgery-061`, `surgery-064` y `surgery-065`.
+
 ## Files Modified This Session
-- `server/services/productionService.js` — Paginación escalable hasta `1000` (`limit=500` por defecto), exclusión estricta de `ANULADA` en ítems y métricas, soporte de filtros compuestos (`COLA_ACTIVA`, `ARCHIVO_OP1`, `ARCHIVO_OP2`), inclusión de `productionLogs.user` y candado `HTTP 403` de inmutabilidad post-acción para Operario 1 y Operario 2 (`0 CRLF`).
-- `src/components/production/hooks/useProductionQueue.js` — Gestión de `queueBucket` (`ACTIVE` vs `ARCHIVE`), `page`/`pagination` con `limit=500`, retiro inmediato de la cola activa al resolver un diseño y preservación de debounce `250ms` (`0 CRLF`).
-- `src/components/production/hooks/usePrintSheets.js` — Elevación de `limit` de `100` a `500` al consultar diseños candidatos sin pliego (`0 CRLF`).
-- `src/components/production/ProductionFilterTabs.jsx` — Sub-filtros contextuales para Cola Activa y Archivo de Resueltos manteniendo `min-h-[44px]`, `aria-pressed` e `if (isOp2Only) return null;` (`0 CRLF`).
-- `src/components/production/ProductionOrderCard.jsx` — Extracción determinista `extractPosterSizeInfo` con badge móvil prominente `shrink-0` (`poster-size-badge` + `poster-qty-badge`), título `line-clamp-2 break-words`, bloque `immutable-audit-record` con usuario y fecha/hora Guatemala (`extractAuditEntries`), `0` botones en archivo y `0` clases naranjas (`0 CRLF`).
-- `src/components/ProductionManagementView.jsx` — Selector estricto `Cola Pendiente / Por Imprimir` vs `Archivo de Resueltos / Impresos`, contador `"Mostrando X de Y diseños"`, controles de paginación accesibles y `0` clases naranjas (`0 CRLF`).
-- `tests/production/production-scale-mobile-and-immutable-archive.test.js` — Suite integral de verificación de `feat-016` (cola de 360/620 diseños, exclusión de anuladas, inmutabilidad `403` Op1/Op2, extracción móvil de tamaños y auditoría cronológica) (`0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés actualizado a `WIP = 0` con `feat-016` en `done` (`0 CRLF`).
+- `server/services/sales/remoteSaleService.js` — Retirada la compuerta del 50% en `createRemoteSaleTransaction` y `registerBalancePayment`, aceptando cualquier anticipo `> 0` y `<= totalAmount` (`0 CRLF`).
+- `src/components/manual-sale/hooks/useRemoteSaleForm.js` — Eliminado el `useEffect` de auto-llenado al 50% y el bloqueo de `minDeposit`, validando anticipo libre `> 0` (`342L <= 350L`, `0 CRLF`).
+- `src/components/manual-sale/RemoteQuoterSummary.jsx` — Etiqueta `Valor del anticipo`, solo campo numérico + botón `100%`, retiro de emojis a color redundantes con texto centrado y botón primario `Registrar Venta (abono Q 0.00)` dinámico (`316L <= 350L`, `0 CRLF`).
+- `src/components/FastManualSaleForm.jsx` — Limpieza de doble icono `📱` junto a `<Smartphone />`, subtítulo sin `50/50` y centrado de controles (`333L <= 350L`, `0 CRLF`).
+- `src/components/manual-sale/WhatsAppQuoteShareModal.jsx` — Limpieza de dobles iconos (`📲`, `✅`, `📋`) dejando solo iconos minimalistas Lucide con texto centrado (`0 CRLF`).
+- `src/components/sales/BalancePaymentModal.jsx` — Retiro del mínimo del 50% y doble icono en anticipo diferido (`PENDIENTE_PAGO`), etiqueta `Valor del anticipo` y botón `100%` (`0 CRLF`).
+- `src/App.jsx` y `src/components/LoginView.jsx` — Nuevo pie de página global `Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026` (`0 CRLF`).
+- `tests/sales/remote-sale-flexible-deposit-and-footer.test.js` — Suite integral backend + frontend para los 5 requerimientos de `feat-017` (`9/9 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Estado del arnés cerrado en `done` (`WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite Integral de Producción (`feat-016` + Aislamiento Vendedor + Adversarial Phase 5): `node --test tests/production/production-scale-mobile-and-immutable-archive.test.js tests/unit/production-seller-isolation.test.js tests/production/production-adversarial.test.js` -> `25/25 PASS across 12 suites (0 fail)`
-- [x] Suite Completa de Pruebas Unitarias: `npm run test:unit` -> `265/265 PASS across 109 suites`
-- [x] Suite Completa de Voz: `npm run test:voice` -> `53/53 PASS across 12 suites`
-- [x] Vigilante Arquitectónico Tolerancia Cero (Puerta 1): `bash scripts/check-architecture.sh` -> `0 violaciones, 0 excepciones, higiene y 6 capas verificadas`
-- [x] Validación de los 5 Subsistemas y DAG (Puerta 2): `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
-- [x] Puertas 1-3 en Estado Limpio: `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, zero-trust 13/13 PASS, vite build 1566 modules PASS)`
-- [x] Compuerta Unificada del Arnés: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (275 JS syntax OK, 31.69s)`
-- [x] Verificación de Formato: `0 CRLF` en todos los archivos gobernados y modificados.
+- [x] Suite Dedicada `feat-017` + Contratos Quirúrgicos: `node --test tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (58/58 PASS across 20 suites in 335.12ms)`
+- [x] Pruebas Unitarias Completas: `npm run test:unit` -> `Exit code 0 (265/265 PASS across 109 suites)`
+- [x] Suites de Voz y VAD: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites)`
+- [x] Compuerta Física Unificada: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (276 JS syntax OK, 13/13 zero-trust, 193 secrets OK, vite build 1566 modules PASS in 4.22s)`
+- [x] Verificación en 3 Puertas (`sesion-024`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, zero-trust 13/13 PASS, vite build PASS)`
+- [x] Validación Matemática del Arnés: `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0, DAG respetado)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`).
-2. Todas las tareas planificadas `feat-000..016` están completadas y verificadas.
-3. El inicio estándar para cualquier nueva tarea se ejecuta con `bash ./init.sh`.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`), con `feat-000..017` completadas y verificadas.
+2. Listo para despliegue a producción cuando el usuario lo indique o para abordar el siguiente requerimiento iniciando con `bash ./init.sh`.

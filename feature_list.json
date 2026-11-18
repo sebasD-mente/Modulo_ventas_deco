@@ -511,6 +511,38 @@
       ],
       "evidence": "node --test tests/production/production-scale-mobile-and-immutable-archive.test.js tests/unit/production-seller-isolation.test.js tests/production/production-adversarial.test.js -> Exit code 0 (25/25 PASS across 12 suites in 1311.14ms: 360-item fair queue returned without 50/100 truncation + pagination up to 1000, ANULADA sales excluded in items & metrics, Operario 1 & Operario 2 immediate removal from active queue into immutable archive with user/date/time America/Guatemala stamps from productionLogs + HTTP 403 anti-reversal lock, prominent non-truncated poster-size-badge & line-clamp-2 on mobile, zero amber/orange classes, and 0 action buttons in archive); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, audit-secrets 193 files OK, verify-gemini-models PASS, zero-trust 13/13 PASS, vite build 1566 modules PASS in 4.48s); npm run harness:check -> status HARNESS_PASS (275 JS syntax OK, 31.69s); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/schema.prisma (reutilizando SaleItem y ProductionLog con user), y preservados todos los guardarraíles de production-seller-isolation, production-adversarial y phase5-frontend-ergonomics-resilience."
+    },
+    {
+      "id": "feat-017",
+      "name": "Flexibilización de Anticipo en Nueva Venta de Redes (Sin Mínimo del 50%), Iconos Minimalistas Centrados, Etiqueta 'Valor del anticipo', Botón 'Registrar Venta (abono Q 0.00)' y Pie de Página Global 2026",
+      "description": "Actualizar el flujo de Nueva Venta de Redes (VENDEDOR_REDES / REDES_PERSONALIZADO) y el pie de página global sin tocar prisma/schema.prisma: (1) Anticipo libre sin tope mínimo del 50%: retirar la validación que exige al menos el 50% tanto en frontend (useRemoteSaleForm.js, RemoteQuoterSummary.jsx y BalancePaymentModal.jsx) como en backend (createRemoteSaleTransaction y registerBalancePayment en server/services/sales/remoteSaleService.js), eliminando el auto-llenado forzoso al 50%, el botón '50% Anticipo', los avisos de mínimo 50% y la alerta ámbar de anticipo insuficiente, dejando únicamente el campo numérico para que el vendedor ingrese el valor del anticipo cobrado (> 0 y <= totalAmount) y el botón de 100%; (2) Limpieza de doble icono y centrado en botones: eliminar los emojis/iconos a color redundantes (⚡, ⏳, 💯, 🔍, 📱, 📲, ✅, 📋) en los botones de RemoteQuoterSummary.jsx (y cabeceras/modales adyacentes FastManualSaleForm.jsx y WhatsAppQuoteShareModal.jsx), conservando exclusivamente los iconos minimalistas de Lucide y centrando debidamente icono y texto (justify-center text-center); (3) Etiqueta del campo de anticipo: sustituir 'Monto ingresado por el cliente (Q):' por el título exacto 'Valor del anticipo'; (4) Botón de cierre de venta: reemplazar el texto 'Registrar Pedido 50/50...' por 'Registrar Venta (abono Q X.XX)' mostrando 'Registrar Venta (abono Q 0.00)' cuando el campo de abono está en 0.00 y actualizando dinámicamente el monto ingresado; y (5) Pie de página global del sitio: cambiar el footer general en src/App.jsx (e incorporarlo consistentemente en src/components/LoginView.jsx) por 'Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026'.",
+      "area": "remote-sales-ui-and-global-footer",
+      "user_visible_behavior": "En Nueva Venta de Redes el vendedor puede registrar cualquier monto de anticipo cobrado sin bloqueo del 50% usando únicamente el campo 'Valor del anticipo' o el botón de 100%, ve botones limpios con un solo icono minimalista y texto centrado, finaliza con el botón 'Registrar Venta (abono Q 0.00)' (con el monto dinámico del abono), y todo el sitio muestra en el pie de página 'Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026'.",
+      "priority": "P1",
+      "status": "done",
+      "dependencies": [
+        "feat-016"
+      ],
+      "required_files": [
+        "server/services/sales/remoteSaleService.js",
+        "src/components/manual-sale/hooks/useRemoteSaleForm.js",
+        "src/components/manual-sale/RemoteQuoterSummary.jsx",
+        "src/components/FastManualSaleForm.jsx",
+        "src/components/manual-sale/WhatsAppQuoteShareModal.jsx",
+        "src/components/sales/BalancePaymentModal.jsx",
+        "src/App.jsx",
+        "src/components/LoginView.jsx",
+        "tests/sales/remote-sale-flexible-deposit-and-footer.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100"
+      ],
+      "evidence": "node --test tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/adversarial/surgery-056-permanent-pos-and-pickup-accounting.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js -> Exit code 0 (58/58 PASS across 20 suites in 335.12ms: <50% flexible deposits accepted in createRemoteSaleTransaction & registerBalancePayment activating A_PRODUCCION, 0 auto-fill in useRemoteSaleForm, exact label 'Valor del anticipo' + free input & 100% button only, 0 redundant colored button emojis + justify-center text-center alignment, dynamic 'Registrar Venta (abono Q 0.00)' CTA, and 2026 global footer in App.jsx & LoginView.jsx); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS across 12 suites); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (276 JS syntax OK, 13/13 zero-trust, 193 secrets OK, vite build 1566 modules PASS in 4.22s); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado. Cero lectura de .env, cero cambios en prisma/schema.prisma, y preservados al 100% los guardarraíles de surgery-056, surgery-059, surgery-061, surgery-064 y surgery-065."
     }
   ]
 }

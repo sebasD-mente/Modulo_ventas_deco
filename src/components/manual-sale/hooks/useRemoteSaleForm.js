@@ -138,23 +138,15 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     return () => { isMounted = false; };
   }, [authFetch, eventId]);
 
-  // Aritmética financiera reactiva
+  // Aritmética financiera reactiva (anticipo libre > 0 sin tope mínimo del 50%)
   const productsSubtotal = cartItems.reduce((sum, it) => sum + (Number(it.subtotal) || 0), 0);
   const productsAmount = Math.max(0, Number((productsSubtotal - (Number(discount) || 0)).toFixed(2)));
   const effectiveShippingCost = deliveryMethod === 'ENVIO_COURIER' ? Number(shippingCost || 0) : 0;
   const totalAmount = Number((productsAmount + effectiveShippingCost).toFixed(2));
-  const minDeposit = Number((totalAmount * 0.50).toFixed(2));
-
-  // Sincronizar anticipo por defecto si el usuario aún no ingresó uno manual
-  useEffect(() => {
-    if (!isPendingPaymentOnly && totalAmount > 0 && (!depositInput || Number(depositInput) === 0)) {
-      setDepositInput(minDeposit.toString());
-    }
-  }, [totalAmount, minDeposit, isPendingPaymentOnly]);
 
   const numericDeposit = isPendingPaymentOnly ? 0 : (Number(depositInput) || 0);
   const balanceDue = Math.max(0, Number((totalAmount - numericDeposit).toFixed(2)));
-  const isDepositValid = totalAmount > 0 && (isPendingPaymentOnly || (numericDeposit >= minDeposit && numericDeposit <= totalAmount + 0.01));
+  const isDepositValid = totalAmount > 0 && (isPendingPaymentOnly || (numericDeposit > 0 && numericDeposit <= totalAmount + 0.01));
 
   // Selección de cliente autocompletado
   const selectCustomer = (cust) => {
@@ -233,8 +225,8 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       return false;
     }
     if (!isPendingPaymentOnly) {
-      if (numericDeposit < minDeposit) {
-        setSubmitError(`Anticipo insuficiente: Para iniciar producción se requiere un abono mínimo de Q ${minDeposit.toFixed(2)} (50%).`);
+      if (numericDeposit <= 0) {
+        setSubmitError('Debes ingresar un valor de anticipo mayor a Q 0.00 o seleccionar Pendiente Pago.');
         return false;
       }
       if (numericDeposit > totalAmount + 0.01) {
@@ -335,7 +327,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     deliveryMethod, setDeliveryMethod, shippingCost, setShippingCost,
     shippingCourier, setShippingCourier, shippingTrackingNumber, setShippingTrackingNumber,
     pickupEventId, setPickupEventId, availablePickupEvents,
-    productsSubtotal, productsAmount, effectiveShippingCost, totalAmount, minDeposit,
+    productsSubtotal, productsAmount, effectiveShippingCost, totalAmount,
     depositInput, setDepositInput, numericDeposit, balanceDue, isDepositValid,
     isPendingPaymentOnly, setIsPendingPaymentOnly,
     depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,

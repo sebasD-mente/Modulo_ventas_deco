@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, Smartphone, CreditCard, Banknote, AlertTriangle, CheckCircle2, Loader2, DollarSign, Upload, X, Clock, Zap, Search } from 'lucide-react';
+import { Calculator, Smartphone, CreditCard, Banknote, AlertTriangle, CheckCircle2, Loader2, Upload, X, Clock, Zap, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const PAYMENT_METHODS = [
@@ -10,15 +10,15 @@ const PAYMENT_METHODS = [
 
 export default function RemoteQuoterSummary({
   productsSubtotal = 0, productsAmount = 0, discount = 0, effectiveShippingCost = 0, totalAmount = 0,
-  minDeposit = 0, depositInput = '', setDepositInput, numericDeposit = 0, balanceDue = 0,
+  depositInput = '', setDepositInput, numericDeposit = 0, balanceDue = 0,
   isDepositValid = false, depositPaymentMethod, setDepositPaymentMethod, depositReference, setDepositReference,
   remoteSaleNotes, setRemoteSaleNotes, depositReceiptUrl = null, setDepositReceiptUrl,
   isUploadingReceipt = false, receiptUploadError = null, onUploadReceipt,
   isPendingPaymentOnly = false, setIsPendingPaymentOnly,
   isSubmitting, submitError, onConfirmRemoteSale,
 }) {
-  const isInsufficient = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit < minDeposit;
-  const isPaidTotal = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit >= totalAmount;
+  const isOverTotal = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit > totalAmount + 0.01;
+  const isPaidTotal = !isPendingPaymentOnly && totalAmount > 0 && numericDeposit >= totalAmount && !isOverTotal;
 
   const authContext = useAuth ? useAuth() : null;
   const authFetch = authContext?.authFetch || window.fetch.bind(window);
@@ -47,7 +47,7 @@ export default function RemoteQuoterSummary({
         detectedAmount: 0,
         expectedAmount: numericDeposit,
         isMatch: false,
-        summary: `⚠️ Fallo en OCR: ${err.message}`,
+        summary: `Fallo en OCR: ${err.message}`,
       });
     } finally {
       setIsVerifyingOcr(false);
@@ -79,26 +79,26 @@ export default function RemoteQuoterSummary({
         <button
           type="button"
           onClick={() => setIsPendingPaymentOnly && setIsPendingPaymentOnly(false)}
-          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center justify-center gap-1.5 ${
+          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center justify-center gap-1.5 text-center ${
             !isPendingPaymentOnly
               ? 'bg-white text-black border-white shadow-sm font-bold'
               : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'
           }`}
         >
           <Zap className={`w-3.5 h-3.5 shrink-0 ${!isPendingPaymentOnly ? 'text-black' : 'text-neutral-400'}`} />
-          <span className="truncate">⚡ Con Anticipo</span>
+          <span>Con Anticipo</span>
         </button>
         <button
           type="button"
           onClick={() => setIsPendingPaymentOnly && setIsPendingPaymentOnly(true)}
-          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center justify-center gap-1.5 ${
+          className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center justify-center gap-1.5 text-center ${
             isPendingPaymentOnly
               ? 'bg-white text-black border-white shadow-sm font-bold'
               : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'
           }`}
         >
           <Clock className={`w-3.5 h-3.5 shrink-0 ${isPendingPaymentOnly ? 'text-black' : 'text-neutral-400'}`} />
-          <span className="truncate">⏳ Pendiente Pago</span>
+          <span>Pendiente Pago</span>
         </button>
       </div>
 
@@ -110,7 +110,7 @@ export default function RemoteQuoterSummary({
             <span>Cotización en espera de transferencia (Q {totalAmount.toFixed(2)})</span>
           </div>
           <p className="text-[11px] text-neutral-300 leading-relaxed">
-            La orden se registrará reservada. <strong>No entrará a producción en taller</strong> hasta que se acredite y registre el anticipo (mínimo 50% = Q {minDeposit.toFixed(2)}).
+            La orden se registrará reservada. <strong>No entrará a producción en taller</strong> hasta que se acredite y registre el anticipo.
           </p>
           <input
             type="text"
@@ -122,67 +122,51 @@ export default function RemoteQuoterSummary({
         </div>
       ) : (
         <>
-          {/* Control de Anticipo 50/50 */}
+          {/* Campo Libre de Anticipo + Botón 100% */}
           <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-1">
-              <span className="font-semibold text-neutral-200 flex items-center gap-1">
-                <DollarSign className="w-3.5 h-3.5 text-white" />
-                <span>Monto de Anticipo a Registrar</span>
-              </span>
-              <span className="text-neutral-300 font-mono font-bold text-[11px]">Mínimo 50%: Q {minDeposit.toFixed(2)}</span>
-            </div>
-
-            {/* Botones de 1 Toque */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDepositInput(minDeposit.toString())}
-                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                  numericDeposit === minDeposit && !isPaidTotal
-                    ? 'bg-white text-black border-white shadow-sm font-bold'
-                    : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'
-                }`}
-              >
-                ⚡ 50% Anticipo (Q {minDeposit.toFixed(2)})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDepositInput(totalAmount.toString())}
-                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                  isPaidTotal
-                    ? 'bg-white text-black border-white shadow-sm font-bold'
-                    : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'
-                }`}
-              >
-                💯 100% Total (Q {totalAmount.toFixed(2)})
-              </button>
-            </div>
-
-            {/* Input Numérico de Anticipo Personalizado */}
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Monto ingresado por el cliente (Q):</label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={depositInput}
-                onChange={(e) => setDepositInput(e.target.value)}
-                placeholder={`Mínimo Q ${minDeposit.toFixed(2)}`}
-                className="w-full min-h-[44px] px-3.5 py-2.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-white"
-              />
+              <label
+                htmlFor="remote-deposit-input"
+                className="block text-xs font-semibold text-neutral-200 mb-2"
+              >
+                Valor del anticipo
+              </label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  id="remote-deposit-input"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={depositInput}
+                  onChange={(e) => setDepositInput(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 min-h-[44px] px-3.5 py-2.5 bg-black border border-neutral-800 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setDepositInput(totalAmount > 0 ? totalAmount.toString() : '')}
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border flex items-center justify-center gap-1.5 text-center shrink-0 ${
+                    isPaidTotal
+                      ? 'bg-white text-black border-white shadow-sm font-bold'
+                      : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>100% (Q {totalAmount.toFixed(2)})</span>
+                </button>
+              </div>
             </div>
 
-            {/* Freno Preventivo Visual */}
-            {isInsufficient && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 space-y-1">
-                <div className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" /><span>Anticipo insuficiente</span></div>
-                <p className="text-[11px] text-amber-200/90 leading-relaxed">Para iniciar producción en taller se requiere un abono mínimo de <strong>Q {minDeposit.toFixed(2)} (50%)</strong>. Saldo pendiente: Q {balanceDue.toFixed(2)}.</p>
+            {isOverTotal && (
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 flex items-center gap-1.5 text-xs">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>El anticipo no puede superar el total de la orden (Q {totalAmount.toFixed(2)}).</span>
               </div>
             )}
 
             {isDepositValid && !isPaidTotal && (
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 font-semibold"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /><span>Anticipo 50% válido</span></span>
+                <span className="flex items-center gap-1.5 font-semibold"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /><span>Anticipo registrado</span></span>
                 <span className="font-bold font-mono">Saldo pendiente: Q {balanceDue.toFixed(2)}</span>
               </div>
             )}
@@ -207,12 +191,12 @@ export default function RemoteQuoterSummary({
                     key={m.id}
                     type="button"
                     onClick={() => setDepositPaymentMethod(m.id)}
-                    className={`min-h-[44px] px-2.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border ${
+                    className={`min-h-[44px] px-2.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 text-center transition-colors cursor-pointer border ${
                       isSel ? 'bg-white text-black border-white' : 'bg-black text-neutral-400 border-neutral-800 hover:text-white'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{m.label}</span>
+                    <span>{m.label}</span>
                   </button>
                 );
               })}
@@ -231,7 +215,7 @@ export default function RemoteQuoterSummary({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img src={depositReceiptUrl} alt="Comprobante" className="w-10 h-10 object-cover rounded-lg border border-neutral-700 bg-neutral-900 shrink-0" />
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-emerald-400 block truncate">✓ Comprobante Adjunto</span>
+                        <span className="text-xs font-bold text-emerald-400 block truncate">Comprobante Adjunto</span>
                         <a href={depositReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-neutral-400 hover:text-white underline truncate block">Ver original</a>
                       </div>
                     </div>
@@ -245,17 +229,17 @@ export default function RemoteQuoterSummary({
                     type="button"
                     onClick={handleVerifyReceipt}
                     disabled={isVerifyingOcr}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-200 font-bold text-xs flex items-center justify-center gap-2 text-center transition-colors cursor-pointer"
                   >
                     {isVerifyingOcr ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                        <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
                         <span>Escaneando boleta con OCR Gemini...</span>
                       </>
                     ) : (
                       <>
-                        <Search className="w-4 h-4 text-cyan-400" />
-                        <span>🔍 Verificar Boleta (OCR)</span>
+                        <Search className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span>Verificar Boleta (OCR)</span>
                       </>
                     )}
                   </button>
@@ -286,22 +270,23 @@ export default function RemoteQuoterSummary({
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 min-h-[44px] px-3 py-2 bg-neutral-900 border border-dashed border-neutral-700 hover:border-neutral-500 rounded-xl text-xs text-neutral-300 font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                  <label className="flex-1 min-h-[44px] px-3 py-2 bg-neutral-900 border border-dashed border-neutral-700 hover:border-neutral-500 rounded-xl text-xs text-neutral-300 font-semibold flex items-center justify-center gap-2 text-center cursor-pointer transition-colors">
                     <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={isUploadingReceipt} onChange={(e) => { const f = e.target.files?.[0]; if (f && onUploadReceipt) onUploadReceipt(f); }} />
-                    {isUploadingReceipt ? <Loader2 className="w-4 h-4 animate-spin text-cyan-400" /> : <Upload className="w-4 h-4 text-cyan-400" />}
+                    {isUploadingReceipt ? <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" /> : <Upload className="w-4 h-4 text-cyan-400 shrink-0" />}
                     <span>{isUploadingReceipt ? 'Subiendo voucher a la nube...' : 'Adjuntar Comprobante (Voucher / Foto)'}</span>
                   </label>
                 </div>
               )}
-              {receiptUploadError && <span className="text-[11px] text-red-400 block font-semibold">⚠️ {receiptUploadError}</span>}
+              {receiptUploadError && <span className="text-[11px] text-red-400 block font-semibold">{receiptUploadError}</span>}
             </div>
           </div>
         </>
       )}
 
       {submitError && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold">
-          ⚠️ {submitError}
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-semibold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{submitError}</span>
         </div>
       )}
 
@@ -310,7 +295,7 @@ export default function RemoteQuoterSummary({
         type="button"
         disabled={!isDepositValid || isSubmitting}
         onClick={onConfirmRemoteSale}
-        className={`w-full min-h-[48px] px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl active:scale-95 ${
+        className={`w-full min-h-[48px] px-6 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-xl active:scale-95 ${
           !isDepositValid || isSubmitting
             ? 'opacity-40 pointer-events-none bg-neutral-800 text-neutral-500 border border-neutral-700'
             : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
@@ -318,17 +303,11 @@ export default function RemoteQuoterSummary({
       >
         {isSubmitting ? (
           <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>{isPendingPaymentOnly ? 'Registrando cotización pendiente...' : 'Registrando pedido y enviando a taller...'}</span>
+            <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+            <span>Registrando venta...</span>
           </>
         ) : (
-          <span>
-            {isPendingPaymentOnly
-              ? 'Registrar Pedido (Pendiente de Pago)'
-              : isPaidTotal
-                ? `Registrar Pedido 100% Pagado (Q ${numericDeposit.toFixed(2)})`
-                : `Registrar Pedido 50/50 (Abono Q ${numericDeposit.toFixed(2)})`}
-          </span>
+          <span>{`Registrar Venta (abono Q ${numericDeposit.toFixed(2)})`}</span>
         )}
       </button>
     </div>

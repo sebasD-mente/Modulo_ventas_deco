@@ -303,6 +303,9 @@ function SalesTerminalMain() {
             Cerrar sesión
           </button>
         </div>
+        <footer className="pt-6 text-center text-xs text-neutral-500">
+          Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026
+        </footer>
       </div>
     );
   }
@@ -389,7 +392,7 @@ function SalesTerminalMain() {
       </main>
 
       <footer className="border-t border-neutral-900 py-4 px-6 text-center text-xs text-neutral-500">
-        STAND {'{IA}'} SaaS • Desarrollado por <strong>Deko Labs</strong> para <strong>Deco Vintage Guate</strong> • PostgreSQL VPS Inmutable
+        Desarrollado por Sebastian Jimenez / Deko Labs Todos los Derechos Reservados 2026
       </footer>
     </div>
   );

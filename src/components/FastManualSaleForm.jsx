@@ -58,7 +58,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       disabled={isSyncingCatalog}
       title="Sincronizar catálogo web"
       aria-label="Sincronizar catálogo web"
-      className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 text-xs font-semibold flex items-center justify-center gap-1.5 text-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <RefreshCw className={`w-4 h-4 text-cyan-400 shrink-0 ${isSyncingCatalog ? 'animate-spin' : ''}`} />
       <span className="text-xs">{label}</span>
@@ -103,7 +103,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
               {isVendedorRedesOnly ? (
                 <>
                   <Smartphone className="w-4 h-4 text-cyan-400" />
-                  <span>📱 Gestión de Pedidos de Redes</span>
+                  <span>Gestión de Pedidos de Redes</span>
                 </>
               ) : (
                 <>
@@ -117,7 +117,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                 ? 'Catálogo general, diseños personalizados, CRM WhatsApp y logística de envíos'
                 : saleMode === 'POS_FERIA'
                   ? 'Venta rápida y cobro presencial en mostrador'
-                  : 'Venta remota con anticipo 50/50, CRM y logística'}
+                  : 'Venta remota, registro de anticipo, CRM y logística'}
             </p>
           </div>
         </div>
@@ -221,11 +221,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             availablePickupEvents={remoteForm.availablePickupEvents}
           />
 
-          {/* Cotizador 50/50 y Registro de Anticipo */}
+          {/* Cotizador y Registro de Anticipo */}
           <RemoteQuoterSummary
             productsSubtotal={remoteForm.productsSubtotal} productsAmount={remoteForm.productsAmount}
             discount={cart.discount} effectiveShippingCost={remoteForm.effectiveShippingCost}
-            totalAmount={remoteForm.totalAmount} minDeposit={remoteForm.minDeposit}
+            totalAmount={remoteForm.totalAmount}
             depositInput={remoteForm.depositInput} setDepositInput={remoteForm.setDepositInput}
             numericDeposit={remoteForm.numericDeposit} balanceDue={remoteForm.balanceDue}
             isDepositValid={remoteForm.isDepositValid} depositPaymentMethod={remoteForm.depositPaymentMethod}

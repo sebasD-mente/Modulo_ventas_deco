@@ -109,27 +109,27 @@ Tu pedido entra hoy mismo a taller de producción. Te compartiremos tu guía de 
           <button
             type="button"
             onClick={handleOpenWhatsApp}
-            className="w-full min-h-[48px] px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95"
+            className="w-full min-h-[48px] px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm flex items-center justify-center gap-2 text-center transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95"
           >
-            <Smartphone className="w-5 h-5" />
-            <span>📲 Abrir en WhatsApp ({sale.customer?.phone || 'Cliente'})</span>
+            <Smartphone className="w-5 h-5 shrink-0" />
+            <span>Abrir en WhatsApp ({sale.customer?.phone || 'Cliente'})</span>
           </button>
 
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={handleCopy}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 text-center transition-colors cursor-pointer"
             >
               {copied ? (
                 <>
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span className="text-emerald-400">¡Copiado! ✅</span>
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-emerald-400">¡Copiado!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
-                  <span>📋 Copiar Texto</span>
+                  <Copy className="w-4 h-4 shrink-0" />
+                  <span>Copiar Texto</span>
                 </>
               )}
             </button>
@@ -137,7 +137,7 @@ Tu pedido entra hoy mismo a taller de producción. Te compartiremos tu guía de 
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-400 hover:text-white font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-400 hover:text-white font-bold text-xs flex items-center justify-center text-center transition-colors cursor-pointer"
             >
               Cerrar y Continuar
             </button>

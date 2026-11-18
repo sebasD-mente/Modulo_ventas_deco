@@ -127,7 +127,7 @@ async function findExistingRemoteSaleByKey(client, tenantId, idempotencyKey) {
 }
 
 /**
- * Transacción ACID para registro de Venta Remota con compuerta estricta de anticipo 50/50.
+ * Transacción ACID para registro de Venta Remota con anticipo libre (> 0) o pendiente de pago.
  */
 export async function createRemoteSaleTransaction({ tenantId, sellerId, data, idempotencyKey = null }) {
   // Fast-Path Idempotencia RFC 7231
@@ -177,6 +177,12 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
     status = 'PENDIENTE';
     itemProductionStatus = 'PENDIENTE';
   } else {
+    if (paymentsTotal <= 0) {
+      const error = new Error('El valor del anticipo debe ser mayor a Q 0.00.');
+      error.statusCode = 400;
+      throw error;
+    }
+
     if (paymentsTotal > totalAmount + 0.01) {
       const error = new Error(
         `El monto de pago registrado (Q ${paymentsTotal.toFixed(2)}) no puede superar el total de la orden (Q ${totalAmount.toFixed(2)}).`
@@ -185,18 +191,7 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
       throw error;
     }
 
-    // 2. Compuerta Inquebrantable del 50% de Anticipo cuando se incluye pago
-    const requiredDeposit = Number((totalAmount * 0.50).toFixed(2));
-    const minProductDeposit = Number((productsAmount * 0.50).toFixed(2));
-    if (paymentsTotal < requiredDeposit && paymentsTotal < minProductDeposit) {
-      const error = new Error(
-        `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un anticipo de Q ${paymentsTotal.toFixed(2)}.`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const isFullPayment = paymentsTotal >= totalAmount;
+    const isFullPayment = Math.abs(paymentsTotal - totalAmount) < 0.005 || paymentsTotal >= totalAmount;
     paymentStatus = isFullPayment ? 'PAGADO_TOTAL' : 'ANTICIPO_PAGADO';
     depositAmount = isFullPayment ? totalAmount : paymentsTotal;
     balanceDue = isFullPayment ? 0.0 : Number((totalAmount - paymentsTotal).toFixed(2));
@@ -353,11 +348,8 @@ export async function registerBalancePayment({
     let newDepositAmount;
 
     if (isPendingPayment) {
-      const requiredDeposit = Number((Number(sale.totalAmount) * 0.50).toFixed(2));
-      if (newPaymentsTotal < requiredDeposit) {
-        const error = new Error(
-          `Anticipo insuficiente: Se requiere al menos el 50% del total de la orden (Q ${requiredDeposit.toFixed(2)}), pero se recibió un pago de Q ${newPaymentsTotal.toFixed(2)}.`
-        );
+      if (newPaymentsTotal <= 0) {
+        const error = new Error('El valor del anticipo debe ser mayor a Q 0.00.');
         error.statusCode = 400;
         throw error;
       }
