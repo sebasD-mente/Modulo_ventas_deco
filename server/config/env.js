@@ -9,6 +9,11 @@ const __dirname = path.dirname(__filename);
 // Cargar .env desde la raíz del proyecto
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+const optionalSecretField = z.preprocess(
+  (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+  z.string().min(16).optional()
+);
+
 export const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -45,7 +50,8 @@ export const envSchema = z.object({
   DEFAULT_CURRENCY: z.string().default('GTQ'),
   DEFAULT_CURRENCY_SYMBOL: z.string().default('Q'),
   WEB_CATALOG_URL: z.string().default('https://decovintage.online'),
-  CATALOG_WEBHOOK_SECRET: z.string().min(16).optional(),
+  CATALOG_WEBHOOK_SECRET: optionalSecretField,
+  WEB_ORDERS_WEBHOOK_SECRET: optionalSecretField,
 });
 
 const rawEnv = {
@@ -55,10 +61,10 @@ const rawEnv = {
 
 const parsedEnv = envSchema.safeParse(rawEnv);
 
-const isTest = 
-  process.env.NODE_ENV === 'test' || 
+const isTest =
+  process.env.NODE_ENV === 'test' ||
   process.execArgv.includes('--test') ||
-  process.argv.some(arg => arg.includes('test')) ||
+  process.argv.some((arg) => arg.includes('test')) ||
   Boolean(process.env.NODE_TEST_CONTEXT);
 
 if (!parsedEnv.success) {
@@ -74,9 +80,24 @@ if (!parsedEnv.success) {
   }
 }
 
+const resolvedCatalogSecret = parsedEnv.success
+  ? (parsedEnv.data.CATALOG_WEBHOOK_SECRET || '')
+  : (process.env.CATALOG_WEBHOOK_SECRET || '');
+const resolvedWebOrdersSecret = parsedEnv.success
+  ? (parsedEnv.data.WEB_ORDERS_WEBHOOK_SECRET || resolvedCatalogSecret)
+  : (process.env.WEB_ORDERS_WEBHOOK_SECRET || resolvedCatalogSecret);
+
 export const ENV = parsedEnv.success
-  ? { ...parsedEnv.data, CATALOG_WEBHOOK_SECRET: parsedEnv.data.CATALOG_WEBHOOK_SECRET || '' }
-  : { CATALOG_WEBHOOK_SECRET: process.env.CATALOG_WEBHOOK_SECRET || '' };
+  ? {
+      ...parsedEnv.data,
+      CATALOG_WEBHOOK_SECRET: resolvedCatalogSecret,
+      WEB_ORDERS_WEBHOOK_SECRET: resolvedWebOrdersSecret,
+    }
+  : {
+      CATALOG_WEBHOOK_SECRET: resolvedCatalogSecret,
+      WEB_ORDERS_WEBHOOK_SECRET: resolvedWebOrdersSecret,
+      WEB_CATALOG_URL: process.env.WEB_CATALOG_URL || 'https://decovintage.online',
+    };
 
 // 🛡️ REGLA PERMANENTE: CANDADO DE AISLAMIENTO ESTRICTO DE INFRAESTRUCTURA
 const FORBIDDEN_PATTERNS = ['145.223.120.56', 'catalog_db', 'admin_deco'];

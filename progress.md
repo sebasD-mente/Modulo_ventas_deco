@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-18 19:11
-**Session ID:** sesion-032 (Ejecución y Certificación `feat-021`: Decimales `42.2 cm` y Paridad Matemática Exacta del Cotizador con Web Deco Vintage)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..021` en `done`; `feat-022..023` en `not-started`)
+**Last Updated:** 2026-11-18 19:27
+**Session ID:** sesion-033 (Ejecución y Certificación `feat-022`: Backend `WebOrderInbox`, Webhook S2S, Sync Pull y Cierre Atómico en Venta Remota)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..022` en `done`; `feat-023` en `not-started`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -91,14 +91,18 @@
   - Actualizado `src/components/manual-sale/CustomItemModal.jsx` (`252L <= 280L`) incorporando `step="0.01"` e `inputMode="decimal"` en los inputs de Ancho y Alto (`min="5" max="300"`), consumiendo `calculateCustomPosterPrice` y `validateCustomDimensions`, y preservando decimales limpios en `customDimensions` (`Especial: 42.2 x 30 cm (Corte Taller)`).
   - Actualizado `extractPosterSizeInfo` en `src/components/production/ProductionOrderCard.jsx` para extraer medidas decimales (`\d+(?:\.\d+)?`) tanto desde `customDimensions` (incluyendo paréntesis anidados `(Corte Taller)`) como desde `description` en el badge móvil de Taller.
   - Creada la suite dedicada `tests/sales/custom-decimal-pricing-parity.test.js` (`15/15 PASS`).
+- [x] **Backend de Bandeja de Pedidos Web (`WebOrderInbox`), Webhook S2S, Sync Pull Resiliente y Cierre Atómico al Registrar Venta `feat-022` (`43/43` `web-orders-inbox` + `schema-robustness` + `zero-trust` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Añadido el modelo aditivo `WebOrderInbox` (`@@map("web_order_inbox")`) en `prisma/schema.prisma` con `@@unique([tenantId, orderNumber])`, aislamiento multi-tenant, estados `PENDIENTE | IMPORTADO | DESCARTADO`, orígenes `WEB_CART | WEB_CUSTOM | WEB_QUICK_POSTER` y trazabilidad `importedSaleId`/`importedSaleNumber`/`importedById`/`importedAt` (`npx prisma generate` `< 2500ms`, `0` colisiones de índices), junto con `server/validators/webOrderValidators.js` y soporte de `webOrderInboxId` / `webOrderNumber` en `server/validators/remoteSaleValidators.js`.
+  - Incorporado `WEB_ORDERS_WEBHOOK_SECRET` opcional (`min(16)`) con fallback seguro hacia `CATALOG_WEBHOOK_SECRET` en `server/config/env.js` (`0 CRLF`).
+  - Creado `server/services/sales/webOrderInboxService.js` (`0` violaciones de capa) con autorización S2S en tiempo constante (`crypto.timingSafeEqual`), normalización de materiales (`mdf -> MDF_5_5MM`, `pvc -> PVC_5MM`, `vinyl_only -> VINILO_SOLO`), medidas decimales (`42.2 x 30 cm`), precios de respaldo canónicos, resolución de `productId` local por `sku` (`WEB-<posterId>`) y URLs absolutas `https://...`, upsert idempotente que jamás revierte `IMPORTADO`/`DESCARTADO`, sincronización Pull hacia `GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox`, descarte/restauración y notificación S2S `PATCH ${WEB_CATALOG_URL}/api/custom-orders/integration/:orderNumber/status`.
+  - Integrado en `createRemoteSaleTransaction` (`server/services/sales/remoteSaleService.js`) el marcado transaccional atómico a `IMPORTADO` (candado anti-TOCTOU `updateMany` + `HTTP 409` ante doble importación), estampado `[Origen Web: #CP-XXXX]` en `sale.notes` y expuestos los endpoints en `server/controllers/webOrderInboxController.js` + `server/routes/apiRoutes.js` (`POST /api/webhooks/web-orders`, `GET /api/sales/web-orders`, `POST /api/sales/web-orders/sync`, `PATCH /api/sales/web-orders/:id/discard` y `PATCH /api/sales/web-orders/:id/restore`).
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..021` completadas; `feat-022` y `feat-023` en `not-started`).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..022` completadas; `feat-023` en `not-started`).
 
 ### What's Next
-- Ejecutar en orden secuencial estricto (`WIP = 1` por vez):
-  1. **`feat-022` (`P0`)**: Backend `WebOrderInbox`, webhook S2S `POST /api/webhooks/web-orders`, sincronización pull `GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox` y marcado atómico `IMPORTADO` al registrar la venta remota.
-  2. **`feat-023` (`P1`)**: Botón `"Importar Pedido Web"` con ventana flotante de selección en *Pedidos / Venta* (sin precargas sorpresivas) + pestaña `"Bandeja Web"` con contador de pendientes para `VENDEDOR_REDES` y `SUPER_ADMIN`.
+- Ejecutar bajo `WIP = 1`:
+  1. **`feat-023` (`P1`)**: Botón `"Importar Pedido Web"` con ventana flotante de selección en *Pedidos / Venta* (sin precargas sorpresivas) + pestaña `"Bandeja Web"` con contador de pendientes para `VENDEDOR_REDES` y `SUPER_ADMIN`.
 - En el repositorio vecino `Web Deco Vintage Proyect`, su Agente Planificador y su Agente Ejecutor implementarán las 3 tareas especificadas en `C:\Users\sebas\Documents\nuve DRIVE\Comunicacion entre agentes\2026-11-18_INFORME_INTEGRACION_PEDIDOS_Y_COTIZADOR_WEB_DECO_VINTAGE.md`.
 
 ## Blockers / Risks
@@ -144,21 +148,25 @@
 - **Integración S2S Híbrida (`Push Webhook` + `Pull Sync`) y Ventana Flotante de Importación sin Precarga Sorpresiva (`feat-022` y `feat-023` — Planificado)**:
   - Context: Para eliminar el doble trabajo del `VENDEDOR_REDES` cuando un cliente compra o cotiza en `decovintage.online` (Carrito, Cotizador Personalizado o Compra Rápida por WhatsApp), ambos sistemas deben integrar pedidos respetando el candado de aislamiento total de bases de datos (`FORBIDDEN_PATTERNS` en `server/config/env.js`) y sin sorprender al vendedor con campos pre-llenados de repente.
   - Alternatives considered: (a) Conectar `Modulo_Ventas` directamente al PostgreSQL de la Web (prohibido por arquitectura Zero-Trust); (b) Crear directamente la venta en `PENDIENTE_PAGO` sin pasar por el formulario o auto-rellenar el último pedido web apenas entra el vendedor (descartado por el propietario porque confunde el flujo de atención).
-  - Resolution: Se diseñó `WebOrderInbox` alimentado por Webhook S2S en tiempo real (`POST /api/webhooks/web-orders` con `x-webhook-secret` en tiempo constante) más recuperación Pull (`GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox`), exponiendo tanto una pestaña dedicada `"Bandeja Web"` con contador de pendientes como un botón `"Importar Pedido Web"` en *Pedidos / Venta* que abre una ventana flotante (`WebOrdersImportModal.jsx`) desde donde el vendedor escoge explícitamente el pedido a precargar, cerrándolo atómicamente como `IMPORTADO` al registrar la venta.
+  - Resolution: Se diseñó e implementó en backend (`feat-022`) `WebOrderInbox` alimentado por Webhook S2S en tiempo real (`POST /api/webhooks/web-orders` con `x-webhook-secret` en tiempo constante) más recuperación Pull (`GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox`) y candado atómico `updateMany` (`status: { not: 'IMPORTADO' }`) dentro de `createRemoteSaleTransaction`, quedando listo para exponer en `feat-023` la pestaña dedicada `"Bandeja Web"` y el botón `"Importar Pedido Web"` con ventana flotante (`WebOrdersImportModal.jsx`).
 
 ## Files Modified This Session
-- `src/utils/customPosterPricing.js` — Nuevo motor puro de cotización personalizada con decimales y paridad Web (`188L`, Capa 1 `utils`, `0` imports superiores, `0 CRLF`).
-- `src/components/manual-sale/CustomItemModal.jsx` — Inputs de Ancho y Alto con `step="0.01"` e `inputMode="decimal"`, validación decimal `[5, 300] cm`, integración de `calculateCustomPosterPrice` y formato limpio `Especial: 42.2 x 30 cm (Corte Taller)` (`252L <= 280L`, `0 CRLF`).
-- `src/components/production/ProductionOrderCard.jsx` — `extractPosterSizeInfo` actualizado para extraer medidas decimales (`\d+(?:\.\d+)?`) y limpiar sufijos con paréntesis anidados `(Corte Taller)` en móvil (`0 CRLF`).
-- `tests/sales/custom-decimal-pricing-parity.test.js` — Suite de los 7 Vectores Dorados, pureza de capa, validación de decimales, flujo transaccional y extracción móvil en Taller (`15/15 PASS`, `0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-021` (`done`, `WIP = 0`, `0 CRLF`).
+- `prisma/schema.prisma` — Modelo aditivo `WebOrderInbox` (`@@map("web_order_inbox")`) con `@@unique([tenantId, orderNumber])`, índices libres de colisiones y relaciones `SetNull` hacia `Sale` y `User` (`0 CRLF`).
+- `server/config/env.js` — Variable opcional `WEB_ORDERS_WEBHOOK_SECRET` (`min(16)`) con fallback seguro hacia `CATALOG_WEBHOOK_SECRET` (`0 CRLF`).
+- `server/validators/webOrderValidators.js` — Esquemas Zod puros (Capa 1) para webhook S2S, filtros de bandeja, sync pull y descarte (`0 CRLF`).
+- `server/validators/remoteSaleValidators.js` — Soporte opcional de `webOrderInboxId` y `webOrderNumber` en `createRemoteSaleSchema` (`0 CRLF`).
+- `server/services/sales/webOrderInboxService.js` — Servicio S2S (autorización en tiempo constante, normalización de ítems/materiales/medidas decimales/URLs absolutas, upsert idempotente sin regresión de estados terminales, sync pull, descarte/restauración y callback `PATCH .../status`, `0 CRLF`).
+- `server/services/sales/remoteSaleService.js` — Marcado atómico `IMPORTADO` con bloqueo `HTTP 409` anti-TOCTOU, sello `[Origen Web: #CP-XXXX]` en `sale.notes` y notificación S2S tras commit (`0 CRLF`).
+- `server/controllers/webOrderInboxController.js` y `server/routes/apiRoutes.js` — Endpoints S2S y rutas protegidas para `SUPER_ADMIN` y `VENDEDOR_REDES` (`0` saltos `Controller -> Config`, `0 CRLF`).
+- `tests/sales/web-orders-inbox-service.test.js` — Suite unitaria e integración transaccional de `WebOrderInbox` (`0 CRLF`).
+- `ARCHITECTURE.md`, `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-022` (`done`, `WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite de Decimales, Vectores Dorados y Regresión de Cotizador (`feat-021`): `node --test tests/sales/custom-decimal-pricing-parity.test.js tests/sales/upload-art-quoter.test.js tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (53/53 PASS across 15 suites in 455.54ms)`
-- [x] Regresión de Producción y Ergonomía Táctil: `node --test tests/production/production-scale-mobile-and-immutable-archive.test.js` -> `8/8 PASS`; `node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js` -> `1/1 PASS`
-- [x] Pruebas Unitarias, Voz y Compuerta Unificada Deko Labs: `npm run test:unit` -> `265/265 PASS across 109 suites`; `npm run test:voice` -> `53/53 PASS across 12 suites`; `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.77s, 196 secrets OK, 281 JS syntax OK, 13/13 zero-trust, vite build 1569 modules PASS)`
-- [x] Verificación Final en 3 Puertas (`sesion-032`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
+- [x] Generación Prisma y Suites de `WebOrderInbox`, Esquema y Zero-Trust (`feat-022`): `npx prisma generate` -> `Generated Prisma Client v6.19.3 in 125ms`; `node --test tests/sales/web-orders-inbox-service.test.js tests/schema/schema-robustness.test.js tests/security/zero-trust.test.js` -> `Exit code 0 (43/43 PASS across 13 suites)`
+- [x] Regresión de Ventas Remotas, Cotizador Decimal, Comisiones y Voz: `node --test tests/sales/remote-sale-design-edition.test.js tests/sales/custom-decimal-pricing-parity.test.js tests/sales/remote-sale-flexible-deposit-and-footer.test.js tests/sales/custom-item-multi-image-and-reset.test.js tests/commissions/commission-design-edition-inclusion.test.js` -> `PASS`; `npm run test:voice` -> `53/53 PASS across 12 suites`
+- [x] Pruebas Unitarias y Compuerta Unificada Deko Labs: `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.73s, 199 secrets OK, 285 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites, vite build 1569 modules PASS)`
+- [x] Verificación Final en 3 Puertas (`sesion-033`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..021` en `done`; `feat-022..023` listas en `not-started`).
-2. Iniciar la siguiente sesión con `bash ./init.sh`, cambiar únicamente `feat-022` a `in-progress` (`WIP = 1`) e implementar el backend `WebOrderInbox` + S2S antes de avanzar a `feat-023`.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..022` en `done`; `feat-023` lista en `not-started`).
+2. Iniciar la siguiente sesión con `bash ./init.sh`, cambiar únicamente `feat-023` a `in-progress` (`WIP = 1`) e implementar la UI de Bandeja Web + botón `"Importar Pedido Web"` con ventana flotante de selección (respetando cero precargas sorpresivas y techos de líneas).

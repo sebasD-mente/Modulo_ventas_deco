@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma.js';
 import { generateSaleNumber } from './saleNumberGenerator.js';
 import { validateOfficialItemPrice } from '../catalog/catalogSizeResolver.js';
+import { normalizeWebOrderNumber, notifyWebOrderStatus } from './webOrderInboxService.js';
 
 /**
  * Busca o crea un cliente CRM de forma atómica e idempotente por (tenantId, phone).
@@ -220,12 +221,41 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
   // Asignar el estado de producción correspondiente a los ítems
   itemsData.forEach((it) => { it.productionStatus = itemProductionStatus; });
 
+  const rawWebOrderInboxId = typeof data.webOrderInboxId === 'string' && data.webOrderInboxId.trim()
+    ? data.webOrderInboxId.trim()
+    : null;
+  const rawWebOrderNumber = normalizeWebOrderNumber(data.webOrderNumber);
+
   try {
-    return await prisma.$transaction(async (tx) => {
+    const committedSale = await prisma.$transaction(async (tx) => {
       if (idempotencyKey) {
         const existing = await findExistingRemoteSaleByKey(tx, tenantId, idempotencyKey);
         if (existing) return { ...existing, idempotentReplay: true };
       }
+
+      let inboxOrder = null;
+      if (rawWebOrderInboxId || rawWebOrderNumber) {
+        if (rawWebOrderInboxId && typeof tx.webOrderInbox?.findFirst === 'function') {
+          inboxOrder = await tx.webOrderInbox.findFirst({ where: { id: rawWebOrderInboxId, tenantId } });
+          if (!inboxOrder) {
+            const notFoundErr = new Error('El pedido web seleccionado no existe en la bandeja de esta empresa.');
+            notFoundErr.statusCode = 404;
+            throw notFoundErr;
+          }
+        } else if (rawWebOrderNumber && typeof tx.webOrderInbox?.findFirst === 'function') {
+          inboxOrder = await tx.webOrderInbox.findFirst({ where: { tenantId, orderNumber: rawWebOrderNumber } });
+        }
+
+        if (inboxOrder && inboxOrder.status === 'IMPORTADO') {
+          const dupErr = new Error(
+            `El pedido web #${inboxOrder.orderNumber} ya fue importado previamente (${inboxOrder.importedSaleNumber || 'venta registrada'}).`
+          );
+          dupErr.statusCode = 409;
+          throw dupErr;
+        }
+      }
+
+      const resolvedWebOrderNumber = inboxOrder?.orderNumber || rawWebOrderNumber || null;
 
       let finalCustomerId = data.customerId || null;
       if (data.customer) {
@@ -235,10 +265,16 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
 
       const saleNumber = await generateSaleNumber(eventId, tx);
       const baseNotes = typeof data.notes === 'string' ? data.notes.trim() : '';
+      const webOriginTag = resolvedWebOrderNumber ? `[Origen Web: #${resolvedWebOrderNumber}]` : '';
+      const shouldAppendWebTag = Boolean(webOriginTag && !baseNotes.includes(webOriginTag));
       const editionNoteStamp = (editionCost > 0 || editionDescription)
         ? `[Edición (+Q ${editionCost.toFixed(2)}): ${editionDescription || 'Edición personalizada'}]`
         : '';
-      const combinedSaleNotes = [baseNotes, editionNoteStamp].filter(Boolean).join('\n') || null;
+      const combinedSaleNotes = [
+        baseNotes,
+        shouldAppendWebTag ? webOriginTag : '',
+        editionNoteStamp,
+      ].filter(Boolean).join('\n') || null;
 
       const sale = await tx.sale.create({
         data: {
@@ -277,6 +313,43 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
         },
       });
 
+      if (inboxOrder) {
+        if (typeof tx.webOrderInbox?.updateMany === 'function') {
+          const lockGuard = await tx.webOrderInbox.updateMany({
+            where: {
+              id: inboxOrder.id,
+              tenantId,
+              status: { not: 'IMPORTADO' },
+            },
+            data: {
+              status: 'IMPORTADO',
+              importedSaleId: sale.id,
+              importedSaleNumber: sale.saleNumber,
+              importedById: sellerId,
+              importedAt: new Date(),
+            },
+          });
+          if (!lockGuard || lockGuard.count === 0) {
+            const raceErr = new Error(
+              `El pedido web #${inboxOrder.orderNumber} acaba de ser importado por otra operación concurrente.`
+            );
+            raceErr.statusCode = 409;
+            throw raceErr;
+          }
+        } else if (typeof tx.webOrderInbox?.update === 'function') {
+          await tx.webOrderInbox.update({
+            where: { id: inboxOrder.id },
+            data: {
+              status: 'IMPORTADO',
+              importedSaleId: sale.id,
+              importedSaleNumber: sale.saleNumber,
+              importedById: sellerId,
+              importedAt: new Date(),
+            },
+          });
+        }
+      }
+
       await tx.auditLog.create({
         data: {
           tenantId, userId: sellerId, action: 'VENTA_REMOTA_REGISTRADA', entity: 'sale', entityId: sale.id,
@@ -289,6 +362,8 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
             customerId: finalCustomerId,
             editionCost,
             editionDescription: editionDescription || null,
+            webOrderInboxId: inboxOrder?.id || null,
+            webOrderNumber: resolvedWebOrderNumber,
           },
         },
       });
@@ -297,8 +372,20 @@ export async function createRemoteSaleTransaction({ tenantId, sellerId, data, id
         ...sale,
         editionCost,
         editionDescription: editionDescription || null,
+        webOrderInboxId: inboxOrder?.id || null,
+        webOrderNumber: resolvedWebOrderNumber,
       };
     }, { maxWait: 15000, timeout: 30000 });
+
+    if (!committedSale.idempotentReplay && committedSale.webOrderNumber) {
+      await notifyWebOrderStatus({
+        orderNumber: committedSale.webOrderNumber,
+        status: 'IMPORTADO',
+        externalSaleNumber: committedSale.saleNumber,
+      });
+    }
+
+    return committedSale;
   } catch (err) {
     if (
       idempotencyKey &&

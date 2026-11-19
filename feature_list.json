@@ -665,7 +665,7 @@
       "area": "remote-sales-web-orders-inbox-backend",
       "user_visible_behavior": "Cada vez que un cliente realiza un pedido en la Web Deco Vintage (Carrito, Cotizador Personalizado o Compra Rápida por WhatsApp), queda grabado al instante en la bandeja de Módulo de Ventas (o se recupera vía sincronización pull) y al registrar la venta se marca atómicamente como IMPORTADO impidiendo duplicados.",
       "priority": "P0",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-021"
       ],
@@ -688,7 +688,8 @@
         "bash scripts/check-architecture.sh",
         "node scripts/validate-harness.mjs --min-score 100"
       ],
-      "notes": "Guardarraíles estrictos: PROHIBIDO leer o editar .env y PROHIBIDO conectar a base de datos ajena; respetar 0 saltos Controller -> Config (webOrderInboxController solo importa de server/services/); ejecutar npx prisma generate tras actualizar prisma/schema.prisma y verificar que schema-robustness.test.js pase en < 2500ms; 0 CRLF."
+      "evidence": "npx prisma generate -> Generated Prisma Client v6.19.3 in 125ms; node --test tests/sales/web-orders-inbox-service.test.js tests/schema/schema-robustness.test.js tests/security/zero-trust.test.js -> Exit code 0 (43/43 PASS across 13 suites: WebOrderInbox DMMF & @@unique([tenantId, orderNumber]) + 0 index collisions in < 2500ms, constant-time timingSafeEqual S2S auth 401/200 with WEB_ORDERS_WEBHOOK_SECRET & CATALOG_WEBHOOK_SECRET fallback, mdf/pvc/vinyl_only + decimal 42.2x30 cm + absolute URL normalization, idempotent upsert without reverting IMPORTADO/DESCARTADO on webhooks or Sync Pull, discard/restore + PATCH callback, atomic IMPORTADO lock in createRemoteSaleTransaction with HTTP 409 anti-duplication & '[Origen Web: #CP-XXXX]' stamp, 0 Controller->Config jumps); npm run test:unit -> Exit code 0 (265/265 PASS across 109 suites); npm run test:voice -> Exit code 0 (53/53 PASS); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 30.73s (199 secrets OK, 285 JS syntax OK, 13/13 zero-trust, vite build 1569 modules PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-033. Guardarraíles cumplidos al 100%: cero lectura/modificación de .env, cero conexión a base de datos ajena, 0 saltos Controller -> Config en webOrderInboxController.js, schema-robustness 23/23 PASS (< 2500ms, 0 colisiones de índices) y 0 CRLF."
     },
     {
       "id": "feat-023",

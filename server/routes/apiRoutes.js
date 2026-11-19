@@ -91,6 +91,13 @@ import {
 } from '../controllers/aiController.js';
 
 import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
+import {
+  discardWebOrderHandler,
+  getWebOrdersInbox,
+  handleWebOrderWebhook,
+  restoreWebOrderHandler,
+  triggerWebOrdersSync,
+} from '../controllers/webOrderInboxController.js';
 
 const router = express.Router();
 const authenticate = authMiddleware;
@@ -103,6 +110,7 @@ router.get('/auth/config', getAuthConfig);
 router.post('/auth/google', handleGoogleLogin);
 router.post('/catalog/webhook', handleCatalogWebhook);
 router.post('/webhooks/catalog-sync', handleCatalogWebhook);
+router.post('/webhooks/web-orders', handleWebOrderWebhook);
 
 // ==========================================
 // 2. MIDDLEWARE GLOBAL DE AUTENTICACIÓN
@@ -219,6 +227,26 @@ router.post(
   requireRole(['SUPER_ADMIN', 'VENDEDOR', 'VENDEDOR_REDES']),
   validate(createRemoteSaleSchema),
   createRemoteSale
+);
+router.get(
+  '/sales/web-orders',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  getWebOrdersInbox
+);
+router.post(
+  '/sales/web-orders/sync',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  triggerWebOrdersSync
+);
+router.patch(
+  '/sales/web-orders/:id/discard',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  discardWebOrderHandler
+);
+router.patch(
+  '/sales/web-orders/:id/restore',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  restoreWebOrderHandler
 );
 router.post(
   '/sales/:id/balance-payment',

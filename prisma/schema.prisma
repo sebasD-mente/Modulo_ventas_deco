@@ -26,8 +26,9 @@ model Tenant {
   sales        Sale[]
   cashClosings CashClosing[]
   auditLogs    AuditLog[]
-  customers    Customer[]
+  customers     Customer[]
   eventExpenses EventExpense[]
+  webOrderInbox WebOrderInbox[]
 
   @@map("tenants")
 }
@@ -56,6 +57,7 @@ model User {
   productionLogs      ProductionLog[]
   sellerSettlements   CommissionSettlement[] @relation("SellerSettlements")
   approvedSettlements CommissionSettlement[] @relation("SettlementApprover")
+  importedWebOrders   WebOrderInbox[]        @relation("WebOrderImporter")
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -224,9 +226,10 @@ model Sale {
   commissionSettlement    CommissionSettlement? @relation(fields: [commissionSettlementId], references: [id], onDelete: SetNull)
   commissionPaid          Boolean               @default(false)
 
-  items       SaleItem[]
-  payments    SalePayment[]
-  attachments SaleAttachment[]
+  items             SaleItem[]
+  payments          SalePayment[]
+  attachments       SaleAttachment[]
+  importedWebOrders WebOrderInbox[]  @relation("ImportedWebOrders")
 
   @@unique([eventId, saleNumber])
   @@unique([tenantId, idempotencyKey])
@@ -423,5 +426,42 @@ model EventExpense {
   @@index([tenantId, eventId])
   @@index([eventId, category])
   @@map("event_expenses")
+}
+
+model WebOrderInbox {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalOrderId    String?
+  orderNumber        String
+  orderSource        String    @default("WEB_CUSTOM") // WEB_CART | WEB_CUSTOM | WEB_QUICK_POSTER
+  status             String    @default("PENDIENTE")  // PENDIENTE | IMPORTADO | DESCARTADO
+  customerName       String
+  customerPhone      String?
+  customerAddress    String?   @db.Text
+  customerDepartment String?
+  customerNotes      String?   @db.Text
+  totalUnits         Int       @default(1)
+  quotedTotal        Decimal   @default(0) @db.Decimal(10, 2)
+  items              Json      @default("[]")
+  rawPayload         Json?
+  webCreatedAt       DateTime?
+  importedSaleId     String?
+  importedSale       Sale?     @relation("ImportedWebOrders", fields: [importedSaleId], references: [id], onDelete: SetNull)
+  importedSaleNumber String?
+  importedById       String?
+  importedBy         User?     @relation("WebOrderImporter", fields: [importedById], references: [id], onDelete: SetNull)
+  importedAt         DateTime?
+  discardedById      String?
+  discardedAt        DateTime?
+  discardReason      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, orderSource])
+  @@index([importedSaleId])
+  @@map("web_order_inbox")
 }
 

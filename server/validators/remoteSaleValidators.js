@@ -49,6 +49,14 @@ export const createRemoteSaleSchema = z.object({
   discount: z.number().nonnegative('El descuento no puede ser negativo').default(0),
   editionDescription: z.string().trim().max(300, 'La descripción de la edición no puede exceder 300 caracteres').optional().nullable(),
   editionCost: z.number().nonnegative('El costo de edición no puede ser negativo').optional().default(0),
+  webOrderInboxId: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().trim().min(1).max(128).optional().nullable()
+  ),
+  webOrderNumber: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().trim().min(1).max(64).optional().nullable()
+  ),
   notes: z.string().max(500).optional().nullable(),
   idempotencyKey: z.string().max(255).optional().nullable(),
 }).refine(
