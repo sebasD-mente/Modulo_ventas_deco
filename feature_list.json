@@ -698,7 +698,7 @@
       "area": "remote-sales-web-orders-inbox-ui",
       "user_visible_behavior": "El Vendedor de Redes (y Super Admin) dispone de una pestaña 'Bandeja Web' con contador de pedidos nuevos y, dentro de Pedidos / Venta, de un botón 'Importar Pedido Web' que abre una ventana flotante con los pedidos hechos en la página web; al escoger uno de la lista, toda la información del cliente, fotos HD, medidas decimales y precios se precarga automáticamente en el formulario sin doble digitación.",
       "priority": "P1",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-022"
       ],
@@ -721,7 +721,8 @@
         "node scripts/validate-harness.mjs --min-score 100",
         "npm run harness:check"
       ],
-      "notes": "Guardarraíles estrictos de techos de líneas y estética: mantener Header.jsx <= 280L (surgery-059 4.1), FastManualSaleForm.jsx <= 350L (surgery-059 4.1 y surgery-061 4.4), useRemoteSaleForm.js <= 350L (surgery-061 4.2), WebOrdersImportModal.jsx <= 280L y WebOrdersInboxView.jsx <= 280L; preservar orden DOM SaleCartList -> DesignEditionPanel -> DeliveryMethodSelector -> RemoteQuoterSummary; jamás precargar un pedido automáticamente sin que el vendedor lo seleccione explícitamente; cero clases amber-*/orange-*, cero doble icono/emojis redundantes en botones, controles >= 44px y 0 CRLF."
+      "evidence": "node --test tests/sales/web-orders-import-ui.test.js tests/sales/web-orders-inbox-service.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js -> Exit code 0 (98/98 PASS across 34 suites in 479.8ms: zero automatic preload on mount, WebOrderImportBanner 82L<=120L with pending badge & #CP-XXXX unlink chip, WebOrdersImportModal 253L<=280L with useModalBackHandler + sync pull + HD previews + Cargar al Formulario, WebOrdersInboxView 257L<=280L lazy-loaded on tab bandeja-web with Pendientes/Importados/Descartados + discard/restore + Importar a Venta, useWebOrderImport 275L<=280L decimal/catalog/CRM mapping, FastManualSaleForm 339L<=350L, useRemoteSaleForm 343L<=350L, Header 276L<=280L, App 395L<=420L, >=44px controls, 0 amber/orange classes); npm run test:voice -> Exit code 0 (53/53 PASS); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 38.87s (check-architecture 0 violations, validate-harness 100/100, 203 secrets OK, 287 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1573 modules PASS with lazy WebOrdersInboxView chunk); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-034. Guardarraíles estrictos cumplidos al 100%: Header.jsx <= 280L (276L), FastManualSaleForm.jsx <= 350L (339L), useRemoteSaleForm.js <= 350L (343L), WebOrderImportBanner.jsx <= 120L (82L), WebOrdersImportModal.jsx <= 280L (253L), WebOrdersInboxView.jsx <= 280L (257L), App.jsx <= 420L (395L), cero precarga sorpresiva, cero clases amber-*/orange-*, controles >= 44px y 0 CRLF."
     }
   ]
 }

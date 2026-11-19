@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ShoppingBag, Store, Smartphone, Palette, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { DEFAULT_SIZES, DEFAULT_MEDIUM_SIZE } from './manual-sale/manualSaleConstants';
+import { DEFAULT_MEDIUM_SIZE } from './manual-sale/manualSaleConstants';
 import useCatalogSearch from './manual-sale/hooks/useCatalogSearch';
 import useManualSaleCart from './manual-sale/hooks/useManualSaleCart';
 import useRemoteSaleForm from './manual-sale/hooks/useRemoteSaleForm';
+import useWebOrderImport from './manual-sale/hooks/useWebOrderImport';
 import CatalogSearchInput from './manual-sale/CatalogSearchInput';
 import PosterConfigurator from './manual-sale/PosterConfigurator';
 import SaleCartList from './manual-sale/SaleCartList';
@@ -15,11 +16,16 @@ import RemoteQuoterSummary from './manual-sale/RemoteQuoterSummary';
 import CustomItemModal from './manual-sale/CustomItemModal';
 import DesignEditionPanel from './manual-sale/DesignEditionPanel';
 import WhatsAppQuoteShareModal from './manual-sale/WhatsAppQuoteShareModal';
+import WebOrderImportBanner from './manual-sale/WebOrderImportBanner';
+import WebOrdersImportModal from './manual-sale/WebOrdersImportModal';
 
-export default function FastManualSaleForm({ eventId, onSaleRegistered, initialDraft = null }) {
+export default function FastManualSaleForm({
+  eventId, onSaleRegistered, initialDraft = null,
+  incomingWebOrder = null, onIncomingWebOrderConsumed = null,
+  onPendingWebOrdersCountChange = null, webOrdersRefreshKey = 0,
+}) {
   const { isVendedorRedes, isVendedor, isSuperAdmin, authFetch } = useAuth();
   const isVendedorRedesOnly = Boolean(isVendedorRedes && !isVendedor && !isSuperAdmin);
-  const isVendedorMostradorOnly = Boolean(isVendedor && !isVendedorRedes && !isSuperAdmin);
   const canToggleSaleMode = Boolean(isSuperAdmin || (isVendedor && isVendedorRedes));
   const [saleMode, setSaleMode] = useState(
     isVendedorRedesOnly ? 'REDES_PERSONALIZADO' : 'POS_FERIA'
@@ -27,6 +33,7 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
   const [syncFeedbackMsg, setSyncFeedbackMsg] = useState(null);
+  const refreshWebRef = useRef(null);
 
   const handleSyncCatalog = async () => {
     if (isSyncingCatalog) return;
@@ -74,9 +81,18 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
   ) : null;
 
   const [selectedPoster, setSelectedPoster] = useState(null);
+  const handleRegistered = (saleData) => {
+    refreshWebRef.current?.();
+    onSaleRegistered?.(saleData);
+  };
   const search = useCatalogSearch({ eventId, onClearSelection: () => setSelectedPoster(null) });
-  const cart = useManualSaleCart({ eventId, onSaleRegistered, initialDraft });
-  const remoteForm = useRemoteSaleForm({ eventId, onSaleRegistered, cart });
+  const cart = useManualSaleCart({ eventId, onSaleRegistered: handleRegistered, initialDraft });
+  const remoteForm = useRemoteSaleForm({ eventId, onSaleRegistered: handleRegistered, cart });
+  const webImport = useWebOrderImport({
+    enabled: Boolean(isSuperAdmin || isVendedorRedes), authFetch, cart, remoteForm, setSaleMode,
+    incomingWebOrder, onIncomingWebOrderConsumed, onPendingCountChange: onPendingWebOrdersCountChange, refreshKey: webOrdersRefreshKey,
+  });
+  refreshWebRef.current = webImport.fetchPendingOrders;
   const [selectedSize, setSelectedSize] = useState(DEFAULT_MEDIUM_SIZE);
   const [itemQuantity, setItemQuantity] = useState(1);
 
@@ -162,6 +178,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
       {/* MODO REDES / PERSONALIZADO (Exclusivo para SUPER_ADMIN y VENDEDOR_REDES) */}
       {saleMode === 'REDES_PERSONALIZADO' && (isSuperAdmin || isVendedorRedes) ? (
         <div className="space-y-5">
+          <WebOrderImportBanner
+            pendingCount={webImport.pendingCount} linkedWebOrder={remoteForm.linkedWebOrder}
+            onOpenModal={() => webImport.setIsImportModalOpen(true)} onUnlink={webImport.unlinkWebOrder}
+          />
+
           {/* CRM y Cliente */}
           <CustomerWhatsAppSearch
             customerQuery={remoteForm.customerQuery} setCustomerQuery={remoteForm.setCustomerQuery}
@@ -174,16 +195,11 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Búsqueda Catálogo + Botón Personalizado */}
           <CatalogSearchInput
-            {...search}
-            eventId={eventId}
-            onSelectPoster={handleSelectPoster}
-            onClearSearch={search.clearSearch}
-            hasSelectedPoster={Boolean(selectedPoster)}
+            {...search} eventId={eventId} onSelectPoster={handleSelectPoster}
+            onClearSearch={search.clearSearch} hasSelectedPoster={Boolean(selectedPoster)}
             customAction={
               <button
-                type="button"
-                data-testid="custom-item-btn"
-                onClick={() => setIsCustomModalOpen(true)}
+                type="button" data-testid="custom-item-btn" onClick={() => setIsCustomModalOpen(true)}
                 className="min-h-[44px] min-w-[96px] px-4 py-3 rounded-2xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm shrink-0 whitespace-nowrap"
               >
                 <Palette className="w-4 h-4 shrink-0" />
@@ -194,12 +210,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {selectedPoster && (
             <PosterConfigurator
-              selectedPoster={selectedPoster}
-              selectedSize={selectedSize}
-              setSelectedSize={setSelectedSize}
-              itemQuantity={itemQuantity}
-              setItemQuantity={setItemQuantity}
-              onAddToCart={handleAddToCart}
+              selectedPoster={selectedPoster} selectedSize={selectedSize} setSelectedSize={setSelectedSize}
+              itemQuantity={itemQuantity} setItemQuantity={setItemQuantity} onAddToCart={handleAddToCart}
               onCancel={() => { setSelectedPoster(null); search.clearSearch(); }}
             />
           )}
@@ -213,10 +225,8 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
 
           {/* Casilla de Edición de Diseño (Descripción + Costo sumado al Total) */}
           <DesignEditionPanel
-            editionDescription={remoteForm.editionDescription}
-            setEditionDescription={remoteForm.setEditionDescription}
-            editionCost={remoteForm.editionCost}
-            setEditionCost={remoteForm.setEditionCost}
+            editionDescription={remoteForm.editionDescription} setEditionDescription={remoteForm.setEditionDescription}
+            editionCost={remoteForm.editionCost} setEditionCost={remoteForm.setEditionCost}
             effectiveEditionCost={remoteForm.effectiveEditionCost}
           />
 
@@ -249,24 +259,26 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             onConfirmRemoteSale={remoteForm.confirmRemoteSale}
           />
 
-          {/* Modal de Ítem Personalizado */}
-          <CustomItemModal
-            isOpen={isCustomModalOpen}
-            onClose={() => setIsCustomModalOpen(false)}
-            onAddCustomItem={remoteForm.addCustomItem}
+          <WebOrdersImportModal
+            isOpen={webImport.isImportModalOpen} onClose={() => webImport.setIsImportModalOpen(false)}
+            orders={webImport.pendingOrders} pendingCount={webImport.pendingCount}
+            searchQuery={webImport.searchQuery} setSearchQuery={webImport.setSearchQuery}
+            isLoading={webImport.isLoadingOrders} isSyncing={webImport.isSyncingWeb}
+            feedback={webImport.modalFeedback} onSync={webImport.handleSyncFromWeb}
+            onImportOrder={webImport.importOrderToForm}
           />
 
-          {/* Modal Compartir Comprobante por WhatsApp */}
+          <CustomItemModal
+            isOpen={isCustomModalOpen} onClose={() => setIsCustomModalOpen(false)} onAddCustomItem={remoteForm.addCustomItem}
+          />
+
           <WhatsAppQuoteShareModal
-            isOpen={remoteForm.showShareModal}
-            onClose={() => remoteForm.setShowShareModal(false)}
-            sale={remoteForm.completedSale}
+            isOpen={remoteForm.showShareModal} onClose={() => remoteForm.setShowShareModal(false)} sale={remoteForm.completedSale}
           />
         </div>
       ) : (
         /* MODO MOSTRADOR (FERIA 100%) */
         <div className="space-y-6">
-          {/* Banner de Borrador Importado de IA */}
           {cart.inputChannel !== 'MANUAL_RAPIDA' && cart.cartItems.length > 0 && (
             <div className="p-3.5 bg-cyan-950/60 border border-cyan-800 rounded-2xl flex items-center justify-between text-xs gap-2">
               <div className="flex items-center gap-2 text-cyan-300">
@@ -276,15 +288,13 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
                 </span>
               </div>
               <button
-                type="button"
-                onClick={cart.clearCart}
-                className="min-h-[36px] px-3 py-1 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold cursor-pointer shrink-0"
+                type="button" onClick={cart.clearCart}
+                className="min-h-[44px] px-3 py-1 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold cursor-pointer shrink-0"
               >
                 Descartar
               </button>
             </div>
           )}
-
 
           <div className="space-y-2">
             <div className="flex items-center justify-end gap-2">
@@ -292,22 +302,15 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
             </div>
             {renderSyncFeedback()}
             <CatalogSearchInput
-              {...search}
-              eventId={eventId}
-              onSelectPoster={handleSelectPoster}
-              onClearSearch={search.clearSearch}
-              hasSelectedPoster={Boolean(selectedPoster)}
+              {...search} eventId={eventId} onSelectPoster={handleSelectPoster}
+              onClearSearch={search.clearSearch} hasSelectedPoster={Boolean(selectedPoster)}
             />
           </div>
 
           {selectedPoster && (
             <PosterConfigurator
-              selectedPoster={selectedPoster}
-              selectedSize={selectedSize}
-              setSelectedSize={setSelectedSize}
-              itemQuantity={itemQuantity}
-              setItemQuantity={setItemQuantity}
-              onAddToCart={handleAddToCart}
+              selectedPoster={selectedPoster} selectedSize={selectedSize} setSelectedSize={setSelectedSize}
+              itemQuantity={itemQuantity} setItemQuantity={setItemQuantity} onAddToCart={handleAddToCart}
               onCancel={() => { setSelectedPoster(null); search.clearSearch(); }}
             />
           )}
@@ -319,20 +322,13 @@ export default function FastManualSaleForm({ eventId, onSaleRegistered, initialD
           />
 
           <PaymentSummaryBar
-            paymentMethod={cart.paymentMethod}
-            setPaymentMethod={cart.setPaymentMethod}
-            discount={cart.effectiveDiscount || cart.discount}
-            setDiscount={cart.setDiscount}
-            notes={cart.notes}
-            setNotes={cart.setNotes}
-            subtotal={cart.subtotal}
-            grandTotal={cart.grandTotal}
-            hasActiveCombo={cart.hasActiveCombo}
-            comboSavings={cart.comboSavings}
-            comboTrios={cart.comboTrios}
-            mediumCount={cart.mediumCount}
-            isSubmitting={cart.isSubmitting}
-            disabled={cart.cartItems.length === 0}
+            paymentMethod={cart.paymentMethod} setPaymentMethod={cart.setPaymentMethod}
+            discount={cart.effectiveDiscount || cart.discount} setDiscount={cart.setDiscount}
+            notes={cart.notes} setNotes={cart.setNotes}
+            subtotal={cart.subtotal} grandTotal={cart.grandTotal}
+            hasActiveCombo={cart.hasActiveCombo} comboSavings={cart.comboSavings}
+            comboTrios={cart.comboTrios} mediumCount={cart.mediumCount}
+            isSubmitting={cart.isSubmitting} disabled={cart.cartItems.length === 0}
             onConfirmSale={cart.confirmSale}
           />
         </div>

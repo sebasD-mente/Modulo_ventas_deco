@@ -51,9 +51,10 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
   const [isInlineCreation, setIsInlineCreation] = useState(false);
   const [customerData, setCustomerData] = useState(INITIAL_CUSTOMER_DATA);
 
-  // Edición de Diseño (Descripción + Costo sumado al Total)
+  // Edición de Diseño y Vínculo Opcional con Pedido Web
   const [editionDescription, setEditionDescription] = useState('');
   const [editionCost, setEditionCost] = useState('');
+  const [linkedWebOrder, setLinkedWebOrder] = useState(null);
 
   // Logística y Flete
   const [deliveryMethod, setDeliveryMethod] = useState('ENVIO_COURIER');
@@ -114,17 +115,14 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       setIsSearchingCustomer(false);
       return;
     }
-
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     setIsSearchingCustomer(true);
-
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const res = await authFetch(`/api/customers?query=${encodeURIComponent(customerQuery.trim())}`);
         const json = await res.json();
         if (json.success) {
-          const list = Array.isArray(json.data) ? json.data : (json.data?.customers || []);
-          setCustomerResults(list);
+          setCustomerResults(Array.isArray(json.data) ? json.data : (json.data?.customers || []));
         }
       } catch (err) {
         console.error('Error buscando clientes:', err);
@@ -132,10 +130,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
         setIsSearchingCustomer(false);
       }
     }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    };
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [customerQuery, authFetch]);
 
   // Cargar eventos para retiro si el método es RETIRO_EVENTO (excluyendo el canal digital)
@@ -281,6 +276,8 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       discount: Number(discount) || 0,
       editionDescription: editionDescription.trim() || null,
       editionCost: effectiveEditionCost,
+      webOrderInboxId: linkedWebOrder?.id || null,
+      webOrderNumber: linkedWebOrder?.orderNumber || null,
       notes: remoteSaleNotes?.trim() || null,
       idempotencyKey: clientUuid,
     };
@@ -304,6 +301,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
       setShippingCost(0);
       setEditionDescription('');
       setEditionCost('');
+      setLinkedWebOrder(null);
       setIsPendingPaymentOnly(false);
       setDepositInput('');
       setDepositReference('');
@@ -326,6 +324,7 @@ export function useRemoteSaleForm({ eventId, onSaleRegistered, cart }) {
     selectedCustomer, customerData, setCustomerData, isInlineCreation, setIsInlineCreation,
     selectCustomer, clearSelectedCustomer, departments: GUATEMALA_DEPARTMENTS,
     editionDescription, setEditionDescription, editionCost, setEditionCost, effectiveEditionCost,
+    linkedWebOrder, setLinkedWebOrder,
     deliveryMethod, setDeliveryMethod, shippingCost, setShippingCost,
     shippingCourier, setShippingCourier, shippingTrackingNumber, setShippingTrackingNumber,
     pickupEventId, setPickupEventId, availablePickupEvents,

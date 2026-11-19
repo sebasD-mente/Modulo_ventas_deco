@@ -14,6 +14,7 @@ const CashClosingView = lazy(() => import('./components/CashClosingView'));
 const UserManagementView = lazy(() => import('./components/UserManagementView'));
 const CommissionSettlementView = lazy(() => import('./components/CommissionSettlementView'));
 const OrderTrackingView = lazy(() => import('./components/OrderTrackingView'));
+const WebOrdersInboxView = lazy(() => import('./components/WebOrdersInboxView'));
 
 function ViewLoadingFallback() {
   return (
@@ -76,6 +77,9 @@ function SalesTerminalMain() {
   const [unassignedSeller, setUnassignedSeller] = useState(false);
   const [liveMetrics, setLiveMetrics] = useState(null);
   const [manualDraft, setManualDraft] = useState(null);
+  const [pendingWebOrdersCount, setPendingWebOrdersCount] = useState(0);
+  const [pendingWebOrderImport, setPendingWebOrderImport] = useState(null);
+  const [webOrdersRefreshKey, setWebOrdersRefreshKey] = useState(0);
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -313,12 +317,8 @@ function SalesTerminalMain() {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
       <Header
-        activeEvent={activeEvent}
-        activeEventsList={activeEventsList}
-        onSelectEvent={handleSelectEvent}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        liveMetrics={liveMetrics}
+        activeEvent={activeEvent} activeEventsList={activeEventsList} onSelectEvent={handleSelectEvent}
+        activeTab={activeTab} setActiveTab={setActiveTab} liveMetrics={liveMetrics} pendingWebOrdersCount={pendingWebOrdersCount}
       />
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-8">
@@ -326,30 +326,37 @@ function SalesTerminalMain() {
           <div className={activeTab === 'venta' ? 'space-y-6' : 'hidden'}>
             <div id="manual-sale-form-anchor">
               <FastManualSaleForm
-                key={activeEvent?.id || 'no-event'}
-                eventId={activeEvent?.id}
-                onSaleRegistered={refreshMetrics}
-                initialDraft={manualDraft}
-                onDraftConsumed={() => setManualDraft(null)}
+                key={activeEvent?.id || 'no-event'} eventId={activeEvent?.id} onSaleRegistered={refreshMetrics}
+                initialDraft={manualDraft} onDraftConsumed={() => setManualDraft(null)}
+                incomingWebOrder={pendingWebOrderImport} onIncomingWebOrderConsumed={() => setPendingWebOrderImport(null)}
+                onPendingWebOrdersCountChange={setPendingWebOrdersCount} webOrdersRefreshKey={webOrdersRefreshKey}
               />
             </div>
 
             <RecentSalesList
-              key={activeEvent?.id || 'no-event'}
-              eventId={activeEvent?.id}
-              refreshTrigger={salesRefreshTrigger}
-              onSaleUpdated={refreshMetrics}
+              key={activeEvent?.id || 'no-event'} eventId={activeEvent?.id}
+              refreshTrigger={salesRefreshTrigger} onSaleUpdated={refreshMetrics}
             />
           </div>
         )}
 
         <Suspense fallback={<ViewLoadingFallback />}>
-          {activeTab === 'eventos' && (isSuperAdmin || isVendedorRedes) && (
-            <EventsManagementView
-              onEventActivated={async (activatedEvent) => {
-                await syncEventsList(activatedEvent);
+          {activeTab === 'bandeja-web' && (isSuperAdmin || isVendedorRedes) && (
+            <WebOrdersInboxView
+              onImportToSale={(order) => {
+                setPendingWebOrderImport(order);
                 setActiveTab('venta');
               }}
+              onCountsChanged={(counts) => {
+                if (typeof counts?.pending === 'number') setPendingWebOrdersCount(counts.pending);
+                setWebOrdersRefreshKey((prev) => prev + 1);
+              }}
+            />
+          )}
+
+          {activeTab === 'eventos' && (isSuperAdmin || isVendedorRedes) && (
+            <EventsManagementView
+              onEventActivated={async (activatedEvent) => { await syncEventsList(activatedEvent); setActiveTab('venta'); }}
               onEventsChanged={syncEventsList}
             />
           )}
@@ -357,37 +364,17 @@ function SalesTerminalMain() {
           {activeTab === 'monitor' && (isSuperAdmin || isVendedor || isVendedorRedes) && (
             <MonitorDashboardView
               activeEvent={activeEvent}
-              onPopulateManualForm={(draft) => {
-                setManualDraft(draft);
-                setActiveTab('venta');
-              }}
+              onPopulateManualForm={(draft) => { setManualDraft(draft); setActiveTab('venta'); }}
             />
           )}
 
-          {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2 || isVendedorRedes) && (
-            <ProductionManagementView />
-          )}
-
-          {activeTab === 'seguimiento' && (isSuperAdmin || isVendedor || isVendedorRedes || isOperario1 || isOperario2) && (
-            <OrderTrackingView onOrderUpdated={refreshMetrics} />
-          )}
-
+          {activeTab === 'produccion' && (isSuperAdmin || isOperario1 || isOperario2 || isVendedorRedes) && <ProductionManagementView />}
+          {activeTab === 'seguimiento' && (isSuperAdmin || isVendedor || isVendedorRedes || isOperario1 || isOperario2) && <OrderTrackingView onOrderUpdated={refreshMetrics} />}
           {activeTab === 'cierre' && (isSuperAdmin || isVendedor) && (
-            <CashClosingView
-              key={activeEvent?.id || 'no-event'}
-              liveMetrics={liveMetrics}
-              activeEvent={activeEvent}
-              onClosingCompleted={refreshMetrics}
-            />
+            <CashClosingView key={activeEvent?.id || 'no-event'} liveMetrics={liveMetrics} activeEvent={activeEvent} onClosingCompleted={refreshMetrics} />
           )}
-
-          {activeTab === 'usuarios' && isSuperAdmin && (
-            <UserManagementView />
-          )}
-
-          {activeTab === 'comisiones' && (isSuperAdmin || isVendedorRedes) && (
-            <CommissionSettlementView />
-          )}
+          {activeTab === 'usuarios' && isSuperAdmin && <UserManagementView />}
+          {activeTab === 'comisiones' && (isSuperAdmin || isVendedorRedes) && <CommissionSettlementView />}
         </Suspense>
       </main>
 

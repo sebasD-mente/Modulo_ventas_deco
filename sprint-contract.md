@@ -4,29 +4,27 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-022` `done`; Siguiente en Cola: `feat-023`)
-- **Tareas completadas recientemente:** `feat-020` (`7b0523e`), `feat-021` (`1b8e48c`) y **`feat-022` (`done` — Backend `WebOrderInbox`, Webhook S2S, Sync Pull y Cierre Atómico al Registrar Venta)**.
-- **Siguiente en Cola DAG (`not-started`, ejecutar bajo `WIP = 1`):**
-  1. **`feat-023` (`P1`, depende de `feat-022` `done`)**: Vista `"Bandeja Web"` + Botón `"Importar Pedido Web"` con Ventana Flotante de Selección y Precarga al Formulario para `VENDEDOR_REDES` y `SUPER_ADMIN`.
+## Estado Actual del Contrato (`WIP = 0` — `feat-000..023` en `done`)
+- **Tareas completadas recientemente:** `feat-021` (`1b8e48c`), `feat-022` (`54b01ed`) y **`feat-023` (`done` — Vista `Bandeja Web` + Botón `Importar Pedido Web` con Ventana Flotante y Precarga Limpia)**.
+- **Tareas pendientes en `feature_list.json`:** Ninguna (`WIP = 0`; `24/24` tareas del backlog completadas y certificadas).
 
 ---
 
-## Contrato Certificado Recientemente: `feat-022` (`done`)
+## Contrato Certificado Recientemente: `feat-023` (`done`)
 
-### Entregables Verificados en `feat-022`
-1. **Capa 1 (`Types`)**: `model WebOrderInbox` (`@@map("web_order_inbox")`) en `prisma/schema.prisma` (`npx prisma generate` `< 2500ms`, `0` colisiones de índices), `server/validators/webOrderValidators.js` y extensión de `createRemoteSaleSchema` en `server/validators/remoteSaleValidators.js` (`webOrderInboxId` y `webOrderNumber`).
-2. **Capa 2 (`Config`)**: `WEB_ORDERS_WEBHOOK_SECRET` opcional (`min(16)`) con fallback a `CATALOG_WEBHOOK_SECRET` en `server/config/env.js` (`0 CRLF`).
-3. **Capa 3/4 (`Service`)**: `server/services/sales/webOrderInboxService.js` (`isWebOrderWebhookAuthorized` con `crypto.timingSafeEqual`, normalización de materiales `mdf/pvc/vinyl_only`, medidas decimales y URLs absolutas, upsert idempotente que jamás revierte `IMPORTADO`/`DESCARTADO`, `syncWebOrdersFromWeb`, `listWebOrders`, `discardWebOrder`, `restoreWebOrder` y `notifyWebOrderStatus`) e integración atómica en `createRemoteSaleTransaction` (`server/services/sales/remoteSaleService.js`) con bloqueo `HTTP 409` y sello `[Origen Web: #CP-XXXX]`.
-4. **Capa 5 (`Runtime`)**: `server/controllers/webOrderInboxController.js` (`0` imports hacia `server/config/*`), rutas en `server/routes/apiRoutes.js` (`POST /api/webhooks/web-orders`, `GET /api/sales/web-orders`, `POST /api/sales/web-orders/sync`, `PATCH /api/sales/web-orders/:id/discard` y `PATCH /api/sales/web-orders/:id/restore`) y suite `tests/sales/web-orders-inbox-service.test.js` (`43/43 PASS` junto con `schema-robustness` y `zero-trust`).
+### Entregables Verificados en `feat-023`
+1. **Orquestación y Precarga sin Sorpresas (`src/components/manual-sale/hooks/useWebOrderImport.js`, `275L <= 280L`)**:
+   - Exportados helpers puros (`mapWebOrderItemToCartItem`, `buildWebOrderCustomerDraft`, `filterWebOrdersByQuery`, `formatWebOrderSourceLabel`, `formatWebMaterialLabel`) que mapean pósters de catálogo (con y sin `productId` local), personalizados con decimales (`42.2 x 30 cm`), materiales (`MDF_5_5MM`, `PVC_5MM`, `VINILO_SOLO`) y fotos HD absolutas.
+   - Búsqueda de cliente en CRM por teléfono (`GET /api/customers?query=...`) con apertura automática del formulario inline cuando el cliente es nuevo o carece de dirección completa, y cero precarga automática al abrir la vista.
+2. **Banner + Ventana Flotante en Pedidos / Venta (`WebOrderImportBanner.jsx` `82L <= 120L` + `WebOrdersImportModal.jsx` `253L <= 280L`)**:
+   - Botón accesible `'Importar Pedido Web'` con contador vivo de pendientes y chip `'#CP-XXXX cargado'` + `'Desvincular'` montado al inicio de `REDES_PERSONALIZADO` en `FastManualSaleForm.jsx` (`339L <= 350L`).
+   - Ventana flotante con `useModalBackHandler`, buscador instantáneo, botón `'Actualizar'` (`POST /api/sales/web-orders/sync`), miniaturas HD, medidas decimales, notas, total cotizado y botón `'Cargar al Formulario'`, enviando `webOrderInboxId` / `webOrderNumber` desde `useRemoteSaleForm.js` (`343L <= 350L`).
+3. **Pestaña Dedicada `'Bandeja Web'` (`Header.jsx` `276L <= 280L`, `App.jsx` `395L <= 420L` y `WebOrdersInboxView.jsx` `257L <= 280L`)**:
+   - Pestaña `'bandeja-web'` con badge de pendientes para `SUPER_ADMIN` y `VENDEDOR_REDES`, carga `lazy` en `App.jsx`, filtros `Pendientes / Importados / Descartados`, sincronización manual, descarte, restauración y acción `'Importar a Venta'`.
+4. **Suite de Verificación (`tests/sales/web-orders-import-ui.test.js`)**:
+   - `98/98 PASS` junto con `web-orders-inbox-service`, `surgery-059`, `surgery-061`, `remote-sale-design-edition` y `commission-frontend`; `265/265` unit tests, `53/53` voice tests, `HARNESS_PASS` y `bash ./init.sh` `100/100` con `0 CRLF`.
 
 ---
-
-## Contrato Preparado para la Siguiente Tarea en Cola (`feat-023`)
-*(Al iniciar `feat-023`, actualizar a `in-progress` bajo `WIP = 1`)*
-
-- **Regla de oro UX acordada con el usuario:** El formulario de *Pedidos / Venta* NUNCA debe aparecer precargado por sorpresa al entrar. Siempre inicia limpio; arriba del modo `REDES_PERSONALIZADO` muestra el botón **`Importar Pedido Web`** (con contador de pendientes) que abre la **ventana flotante `WebOrdersImportModal.jsx`**, desde donde el vendedor escoge el pedido deseado y recién ahí se precargan cliente + pósters + fotos HD + medidas decimales + precios.
-- Pestaña **`Bandeja Web`** (`id: 'bandeja-web'`) en `Header.jsx` (`<= 280L`) y `App.jsx` (`WebOrdersInboxView.jsx <= 280L`) para `VENDEDOR_REDES` y `SUPER_ADMIN` con filtros `Pendientes / Importados / Descartados`, botón `Actualizar` (`POST /api/sales/web-orders/sync`) y acción `Importar a Venta`.
-- Respetar estrictamente techos de líneas (`FastManualSaleForm.jsx <= 350L`, `useRemoteSaleForm.js <= 350L`, `Header.jsx <= 280L`, `WebOrdersImportModal.jsx <= 280L`, `WebOrdersInboxView.jsx <= 280L`, `WebOrderImportBanner.jsx <= 120L`), controles `>= 44px`, estética blanca/neutra (`0` `amber-*`/`orange-*`), `0` emojis redundantes y `0 CRLF`.
 
 ## Exclusiones Explícitas (`Out-of-Scope`)
 - Cero lectura o modificación de `.env`.

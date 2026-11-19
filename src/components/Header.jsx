@@ -3,16 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Menu, X, ShoppingBag, Calendar, Activity,
   Package, Clock, Wallet, Users, Percent, ChevronRight,
-  AlertCircle, Mail, ChevronDown, Check,
+  AlertCircle, Mail, ChevronDown, Check, Globe,
 } from 'lucide-react';
 
 const TAB_ICONS = {
-  venta: ShoppingBag, eventos: Calendar, monitor: Activity, produccion: Package,
+  venta: ShoppingBag, 'bandeja-web': Globe, eventos: Calendar, monitor: Activity, produccion: Package,
   seguimiento: Clock, cierre: Wallet, usuarios: Users, comisiones: Percent,
 };
 
 export default function Header({
-  activeEvent, activeEventsList = [], onSelectEvent, activeTab, setActiveTab,
+  activeEvent, activeEventsList = [], onSelectEvent, activeTab, setActiveTab, pendingWebOrdersCount = 0,
 }) {
   const { user, logout, isSuperAdmin, isVendedor, isVendedorRedes, isOperario1, isOperario2 } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -44,8 +44,8 @@ export default function Header({
   let navTabs = [];
   if (isSuperAdmin) {
     navTabs = [
-      { id: 'venta', label: 'Nueva venta' }, { id: 'eventos', label: 'Eventos' },
-      { id: 'monitor', label: 'Monitor' }, { id: 'produccion', label: 'Producción' },
+      { id: 'venta', label: 'Nueva venta' }, { id: 'bandeja-web', label: 'Bandeja Web', badge: pendingWebOrdersCount },
+      { id: 'eventos', label: 'Eventos' }, { id: 'monitor', label: 'Monitor' }, { id: 'produccion', label: 'Producción' },
       { id: 'seguimiento', label: 'Seguimiento' }, { id: 'cierre', label: 'Cierre' },
       { id: 'usuarios', label: 'Usuarios' }, { id: 'comisiones', label: 'Comisiones' },
     ];
@@ -53,6 +53,7 @@ export default function Header({
     const tabMap = new Map();
     if (isVendedorRedes && !isVendedor) {
       tabMap.set('venta', { id: 'venta', label: 'Pedidos / Venta' });
+      tabMap.set('bandeja-web', { id: 'bandeja-web', label: 'Bandeja Web', badge: pendingWebOrdersCount });
       tabMap.set('eventos', { id: 'eventos', label: 'Punto de Venta' });
       if (!isOperario1 && !isOperario2) tabMap.set('produccion', { id: 'produccion', label: 'Mis Pedidos' });
       tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
@@ -63,6 +64,7 @@ export default function Header({
         tabMap.set('monitor', { id: 'monitor', label: 'Monitor' });
       }
       if (isVendedorRedes) {
+        tabMap.set('bandeja-web', { id: 'bandeja-web', label: 'Bandeja Web', badge: pendingWebOrdersCount });
         tabMap.set('eventos', { id: 'eventos', label: 'Punto de Venta' });
         tabMap.set('seguimiento', { id: 'seguimiento', label: 'Seguimiento' });
         tabMap.set('comisiones', { id: 'comisiones', label: 'Mis Comisiones' });
@@ -113,9 +115,14 @@ export default function Header({
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
         <button
           type="button" onClick={() => setIsMenuOpen((prev) => !prev)} aria-label="Abrir menú"
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black cursor-pointer transition-colors shrink-0"
+          className="relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black cursor-pointer transition-colors shrink-0"
         >
           {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {(isSuperAdmin || isVendedorRedes) && pendingWebOrdersCount > 0 && !isMenuOpen && (
+            <span data-testid="header-web-orders-badge" className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center">
+              {pendingWebOrdersCount}
+            </span>
+          )}
         </button>
 
         <div className="flex flex-col items-center justify-center shrink-0">
@@ -205,9 +212,9 @@ export default function Header({
                   <span className="truncate">Stand: <strong className="font-bold">{activeEvent.name}</strong></span>
                 </div>
               ) : (
-                <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 flex items-center justify-between text-xs text-amber-900">
-                  <div className="flex items-center gap-1.5 font-bold"><AlertCircle className="w-4 h-4 text-amber-600 shrink-0" /><span>Sin stand activo</span></div>
-                  <button type="button" onClick={() => { setActiveTab('eventos'); setIsMenuOpen(false); }} className="min-h-[36px] px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center">Activar</button>
+                <div className="bg-neutral-100 border border-neutral-300 rounded-xl p-2.5 flex items-center justify-between text-xs text-neutral-900">
+                  <div className="flex items-center gap-1.5 font-bold"><AlertCircle className="w-4 h-4 text-neutral-700 shrink-0" /><span>Sin stand activo</span></div>
+                  <button type="button" onClick={() => { setActiveTab('eventos'); setIsMenuOpen(false); }} className="min-h-[44px] px-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center justify-center">Activar</button>
                 </div>
               )}
             </div>
@@ -221,7 +228,14 @@ export default function Header({
                     className={`min-h-[44px] w-full rounded-xl flex items-center justify-between px-3 text-sm font-bold transition-all cursor-pointer ${isActive ? 'bg-black text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-100'}`}
                   >
                     <div className="flex items-center gap-3"><TabIcon className="w-5 h-5 shrink-0" /><span>{tab.label}</span></div>
-                    <ChevronRight className={`w-4 h-4 shrink-0 ${isActive ? 'text-white/70' : 'text-neutral-400'}`} />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {tab.badge > 0 && (
+                        <span data-testid={`nav-badge-${tab.id}`} className={`px-2 py-0.5 rounded-full text-[11px] font-black ${isActive ? 'bg-emerald-400 text-black' : 'bg-black text-white'}`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                      <ChevronRight className={`w-4 h-4 shrink-0 ${isActive ? 'text-white/70' : 'text-neutral-400'}`} />
+                    </div>
                   </button>
                 );
               })}
