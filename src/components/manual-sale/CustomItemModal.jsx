@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Palette, X, Plus, Ruler, Sparkles, Scissors } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { OFFICIAL_SIZES, CUSTOM_CM2_RATE, WOOD_CUSTOM_CUT_SURCHARGE, PVC_SURCHARGE, VINYL_DISCOUNT_FACTOR } from './manualSaleConstants';
+import { CUSTOM_MIN_CM, CUSTOM_MAX_CM, calculateCustomPosterPrice, validateCustomDimensions, formatDecimalCm } from '../../utils/customPosterPricing';
 import { getLocalCatalog } from '../../services/catalogCacheService';
 import CustomArtUploader, { revokeArtPreviewUrls } from './CustomArtUploader';
 
@@ -92,20 +93,12 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
   }, [isOpen, resetModalState]);
 
   useEffect(() => {
-    let price = 0;
-    if (mode === 'STANDARD') {
-      if (selectedSize) {
-        const base = selectedSize.precio || 0;
-        price = material === 'PVC_5MM' ? base + PVC_SURCHARGE : material === 'VINILO_SOLO' ? base * VINYL_DISCOUNT_FACTOR : base;
-      }
-    } else {
-      const w = Number(customWidth) || 0, h = Number(customHeight) || 0;
-      if (w > 0 && h > 0) {
-        const basePrint = w * h * CUSTOM_CM2_RATE;
-        price = material === 'PVC_5MM' ? basePrint + PVC_SURCHARGE : material === 'VINILO_SOLO' ? basePrint * VINYL_DISCOUNT_FACTOR : basePrint + WOOD_CUSTOM_CUT_SURCHARGE;
-      }
-    }
-    if (price > 0) setUnitPrice(String(Number(price.toFixed(2))));
+    const { unitPrice: calcUnit } = calculateCustomPosterPrice({
+      mode, material, selectedSize, customWidth, customHeight, quantity: 1,
+      cm2Rate: CUSTOM_CM2_RATE, woodCutSurcharge: WOOD_CUSTOM_CUT_SURCHARGE,
+      pvcSurcharge: PVC_SURCHARGE, vinylFactor: VINYL_DISCOUNT_FACTOR,
+    });
+    setUnitPrice(calcUnit > 0 ? String(calcUnit) : '');
   }, [mode, material, selectedSize, customWidth, customHeight]);
 
   if (!isOpen) return null;
@@ -119,8 +112,9 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
     e.preventDefault();
     if (isUploading) return setErrorMsg('Espera a que termine de subir la imagen a la nube.');
     if (!description.trim()) return setErrorMsg('Ingresa una descripción para el diseño.');
-    if (mode === 'CUSTOM' && (!Number(customWidth) || !Number(customHeight))) {
-      return setErrorMsg('Ingresa un ancho y alto válidos en centímetros.');
+    if (mode === 'CUSTOM') {
+      const dimCheck = validateCustomDimensions(customWidth, customHeight, { minCm: CUSTOM_MIN_CM, maxCm: CUSTOM_MAX_CM });
+      if (!dimCheck.valid) return setErrorMsg(dimCheck.error);
     }
     if (mode === 'STANDARD' && !selectedSize) {
       return setErrorMsg('Selecciona una medida estándar para el cuadro o cambia a Medida Especial.');
@@ -130,7 +124,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
 
     const dims = mode === 'STANDARD'
       ? `Estándar: ${selectedSize?.nombre || 'Personalizado'} (${selectedSize?.dimensiones || 'N/A'})`
-      : `Especial: ${customWidth.trim()} x ${customHeight.trim()} cm (Corte Taller)`;
+      : `Especial: ${formatDecimalCm(customWidth)} x ${formatDecimalCm(customHeight)} cm (Corte Taller)`;
 
     const payloads = buildCustomItemPayloads({
       description, material, customDimensions: dims, unitPrice: priceNum,
@@ -141,10 +135,11 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
     onClose();
   };
 
-  const widthNum = Number(customWidth) || 0;
-  const heightNum = Number(customHeight) || 0;
-  const area = widthNum * heightNum;
-  const basePrint = area * CUSTOM_CM2_RATE;
+  const { area, basePrint } = calculateCustomPosterPrice({
+    mode, material, selectedSize, customWidth, customHeight, quantity,
+    cm2Rate: CUSTOM_CM2_RATE, woodCutSurcharge: WOOD_CUSTOM_CUT_SURCHARGE,
+    pvcSurcharge: PVC_SURCHARGE, vinylFactor: VINYL_DISCOUNT_FACTOR,
+  });
   const totalArtsCount = uploadedArts.length + (customImageUrl.trim() && !uploadedArts.some((a) => a.url === customImageUrl.trim()) ? 1 : 0);
 
   return (
@@ -190,7 +185,7 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
                 {availableSizes.map((sz) => {
                   const isSel = selectedSize?.sizeId === sz.sizeId;
-                  const price = material === 'PVC_5MM' ? sz.precio + PVC_SURCHARGE : material === 'VINILO_SOLO' ? sz.precio * VINYL_DISCOUNT_FACTOR : sz.precio;
+                  const { unitPrice: price } = calculateCustomPosterPrice({ mode: 'STANDARD', material, selectedSize: sz, pvcSurcharge: PVC_SURCHARGE, vinylFactor: VINYL_DISCOUNT_FACTOR });
                   return (
                     <button key={sz.sizeId} type="button" onClick={() => setSelectedSize(sz)} className={`p-2 rounded-xl border text-left transition-all min-h-[44px] cursor-pointer ${isSel ? 'border-white bg-white/10 text-white font-bold ring-1 ring-white' : 'border-neutral-800 bg-black text-neutral-300 hover:border-neutral-700'}`}>
                       <div className="flex justify-between items-center"><span className="font-bold">{sz.nombre}</span><span className="font-mono text-emerald-400 font-black">Q{price}</span></div>
@@ -205,16 +200,16 @@ export default function CustomItemModal({ isOpen, onClose, onAddCustomItem }) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[11px] text-neutral-400 block mb-1">Ancho (cm) *</label>
-                    <input type="number" min="5" max="300" placeholder="Ej. 48" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-white focus:outline-none" />
+                    <input type="number" min="5" max="300" step="0.01" inputMode="decimal" placeholder="Ej. 42.2" value={customWidth} onChange={(e) => { setCustomWidth(e.target.value.replace(',', '.')); setErrorMsg(''); }} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-white focus:outline-none" />
                   </div>
                   <div>
                     <label className="text-[11px] text-neutral-400 block mb-1">Alto (cm) *</label>
-                    <input type="number" min="5" max="300" placeholder="Ej. 68" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:border-white focus:outline-none" />
+                    <input type="number" min="5" max="300" step="0.01" inputMode="decimal" placeholder="Ej. 68.5" value={customHeight} onChange={(e) => { setCustomHeight(e.target.value.replace(',', '.')); setErrorMsg(''); }} className="w-full min-h-[44px] px-3 bg-black border border-neutral-800 rounded-xl text-white focus:border-white focus:outline-none" />
                   </div>
                 </div>
                 {area > 0 && (
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-between text-[11px]">
-                    <span className="text-neutral-400">Área: <strong className="text-white font-mono">{area.toLocaleString()} cm²</strong></span>
+                    <span className="text-neutral-400">Área: <strong className="text-white font-mono">{area.toLocaleString('en-US', { maximumFractionDigits: 2 })} cm²</strong></span>
                     {material === 'MDF_5_5MM' && <span className="text-neutral-300 flex items-center gap-1 font-semibold"><Scissors className="w-3.5 h-3.5 text-cyan-400" />Base Q{basePrint.toFixed(2)} + Q25 corte taller</span>}
                     {material === 'PVC_5MM' && <span className="text-sky-400 font-semibold">Base Q{basePrint.toFixed(2)} + Q15 PVC</span>}
                     {material === 'VINILO_SOLO' && <span className="text-emerald-400 font-semibold">Base Q{basePrint.toFixed(2)} x 50% lámina</span>}

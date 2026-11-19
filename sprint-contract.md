@@ -4,46 +4,63 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-020` Completada y Verificada)
-- **Tareas recientes completadas:** `feat-017`, `feat-018`, `feat-019` (`c9b88a0`) y `feat-020` (`done`).
-- **Siguiente tarea planificada en cola DAG:** Ninguna pendiente (`WIP = 0`; `feat-000..020` en `done`).
-- **Marcha de trabajo ejecutada:** `Modo Diario Ágil` (`WIP = 1 -> 0`, verificación en 3 puertas `bash ./init.sh` `100/100` + `npm run harness:check` `HARNESS_PASS`).
+## Estado Actual del Contrato (`WIP = 0` — `feat-021` `done`; Siguiente en Cola: `feat-022 -> feat-023`)
+- **Tareas completadas recientemente:** `feat-019` (`c9b88a0`), `feat-020` (`7b0523e`) y **`feat-021` (`done` — decimales `42.2 cm` + paridad exacta de 7 Vectores Dorados con Web Deco Vintage)**.
+- **Cola DAG pendiente (`not-started`, ejecutar de 1 en 1 bajo `WIP = 1`):**
+  1. **`feat-022` (`P0`, depende de `feat-021` `done`)**: Backend de Bandeja de Pedidos Web (`WebOrderInbox`), Webhook S2S en Tiempo Real, Sync Pull Resiliente y Cierre Atómico al Registrar Venta.
+  2. **`feat-023` (`P1`, depende de `feat-022`)**: Vista `"Bandeja Web"` + Botón `"Importar Pedido Web"` con Ventana Flotante de Selección y Precarga al Formulario para `VENDEDOR_REDES` y `SUPER_ADMIN`.
+- **Coordinación Inter-Repositorios (`Web Deco Vintage Proyect`):** Entregado el informe técnico completo en `C:\Users\sebas\Documents\nuve DRIVE\Comunicacion entre agentes\2026-11-18_INFORME_INTEGRACION_PEDIDOS_Y_COTIZADOR_WEB_DECO_VINTAGE.md` (inspección en solo lectura; el repositorio vecino permanece 100% intacto para ser planificado y ejecutado por sus propios agentes).
 
 ---
 
-## Alcance Incluido (`In-Scope`) para `feat-020`
+## Contrato Certificado Recientemente: `feat-021` (`done`)
 
-1. **Incluir el Costo de Edición de Diseño en la Base Comisionable del 20% (`server/services/commissionService.js`)**:
-   - Exportar una función pura `extractSaleEditionCost(sale = {})`:
-     - Si `sale?.editionCost != null && Number.isFinite(Number(sale.editionCost)) && Number(sale.editionCost) > 0`, retorna `Number(Number(sale.editionCost).toFixed(2))`.
-     - En caso contrario, si `typeof sale?.notes === 'string'` coincide con `/\[Edici[oó]n\s*\(\+Q\s*([0-9]+(?:\.[0-9]{1,2})?)\)/i`, retorna `Number(Number(match[1]).toFixed(2))`.
-     - En cualquier otro caso retorna `0`.
-   - Actualizar `calculateSaleProductBase(sale)` para que cuando se calcule a partir de `sale.itemsSubtotal` o de `sale.items`:
-     ```js
-     const netProducts = Math.max(0, itemsSub - Number(sale.discount || 0));
-     const editionCost = extractSaleEditionCost(sale);
-     return Number((netProducts + editionCost).toFixed(2));
-     ```
-     *(Y cuando no venga ni `itemsSubtotal` ni `items`, la rama fallback `totalAmount - shippingCost` ya incluye el valor de la edición y excluye el 100% del flete).*
-   - En `getSettlementById({ tenantId, settlementId })`: enriquecer `settlement.sales` mapeando cada venta con `baseProductos: calculateSaleProductBase(s)` y `commissionAmount: Number((calculateSaleProductBase(s) * 0.20).toFixed(2))` para que el modal de recibo detallado reciba siempre la base exacta con edición incluida.
+### Alcance Incluido (`In-Scope`) en `feat-021`
+1. **Motor Puro de Precio Personalizado con Decimales (`src/utils/customPosterPricing.js` — Capa 1 `utils`)**:
+   - Exportar `parseDecimalCm(raw)` aceptando tanto punto como coma decimal (`'42.2'` o `'42,2'` -> `42.2`).
+   - Exportar `CUSTOM_MIN_CM = 5` y `CUSTOM_MAX_CM = 300`.
+   - Exportar `calculateCustomPosterPrice({ mode, material, selectedSize, customWidth, customHeight, quantity = 1, cm2Rate = 0.048, woodCutSurcharge = 25.00, pvcSurcharge = 15.00, vinylFactor = 0.50 })`:
+     - En `mode === 'CUSTOM'`:
+       - `area = Number((w * h).toFixed(2))`
+       - `basePrint = area * cm2Rate`
+       - `MDF_5_5MM`: `rawUnit = basePrint + 25.00` (corte especial de madera en taller acordado para ambos sistemas)
+       - `PVC_5MM`: `rawUnit = basePrint + 15.00`
+       - `VINILO_SOLO`: `rawUnit = basePrint * 0.50`
+     - En `mode === 'STANDARD'`:
+       - `MDF_5_5MM`: `selectedSize.precio` (sin recargo de Q25)
+       - `PVC_5MM`: `selectedSize.precio + 15.00`
+       - `VINILO_SOLO`: `selectedSize.precio * 0.50`
+     - Redondeo canónico exacto: `unitPrice = Number(rawUnit.toFixed(2))`, `subtotal = Number((unitPrice * qty).toFixed(2))`.
 
-2. **Alineación en Recibo de Liquidación (`src/components/commissions/SettlementDetailReceiptModal.jsx`)**:
-   - En el cálculo de respaldo por fila de `SettlementDetailReceiptModal.jsx`, asegurar que si llegara un objeto con `s.itemsSubtotal` sin `s.baseProductos`, sume también el cargo de edición extraído de `s.editionCost` o `s.notes` (`extractReceiptEditionCost`), **conservando obligatoriamente `s.baseProductos ??`** (y jamás `||`).
-   - *(Nota: `OnlineSalesHistoryModal.jsx` ya calcula `Math.max(0, Number(sale.totalAmount || 0) - Number(sale.shippingCost || 0))`, por lo que ya incluye automáticamente la edición y excluye el flete).*
+2. **Vectores Dorados Obligatorios (`cm2Rate = 0.048`)**:
+   - `42.2 x 30 cm`, `MDF_5_5MM`, `qty = 1` -> `area = 1266`, `unitPrice = 85.77`, `subtotal = 85.77`
+   - `42.2 x 30 cm`, `MDF_5_5MM`, `qty = 2` -> `area = 1266`, `unitPrice = 85.77`, `subtotal = 171.54`
+   - `42.2 x 30 cm`, `PVC_5MM`, `qty = 1` -> `area = 1266`, `unitPrice = 75.77`, `subtotal = 75.77`
+   - `42.2 x 30 cm`, `VINILO_SOLO`, `qty = 1` -> `area = 1266`, `unitPrice = 30.38`, `subtotal = 30.38`
+   - `42.2 x 58.5 cm`, `MDF_5_5MM`, `qty = 1` -> `area = 2468.7`, `unitPrice = 143.50`, `subtotal = 143.50`
+   - `48.5 x 68.25 cm`, `MDF_5_5MM`, `qty = 3` -> `area = 3310.13`, `unitPrice = 183.89`, `subtotal = 551.67`
+   - `40 x 50 cm`, `MDF_5_5MM`, `qty = 1` -> `area = 2000`, `unitPrice = 121.00`, `subtotal = 121.00`
 
-3. **Actualización de Contrato en `feat-019` y Nueva Suite de Comisiones (`tests/sales/remote-sale-design-edition.test.js` + `tests/commissions/commission-design-edition-inclusion.test.js`)**:
-   - En `tests/sales/remote-sale-design-edition.test.js` (test `3.2`): actualizar la aserción de `calculateSaleProductBase(sale)` de `130` a `155` (`2x Q65 = Q130` en pósters + `Q25` de edición = **`Q155.00`** de base comisionable -> **`Q31.00`** de comisión 20%, manteniendo excluido el flete de `Q35`).
-   - Crear `tests/commissions/commission-design-edition-inclusion.test.js` validando:
-     1. `extractSaleEditionCost` y `calculateSaleProductBase` tanto con `editionCost` directo como leído desde `sale.notes` (`[Edición (+Q 25.00): ...]`) tal como sale de PostgreSQL.
-     2. Combinación de productos + descuento + edición + flete (confirmando que la edición SÍ suma a la comisión del 20% y el flete NUNCA suma).
-     3. `getPendingCommissions` (`totalProductsAmount`, `totalCommission`, `sales[i].commissionAmount` y `waitingSummary.potentialCommission`), `createSettlementTransaction` (`totalProductsAmount` y `totalCommission`) y `getSettlementById` (`settlement.sales[i].baseProductos`).
+3. **Formulario `CustomItemModal.jsx` y Badge Móvil en `ProductionOrderCard.jsx`**:
+   - En `src/components/manual-sale/CustomItemModal.jsx` (`<= 280` líneas): agregar `step="0.01"` e `inputMode="decimal"` a los inputs de ancho y alto (`min="5" max="300"`), delegar el cálculo a `calculateCustomPosterPrice`, conservar `customDimensions` con decimales limpios (`Especial: 42.2 x 30 cm (Corte Taller)`) y mantener intactos `resetModalState()`, carga múltiple y guardarraíles de `surgery-061`.
+   - En `src/components/production/ProductionOrderCard.jsx`: actualizar la expresión regular de medidas en `extractPosterSizeInfo` (`\d+(?:\.\d+)?`) para que Taller muestre medidas decimales sin truncar en móvil.
+   - Crear `tests/sales/custom-decimal-pricing-parity.test.js`.
 
-4. **Guardarraíles Innegociables de Suites Existentes**:
-   - En `SettlementDetailReceiptModal.jsx`, preservar exactamente `s.baseProductos ??` (`tests/commissions/commission-frontend.test.js` test `5.5` falla si se usa `||` o se quita `s.baseProductos ??`).
-   - Para ventas sin edición (`editionCost = 0` y sin sello en `notes`), `calculateSaleProductBase(sale)` debe devolver exactamente los mismos valores que antes (`tests/domain3/commission.test.js` y `tests/adversarial/m3-commission-invariants-challenger.test.js` 100% en verde; alineando `MockCommissionStore` de `m3-commission-invariants-challenger.test.js` al predicado Prisma `{ status: { in: [...] } }` y al ciclo de 2 pasos `PENDIENTE_PAGO -> PAGADO` de `surgeries-zero-compromise.test.js` 1.1 sin relajar ninguna aserción matemática ni de compuerta HTTP 422).
-   - Mantener `SettlementDetailReceiptModal.jsx <= 280` líneas y `0 CRLF` en todos los archivos tocados.
+---
+
+## Contratos Arquitectónicos para las Siguientes Tareas en Cola (`feat-022` y `feat-023`)
+*(Al terminar `feat-021`, el Agente Ejecutor deberá actualizar esta sección activa antes de codificar `feat-022` y luego `feat-023`)*
+
+- **`feat-022` (Backend `WebOrderInbox` + S2S)**:
+  - Aislamiento total de BD: comunicación exclusivamente vía HTTPS S2S con `x-webhook-secret` (`WEB_ORDERS_WEBHOOK_SECRET || CATALOG_WEBHOOK_SECRET`) verificado con `crypto.timingSafeEqual`.
+  - Endpoints: `POST /api/webhooks/web-orders` (público S2S, `401` sin firma válida), `GET /api/sales/web-orders`, `POST /api/sales/web-orders/sync` (pull desde `${WEB_CATALOG_URL}/api/custom-orders/integration/inbox`), `PATCH /api/sales/web-orders/:id/discard` y `PATCH /api/sales/web-orders/:id/restore`.
+  - En `createRemoteSaleTransaction`: cuando venga `webOrderInboxId` / `webOrderNumber`, marcar `IMPORTADO` en la misma transacción ACID con bloqueo `HTTP 409` si ya fue importado, y notificar `PATCH ${WEB_CATALOG_URL}/api/custom-orders/integration/:orderNumber/status`.
+- **`feat-023` (UI Bandeja Web + Modal Flotante de Importación)**:
+  - **Regla de oro UX acordada con el usuario:** El formulario de *Pedidos / Venta* NUNCA debe aparecer precargado por sorpresa al entrar. Siempre inicia limpio; arriba del modo `REDES_PERSONALIZADO` muestra el botón **`Importar Pedido Web`** (con contador de pendientes) que abre la **ventana flotante `WebOrdersImportModal.jsx`**, desde donde el vendedor escoge el pedido deseado y recién ahí se precargan cliente + pósters + fotos HD + medidas decimales + precios.
+  - Además, pestaña **`Bandeja Web`** (`id: 'bandeja-web'`) en `Header.jsx` (`<= 280L`) y `App.jsx` (`WebOrdersInboxView.jsx <= 280L`) para `VENDEDOR_REDES` y `SUPER_ADMIN` con filtros `Pendientes / Importados / Descartados` y botón `Importar a Venta`.
+  - Respetar estrictamente techos de líneas (`FastManualSaleForm.jsx <= 350L`, `useRemoteSaleForm.js <= 350L`, `Header.jsx <= 280L`), controles `>= 44px`, estética blanca/neutra (`0` `amber-*`/`orange-*`) y `0 CRLF`.
 
 ## Exclusiones Explícitas (`Out-of-Scope`)
 - Cero lectura o modificación de `.env`.
-- Cero modificaciones en `prisma/schema.prisma`.
-- Cero cambios en la regla de exclusión estricta del flete (`shippingCost` sigue 100% excluido de comisión).
+- Cero escritura en el repositorio vecino `C:\Users\sebas\Documents\Antigravity Files\Web Deco Vintage Proyect`.
+- Cero conexión directa entre bases de datos PostgreSQL de ambos proyectos.

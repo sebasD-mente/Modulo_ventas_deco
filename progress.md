@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-17 21:53
-**Session ID:** sesion-030 (Implementación y Cierre de `feat-020`: Inclusión del Costo de Edición de Diseño en la Base Comisionable del 20% Excluyendo el Flete)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..020` en `done`)
+**Last Updated:** 2026-11-18 19:11
+**Session ID:** sesion-032 (Ejecución y Certificación `feat-021`: Decimales `42.2 cm` y Paridad Matemática Exacta del Cotizador con Web Deco Vintage)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..021` en `done`; `feat-022..023` en `not-started`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -86,15 +86,23 @@
   - Enriquecido `getSettlementById` en `server/services/commissionService.js` mapeando cada venta en `settlement.sales` con `baseProductos` y `commissionAmount` al 20%, impactando automáticamente `getPendingCommissions` (`sales`, `totalProductsAmount`, `totalCommission`, `waitingSummary.potentialCommission`) y `createSettlementTransaction`.
   - Actualizado `src/components/commissions/SettlementDetailReceiptModal.jsx` (`267L <= 280L`) con `extractReceiptEditionCost` y `calculateReceiptRowAmounts` preservando estrictamente `s.baseProductos ??`.
   - Actualizada la aserción `3.2` en `tests/sales/remote-sale-design-edition.test.js` (`Q 130 + Q 25 = Q 155 -> Q 31.00`), alineado `MockCommissionStore` en `tests/adversarial/m3-commission-invariants-challenger.test.js` al predicado Prisma `{ status: { in: [...] } }` y al ciclo `PENDIENTE_PAGO -> PAGADO` (`Surgery 1.1..1.2`), y creada la suite dedicada `tests/commissions/commission-design-edition-inclusion.test.js` (`6/6 PASS`).
+- [x] **Soporte de Medidas con Decimales (`42.2 cm`) y Paridad Matemática Exacta del Cotizador con Web Deco Vintage `feat-021` (`53/53` `custom-decimal-pricing-parity` + `upload-art-quoter` + `custom-item-multi-image` + `surgery-061` PASS, `8/8` `production-scale` PASS, `1/1` `val005` `CustomItemModal` PASS, `265/265` unit tests PASS, `53/53` voice tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Creada la utilidad pura `src/utils/customPosterPricing.js` (`188L`, Capa 1 `utils`, `0` imports hacia capas superiores) exportando `parseDecimalCm`, `formatDecimalCm`, `validateCustomDimensions`, `normalizePosterMaterial` y `calculateCustomPosterPrice` con redondeo canónico (`area = Number((w * h).toFixed(2))`, `unitPrice = Number(rawUnit.toFixed(2))`, `subtotal = Number((unitPrice * qty).toFixed(2))`) y paridad exacta al centavo en los 7 Vectores Dorados compartidos con Web Deco Vintage (`+Q 25.00` corte especial MDF, `+Q 15.00` PVC, `50%` Vinilo Solo).
+  - Actualizado `src/components/manual-sale/CustomItemModal.jsx` (`252L <= 280L`) incorporando `step="0.01"` e `inputMode="decimal"` en los inputs de Ancho y Alto (`min="5" max="300"`), consumiendo `calculateCustomPosterPrice` y `validateCustomDimensions`, y preservando decimales limpios en `customDimensions` (`Especial: 42.2 x 30 cm (Corte Taller)`).
+  - Actualizado `extractPosterSizeInfo` en `src/components/production/ProductionOrderCard.jsx` para extraer medidas decimales (`\d+(?:\.\d+)?`) tanto desde `customDimensions` (incluyendo paréntesis anidados `(Corte Taller)`) como desde `description` en el badge móvil de Taller.
+  - Creada la suite dedicada `tests/sales/custom-decimal-pricing-parity.test.js` (`15/15 PASS`).
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..020` completadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..021` completadas; `feat-022` y `feat-023` en `not-started`).
 
 ### What's Next
-- Revisar con el propietario si desea desplegar `feat-020` a producción (`https://ventas.decovintage.online`) o planificar nuevas mejoras en el backlog.
+- Ejecutar en orden secuencial estricto (`WIP = 1` por vez):
+  1. **`feat-022` (`P0`)**: Backend `WebOrderInbox`, webhook S2S `POST /api/webhooks/web-orders`, sincronización pull `GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox` y marcado atómico `IMPORTADO` al registrar la venta remota.
+  2. **`feat-023` (`P1`)**: Botón `"Importar Pedido Web"` con ventana flotante de selección en *Pedidos / Venta* (sin precargas sorpresivas) + pestaña `"Bandeja Web"` con contador de pendientes para `VENDEDOR_REDES` y `SUPER_ADMIN`.
+- En el repositorio vecino `Web Deco Vintage Proyect`, su Agente Planificador y su Agente Ejecutor implementarán las 3 tareas especificadas en `C:\Users\sebas\Documents\nuve DRIVE\Comunicacion entre agentes\2026-11-18_INFORME_INTEGRACION_PEDIDOS_Y_COTIZADOR_WEB_DECO_VINTAGE.md`.
 
 ## Blockers / Risks
-- Ninguno activo (`0` lectura de `.env`; `Overall: 100/100`; arquitectura en verde con 0 excepciones; 265/265 unit tests PASS; 53/53 voice tests PASS; 122/122 commission & design edition contract tests PASS).
+- Ninguno activo (`0` lectura de `.env`; `0` modificaciones al repositorio vecino; `Overall: 100/100`; arquitectura en verde con 0 excepciones).
 
 ## Decisions Made
 - **Ventana contable sin traslapes ni huecos `(C_{D-1}, C_D]` para traspaso post-cierre (`feat-013`)**:
@@ -113,41 +121,44 @@
   - Context: Con >300 diseños vendidos en feria, el límite de `50` ocultaba pedidos, `truncate` ocultaba el tamaño en móvil, y mezclar ítems resueltos con pendientes permitía confusiones y carecía de un archivo inmutable auditable para Operario 1 y Operario 2, sin alterar `prisma/schema.prisma`.
   - Alternatives considered: (a) Añadir nuevas columnas de auditoría en `SaleItem` modificando `prisma/schema.prisma` (descartado porque `ProductionLog` con relación `user` ya persiste cada transición); (b) Mostrar pestañas de archivo dentro de `ProductionFilterTabs` para `isOp2Only` rompiendo el contrato histórico `if (isOp2Only) return null;` de `production-adversarial.test.js` (descartado para preservar compatibilidad al 100%).
   - Resolution: Se incorporó un selector superior dedicado de bandeja (`Cola Pendiente / Por Imprimir` vs `Archivo de Resueltos / Impresos`) en `ProductionManagementView.jsx` para ambos operarios y `SUPER_ADMIN`, conservando `ProductionFilterTabs` para sub-estados de Operario 1 / Admin (`if (isOp2Only) return null;`), proyectando `productionLogs` ordenados cronológicamente con nombre de usuario y hora `America/Guatemala` y bloqueando con `HTTP 403` cualquier mutación posterior de operarios sobre diseños ya procesados.
-
 - **Retiro Fullstack de la Compuerta del 50% de Anticipo en Ventas de Redes (`feat-017`)**:
   - Context: En `RemoteQuoterSummary.jsx` y `useRemoteSaleForm.js` el vendedor no podía ingresar un anticipo menor al 50% (además un `useEffect` auto-rellenaba el 50% al agregar productos), pero en `server/services/sales/remoteSaleService.js` (`createRemoteSaleTransaction` y `registerBalancePayment`) también existía una compuerta dura `HTTP 400` del 50%.
   - Alternatives considered: Retirar la validación únicamente en el componente React `RemoteQuoterSummary.jsx` (descartado porque `POST /api/sales/remote` rechazaría en servidor con `HTTP 400 Anticipo insuficiente` cualquier anticipo menor al 50%).
   - Resolution: Se retiró la restricción del 50% de extremo a extremo (`RemoteQuoterSummary.jsx`, `useRemoteSaleForm.js`, `BalancePaymentModal.jsx` y `remoteSaleService.js`), iniciando `depositInput` vacío (`''` -> `abono Q 0.00`), dejando únicamente el campo `Valor del anticipo` y el botón de `100%`, y preservando intactas las clases y contratos estáticos exigidos por `surgery-056`, `surgery-059`, `surgery-061`, `surgery-064` y `surgery-065`.
-
 - **Extracción de `CustomArtUploader.jsx` + Reinicio Limpio + Lote Multi-Imagen 1-a-1 hacia `SaleItem` (`feat-018` — Implementado)**:
   - Context: En producción el vendedor de redes reportó que `CustomItemModal.jsx` permitía subir el primer diseño pero bloqueaba agregar más diseños después, porque el modal permanece siempre montado (`if (!isOpen) return null;`), nunca reiniciaba `uploadSuccess` al enviar/cerrar y ocultaba el `<input type="file">` cuando `uploadSuccess === true`; además carecía de selección `multiple` y de botón para quitar/cambiar imagen, estando `CustomItemModal.jsx` en `277/280` líneas (`surgery-061` test `4.1`).
   - Alternatives considered: (a) Guardar un array de URLs concatenadas en una sola fila de `SaleItem` (descartado porque rompería `prisma/schema.prisma` y evitaría que Taller/Producción gestione cada póster por separado); (b) Meter toda la galería `multiple` dentro de `CustomItemModal.jsx` sin extraer subcomponente (descartado porque superaría de inmediato el techo duro de `280` líneas de `surgery-061`).
   - Resolution: Se implementó `resetModalState()` en `CustomItemModal.jsx` (`258L <= 280L`), se extrajo `CustomArtUploader.jsx` (`223L <= 280L`) con `<input type="file" multiple>`, limpieza `e.target.value = ''` y remoción individual de miniaturas (`min-h-[44px] min-w-[44px]`), y se habilitó la creación 1-a-1 de `SaleItem`s con secuencia monotónica libre de colisiones en `useRemoteSaleForm.js` (`342L <= 350L`).
-
 - **Cargo de Edición de Diseño sin `SaleItem` Fantasma ni Migración Prisma (`feat-019` — Implementado)**:
   - Context: El usuario solicitó añadir en Nueva Venta de Redes, justo debajo de la lista de diseños agregados (`SaleCartList`), una casilla para registrar la descripción de una edición (ej. `"Se agregaron letras en la esquina inferior"`) y el costo de esa edición sumándolo al total del pedido, sin alterar `prisma/schema.prisma`.
   - Alternatives considered: (a) Insertar un `SaleItem` adicional llamado `"Edición..."` (descartado porque entraría como póster falso a la cola de impresión de Taller/Operario 2 y alteraría la base de pósters de comisión del 20%); (b) Agregar columnas nuevas en `Sale` en `prisma/schema.prisma` (descartado para mantener cero migraciones destructivas/DDL innecesarias en producción).
   - Resolution: Se implementó `DesignEditionPanel.jsx` (`86L`) entre `SaleCartList` y `DeliveryMethodSelector` (respetando `surgery-059` `2.1` y `4.2`), sumando `effectiveEditionCost` a `totalAmount` en `useRemoteSaleForm.js` (`344L <= 350L`) y `createRemoteSaleTransaction`, desglosándolo en `RemoteQuoterSummary.jsx` (`323L <= 350L`) y `WhatsAppQuoteShareModal.jsx` (`187L <= 280L`), y estampando `[Edición (+Q X.XX): ...]` en `sale.notes` y `[Edición]: ...` en `SaleItem.productionNotes` para que Taller vea la instrucción directamente en `ProductionOrderCard.jsx`.
-
 - **Inclusión del Cargo de Edición de Diseño en la Comisión del 20% (`feat-020` — Implementado)**:
   - Context: En `feat-019` se mantuvo la edición fuera de `calculateSaleProductBase`, pero el propietario aclaró explícitamente que el valor cobrado por Edición de Diseño **sí se incluye en el cálculo del 20% de comisión** del vendedor de redes (únicamente el flete queda excluido).
   - Alternatives considered: Crear un `SaleItem` adicional para sumar la edición (descartado porque contaminaría la cola de impresión de Taller con un cuadro inexistente) o sumar `editionCost` también en la rama fallback `totalAmount - shippingCost` (descartado porque `totalAmount` ya incluye `editionCost`, lo que causaría doble conteo).
   - Resolution: `calculateSaleProductBase(sale)` en `commissionService.js` suma `extractSaleEditionCost(sale)` a `Math.max(0, itemsSub - discount)` cuando la venta trae `itemsSubtotal` o `items` (y usa `Math.max(0, totalAmount - shippingCost)` sin doble conteo cuando solo trae `totalAmount`), enriqueciendo `getSettlementById` y alineando `SettlementDetailReceiptModal.jsx` (`267L <= 280L`) con preservación estricta de `s.baseProductos ??`.
+- **Unificación Matemática de Medidas Especiales con Decimales y `+Q 25.00` Corte MDF en Ambos Sistemas (`feat-021` — Implementado)**:
+  - Context: La auditoría en solo lectura de `Web Deco Vintage Proyect` reveló que `Modulo_Ventas` bloqueaba decimales (`42.2 cm`) por carecer de `step="0.01"` dentro de `<form>` en `CustomItemModal.jsx`, mientras que la Web sí dejaba pasar decimales pero omitía el recargo de `+Q 25.00` de corte especial de madera MDF (`WOOD_CUSTOM_CUT_SURCHARGE`).
+  - Alternatives considered: (a) Eliminar el recargo de `+Q 25.00` en `Modulo_Ventas` para igualar el cálculo anterior de la Web (descartado por decisión expresa del propietario: el recargo de `+Q 25.00` por corte especial de madera sí corresponde comercialmente y debe aplicarse también en la Web); (b) Multiplicar precios flotantes sin redondear el unitario antes de la cantidad (descartado porque causaba deriva de centavos entre frontend y backend para `quantity >= 2`).
+  - Resolution: Se implementó `src/utils/customPosterPricing.js` (`188L`, Capa 1 `utils`) con la fórmula única `area = Number((w * h).toFixed(2))`, `basePrint = area * 0.048`, `MDF = basePrint + 25.00`, `PVC = basePrint + 15.00`, `Vinilo = basePrint * 0.50`, `unitPrice = Number(rawUnit.toFixed(2))` y `subtotal = Number((unitPrice * qty).toFixed(2))`, integrada en `CustomItemModal.jsx` (`252L <= 280L`, con `step="0.01"` e `inputMode="decimal"`), en `ProductionOrderCard.jsx` (`extractPosterSizeInfo` con soporte decimal y paréntesis anidados) y certificada con los 7 Vectores Dorados en `tests/sales/custom-decimal-pricing-parity.test.js` (`15/15 PASS`).
+- **Integración S2S Híbrida (`Push Webhook` + `Pull Sync`) y Ventana Flotante de Importación sin Precarga Sorpresiva (`feat-022` y `feat-023` — Planificado)**:
+  - Context: Para eliminar el doble trabajo del `VENDEDOR_REDES` cuando un cliente compra o cotiza en `decovintage.online` (Carrito, Cotizador Personalizado o Compra Rápida por WhatsApp), ambos sistemas deben integrar pedidos respetando el candado de aislamiento total de bases de datos (`FORBIDDEN_PATTERNS` en `server/config/env.js`) y sin sorprender al vendedor con campos pre-llenados de repente.
+  - Alternatives considered: (a) Conectar `Modulo_Ventas` directamente al PostgreSQL de la Web (prohibido por arquitectura Zero-Trust); (b) Crear directamente la venta en `PENDIENTE_PAGO` sin pasar por el formulario o auto-rellenar el último pedido web apenas entra el vendedor (descartado por el propietario porque confunde el flujo de atención).
+  - Resolution: Se diseñó `WebOrderInbox` alimentado por Webhook S2S en tiempo real (`POST /api/webhooks/web-orders` con `x-webhook-secret` en tiempo constante) más recuperación Pull (`GET ${WEB_CATALOG_URL}/api/custom-orders/integration/inbox`), exponiendo tanto una pestaña dedicada `"Bandeja Web"` con contador de pendientes como un botón `"Importar Pedido Web"` en *Pedidos / Venta* que abre una ventana flotante (`WebOrdersImportModal.jsx`) desde donde el vendedor escoge explícitamente el pedido a precargar, cerrándolo atómicamente como `IMPORTADO` al registrar la venta.
 
 ## Files Modified This Session
-- `server/services/commissionService.js` — Exportado `extractSaleEditionCost(sale)`, sumado el cargo de edición a `calculateSaleProductBase(sale)` y enriquecidas `settlement.sales` en `getSettlementById` (`0 CRLF`).
-- `src/components/commissions/SettlementDetailReceiptModal.jsx` — Incorporados `extractReceiptEditionCost` y `calculateReceiptRowAmounts` preservando `s.baseProductos ??` (`267L <= 280L`, `0 CRLF`).
-- `tests/sales/remote-sale-design-edition.test.js` — Actualizada aserción `3.2` para verificar base comisionable `Q 155.00` y comisión `Q 31.00` (`0 CRLF`).
-- `tests/commissions/commission-design-edition-inclusion.test.js` — Nueva suite dedicada (`6/6 PASS`) cubriendo extracción directa/notas multilínea, descuentos, exclusión de flete, liquidaciones y recibo (`0 CRLF`).
-- `tests/adversarial/m3-commission-invariants-challenger.test.js` — Alineado `MockCommissionStore` al predicado Prisma `{ status: { in: [...] } }` y al ciclo de 2 pasos `PENDIENTE_PAGO -> PAGADO` (`Surgery 1.1..1.2`) (`0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md`, `session-handoff.md` — Cierre documental de `feat-020` en `done` (`WIP = 0`, `0 CRLF`).
+- `src/utils/customPosterPricing.js` — Nuevo motor puro de cotización personalizada con decimales y paridad Web (`188L`, Capa 1 `utils`, `0` imports superiores, `0 CRLF`).
+- `src/components/manual-sale/CustomItemModal.jsx` — Inputs de Ancho y Alto con `step="0.01"` e `inputMode="decimal"`, validación decimal `[5, 300] cm`, integración de `calculateCustomPosterPrice` y formato limpio `Especial: 42.2 x 30 cm (Corte Taller)` (`252L <= 280L`, `0 CRLF`).
+- `src/components/production/ProductionOrderCard.jsx` — `extractPosterSizeInfo` actualizado para extraer medidas decimales (`\d+(?:\.\d+)?`) y limpiar sufijos con paréntesis anidados `(Corte Taller)` en móvil (`0 CRLF`).
+- `tests/sales/custom-decimal-pricing-parity.test.js` — Suite de los 7 Vectores Dorados, pureza de capa, validación de decimales, flujo transaccional y extracción móvil en Taller (`15/15 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-021` (`done`, `WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suite Dedicada + Contratos de Comisiones y Edición (`feat-020`): `node --test tests/commissions/commission-design-edition-inclusion.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js tests/domain3/commission.test.js tests/adversarial/m3-commission-invariants-challenger.test.js` -> `Exit code 0 (122/122 PASS across 33 suites in 285.28ms)`
-- [x] Pruebas Unitarias y de Voz: `npm run test:unit` -> `265/265 PASS across 109 suites`; `npm run test:voice` -> `53/53 PASS across 12 suites`
-- [x] Compuerta Física Integral: `npm run harness:check` -> `status: HARNESS_PASS, framework: STAND-IA-UNIFIED-HARNESS in 32.91s (195 secrets OK, 279 JS syntax OK, 13/13 zero-trust, vite build 1568 modules PASS in 4.19s)`
-- [x] Verificación en 3 Puertas (`sesion-030`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS, check-architecture 0 violations, zero-trust 13/13 PASS, vite build PASS)`
+- [x] Suite de Decimales, Vectores Dorados y Regresión de Cotizador (`feat-021`): `node --test tests/sales/custom-decimal-pricing-parity.test.js tests/sales/upload-art-quoter.test.js tests/sales/custom-item-multi-image-and-reset.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js` -> `Exit code 0 (53/53 PASS across 15 suites in 455.54ms)`
+- [x] Regresión de Producción y Ergonomía Táctil: `node --test tests/production/production-scale-mobile-and-immutable-archive.test.js` -> `8/8 PASS`; `node --test --test-name-pattern=CustomItemModal tests/adversarial/val005-sprint3-ergonomics-api-challenger.test.js` -> `1/1 PASS`
+- [x] Pruebas Unitarias, Voz y Compuerta Unificada Deko Labs: `npm run test:unit` -> `265/265 PASS across 109 suites`; `npm run test:voice` -> `53/53 PASS across 12 suites`; `npm run harness:check` -> `status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS (30.77s, 196 secrets OK, 281 JS syntax OK, 13/13 zero-trust, vite build 1569 modules PASS)`
+- [x] Verificación Final en 3 Puertas (`sesion-032`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..020` en `done`).
-2. `feat-020` está lista para commit/despliegue cuando el propietario lo indique (`npm run deploy` previa solicitud).
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..021` en `done`; `feat-022..023` listas en `not-started`).
+2. Iniciar la siguiente sesión con `bash ./init.sh`, cambiar únicamente `feat-022` a `in-progress` (`WIP = 1`) e implementar el backend `WebOrderInbox` + S2S antes de avanzar a `feat-023`.

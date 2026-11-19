@@ -81,9 +81,16 @@ export function extractPosterSizeInfo(item = {}) {
 
   if (customDims) {
     let cleanTitle = rawDescription;
-    const customParenEnd = rawDescription.match(/\([^)]*\)\s*$/);
-    if (customParenEnd && customParenEnd[0].toLowerCase().includes(customDims.toLowerCase())) {
-      cleanTitle = rawDescription.slice(0, customParenEnd.index).trim() || rawDescription;
+    const escapedDims = customDims.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wrappedSuffixRe = new RegExp(`\\(\\s*(?:[^()]*,\\s*)?${escapedDims}\\s*\\)\\s*$`, 'i');
+    const wrappedMatch = rawDescription.match(wrappedSuffixRe);
+    if (wrappedMatch) {
+      cleanTitle = rawDescription.slice(0, wrappedMatch.index).trim() || rawDescription;
+    } else {
+      const customParenEnd = rawDescription.match(/\([^)]*\)\s*$/);
+      if (customParenEnd && customParenEnd[0].toLowerCase().includes(customDims.toLowerCase())) {
+        cleanTitle = rawDescription.slice(0, customParenEnd.index).trim() || rawDescription;
+      }
     }
     return {
       sizeLabel: customDims,
@@ -92,7 +99,7 @@ export function extractPosterSizeInfo(item = {}) {
     };
   }
 
-  const trailingDimsRe = /\(\s*([^)]*\d+\s*[x×]\s*\d+[^)]*)\s*\)\s*$/i;
+  const trailingDimsRe = /\(\s*((?:[^()]|\([^()]*\))*\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:[^()]|\([^()]*\))*)\s*\)\s*$/i;
   const dimsMatch = rawDescription.match(trailingDimsRe);
   if (dimsMatch) {
     const cleanTitle = rawDescription.slice(0, dimsMatch.index).trim() || rawDescription;
@@ -100,6 +107,16 @@ export function extractPosterSizeInfo(item = {}) {
       sizeLabel: dimsMatch[1].trim(),
       dimensionsHint: null,
       displayTitle: cleanTitle,
+    };
+  }
+
+  const inlineDimsRe = /\b(\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\s*cm)\b/i;
+  const inlineDimsMatch = rawDescription.match(inlineDimsRe);
+  if (inlineDimsMatch) {
+    return {
+      sizeLabel: inlineDimsMatch[1].trim(),
+      dimensionsHint: null,
+      displayTitle: rawDescription,
     };
   }
 
