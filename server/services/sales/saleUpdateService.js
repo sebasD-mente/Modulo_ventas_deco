@@ -2,6 +2,9 @@ import { prisma } from '../../config/prisma.js';
 import { getGuatemalaDayRange, shiftGuatemalaDateStr } from './saleKpiService.js';
 import { validateOfficialItemPrice } from '../catalog/catalogSizeResolver.js';
 
+const TRAILING_STD_SIZE_RE = /\s*\((?:mini|peque[ñn]o|portada(?:\s+de)?\s+[aá]lbum|portada_album|portada|mediano|grande|gigante)\)\s*$/i;
+const normalizeDesignBase = (desc = '') => String(desc || '').trim().replace(TRAILING_STD_SIZE_RE, '').trim().toLowerCase();
+
 /**
  * Actualiza una venta existente con recálculo transaccional ACID
  */
@@ -111,7 +114,7 @@ export async function updateSaleTransaction({
 
         if (existingItem) {
           matchedExistingIds.add(existingItem.id);
-          const designChanged = trimmedDesc.toLowerCase() !== existingItem.description.trim().toLowerCase();
+          const designChanged = normalizeDesignBase(trimmedDesc) !== normalizeDesignBase(existingItem.description);
           const resolvedProductId = item.productId !== undefined
             ? (item.productId || (designChanged ? null : existingItem.productId))
             : (designChanged ? null : (existingItem.productId || null));
@@ -220,7 +223,7 @@ export async function updateSaleTransaction({
       include: {
         items: {
           include: {
-            product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } },
+            product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true, sizes: true } },
           },
         },
         payments: true,

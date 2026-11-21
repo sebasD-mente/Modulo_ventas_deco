@@ -10,7 +10,7 @@ export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated })
   useModalBackHandler(Boolean(sale), onClose);
   if (!sale) return null;
   const { paymentMethod, setPaymentMethod, items, discount, setDiscount, notes, setNotes,
-    isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleReplaceItem, handleRemoveItem, handleSaveChanges, handleCancelSale } = useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated });
+    isSaving, errorMsg, grandTotal, handleUpdateQuantity, handleChangeSize, handleReplaceItem, handleRemoveItem, handleSaveChanges, handleCancelSale } = useEditSaleForm({ sale, onClose, onSaved, onSaleUpdated });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -20,12 +20,11 @@ export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated })
             <FileEdit className="w-4 h-4 text-white" />
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">Editar venta <span className="font-mono text-white">{sale.saleNumber}</span></h3>
-              <p className="text-[11px] text-neutral-400">Ajusta método de pago, diseño, cantidades o notas de esta transacción</p>
+              <p className="text-[11px] text-neutral-400">Ajusta método de pago, diseño, tamaño, cantidades o notas de esta transacción</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-400 hover:text-white p-1 rounded-lg cursor-pointer"><X className="w-5 h-5" /></button>
         </div>
-
         <form onSubmit={handleSaveChanges} className="p-5 overflow-y-auto space-y-4 no-scrollbar text-xs">
           {errorMsg && <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" /><span>{errorMsg}</span></div>}
           <div>
@@ -39,7 +38,7 @@ export default function EditSaleModal({ sale, onClose, onSaved, onSaleUpdated })
               ))}
             </div>
           </div>
-          <EditSaleItemsTable items={items} onUpdateQuantity={handleUpdateQuantity} onRemoveItem={handleRemoveItem} onReplaceItem={handleReplaceItem} />
+          <EditSaleItemsTable items={items} onUpdateQuantity={handleUpdateQuantity} onChangeSize={handleChangeSize} onRemoveItem={handleRemoveItem} onReplaceItem={handleReplaceItem} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-800">
             <div>
               <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">Descuento Opcional (Q)</label>

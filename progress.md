@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-20 19:46
-**Session ID:** sesion-035 (Auditoría E2E en Vivo y Endurecimiento `feat-024`: Pipeline S2S de Pedidos Web sin Bucle de Refresco, Orden Cronológico `webCreatedAt`, Multi-SKU, Extracción de Cliente y Borrado de Descartados)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..024` en `done`)
+**Last Updated:** 2026-11-20 20:12
+**Session ID:** sesion-036 (Implementación y Certificación `feat-025`: Selector de Cambio de Tamaño de Póster en Editar Venta de Mostrador con Recálculo Reactivo y Transaccional)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..025` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -105,13 +105,17 @@
   - Ordenada `listWebOrders` por `[{ webCreatedAt: 'desc' }, { createdAt: 'desc' }]` y recorrido cronológico en `syncWebOrdersFromWeb` para que el pedido más reciente en la web (ej. `#CP-872579` con `30.2 x 45.2 cm`) encabece siempre la bandeja.
   - Ampliada la búsqueda de productos por SKU (`it.sku`, `WEB-${posterId}`, `WEB-${legacyId}`) para vincular `productId` en pedidos `WEB_CART` / `WEB_QUICK_POSTER`, e incorporada la extracción automática de nombre, dirección y departamento desde `customerNotes` (`'Cliente: ... | Entrega: ... (Depto)'`) tanto en `webOrderInboxService.js` como en `useWebOrderImport.js` (`277L <= 280L`).
   - Expuesto `DELETE /api/sales/web-orders/:id` (`deleteWebOrder` + candado `HTTP 409` sobre `IMPORTADO` + `AuditLog` `PEDIDO_WEB_ELIMINADO`) junto con el botón `'Eliminar'` (`min-h-[44px]`) en la pestaña `Descartados` para limpieza definitiva de registros de prueba o spam.
+- [x] **Selector de Cambio de Tamaño de Póster en Editar Venta de Mostrador `feat-025` (`30/30` `edit-sale-change-size` + `surgery-064` + `p5-2` PASS, `265/265` unit tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Creado el módulo puro Capa 1 `src/utils/editSaleItemSizes.js` (`0` imports superiores) para hidratar `selectedSizeId` y `availableSizes` desde `product.sizes` (o tallas estándar oficiales), reemplazar limpiamente el sufijo final de talla sin afectar paréntesis en títulos, recalcular `unitPrice` y `subtotal`, y preservar edición de tallas tras `'Cambiar diseño'`.
+  - Integrado `handleChangeSize` en `useEditSaleForm.js` (`< 120L`), cableado `onChangeSize` en `EditSaleModal.jsx` (`< 70L`) y renderizados botones táctiles de 1 toque (`min-h-[44px]`, estado activo blanco `bg-white text-black`, `0` clases `amber-*`/`orange-*`) en `EditSaleItemsTable.jsx` (`< 110L`).
+  - Añadido `sizes: true` en la proyección de `product` en `saleKpiService.js` y `saleUpdateService.js`, y normalizada la comparación `normalizeDesignBase` en `updateSaleTransaction` para conservar `productId` y `customImageUrl` cuando solo cambia la talla del póster.
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..024` completadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..025` completadas).
 
 ### What's Next
-- Backlog actual (`feat-000..024`) completado al 100% (`25/25` en `done`).
-- Desplegar `feat-024` a producción y certificar en vivo la sincronización S2S y limpieza de registros de prueba.
+- Backlog actual (`feat-000..025`) completado al 100% (`26/26` en `done`).
+- Listo para desplegar `feat-025` a producción (`npm run deploy`) cuando el usuario lo indique.
 
 ## Blockers / Risks
 - Ninguno activo (`0` lectura de `.env`; `0` modificaciones al repositorio vecino; `Overall: 100/100`; arquitectura en verde con 0 excepciones).
@@ -161,20 +165,23 @@
   - Context: Al probar en vivo la sincronización de los 9 pedidos pendientes reales de `decovintage.online`, se detectó: (1) un bucle de re-consulta cada `200ms` en `WebOrdersInboxView` provocado por pasar un callback inline `onCountsChanged` que incrementaba `webOrdersRefreshKey` en cada lectura; (2) orden invertido (`createdAt` local en vez de `webCreatedAt` real); (3) diferencia entre `WEB-${legacyId}` enviado por `CartDrawer` y `WEB-${posterId}` almacenado en `Modulo_Ventas`, además de datos de cliente embebidos en `customerNotes` en órdenes previas; y (4) ausencia de borrado físico para limpiar pedidos descartados o de prueba.
   - Alternatives considered: (a) Mantener solo `discard` lógico dejando basura de prueba acumulada en `Descartados` (descartado porque impide limpiar pruebas E2E y spam); (b) Modificar `Web Deco Vintage Proyect` (prohibido por regla de solo lectura entre repositorios).
   - Resolution: Se estabilizó `loadOrders` con `useRef(onCountsChanged)` + bandera `{ mutated }` en `WebOrdersInboxView.jsx` (`278L <= 280L`) y `App.jsx` (`394L <= 420L`), se ordenó por `webCreatedAt DESC`, se habilitó resolución multi-SKU + extracción de cliente estructurado en `webOrderInboxService.js` y `useWebOrderImport.js` (`277L <= 280L`), y se expuso `DELETE /api/sales/web-orders/:id` protegiendo órdenes `IMPORTADO` con `HTTP 409`.
+- **Cambio de Tamaño en Editar Venta de Mostrador Respetando Techos Modulares Estrictos (`feat-025` — Implementado)**:
+  - Context: En `Editar venta` se podía cambiar método de pago, cantidades, diseño, descuento y notas, pero no el tamaño del póster; además `EditSaleModal.jsx` (`< 70L`), `useEditSaleForm.js` (`< 120L`) y `EditSaleItemsTable.jsx` (`< 110L`) tienen techos modulares muy estrictos y `saleUpdateService.js` comparaba `description` completa para `designChanged` (lo que habría limpiado `productId` al cambiar solo la talla si no se reenviaba).
+  - Alternatives considered: (a) Incrustar toda la lógica de tallas dentro de `useEditSaleForm.js` y `EditSaleItemsTable.jsx` superando los techos de `120` y `110` líneas (descartado para preservar la modularidad certificada); (b) Mostrar tallas fijas ignorando `product.sizes` de portadas cuadradas `30x30` (descartado para respetar las tallas legítimas de cada obra en catálogo).
+  - Resolution: Se extrajo `src/utils/editSaleItemSizes.js` en Capa 1 (`utils`), se proyectó `sizes: true` en `product` en `saleKpiService.js` y `saleUpdateService.js`, se ajustó `normalizeDesignBase` en `updateSaleTransaction` para distinguir cambio de talla vs cambio de diseño y se montaron las píldoras táctiles `min-h-[44px]` con activo blanco dentro de `EditSaleItemsTable.jsx`.
 
 ## Files Modified This Session
-- `server/services/sales/webOrderInboxService.js` — Orden cronológico `webCreatedAt DESC`, resolución multi-SKU (`sku`, `WEB-${posterId}`, `WEB-${legacyId}`), `extractStructuredCustomerFromNotes` y `deleteWebOrder` (`0 CRLF`).
-- `server/controllers/webOrderInboxController.js` y `server/routes/apiRoutes.js` — Endpoint `DELETE /api/sales/web-orders/:id` para `SUPER_ADMIN` y `VENDEDOR_REDES` (`0 CRLF`).
-- `src/components/WebOrdersInboxView.jsx` (`278L <= 280L`) y `src/App.jsx` (`394L <= 420L`) — Eliminación del bucle de refresco de `200ms` y botón `'Eliminar'` en pestaña `Descartados` (`0 CRLF`).
-- `src/components/manual-sale/hooks/useWebOrderImport.js` (`277L <= 280L`) — Extracción automática de nombre, dirección y departamento desde notas estructuradas (`0 CRLF`).
-- `tests/sales/web-orders-pipeline-hardening.test.js` — Suite de regresión y endurecimiento S2S (`4/4 PASS`, `0 CRLF`).
-- `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-024` (`done`, `WIP = 0`, `0 CRLF`).
+- `src/utils/editSaleItemSizes.js` — Utilidad pura Capa 1 de hidratación, resolución e inmutabilidad de tallas para edición de ventas (`0 CRLF`).
+- `src/components/sales/edit/hooks/useEditSaleForm.js` (`< 120L`), `src/components/sales/edit/EditSaleItemsTable.jsx` (`< 110L`) y `src/components/EditSaleModal.jsx` (`< 70L`) — Selector de tamaño de 1 toque y recálculo reactivo (`0 CRLF`).
+- `server/services/sales/saleKpiService.js` y `server/services/sales/saleUpdateService.js` — Proyección `sizes: true` y preservación de `productId`/`customImageUrl` ante cambio exclusivo de talla (`0 CRLF`).
+- `tests/sales/edit-sale-change-size.test.js` — Suite de verificación unitaria, UI y transaccional (`5/5 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-025` (`done`, `WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suites S2S + Endurecimiento + UI + Paridad Decimal (`feat-021..024`): `node --test tests/sales/web-orders-pipeline-hardening.test.js tests/sales/web-orders-inbox-service.test.js tests/sales/web-orders-import-ui.test.js tests/sales/custom-decimal-pricing-parity.test.js` -> `Exit code 0 (34/34 PASS across 16 suites in 1097ms)`
-- [x] Compuerta Unificada Deko Labs (`STAND-IA-UNIFIED-HARNESS`): `npm run harness:check` -> `status HARNESS_PASS (39.03s: check-architecture PASS, validate-harness 100/100, 203 secrets OK, 288 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1573 modules PASS)`
-- [x] Verificación Final en 3 Puertas (`sesion-035`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
+- [x] Suites de Edición deTamaño + Cirugía 064 + Challenger P5.2 (`feat-025`): `node --test tests/sales/edit-sale-change-size.test.js tests/adversarial/surgery-064-ui-sales-edit-design-and-white-selectors.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js` -> `Exit code 0 (30/30 PASS across 13 suites in 175.99ms)`
+- [x] Compuerta Unificada Deko Labs (`STAND-IA-UNIFIED-HARNESS`): `npm run harness:check` -> `status HARNESS_PASS (32.37s: check-architecture PASS, validate-harness 100/100, 204 secrets OK, 290 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1574 modules PASS)`
+- [x] Verificación Final en 3 Puertas (`sesion-036`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..024` en `done`).
-2. Pipeline S2S entre `decovintage.online` y `ventas.decovintage.online` endurecido y verificado de extremo a extremo.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..025` en `done`).
+2. Listo para desplegar `feat-025` a producción (`npm run deploy`) cuando el usuario lo indique.

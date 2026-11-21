@@ -400,7 +400,7 @@ export async function getEventSalesList({ tenantId, eventId, date = null, month 
     prisma.sale.findMany({
       where,
       include: {
-        items: { include: { product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true } } } },
+        items: { include: { product: { select: { id: true, name: true, sku: true, imageUrl: true, category: true, sizes: true } } } },
         payments: true,
         seller: { select: { fullName: true, email: true } },
         customer: { select: { id: true, fullName: true, phone: true, deliveryAddress: true, department: true, municipality: true, sourceChannel: true } },

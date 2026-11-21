@@ -754,6 +754,37 @@
       ],
       "evidence": "node --test tests/sales/web-orders-pipeline-hardening.test.js tests/sales/web-orders-inbox-service.test.js tests/sales/web-orders-import-ui.test.js tests/sales/custom-decimal-pricing-parity.test.js -> Exit code 0 (34/34 PASS across 16 suites in 1097ms: zero 200ms refresh loop via useRef(onCountsChanged) + meta.mutated guard, chronological webCreatedAt DESC order placing newest web order #1, multi-SKU productId linking WEB-${posterId} + WEB-${legacyId}, structured customer name/address/department extraction from customerNotes, DELETE /api/sales/web-orders/:id with HTTP 409 lock on IMPORTADO + AuditLog PEDIDO_WEB_ELIMINADO, WebOrdersInboxView 278L<=280L, useWebOrderImport 277L<=280L, App 394L<=420L); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 39.03s (check-architecture PASS, validate-harness 100/100, 203 secrets OK, 288 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1573 modules PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
       "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-035 tras auditoría en vivo con los 9 pedidos reales sincronizados desde decovintage.online."
+    },
+    {
+      "id": "feat-025",
+      "name": "Selector de Cambio de Tamaño de Póster en Editar Venta de Mostrador con Recálculo Reactivo y Transaccional",
+      "description": "Permitir cambiar el tamaño de cualquier póster estándar dentro del modal 'Editar venta' (EditSaleModal) en Ventas de Mostrador: (1) Capa 1 utils: crear src/utils/editSaleItemSizes.js (0 imports superiores) con extracción de talla actual, limpieza segura de sufijo de talla al final del título (incluyendo 'Portada de Álbum'), resolución de availableSizes desde product.sizes o tallas oficiales y aplicación inmutable de cambio de talla actualizando description, unitPrice, selectedSizeId y subtotal; (2) Backend: incluir sizes: true en la proyección de product dentro de getEventSalesList (server/services/sales/saleKpiService.js) y updateSaleTransaction (server/services/sales/saleUpdateService.js), y distinguir cambio de talla vs cambio de diseño en updateSaleTransaction para preservar productId y customImageUrl cuando solo cambia el tamaño; (3) UI & Hook: integrar handleChangeSize(idx, newSize) en src/components/sales/edit/hooks/useEditSaleForm.js (< 120 líneas), cablear onChangeSize en src/components/EditSaleModal.jsx (< 70 líneas) y renderizar los botones táctiles de 1 toque (min-h-[44px], estado activo blanco bg-white text-black sin tonos naranja) por cada talla disponible en src/components/sales/edit/EditSaleItemsTable.jsx (< 110 líneas), manteniendo disponibles las tallas también después de usar 'Cambiar diseño'; y (4) crear la suite tests/sales/edit-sale-change-size.test.js.",
+      "area": "counter-sales-edit-poster-size",
+      "user_visible_behavior": "Al pulsar 'Editar' sobre una venta en mostrador, cada póster muestra sus botones de tamaño disponibles (ej. Mini Q25, Pequeño Q35, Mediano Q65, Grande Q125, Gigante Q210); con 1 toque el vendedor cambia el tamaño y el sistema actualiza de inmediato la descripción, el precio unitario, el subtotal, el Total Recalculado y el monto del pago al guardar.",
+      "priority": "P0",
+      "status": "done",
+      "dependencies": [
+        "feat-024"
+      ],
+      "required_files": [
+        "src/utils/editSaleItemSizes.js",
+        "src/components/sales/edit/hooks/useEditSaleForm.js",
+        "src/components/sales/edit/EditSaleItemsTable.jsx",
+        "src/components/EditSaleModal.jsx",
+        "server/services/sales/saleKpiService.js",
+        "server/services/sales/saleUpdateService.js",
+        "tests/sales/edit-sale-change-size.test.js"
+      ],
+      "verification": [
+        "node --test tests/sales/edit-sale-change-size.test.js tests/adversarial/surgery-064-ui-sales-edit-design-and-white-selectors.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js",
+        "npm run test:unit",
+        "bash ./init.sh",
+        "bash scripts/check-architecture.sh",
+        "node scripts/validate-harness.mjs --min-score 100",
+        "npm run harness:check"
+      ],
+      "evidence": "node --test tests/sales/edit-sale-change-size.test.js tests/adversarial/surgery-064-ui-sales-edit-design-and-white-selectors.test.js tests/adversarial/p5-2-sales-closing-challenger.test.js -> Exit code 0 (30/30 PASS across 13 suites in 175.99ms: Capa 1 pure editSaleItemSizes.js 0 upward imports, hydrateEditableSaleItem & buildSizeChangedFields preserving title parentheses & album covers & custom cm2 items, buildReplacedPosterFields keeping sizes editable after design swap, EditSaleModal 69L<70L, useEditSaleForm 118L<120L, EditSaleItemsTable 109L<110L, min-h-[44px] white active pills, product.sizes projection in getEventSalesList & updateSaleTransaction preserving productId/customImageUrl on size-only change and rejecting tampered prices with HTTP 400); npm run harness:check -> status HARNESS_PASS, framework STAND-IA-UNIFIED-HARNESS in 32.37s (check-architecture PASS, validate-harness 100/100, 204 secrets OK, 290 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1574 modules PASS); bash ./init.sh -> Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS); 0 CRLF.",
+      "notes": "Modo Diario Ágil bajo WIP = 1 completado en sesion-036 cumpliendo techos modulares estrictos (< 70L, < 120L, < 110L), 0 clases amber-*/orange-* y 0 CRLF."
     }
   ]
 }
