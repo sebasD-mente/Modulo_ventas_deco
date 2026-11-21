@@ -84,16 +84,19 @@ export function buildWebOrderCustomerDraft(order = {}, departments = []) {
   const rawPhone = String(order?.customerPhone || '').trim();
   const cleanDigits = rawPhone.replace(/[^0-9]/g, '');
   const lookupPhone = cleanDigits.length === 11 && cleanDigits.startsWith('502') ? cleanDigits.slice(3) : cleanDigits;
-  const rawDept = String(order?.customerDepartment || '').trim();
+  const rawNotes = String(order?.customerNotes || '').trim();
+  const noteMatch = rawNotes.match(/Cliente:\s*([^|]+?)(?:\s*\|\s*Entrega:\s*(.+))?$/i);
+  const noteName = noteMatch?.[1]?.trim() && noteMatch[1].trim().toLowerCase() !== 'cliente web' ? noteMatch[1].trim() : '';
+  const rawDeliv = noteMatch?.[2]?.trim() || '';
+  const deptMatch = rawDeliv.match(/\(([^()]+)\)\s*$/);
+  const noteAddr = (deptMatch ? rawDeliv.slice(0, deptMatch.index) : rawDeliv).trim();
+  const rawName = String(order?.customerName || '').trim();
+  const fullName = rawName && rawName.toLowerCase() !== 'cliente web' ? rawName : (noteName || rawName);
+  const rawDept = String(order?.customerDepartment || deptMatch?.[1] || '').trim();
   const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const matchedDept = (Array.isArray(departments) && rawDept ? departments.find((d) => norm(d) === norm(rawDept)) : null) || (rawDept || 'Guatemala');
-  return {
-    fullName: String(order?.customerName || '').trim(),
-    phone: cleanDigits, lookupPhone, email: '',
-    deliveryAddress: String(order?.customerAddress || '').trim(),
-    department: matchedDept, municipality: matchedDept, sourceChannel: 'OTRO',
-    notes: String(order?.customerNotes || '').trim(),
-  };
+  const deliveryAddress = String(order?.customerAddress || '').trim() || (noteAddr.toLowerCase() !== 'por coordinar' ? noteAddr : '');
+  return { fullName, phone: cleanDigits, lookupPhone, email: '', deliveryAddress, department: matchedDept, municipality: matchedDept, sourceChannel: 'OTRO', notes: rawNotes };
 }
 
 export function filterWebOrdersByQuery(orders = [], rawQuery = '') {

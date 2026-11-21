@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Globe, RefreshCw, Search, ArrowRight, Trash2, RotateCcw,
   CheckCircle2, ShoppingBag, User, Phone, MapPin, ExternalLink, Clock, Loader2,
@@ -31,8 +31,10 @@ export default function WebOrdersInboxView({ onImportToSale, onCountsChanged }) 
   const [isSyncing, setIsSyncing] = useState(false);
   const [actingId, setActingId] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const onCountsChangedRef = useRef(onCountsChanged);
+  onCountsChangedRef.current = onCountsChanged;
 
-  const loadOrders = useCallback(async (targetStatus = statusFilter, query = searchQuery) => {
+  const loadOrders = useCallback(async (targetStatus = statusFilter, query = searchQuery, mutated = false) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({ status: targetStatus, limit: '100' });
@@ -41,17 +43,17 @@ export default function WebOrdersInboxView({ onImportToSale, onCountsChanged }) 
       const json = await res.json();
       if (res.ok && json.success) {
         setOrders(Array.isArray(json.data) ? json.data : []);
-        if (json.counts) { setCounts(json.counts); onCountsChanged?.(json.counts); }
+        if (json.counts) { setCounts(json.counts); onCountsChangedRef.current?.(json.counts, { mutated }); }
       }
     } catch (err) {
       console.error('[WebOrdersInboxView] Error consultando bandeja web:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, statusFilter, searchQuery, onCountsChanged]);
+  }, [authFetch, statusFilter, searchQuery]);
 
   useEffect(() => {
-    const timer = setTimeout(() => { loadOrders(statusFilter, searchQuery); }, 200);
+    const timer = setTimeout(() => { loadOrders(statusFilter, searchQuery, false); }, 180);
     return () => clearTimeout(timer);
   }, [statusFilter, searchQuery, loadOrders]);
 
@@ -68,7 +70,7 @@ export default function WebOrdersInboxView({ onImportToSale, onCountsChanged }) 
         text: json.message || (res.ok && json.synced ? 'Bandeja sincronizada con decovintage.online.' : 'No fue posible conectar con la tienda web.'),
         isError: !res.ok || json.synced === false,
       });
-      await loadOrders(statusFilter, searchQuery);
+      await loadOrders(statusFilter, searchQuery, true);
     } catch {
       setFeedback({ text: 'Error de red sincronizando pedidos web.', isError: true });
     } finally {
@@ -77,22 +79,24 @@ export default function WebOrdersInboxView({ onImportToSale, onCountsChanged }) 
   };
 
   const mutateOrderStatus = async (order, action) => {
+    const isDelete = action === 'delete';
     const isDiscard = action === 'discard';
     setActingId(order.id);
     setFeedback(null);
     try {
-      const res = await authFetch(`/api/sales/web-orders/${order.id}/${action}`, {
-        method: 'PATCH',
+      const url = isDelete ? `/api/sales/web-orders/${order.id}` : `/api/sales/web-orders/${order.id}/${action}`;
+      const res = await authFetch(url, {
+        method: isDelete ? 'DELETE' : 'PATCH',
         headers: isDiscard ? { 'Content-Type': 'application/json' } : undefined,
         body: isDiscard ? JSON.stringify({ reason: 'Descartado desde Bandeja Web' }) : undefined,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) throw new Error(json.error || 'No se pudo actualizar el pedido web.');
-      setFeedback({
-        text: isDiscard ? `Pedido #${order.orderNumber} movido a descartados.` : `Pedido #${order.orderNumber} restaurado a pendientes.`,
-        isError: false,
-      });
-      await loadOrders(statusFilter, searchQuery);
+      const okMsg = isDelete
+        ? `Pedido #${order.orderNumber} eliminado definitivamente.`
+        : isDiscard ? `Pedido #${order.orderNumber} movido a descartados.` : `Pedido #${order.orderNumber} restaurado a pendientes.`;
+      setFeedback({ text: okMsg, isError: false });
+      await loadOrders(statusFilter, searchQuery, true);
     } catch (err) {
       setFeedback({ text: err.message, isError: true });
     } finally {
@@ -241,12 +245,20 @@ export default function WebOrdersInboxView({ onImportToSale, onCountsChanged }) 
                   )}
 
                   {order.status === 'DESCARTADO' && (
-                    <button
-                      type="button" data-testid={`inbox-restore-btn-${order.orderNumber}`} disabled={actingId === order.id} onClick={() => mutateOrderStatus(order, 'restore')}
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center justify-center gap-1.5 text-center transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RotateCcw className="w-4 h-4 shrink-0" /><span>Restaurar a Pendientes</span>
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button" data-testid={`inbox-delete-btn-${order.orderNumber}`} disabled={actingId === order.id} onClick={() => mutateOrderStatus(order, 'delete')}
+                        className="min-h-[44px] px-3.5 py-2 rounded-xl bg-black hover:bg-red-950/40 border border-neutral-800 text-neutral-300 hover:text-red-300 font-bold text-xs flex items-center justify-center gap-1.5 text-center transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4 shrink-0" /><span>Eliminar</span>
+                      </button>
+                      <button
+                        type="button" data-testid={`inbox-restore-btn-${order.orderNumber}`} disabled={actingId === order.id} onClick={() => mutateOrderStatus(order, 'restore')}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center justify-center gap-1.5 text-center transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-4 h-4 shrink-0" /><span>Restaurar a Pendientes</span>
+                      </button>
+                    </div>
                   )}
 
                   {order.status === 'IMPORTADO' && (

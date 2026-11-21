@@ -4,25 +4,25 @@ Este documento materializa la **Observabilidad de Proceso (Antes de Codificar)**
 
 ---
 
-## Estado Actual del Contrato (`WIP = 0` — `feat-000..023` en `done`)
-- **Tareas completadas recientemente:** `feat-021` (`1b8e48c`), `feat-022` (`54b01ed`) y **`feat-023` (`done` — Vista `Bandeja Web` + Botón `Importar Pedido Web` con Ventana Flotante y Precarga Limpia)**.
-- **Tareas pendientes en `feature_list.json`:** Ninguna (`WIP = 0`; `24/24` tareas del backlog completadas y certificadas).
+## Estado Actual del Contrato (`WIP = 0` — `feat-000..024` en `done`)
+- **Tareas completadas recientemente:** `feat-021` (`1b8e48c`), `feat-022` (`54b01ed`), `feat-023` (`57078b5`) y **`feat-024` (`done` — Endurecimiento Post-Integración del Pipeline S2S de Pedidos Web)**.
+- **Tareas pendientes en `feature_list.json`:** Ninguna (`WIP = 0`; `25/25` tareas del backlog completadas y certificadas).
 
 ---
 
-## Contrato Certificado Recientemente: `feat-023` (`done`)
+## Contrato Certificado Recientemente: `feat-024` (`done`)
 
-### Entregables Verificados en `feat-023`
-1. **Orquestación y Precarga sin Sorpresas (`src/components/manual-sale/hooks/useWebOrderImport.js`, `275L <= 280L`)**:
-   - Exportados helpers puros (`mapWebOrderItemToCartItem`, `buildWebOrderCustomerDraft`, `filterWebOrdersByQuery`, `formatWebOrderSourceLabel`, `formatWebMaterialLabel`) que mapean pósters de catálogo (con y sin `productId` local), personalizados con decimales (`42.2 x 30 cm`), materiales (`MDF_5_5MM`, `PVC_5MM`, `VINILO_SOLO`) y fotos HD absolutas.
-   - Búsqueda de cliente en CRM por teléfono (`GET /api/customers?query=...`) con apertura automática del formulario inline cuando el cliente es nuevo o carece de dirección completa, y cero precarga automática al abrir la vista.
-2. **Banner + Ventana Flotante en Pedidos / Venta (`WebOrderImportBanner.jsx` `82L <= 120L` + `WebOrdersImportModal.jsx` `253L <= 280L`)**:
-   - Botón accesible `'Importar Pedido Web'` con contador vivo de pendientes y chip `'#CP-XXXX cargado'` + `'Desvincular'` montado al inicio de `REDES_PERSONALIZADO` en `FastManualSaleForm.jsx` (`339L <= 350L`).
-   - Ventana flotante con `useModalBackHandler`, buscador instantáneo, botón `'Actualizar'` (`POST /api/sales/web-orders/sync`), miniaturas HD, medidas decimales, notas, total cotizado y botón `'Cargar al Formulario'`, enviando `webOrderInboxId` / `webOrderNumber` desde `useRemoteSaleForm.js` (`343L <= 350L`).
-3. **Pestaña Dedicada `'Bandeja Web'` (`Header.jsx` `276L <= 280L`, `App.jsx` `395L <= 420L` y `WebOrdersInboxView.jsx` `257L <= 280L`)**:
-   - Pestaña `'bandeja-web'` con badge de pendientes para `SUPER_ADMIN` y `VENDEDOR_REDES`, carga `lazy` en `App.jsx`, filtros `Pendientes / Importados / Descartados`, sincronización manual, descarte, restauración y acción `'Importar a Venta'`.
-4. **Suite de Verificación (`tests/sales/web-orders-import-ui.test.js`)**:
-   - `98/98 PASS` junto con `web-orders-inbox-service`, `surgery-059`, `surgery-061`, `remote-sale-design-edition` y `commission-frontend`; `265/265` unit tests, `53/53` voice tests, `HARNESS_PASS` y `bash ./init.sh` `100/100` con `0 CRLF`.
+### Entregables Verificados en `feat-024`
+1. **Estabilidad React sin Bucle de Refresco (`WebOrdersInboxView.jsx` `278L <= 280L` y `App.jsx` `394L <= 420L`)**:
+   - `onCountsChanged` encapsulado en `useRef` fuera de las dependencias de `loadOrders`, disparando `setWebOrdersRefreshKey` únicamente cuando `meta?.mutated === true`.
+2. **Orden Cronológico Real (`webOrderInboxService.js`)**:
+   - `listWebOrders` ordena por `[{ webCreatedAt: 'desc' }, { createdAt: 'desc' }]` y `syncWebOrdersFromWeb` inserta en orden cronológico para mostrar siempre primero el pedido más reciente de `decovintage.online`.
+3. **Resolución Multi-SKU y Extracción de Cliente desde Notas (`webOrderInboxService.js` y `useWebOrderImport.js` `277L <= 280L`)**:
+   - Coincidencia por `it.sku`, `WEB-${posterId}` y `WEB-${legacyId}` hacia `Product.id`, y extracción automática de nombre, dirección y departamento desde `'Cliente: ... | Entrega: ... (Depto)'`.
+4. **Borrado Definitivo de Descartados / Pruebas (`DELETE /api/sales/web-orders/:id`)**:
+   - `deleteWebOrder` + `deleteWebOrderHandler` + botón `'Eliminar'` (`min-h-[44px]`) en pestaña `Descartados` con bloqueo `HTTP 409` sobre órdenes `IMPORTADO` y registro en `AuditLog`.
+5. **Evidencia Ejecutable**:
+   - `34/34 PASS` en suites `feat-021..024`, `265/265` unit tests, `HARNESS_PASS` y `bash ./init.sh` `100/100` con `0 CRLF`.
 
 ---
 

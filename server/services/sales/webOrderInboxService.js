@@ -100,8 +100,13 @@ export function normalizeWebOrderItem(rawItem = {}, { baseOrigin = 'https://deco
 
   const posterId = rawItem.posterId != null ? String(rawItem.posterId).trim() : null;
   const legacyId = rawItem.legacyId != null ? String(rawItem.legacyId).trim() : null;
-  const sku = (rawItem.sku && String(rawItem.sku).trim()) || (posterId ? `WEB-${posterId}` : (legacyId ? `WEB-${legacyId}` : null));
-  const matchedProduct = sku ? productMapBySku.get(sku) : null;
+  const rawSku = (rawItem.sku && String(rawItem.sku).trim()) || (posterId ? `WEB-${posterId}` : (legacyId ? `WEB-${legacyId}` : null));
+  const matchedProduct =
+    (rawSku && productMapBySku.get(rawSku)) ||
+    (posterId && productMapBySku.get(`WEB-${posterId}`)) ||
+    (legacyId && productMapBySku.get(`WEB-${legacyId}`)) ||
+    null;
+  const sku = matchedProduct?.sku || rawSku;
 
   const stdInput = rawItem.selectedStandardSize && typeof rawItem.selectedStandardSize === 'object' ? rawItem.selectedStandardSize : {};
   const resolvedSizeId = sizeMode === 'custom'
@@ -172,6 +177,26 @@ export function normalizeWebOrderItem(rawItem = {}, { baseOrigin = 'https://deco
   };
 }
 
+export function extractStructuredCustomerFromNotes(rawNotes) {
+  if (!rawNotes || typeof rawNotes !== 'string') return { fullName: null, address: null, department: null };
+  const match = rawNotes.trim().match(/Cliente:\s*([^|]+?)(?:\s*\|\s*Entrega:\s*(.+))?$/i);
+  if (!match) return { fullName: null, address: null, department: null };
+  const parsedName = match[1]?.trim() || null;
+  const fullName = parsedName && parsedName.toLowerCase() !== 'cliente web' ? parsedName : null;
+  let address = null;
+  let department = null;
+  if (match[2]) {
+    let deliveryPart = match[2].trim();
+    const deptMatch = deliveryPart.match(/\(([^()]+)\)\s*$/);
+    if (deptMatch) {
+      department = deptMatch[1].trim() || null;
+      deliveryPart = deliveryPart.slice(0, deptMatch.index).trim();
+    }
+    if (deliveryPart && deliveryPart.toLowerCase() !== 'por coordinar') address = deliveryPart;
+  }
+  return { fullName, address, department };
+}
+
 export function normalizeWebOrderPayload(payload, { baseOrigin = 'https://decovintage.online', productMapBySku = new Map() } = {}) {
   const rawOrder = payload?.order && typeof payload.order === 'object' ? payload.order : payload;
   const orderNumber = normalizeWebOrderNumber(rawOrder?.orderNumber);
@@ -185,13 +210,17 @@ export function normalizeWebOrderPayload(payload, { baseOrigin = 'https://decovi
   const orderSource = ['WEB_CART', 'WEB_CUSTOM', 'WEB_QUICK_POSTER'].includes(rawSource) ? rawSource : 'WEB_CUSTOM';
 
   const cust = rawOrder?.customer && typeof rawOrder.customer === 'object' ? rawOrder.customer : {};
-  const customerName = String(cust.fullName || cust.name || rawOrder?.customerName || 'Cliente Web').trim() || 'Cliente Web';
+  const customerNotes = String(cust.notes || rawOrder?.customerNotes || '').trim() || null;
+  const parsedFromNotes = extractStructuredCustomerFromNotes(customerNotes);
+  const rawCustomerName = String(cust.fullName || cust.name || rawOrder?.customerName || '').trim();
+  const customerName = (rawCustomerName && rawCustomerName.toLowerCase() !== 'cliente web')
+    ? rawCustomerName
+    : (parsedFromNotes.fullName || rawCustomerName || 'Cliente Web');
   const rawPhone = String(cust.phone || rawOrder?.customerPhone || '').trim();
   const cleanDigits = rawPhone.replace(/[^0-9]/g, '');
   const customerPhone = cleanDigits.length >= 8 ? cleanDigits : (rawPhone || null);
-  const customerAddress = String(cust.address || cust.deliveryAddress || rawOrder?.customerAddress || '').trim() || null;
-  const customerDepartment = String(cust.department || rawOrder?.customerDepartment || '').trim() || null;
-  const customerNotes = String(cust.notes || rawOrder?.customerNotes || '').trim() || null;
+  const customerAddress = String(cust.address || cust.deliveryAddress || rawOrder?.customerAddress || '').trim() || parsedFromNotes.address || null;
+  const customerDepartment = String(cust.department || rawOrder?.customerDepartment || '').trim() || parsedFromNotes.department || null;
 
   const rawItems = Array.isArray(rawOrder?.items) ? rawOrder.items : [];
   const items = rawItems.map((it, idx) => normalizeWebOrderItem(it, { baseOrigin, productMapBySku, index: idx }));
@@ -242,9 +271,13 @@ export async function upsertWebOrderInboxRecord({ tenantId, payload, prismaClien
 
   const baseOrigin = getWebIntegrationCandidateUrls(envOverride)[0] || 'https://decovintage.online';
   const rawOrder = payload?.order && typeof payload.order === 'object' ? payload.order : payload;
-  const candidateSkus = (Array.isArray(rawOrder?.items) ? rawOrder.items : [])
-    .map((it) => (it?.sku && String(it.sku).trim()) || (it?.posterId != null ? `WEB-${it.posterId}` : null))
-    .filter(Boolean);
+  const candidateSkus = Array.from(new Set(
+    (Array.isArray(rawOrder?.items) ? rawOrder.items : []).flatMap((it) => [
+      it?.sku && String(it.sku).trim(),
+      it?.posterId != null ? `WEB-${String(it.posterId).trim()}` : null,
+      it?.legacyId != null ? `WEB-${String(it.legacyId).trim()}` : null,
+    ]).filter(Boolean)
+  ));
 
   let productMapBySku = new Map();
   if (candidateSkus.length > 0 && typeof prismaClient.product?.findMany === 'function') {
@@ -295,6 +328,7 @@ export async function upsertWebOrderInboxRecord({ tenantId, payload, prismaClien
       tenantId: targetTenantId,
       status: initialStatus,
       ...normalized,
+      webCreatedAt: normalized.webCreatedAt || new Date(),
     },
   });
   return { record: created, action: 'CREATED', created: true, updated: false };
@@ -324,7 +358,12 @@ export async function listWebOrders({ tenantId, status = 'PENDIENTE', source = n
   }
 
   const [orders, total, pending, imported, discarded] = await Promise.all([
-    prismaClient.webOrderInbox.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),
+    prismaClient.webOrderInbox.findMany({
+      where,
+      skip,
+      take,
+      orderBy: [{ webCreatedAt: 'desc' }, { createdAt: 'desc' }],
+    }),
     prismaClient.webOrderInbox.count({ where }),
     prismaClient.webOrderInbox.count({ where: { tenantId, status: 'PENDIENTE' } }),
     prismaClient.webOrderInbox.count({ where: { tenantId, status: 'IMPORTADO' } }),
@@ -426,7 +465,7 @@ export async function syncWebOrdersFromWeb({ tenantId, status = 'PENDIENTE', lim
   let createdCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
-  for (const rawOrder of remoteOrders) {
+  for (const rawOrder of [...remoteOrders].reverse()) {
     if (!rawOrder?.orderNumber) continue;
     const res = await upsertWebOrderInboxRecord({ tenantId, payload: rawOrder, prismaClient, envOverride });
     if (res.created) createdCount++;
@@ -523,4 +562,35 @@ export async function restoreWebOrder({ tenantId, id, userId = null, fetchImpl =
 
   await notifyWebOrderStatus({ orderNumber: existing.orderNumber, status: 'PENDIENTE', fetchImpl, envOverride });
   return updated;
+}
+
+export async function deleteWebOrder({ tenantId, id, userId = null, prismaClient = prisma } = {}) {
+  const existing = await prismaClient.webOrderInbox.findFirst({ where: { id, tenantId } });
+  if (!existing) {
+    const err = new Error('Pedido web no encontrado.');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (existing.status === 'IMPORTADO') {
+    const err = new Error(`El pedido web #${existing.orderNumber} ya tiene una venta registrada (${existing.importedSaleNumber || 'registrada'}) y no puede eliminarse.`);
+    err.statusCode = 409;
+    throw err;
+  }
+
+  await prismaClient.webOrderInbox.delete({ where: { id: existing.id } });
+
+  if (typeof prismaClient.auditLog?.create === 'function') {
+    await prismaClient.auditLog.create({
+      data: {
+        tenantId,
+        userId: userId || null,
+        action: 'PEDIDO_WEB_ELIMINADO',
+        entity: 'web_order_inbox',
+        entityId: existing.id,
+        details: { orderNumber: existing.orderNumber, previousStatus: existing.status },
+      },
+    });
+  }
+
+  return existing;
 }

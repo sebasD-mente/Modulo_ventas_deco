@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-18 20:28
-**Session ID:** sesion-034 (Ejecución y Certificación `feat-023`: Vista `"Bandeja Web"` y Botón `"Importar Pedido Web"` con Ventana Flotante y Precarga Limpia)
-**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..023` en `done`)
+**Last Updated:** 2026-11-20 19:46
+**Session ID:** sesion-035 (Auditoría E2E en Vivo y Endurecimiento `feat-024`: Pipeline S2S de Pedidos Web sin Bucle de Refresco, Orden Cronológico `webCreatedAt`, Multi-SKU, Extracción de Cliente y Borrado de Descartados)
+**Active Feature:** Ninguna en ejecución (`WIP = 0`; `feat-000..024` en `done`)
 **Standard Startup Path:** `bash ./init.sh`
 **Standard Verification Path:** `bash ./init.sh`
 
@@ -100,13 +100,18 @@
   - Creado `src/components/manual-sale/hooks/useWebOrderImport.js` (`275L <= 280L`) con mapeo determinista de pósters de catálogo (preservando URL HD de respaldo en `customImageUrl` cuando `productId` aún no está sincronizado localmente), personalizados con decimales (`42.2 x 30 cm`), materiales (`MDF_5_5MM`, `PVC_5MM`, `VINILO_SOLO`), normalización de teléfono `+502` y búsqueda CRM por WhatsApp (o apertura automática de creación inline si es cliente nuevo o sin dirección completa), garantizando **cero precarga automática por sorpresa** al abrir la vista.
   - Creados `src/components/manual-sale/WebOrderImportBanner.jsx` (`82L <= 120L`) y `src/components/manual-sale/WebOrdersImportModal.jsx` (`253L <= 280L`, con `useModalBackHandler`, buscador, sincronización Pull `'Actualizar'`, miniaturas HD y botón `'Cargar al Formulario'`), integrados al inicio de `REDES_PERSONALIZADO` en `src/components/FastManualSaleForm.jsx` (`339L <= 350L`) y enviando `webOrderInboxId` / `webOrderNumber` desde `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`343L <= 350L`).
   - Incorporada la pestaña `'Bandeja Web'` (`id: 'bandeja-web'`) con badge vivo de pendientes en `src/components/Header.jsx` (`276L <= 280L`, `0` clases `amber-*`/`orange-*`) y carga diferida (`lazy`) de `src/components/WebOrdersInboxView.jsx` (`257L <= 280L`) en `src/App.jsx` (`395L <= 420L`) con filtros `Pendientes / Importados / Descartados`, descarte, restauración y acción `'Importar a Venta'`, más la suite `tests/sales/web-orders-import-ui.test.js`.
+- [x] **Endurecimiento Post-Integración del Pipeline S2S de Pedidos Web `feat-024` (`34/34` `web-orders-pipeline-hardening` + `inbox-service` + `import-ui` + `decimal-parity` PASS, `265/265` unit tests PASS, `npm run harness:check` `HARNESS_PASS`, `bash ./init.sh` `100/100`)**:
+  - Eliminado de raíz el bucle de re-consulta cada `200ms` en `src/components/WebOrdersInboxView.jsx` (`278L <= 280L`) y `src/App.jsx` (`394L <= 420L`) desacoplando `onCountsChanged` con `useRef` y activando `setWebOrdersRefreshKey` únicamente tras mutaciones reales (`meta?.mutated`).
+  - Ordenada `listWebOrders` por `[{ webCreatedAt: 'desc' }, { createdAt: 'desc' }]` y recorrido cronológico en `syncWebOrdersFromWeb` para que el pedido más reciente en la web (ej. `#CP-872579` con `30.2 x 45.2 cm`) encabece siempre la bandeja.
+  - Ampliada la búsqueda de productos por SKU (`it.sku`, `WEB-${posterId}`, `WEB-${legacyId}`) para vincular `productId` en pedidos `WEB_CART` / `WEB_QUICK_POSTER`, e incorporada la extracción automática de nombre, dirección y departamento desde `customerNotes` (`'Cliente: ... | Entrega: ... (Depto)'`) tanto en `webOrderInboxService.js` como en `useWebOrderImport.js` (`277L <= 280L`).
+  - Expuesto `DELETE /api/sales/web-orders/:id` (`deleteWebOrder` + candado `HTTP 409` sobre `IMPORTADO` + `AuditLog` `PEDIDO_WEB_ELIMINADO`) junto con el botón `'Eliminar'` (`min-h-[44px]`) en la pestaña `Descartados` para limpieza definitiva de registros de prueba o spam.
 
 ### What's In Progress
-- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..023` completadas).
+- Ninguna tarea en ejecución (`WIP = 0`; `feat-000..024` completadas).
 
 ### What's Next
-- Backlog actual (`feat-000..023`) completado al 100% (`24/24` en `done`).
-- Listo para despliegue a producción cuando el usuario lo indique y/o coordinación con el repositorio vecino `Web Deco Vintage Proyect` según `C:\Users\sebas\Documents\nuve DRIVE\Comunicacion entre agentes\2026-11-18_INFORME_INTEGRACION_PEDIDOS_Y_COTIZADOR_WEB_DECO_VINTAGE.md`.
+- Backlog actual (`feat-000..024`) completado al 100% (`25/25` en `done`).
+- Desplegar `feat-024` a producción y certificar en vivo la sincronización S2S y limpieza de registros de prueba.
 
 ## Blockers / Risks
 - Ninguno activo (`0` lectura de `.env`; `0` modificaciones al repositorio vecino; `Overall: 100/100`; arquitectura en verde con 0 excepciones).
@@ -152,23 +157,24 @@
   - Context: Para eliminar el doble trabajo del `VENDEDOR_REDES` cuando un cliente compra o cotiza en `decovintage.online` (Carrito, Cotizador Personalizado o Compra Rápida por WhatsApp), ambos sistemas deben integrar pedidos respetando el candado de aislamiento total de bases de datos (`FORBIDDEN_PATTERNS` en `server/config/env.js`) y sin sorprender al vendedor con campos pre-llenados de repente.
   - Alternatives considered: (a) Conectar `Modulo_Ventas` directamente al PostgreSQL de la Web (prohibido por arquitectura Zero-Trust); (b) Crear directamente la venta en `PENDIENTE_PAGO` sin pasar por el formulario o auto-rellenar el último pedido web apenas entra el vendedor (descartado por el propietario porque confunde el flujo de atención); (c) Seleccionar en modo solo lectura un cliente existente del CRM cuando carece de `deliveryAddress` ni la orden web la trajo (descartado porque bloquearía al vendedor sin campo editable de dirección).
   - Resolution: Se construyó `WebOrderInbox` (`feat-022`) con Webhook S2S + Sync Pull + candado atómico `HTTP 409`, y en `feat-023` se implementaron `useWebOrderImport.js` (`275L`), `WebOrderImportBanner.jsx` (`82L`), `WebOrdersImportModal.jsx` (`253L`, con `useModalBackHandler`) y `WebOrdersInboxView.jsx` (`257L`, lazy-loaded en pestaña `'bandeja-web'`), asegurando cero precarga sorpresiva, preservación de fotos HD para Taller incluso en pósters aún no sincronizados, fusión inteligente con CRM y respeto estricto de todos los techos de líneas (`Header <= 280L`, `FastManualSaleForm <= 350L`, `useRemoteSaleForm <= 350L`, `App <= 420L`).
+- **Endurecimiento del Pipeline S2S tras Prueba E2E con Pedidos Reales (`feat-024` — Implementado)**:
+  - Context: Al probar en vivo la sincronización de los 9 pedidos pendientes reales de `decovintage.online`, se detectó: (1) un bucle de re-consulta cada `200ms` en `WebOrdersInboxView` provocado por pasar un callback inline `onCountsChanged` que incrementaba `webOrdersRefreshKey` en cada lectura; (2) orden invertido (`createdAt` local en vez de `webCreatedAt` real); (3) diferencia entre `WEB-${legacyId}` enviado por `CartDrawer` y `WEB-${posterId}` almacenado en `Modulo_Ventas`, además de datos de cliente embebidos en `customerNotes` en órdenes previas; y (4) ausencia de borrado físico para limpiar pedidos descartados o de prueba.
+  - Alternatives considered: (a) Mantener solo `discard` lógico dejando basura de prueba acumulada en `Descartados` (descartado porque impide limpiar pruebas E2E y spam); (b) Modificar `Web Deco Vintage Proyect` (prohibido por regla de solo lectura entre repositorios).
+  - Resolution: Se estabilizó `loadOrders` con `useRef(onCountsChanged)` + bandera `{ mutated }` en `WebOrdersInboxView.jsx` (`278L <= 280L`) y `App.jsx` (`394L <= 420L`), se ordenó por `webCreatedAt DESC`, se habilitó resolución multi-SKU + extracción de cliente estructurado en `webOrderInboxService.js` y `useWebOrderImport.js` (`277L <= 280L`), y se expuso `DELETE /api/sales/web-orders/:id` protegiendo órdenes `IMPORTADO` con `HTTP 409`.
 
 ## Files Modified This Session
-- `src/components/manual-sale/hooks/useWebOrderImport.js` — Hook y helpers puros de mapeo de pedidos web, cliente CRM/inline, búsqueda y sincronización Pull (`275L <= 280L`, `0 CRLF`).
-- `src/components/manual-sale/WebOrderImportBanner.jsx` — Botón `'Importar Pedido Web'` con contador vivo de pendientes y chip `'#CP-XXXX cargado'` + `'Desvincular'` (`82L <= 120L`, `0 CRLF`).
-- `src/components/manual-sale/WebOrdersImportModal.jsx` — Ventana flotante accesible (`useModalBackHandler`) con buscador, botón `'Actualizar'`, miniaturas HD, medidas decimales y `'Cargar al Formulario'` (`253L <= 280L`, `0 CRLF`).
-- `src/components/WebOrdersInboxView.jsx` — Vista dedicada `'Bandeja Web'` con filtros `Pendientes / Importados / Descartados`, sync pull, descarte, restauración e `'Importar a Venta'` (`257L <= 280L`, `0 CRLF`).
-- `src/components/FastManualSaleForm.jsx` (`339L <= 350L`) y `src/components/manual-sale/hooks/useRemoteSaleForm.js` (`343L <= 350L`) — Integración sin precarga sorpresiva y envío de `webOrderInboxId` / `webOrderNumber` (`0 CRLF`).
-- `src/components/Header.jsx` (`276L <= 280L`) y `src/App.jsx` (`395L <= 420L`) — Pestaña `'bandeja-web'` con contador de pendientes y enrutamiento `lazy` (`0 CRLF`).
-- `tests/sales/web-orders-import-ui.test.js` — Suite de verificación de mapeo, flujo transaccional S2S, UX sin precarga automática, ergonomía `>= 44px`, techos y `0 CRLF`.
-- `ARCHITECTURE.md`, `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-023` (`done`, `WIP = 0`, `0 CRLF`).
+- `server/services/sales/webOrderInboxService.js` — Orden cronológico `webCreatedAt DESC`, resolución multi-SKU (`sku`, `WEB-${posterId}`, `WEB-${legacyId}`), `extractStructuredCustomerFromNotes` y `deleteWebOrder` (`0 CRLF`).
+- `server/controllers/webOrderInboxController.js` y `server/routes/apiRoutes.js` — Endpoint `DELETE /api/sales/web-orders/:id` para `SUPER_ADMIN` y `VENDEDOR_REDES` (`0 CRLF`).
+- `src/components/WebOrdersInboxView.jsx` (`278L <= 280L`) y `src/App.jsx` (`394L <= 420L`) — Eliminación del bucle de refresco de `200ms` y botón `'Eliminar'` en pestaña `Descartados` (`0 CRLF`).
+- `src/components/manual-sale/hooks/useWebOrderImport.js` (`277L <= 280L`) — Extracción automática de nombre, dirección y departamento desde notas estructuradas (`0 CRLF`).
+- `tests/sales/web-orders-pipeline-hardening.test.js` — Suite de regresión y endurecimiento S2S (`4/4 PASS`, `0 CRLF`).
+- `feature_list.json`, `sprint-contract.md`, `progress.md` y `session-handoff.md` — Cierre certificado de `feat-024` (`done`, `WIP = 0`, `0 CRLF`).
 
 ## Verification Evidence
-- [x] Suites de Importación Web UI + Backend + Cirugías y Comisiones (`feat-023`): `node --test tests/sales/web-orders-import-ui.test.js tests/sales/web-orders-inbox-service.test.js tests/adversarial/surgery-059-ui-polish-header-order-sync-camera.test.js tests/adversarial/surgery-061-ui-shipping-clean-colors-custom-modal.test.js tests/sales/remote-sale-design-edition.test.js tests/commissions/commission-frontend.test.js` -> `Exit code 0 (98/98 PASS across 34 suites in 479.8ms)`
-- [x] Suites de Voz y VAD: `npm run test:voice` -> `Exit code 0 (53/53 PASS across 12 suites in 339.9ms)`
-- [x] Compuerta Unificada Deko Labs (`STAND-IA-UNIFIED-HARNESS`): `npm run harness:check` -> `status HARNESS_PASS (38.87s: check-architecture PASS, validate-harness 100/100, 203 secrets OK, 287 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1573 modules PASS)`
-- [x] Verificación Final en 3 Puertas (`sesion-034`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
+- [x] Suites S2S + Endurecimiento + UI + Paridad Decimal (`feat-021..024`): `node --test tests/sales/web-orders-pipeline-hardening.test.js tests/sales/web-orders-inbox-service.test.js tests/sales/web-orders-import-ui.test.js tests/sales/custom-decimal-pricing-parity.test.js` -> `Exit code 0 (34/34 PASS across 16 suites in 1097ms)`
+- [x] Compuerta Unificada Deko Labs (`STAND-IA-UNIFIED-HARNESS`): `npm run harness:check` -> `status HARNESS_PASS (39.03s: check-architecture PASS, validate-harness 100/100, 203 secrets OK, 288 JS syntax OK, 13/13 zero-trust, 265/265 unit tests across 109 suites PASS, vite build 1573 modules PASS)`
+- [x] Verificación Final en 3 Puertas (`sesion-035`): `bash ./init.sh` -> `Exit code 0 (CLEAN STATE, Overall: 100/100, 25/25 PASS)`; `bash scripts/check-architecture.sh` -> `Exit code 0`; `node scripts/validate-harness.mjs --min-score 100` -> `Overall: 100/100 (25/25 PASS, WIP = 0 <= 1)`
 
 ## Notes for Next Session
-1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..023` en `done`).
-2. Listo para desplegar cambios a producción (`prisma db push` aditivo para `web_order_inbox` + `WEB_ORDERS_WEBHOOK_SECRET` compartido con `decovintage.online`) cuando el usuario lo solicite.
+1. Repositorio en estado limpio (`WIP = 0`, `Overall: 100/100`; `feat-000..024` en `done`).
+2. Pipeline S2S entre `decovintage.online` y `ventas.decovintage.online` endurecido y verificado de extremo a extremo.

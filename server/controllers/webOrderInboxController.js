@@ -5,6 +5,7 @@ import {
   webOrderPayloadSchema,
 } from '../validators/webOrderValidators.js';
 import {
+  deleteWebOrder,
   discardWebOrder,
   ingestWebOrderWebhook,
   isWebOrderWebhookAuthorized,
@@ -164,6 +165,31 @@ export async function restoreWebOrderHandler(req, res) {
     return res.status(err.statusCode || 400).json({
       success: false,
       error: err.message || 'Error al restaurar el pedido web.',
+    });
+  }
+}
+
+export async function deleteWebOrderHandler(req, res) {
+  try {
+    const tenantId = req.tenantId;
+    const userId = req.user?.id || null;
+    const { id } = req.params;
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Contexto de empresa no válido.' });
+    }
+
+    const deleted = await deleteWebOrder({ tenantId, id, userId });
+    return res.status(200).json({
+      success: true,
+      message: `Pedido web #${deleted.orderNumber} eliminado definitivamente.`,
+      data: deleted,
+    });
+  } catch (err) {
+    console.error('❌ Error eliminando pedido web:', err);
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      error: err.message || 'Error al eliminar el pedido web.',
     });
   }
 }

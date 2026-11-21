@@ -92,6 +92,7 @@ import {
 
 import { handleCatalogWebhook } from '../controllers/catalogWebhookController.js';
 import {
+  deleteWebOrderHandler,
   discardWebOrderHandler,
   getWebOrdersInbox,
   handleWebOrderWebhook,
@@ -247,6 +248,11 @@ router.patch(
   '/sales/web-orders/:id/restore',
   requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
   restoreWebOrderHandler
+);
+router.delete(
+  '/sales/web-orders/:id',
+  requireRole(['SUPER_ADMIN', 'VENDEDOR_REDES']),
+  deleteWebOrderHandler
 );
 router.post(
   '/sales/:id/balance-payment',

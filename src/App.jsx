@@ -347,9 +347,9 @@ function SalesTerminalMain() {
                 setPendingWebOrderImport(order);
                 setActiveTab('venta');
               }}
-              onCountsChanged={(counts) => {
+              onCountsChanged={(counts, meta) => {
                 if (typeof counts?.pending === 'number') setPendingWebOrdersCount(counts.pending);
-                setWebOrdersRefreshKey((prev) => prev + 1);
+                if (meta?.mutated) setWebOrdersRefreshKey((prev) => prev + 1);
               }}
             />
           )}
